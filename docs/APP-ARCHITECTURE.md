@@ -196,97 +196,90 @@ fills in Codevibe defaults for anything unset:
 | Logo                        | PNG, JPEG or WebP, up to 512 KB, checked by its bytes. SVG is refused (scripts). Served from `/brand/<workspaceId>/logo` with `nosniff` and a sandbox CSP. |
 | Brand colour                | `#rrggbb`. Buttons on the signing page use it; text colour is picked for 4.5:1 contrast.                                                                   |
 | Font                        | `inter`, `space-grotesk`, `system`, `serif`.                                                                                                               |
-| Email sender name, reply-to | The `From` address stays the operator's, so SPF and DKIM keep passing.                                                                                     |
-| Email template overrides    | JSON of subject and intro text per mail kind; rendered through the server's `MailTemplates`.                                                               |
-| Signing-page custom domain  | Stored with a verification time; served once DNS is verified (signing lane).                                                                               |
-| Certificate footer          | A line printed on the certificate page.                                                                                                                    |
+| Email sender name, reply-to | The `From` address stays the operator's, so SPF and DKIM keep passing; only its display name changes.                                                      |
+| Email template overrides    | Subject and opening text per email (invite, reminder, completed, cancelled) with `{{variables}}`; sent through the server's `workspaceMail` hook.          |
+| Signing-page custom domain  | Stored, unique across workspaces, with a verification time that resets when it changes. Routing and TLS are deployment work (below).                       |
+| Certificate footer          | A line printed at the end of the certificate, through the server's `certificateNote` hook.                                                                 |
 | "Secured by Codevibe Sign"  | Badge on the signing page and in emails; on by default.                                                                                                    |
 
-This lane builds the logo, colour, font and sender name settings with a live preview of the
-signing-page header; the other columns exist and are filled in by later lanes.
+**Settings → Brand** has three cards: the look (logo, colour, font, with a preview of the
+signing-page header), emails (sender name, reply-to and the four templates with a live
+preview) and the signing page (badge, certificate footer, custom domain with its DNS record).
 
-## Personal settings
+### Branded emails
 
-Theme (`system`, `light`, `dark`), timezone (IANA name, default from the browser on first
-sign-in) and language (`en` for now). The theme is also kept in a `cvs_theme` cookie so the
-first paint is already in the right theme.
+`src/lib/mail-templates.ts` renders every recipient email from the brand: a header in the
+brand colour with the logo (as an absolute URL), the opening text, the sender's message, the
+button and a footer with the badge when it is on. It is pure and shared, so the settings page
+previews exactly what is sent; the preview is a sandboxed `iframe` (`sandbox=""`, no scripts).
+Overrides are plain text: every value, variable and override is HTML-escaped, line breaks are
+removed from subjects, and a variable an email does not offer is refused when saving, with the
+field named.
 
-## UI system
+| Variable             | Filled with                                      | In               |
+| -------------------- | ------------------------------------------------ | ---------------- |
+| `{{recipient_name}}` | The recipient's name                             | all              |
+| `{{document_title}}` | The envelope title                               | all              |
+| `{{company}}`        | Sender name, or the workspace name               | all              |
+| `{{action}}`         | `sign` or `approve`                              | invite, reminder |
+| `{{expires_on}}`     | Expiry date (`YYYY-MM-DD`), or empty             | invite, reminder |
+| `{{status}}`         | `was declined`, `has expired` or `was withdrawn` | cancelled        |
 
-- **Palette**: navy `#0D1B2A` for structure (sidebar, headings, table headers), blue
-  `#1B6AE0` for actions and focus, teal `#2DD4BF` as the accent (active nav, success, the
-  brand mark). Surfaces are tinted (`#F4F6FA` canvas, white cards with a visible border), so
-  nothing is white on white. Dark mode uses a navy canvas and lifted navy cards.
-- **Type**: Space Grotesk for headings, Inter for body, both self-hosted at build time by
-  `next/font`.
-- **Tokens**: CSS variables on `:root` and `[data-theme=dark]`, exposed to Tailwind v4 with
-  `@theme`. Components use tokens only (`bg-surface`, `text-muted`, `border-line`), never raw
-  colours, so dark mode and later re-theming are one file.
-- **Primitives**: Radix for dialogs, dropdown menus, selects, tabs and tooltips (focus
-  management, keyboard, ARIA). Our wrappers live in `src/components/ui`.
-- **Layout**: a navy sidebar with the workspace switcher and the four sections, a top bar with
-  the page title, primary action and the user menu. Below 768 px the sidebar becomes a drawer;
-  everything works at 390 px wide.
-- **Feedback**: toasts for results, inline field errors for validation, empty states that
-  say what to do next, and error pages that offer a way back.
-- **Accessibility**: WCAG 2.2 AA contrast in both themes, visible focus rings, labels on every
-  control, reduced motion respected.
+`src/server/sign/mail.ts` turns the brand into the sign server's `workspaceMail(workspaceId)`
+answer: templates, `fromName` (sender name or workspace name) and `replyTo`. Envelopes in the
+`default` workspace (API keys without a workspace) keep the server's own templates. One-time
+code emails still use the server's plain template.
 
-## Folder layout
+### Custom signing domains
 
-```
-apps/web/src
-├─ app/                     routes only: pages, layouts, route handlers
-│  ├─ (auth)/sign-in        magic link + Google
-│  ├─ onboarding            create the first workspace
-│  ├─ invite/[token]        accept an invitation
-│  ├─ w/[slug]/             the workspace shell: dashboard, envelopes, templates, settings
-│  ├─ sign/                 signing page (signing lane)
-│  ├─ brand/[workspaceId]/logo   public logo file
-│  └─ api/                  auth, v1, sign, health
-├─ components/{ui,shell,settings}
-├─ lib/                     shared by server and client: roles, brand colours, preferences
-├─ server/                  server only ('server-only')
-│  ├─ env.ts, db.ts, runtime.ts, migrate.ts, db/migrations.ts
-│  ├─ auth/                 Better Auth config and instance, session, page guards
-│  ├─ actions/              server actions, one file per area, all through action.ts
-│  ├─ workspaces.ts, members.ts, invitations.ts, brand.ts, api-keys.ts, preferences.ts
-│  ├─ sign/                 the mounted sign server, principal resolver, in-process client
-│  └─ mail.ts               app mail (magic links, invitations)
-├─ instrumentation.ts       migrations on start and the tick timer
-└─ proxy.ts                 redirects visitors without a session cookie
-```
+Saving a domain stores it (lower case, unique across workspaces) and shows the CNAME record to
+add: the domain pointing at the app's host. Nothing serves it yet. To turn one on, the
+operator:
 
-## Sending and tracking
+1. checks the CNAME resolves to the app host and sets `signing_domain_verified_at`;
+2. adds the domain to the reverse proxy with a certificate (for example Caddy on-demand TLS
+   asking an allow-list endpoint, or a certificate per domain), proxying to the same app;
+3. makes signing links for that workspace use it, by giving `createSignServer` a
+   `signingUrl` that looks the workspace up, and lets `/api/sign/*`, `/api/v1/sign/*`,
+   `/sign` and `/brand/*` through on that host only.
 
-| Screen         | Route                                      | Talks to                                                                                                    |
-| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Dashboard      | `/w/[slug]`                                | SQL over `sign_envelopes` and `sign_audit_events` (`src/server/envelopes.ts`): counts, your turn, activity. |
-| Envelopes      | `/w/[slug]/envelopes`                      | First page server-side, then the browser calls `GET /api/v1/envelopes` with `X-Workspace`.                  |
-| Send (stepper) | `/w/[slug]/envelopes/new`                  | Browser: `POST`, `PATCH` and `/send` on `/api/v1/envelopes`; `?draft=<id>` reopens a draft.                 |
-| Envelope       | `/w/[slug]/envelopes/[id]`                 | In-process `signApi()`: envelope, events, certificate, seal verification.                                   |
-| Downloads      | `.../documents/[docId]`, `.../certificate` | Route handlers that check membership, then proxy the API in-process.                                        |
-| Verify         | `/w/[slug]/verify`                         | Server action: `verify()` from `sign-pdf` against this install's seal certificate.                          |
+Cookies are host-only, so the whole signing session has to stay on the domain the link was
+opened on. Today the link route redirects to `signingPageUrl`, which is the app URL; serving a
+custom domain also needs that redirect to go to `/sign` on the host the request came in on.
 
-- **Drafts** are created on the server when the sender leaves the recipients step (the API needs
-  someone to send to); after that every change is sent as a `PATCH` a second after it is made.
-  Documents cannot change once the draft exists.
-- **Checking uploads**: each PDF goes to a server action that runs `inspectPdf` first, so size,
-  password protection and damage are reported at upload with a sentence on how to fix them.
-  Server actions and the request proxy accept 21 MB bodies for this (`next.config.ts`).
-- **Who may void**: members void the envelopes they sent from the app, admins and owners any.
-  The sender is recorded in `app_envelope_senders` (migration `app/0003_envelope_senders`)
-  when a session call creates an envelope; envelopes created with an API key have no sender, so
-  only admins void them. The rule is enforced in the server actions and, for browser calls to
-  `/api/v1/.../void`, in the principal resolver.
-- **Reminders**: `POST /v1/envelopes/:id/remind` mails a fresh link to whoever's turn it is, at
-  most every 15 minutes per person. A recipient who is a member may ask for their own link
-  again from the dashboard whatever their role.
+## Signing
+
+The person signing never signs in. Their link is `${APP_URL}/api/sign/<token>`, which puts
+the token in an HttpOnly cookie for `/api/v1/sign` and redirects to `/sign`.
+
+| Step           | What the page does                                                                                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open           | `GET /api/v1/sign/link`; then `GET /brand/<workspaceId>/signing` for the header (public, like the logo: name, logo, colour, font, badge).                                     |
+| Not their turn | `canAct` is false: says someone else signs first and that an email will follow.                                                                                               |
+| Code           | OTP recipients ask for a code (`POST link/otp`), type it (`link/otp/verify`); wrong, expired and locked codes each say what to do next.                                       |
+| Consent        | Who asks, the title, the sender's message, the documents; the signer must tick the agreement to sign electronically. Continuing posts `link/view`.                            |
+| Document       | `SigningView` from `sign-react` with the PDFs from `link/documents/<id>`, "Next field", a required-field counter, Finish (Approve for approvers), Decline with a reason.      |
+| Thank you      | After submit, polls `GET /api/v1/sign/receipt` (3 s while sealing, 15 s while others sign, 10 minutes at most) and offers "Download your copy" once every document is sealed. |
+
+- **Dead links**: a link that is used, expired, withdrawn, declined or complete redirects to
+  `/sign?state=<why>&w=<workspaceId>`, and the page explains it in the sender's brand. If the
+  cookie is gone but this browser signed earlier, the receipt cookie takes the signer back to
+  the thank-you page.
+- **SMS**: codes go out by email only (`mailOtpSender`). `SMS_CODES` in
+  `src/server/sign/server.ts` is false, so recipients set to SMS see that text messages are not
+  available here and are asked to have it sent to their email.
+- **Brand on the page**: the header takes the brand colour and logo; the colour also drives
+  buttons and focus rings through the `--primary` tokens, so the page keeps following the
+  light or dark theme. The "Secured by Codevibe Sign" badge shows unless the workspace turned
+  it off.
+- **Layout**: one column from 390 px up; headings take focus when the step changes; every
+  control has a label; errors are announced.
 
 ## Extension points for the next lanes
 
-| Lane                       | Starts from                                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Signing pages and branding | `app/sign/page.tsx`; `getBrand()`; `brand` columns; per-workspace mail templates via `MailTemplates`.                 |
-| Templates and bulk send    | `app/w/[slug]/templates/page.tsx`; `@codevibe_technology/sign-templates`; a `app_templates` table keyed by workspace. |
-| Webhooks UI                | `webhookTargets()` in `src/server/sign/webhooks.ts` reads an `app_webhooks` table (to add).                           |
+| Lane                    | Starts from                                                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Custom signing domains  | `signing_domain` and `signing_domain_verified_at`; the steps under Custom signing domains.                            |
+| SMS codes               | An `OtpSender` for SMS in `src/server/sign/server.ts`, then `SMS_CODES = true`.                                       |
+| Templates and bulk send | `app/w/[slug]/templates/page.tsx`; `@codevibe_technology/sign-templates`; a `app_templates` table keyed by workspace. |
+| Webhooks UI             | `webhookTargets()` in `src/server/sign/webhooks.ts` reads an `app_webhooks` table (to add).                           |
