@@ -23,7 +23,10 @@ export async function run(deps: RunDeps): Promise<void> {
   const error = deps.error ?? console.error;
 
   const config = loadConfig(env);
-  const running = await start(config.server, config.trustProxy ? { trustProxy: true } : {});
+  const running = await start(
+    config.server,
+    config.trustProxy ? { trustProxy: true, trustedProxyHops: config.trustedProxyHops } : {},
+  );
   await running.listen(config.port, config.host);
   log(`Codevibe Sign listening on ${config.host}:${config.port}`);
 

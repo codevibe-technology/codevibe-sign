@@ -76,6 +76,11 @@ export interface SignServerOptions {
   /** Read the client IP from `X-Forwarded-For`. Only enable behind a proxy you control. */
   trustProxy?: boolean;
   /**
+   * How many proxies you control sit in front of the server, each appending to
+   * `X-Forwarded-For`. The client IP is taken that many entries from the right. Default 1.
+   */
+  trustedProxyHops?: number;
+  /**
    * `await` (default) runs emails, webhooks and sealing before the response is sent; failures
    * are retried by `tick()`. `background` returns first and runs them afterwards.
    */

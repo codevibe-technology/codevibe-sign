@@ -62,7 +62,7 @@ export function signerRoutes(rt: Runtime) {
 
   async function resolve(c: Context): Promise<SignerContext> {
     const now = rt.clock.now();
-    const ip = clientIp(c, rt.trustProxy);
+    const ip = clientIp(c, rt);
     await enforce(rt.limiter, `ip:${ip}`, rt.limits.ipRequestsPerMinute, 60_000, now);
     const tokenHash = hashToken(c.req.param('token') ?? '');
     await enforce(rt.limiter, `token:${tokenHash}`, rt.limits.signerRequestsPerMinute, 60_000, now);
@@ -93,7 +93,7 @@ export function signerRoutes(rt: Runtime) {
   const deps = { clock: rt.clock };
   const context = (c: Context): AuditContext => {
     const ua = userAgent(c);
-    return { ip: clientIp(c, rt.trustProxy), ...(ua ? { userAgent: ua } : {}) };
+    return { ip: clientIp(c, rt), ...(ua ? { userAgent: ua } : {}) };
   };
 
   app.get('/:token', async (c) => {
@@ -127,13 +127,7 @@ export function signerRoutes(rt: Runtime) {
       FIFTEEN_MINUTES,
       now,
     );
-    await enforce(
-      rt.limiter,
-      `otp-send-ip:${clientIp(c, rt.trustProxy)}`,
-      sends * 4,
-      FIFTEEN_MINUTES,
-      now,
-    );
+    await enforce(rt.limiter, `otp-send-ip:${clientIp(c, rt)}`, sends * 4, FIFTEEN_MINUTES, now);
 
     const issued = createOtp(rt.random, rt.clock);
     await rt.store.putOtp({
@@ -157,13 +151,7 @@ export function signerRoutes(rt: Runtime) {
     const { envelope, recipient } = signer;
     if (!signer.otpRequired) throw validation('This signing link does not use a one-time code');
     const now = rt.clock.now();
-    await enforce(
-      rt.limiter,
-      `otp-verify-ip:${clientIp(c, rt.trustProxy)}`,
-      30,
-      FIFTEEN_MINUTES,
-      now,
-    );
+    await enforce(rt.limiter, `otp-verify-ip:${clientIp(c, rt)}`, 30, FIFTEEN_MINUTES, now);
     const body = parseJsonObject(await readJson(c));
     const code = typeof body.code === 'string' ? body.code.trim() : '';
 

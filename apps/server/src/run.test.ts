@@ -97,7 +97,7 @@ describe('run', () => {
     const fake = memoryStart();
     const d = deps(fake.start, { TRUST_PROXY: 'true' });
     await run(d);
-    expect(fake.calls[0]?.overrides).toEqual({ trustProxy: true });
+    expect(fake.calls[0]?.overrides).toEqual({ trustProxy: true, trustedProxyHops: 1 });
     await fake.close();
   });
 

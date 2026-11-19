@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { Hono } from 'hono';
 import { authenticate, normalizeApiKeys } from './auth';
+import { clientIp, type ProxyTrust } from './client';
 import { memoryRateLimiter } from './rate-limit';
 import { issueSession, verifySession } from './session';
 
@@ -68,5 +70,37 @@ describe('signer sessions', () => {
     expect(verifySession('secret', `${payload}`, 'hash-a', now)).toBe(false);
     expect(verifySession('secret', `${value}.x`, 'hash-a', now)).toBe(false);
     expect(verifySession('secret', undefined, 'hash-a', now)).toBe(false);
+  });
+});
+
+describe('clientIp', () => {
+  async function ipFor(forwarded: string | undefined, proxy: ProxyTrust): Promise<string> {
+    const app = new Hono();
+    app.get('/', (c) => c.text(clientIp(c, proxy)));
+    const env = { incoming: { socket: { remoteAddress: '10.0.0.5' } } };
+    const headers: Record<string, string> = forwarded ? { 'x-forwarded-for': forwarded } : {};
+    return (await app.request('/', { headers }, env)).text();
+  }
+
+  it('uses the socket address unless the proxy is trusted', async () => {
+    expect(await ipFor('203.0.113.9', { trustProxy: false, trustedProxyHops: 1 })).toBe('10.0.0.5');
+  });
+
+  it('takes the entry the trusted proxy added, not one the client sent', async () => {
+    const one = { trustProxy: true, trustedProxyHops: 1 };
+    expect(await ipFor('203.0.113.9', one)).toBe('203.0.113.9');
+    expect(await ipFor('1.2.3.4, 203.0.113.9', one)).toBe('203.0.113.9');
+    expect(await ipFor('1.2.3.4, 203.0.113.9', { trustProxy: true, trustedProxyHops: 2 })).toBe(
+      '1.2.3.4',
+    );
+    expect(
+      await ipFor('6.6.6.6, 1.2.3.4, 198.51.100.7', { trustProxy: true, trustedProxyHops: 2 }),
+    ).toBe('1.2.3.4');
+  });
+
+  it('falls back to the socket address for missing or malformed entries', async () => {
+    const one = { trustProxy: true, trustedProxyHops: 1 };
+    expect(await ipFor(undefined, one)).toBe('10.0.0.5');
+    expect(await ipFor('1.2.3.4, not-an-ip', one)).toBe('10.0.0.5');
   });
 });

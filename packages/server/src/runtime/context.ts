@@ -42,6 +42,7 @@ export interface Runtime {
   sessionSecret: string;
   tokenTtlMs: number;
   trustProxy: boolean;
+  trustedProxyHops: number;
   effects: 'await' | 'background';
   /** Background job runs still going, so shutdown can wait for them. */
   inflight: Set<Promise<unknown>>;
@@ -57,6 +58,14 @@ const DEFAULT_LIMITS: Required<Limits> = {
   otpSendsPer15Minutes: 5,
   maxAttachmentBytes: 10 * 1024 * 1024,
 };
+
+function proxyHops(value: number | undefined): number {
+  const hops = value ?? 1;
+  if (!Number.isInteger(hops) || hops < 1 || hops > 20) {
+    throw new Error('trustedProxyHops must be a whole number from 1 to 20');
+  }
+  return hops;
+}
 
 export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runtime {
   const publicUrl = options.publicUrl.replace(/\/+$/, '');
@@ -92,6 +101,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     sessionSecret: options.sessionSecret ?? randomBytes(32).toString('hex'),
     tokenTtlMs: (options.tokenTtlDays ?? 30) * 86_400_000,
     trustProxy: options.trustProxy ?? false,
+    trustedProxyHops: proxyHops(options.trustedProxyHops),
     effects: options.effects ?? 'await',
     inflight: new Set(),
   };
