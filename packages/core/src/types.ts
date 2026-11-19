@@ -60,6 +60,12 @@ export interface FieldValue {
   value: string;
 }
 
+export interface PageSize {
+  /** PDF points. */
+  width: number;
+  height: number;
+}
+
 export interface Document {
   id: Id;
   name: string;
@@ -68,6 +74,8 @@ export interface Document {
   pageCount: number;
   /** Key in the FileStore. */
   fileKey: string;
+  /** Size of each page, in page order. When present, fields are checked against these bounds. */
+  pageSizes?: PageSize[];
 }
 
 export interface Recipient {
@@ -82,6 +90,11 @@ export interface Recipient {
   status: RecipientStatus;
   declineReason?: string;
   actedAt?: IsoDateTime;
+  /** When the invitation was issued; reminders count from here. */
+  notifiedAt?: IsoDateTime;
+  viewedAt?: IsoDateTime;
+  remindersSent?: number;
+  lastRemindedAt?: IsoDateTime;
 }
 
 export interface ReminderPolicy {
@@ -147,15 +160,23 @@ export interface AuditEvent {
   hash: string;
 }
 
+/** An audit event before it is placed in the hash chain. */
+export type PendingAuditEvent = Omit<AuditEvent, 'seq' | 'prevHash' | 'hash'>;
+
 /** Something the caller must do after a transition (core never does I/O). */
 export type Effect =
-  | { kind: 'notify'; recipientId: Id; reason: 'invite' | 'reminder' | 'completed_copy' }
+  | {
+      kind: 'notify';
+      recipientId: Id;
+      /** `cancelled` tells recipients already invited that the envelope was declined or voided. */
+      reason: 'invite' | 'reminder' | 'completed_copy' | 'cancelled';
+    }
   | { kind: 'webhook'; event: AuditAction; envelopeId: Id }
   | { kind: 'seal'; envelopeId: Id };
 
 export interface TransitionResult {
   envelope: Envelope;
-  events: Omit<AuditEvent, 'seq' | 'prevHash' | 'hash'>[];
+  events: PendingAuditEvent[];
   effects: Effect[];
 }
 
