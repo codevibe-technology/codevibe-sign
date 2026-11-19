@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
+import { sha256Hex } from '../crypto';
 import { authenticate, normalizeApiKeys } from './auth';
 import { clientIp, type ProxyTrust } from './client';
 import { memoryRateLimiter } from './rate-limit';
@@ -25,6 +26,28 @@ describe('authenticate', () => {
   it('refuses short or missing keys at start-up', () => {
     expect(() => normalizeApiKeys([])).toThrow();
     expect(() => normalizeApiKeys(['short'])).toThrow(/too short/);
+    expect(() => normalizeApiKeys([{ id: 'ops', sha256: 'abc' }])).toThrow(/64 hex/);
+  });
+
+  it('keeps only hashes of the keys', () => {
+    const stored = normalizeApiKeys([
+      'first-key-0123456789',
+      { id: 'ops', key: 'second-key-0123456789' },
+    ]);
+    const kept = JSON.stringify(
+      stored.map((key) => ({ ...key, sha256: key.sha256.toString('latin1') })),
+    );
+    expect(kept).not.toContain('first-key');
+    expect(kept).not.toContain('second-key');
+    expect(stored[1]?.sha256.toString('hex')).toBe(sha256Hex('second-key-0123456789'));
+  });
+
+  it('accepts keys configured as their SHA-256', () => {
+    const hashed = normalizeApiKeys([
+      { id: 'ci', sha256: sha256Hex('third-key-0123456789').toUpperCase() },
+    ]);
+    expect(authenticate('Bearer third-key-0123456789', hashed)).toBe('ci');
+    expect(() => authenticate(`Bearer ${sha256Hex('third-key-0123456789')}`, hashed)).toThrow();
   });
 });
 

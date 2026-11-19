@@ -14,9 +14,9 @@ import { randomBytes } from 'node:crypto';
 import { nodeHasher } from '../crypto';
 import type { PdfEngine } from '../engine';
 import { consoleLogger, type Logger } from '../errors';
-import { normalizeApiKeys } from '../http/auth';
+import { normalizeApiKeys, type StoredApiKey } from '../http/auth';
 import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
-import type { ApiKey, Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
+import type { Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
 import type { ServerStore } from '../store/types';
 import { defaultTemplates, type MailTemplates } from '../templates';
 
@@ -36,7 +36,7 @@ export interface Runtime {
   limits: Required<Limits>;
   webhooks: WebhookTarget[];
   templates: MailTemplates;
-  apiKeys: ApiKey[];
+  apiKeys: StoredApiKey[];
   sealer: Required<SealerOptions>;
   signingUrl: (token: string) => string;
   sessionSecret: string;

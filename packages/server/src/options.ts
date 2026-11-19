@@ -13,11 +13,21 @@ import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore } from './store/types';
 import type { MailTemplates } from './templates';
 
-export interface ApiKey {
-  /** Shown in logs and used to scope idempotency keys and rate limits. Never the secret. */
-  id: string;
-  key: string;
-}
+/**
+ * A sender credential: the secret itself, or its SHA-256 (hex) so the plain key never has to be
+ * in the server's configuration. Either way the server keeps only the hash.
+ */
+export type ApiKey =
+  | {
+      /** Shown in logs and used to scope idempotency keys and rate limits. Never the secret. */
+      id: string;
+      key: string;
+    }
+  | {
+      id: string;
+      /** `sha256(key)` as 64 hex characters, for example from `printf %s "$KEY" | sha256sum`. */
+      sha256: string;
+    };
 
 export interface SealerOptions {
   /** PKCS#12 file with the operator certificate and private key. */

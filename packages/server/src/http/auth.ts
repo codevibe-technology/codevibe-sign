@@ -1,33 +1,49 @@
-import { constantTimeEqual, sha256Hex } from '../crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { sha256Hex } from '../crypto';
 import { HttpError } from '../errors';
 import type { ApiKey } from '../options';
 
-export function normalizeApiKeys(keys: (ApiKey | string)[]): ApiKey[] {
+/** A configured key as the server keeps it: only the SHA-256 of the secret. */
+export interface StoredApiKey {
+  id: string;
+  sha256: Buffer;
+}
+
+const MIN_KEY_LENGTH = 16;
+
+/** Hashes every plain key at start-up, so the secrets themselves are not kept in memory. */
+export function normalizeApiKeys(keys: (ApiKey | string)[]): StoredApiKey[] {
   if (keys.length === 0) throw new Error('At least one API key is required');
   return keys.map((entry) => {
-    const key =
-      typeof entry === 'string'
-        ? { id: `key_${sha256Hex(entry).slice(0, 12)}`, key: entry }
-        : entry;
-    if (key.key.length < 16)
-      throw new Error(`API key ${key.id} is too short (16 characters minimum)`);
-    return key;
+    if (typeof entry === 'string' || 'key' in entry) {
+      const secret = typeof entry === 'string' ? entry : entry.key;
+      const id = typeof entry === 'string' ? `key_${sha256Hex(secret).slice(0, 12)}` : entry.id;
+      if (secret.length < MIN_KEY_LENGTH) {
+        throw new Error(`API key ${id} is too short (${MIN_KEY_LENGTH} characters minimum)`);
+      }
+      return { id, sha256: createHash('sha256').update(secret).digest() };
+    }
+    if (!/^[0-9a-f]{64}$/i.test(entry.sha256)) {
+      throw new Error(`API key ${entry.id} needs sha256 as 64 hex characters`);
+    }
+    return { id: entry.id, sha256: Buffer.from(entry.sha256, 'hex') };
   });
 }
 
 /**
- * Returns the id of the key in `Authorization: Bearer <key>`. Every configured key is
- * compared, in constant time, so timing does not reveal which keys exist.
+ * Returns the id of the key in `Authorization: Bearer <key>`. The presented key is hashed and
+ * compared with every configured hash in constant time, so timing reveals neither which keys
+ * exist nor how much of one matched.
  */
-export function authenticate(header: string | undefined, keys: ApiKey[]): string {
+export function authenticate(header: string | undefined, keys: StoredApiKey[]): string {
   const match = /^Bearer\s+(\S+)\s*$/i.exec(header ?? '');
   if (!match?.[1]) {
     throw new HttpError('UNAUTHORIZED', 'Send an API key as Authorization: Bearer <key>');
   }
-  const presented = match[1];
+  const presented = createHash('sha256').update(match[1]).digest();
   let found: string | undefined;
   for (const key of keys) {
-    if (constantTimeEqual(presented, key.key) && found === undefined) found = key.id;
+    if (timingSafeEqual(presented, key.sha256) && found === undefined) found = key.id;
   }
   if (found === undefined) throw new HttpError('UNAUTHORIZED', 'The API key is not valid');
   return found;
