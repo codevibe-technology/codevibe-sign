@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import * as api from './index';
 import { listen, startSignServer } from './node';
 import { harness } from './testing/harness';
-import { makePdf } from './testing/real-pdf';
+import { makeP12, makePdf } from './testing/real-pdf';
 
 describe('listen', () => {
   it('serves the app over HTTP', async () => {
@@ -57,7 +57,7 @@ describe.skipIf(!url)('startSignServer on PostgreSQL', () => {
         databaseUrl: withSchema.toString(),
         filesDir: files,
         smtp: { host: '127.0.0.1', port: 2525, secure: false, from: 'Sign <sign@example.com>' },
-        seal: { p12: new Uint8Array([1]), passphrase: '' },
+        seal: { p12: makeP12('Node Test Seal', 'node-pass'), passphrase: 'node-pass' },
         apiKeys: ['k'.repeat(32)],
         publicUrl: 'http://localhost:3000',
         tickIntervalMs: 50,
@@ -88,5 +88,5 @@ describe.skipIf(!url)('startSignServer on PostgreSQL', () => {
       await admin.end();
       await rm(files, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });
