@@ -9,3 +9,11 @@ export { seal } from './seal';
 export type { SealOptions } from './seal';
 export { verifySeal } from './verify';
 export type { SealSigner, SealVerification } from './verify';
+export { verify, sealCertificate } from './trust';
+export type {
+  SealCertificate,
+  VerifyFailure,
+  VerifyOptions,
+  VerifyResult,
+  VerifyTrust,
+} from './trust';
