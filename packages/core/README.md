@@ -141,6 +141,7 @@ All take `{ clock }` and return `TransitionResult` (`{ envelope, events, effects
 | `submit(envelope, { recipientId, values, context? }, deps)`   | Signers sign, approvers approve. Completes when all have acted. |
 | `decline(envelope, { recipientId, reason, context? }, deps)`  | Stops the envelope for everyone.                                |
 | `voidEnvelope(envelope, { reason, context? }, deps)`          | Sender withdraws it.                                            |
+| `remind(envelope, { recipientId?, context? }, deps)`          | Sender nudges whoever's turn it is, at most every 15 minutes.   |
 | `tick(envelope, now)`                                         | Sends due reminders or expires the envelope. Idempotent.        |
 | `recordSeal(envelope, { documentId, sha256 }, deps)`          | Logs `document.sealed` after the server seals a file.           |
 

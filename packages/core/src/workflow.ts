@@ -50,6 +50,15 @@ export interface VoidInput {
   context?: AuditContext;
 }
 
+export interface RemindInput {
+  /** One recipient to remind; without it, everyone whose turn it is. */
+  recipientId?: Id;
+  context?: AuditContext;
+}
+
+/** The shortest gap between two reminders to the same recipient, so a sender cannot flood them. */
+export const MIN_REMINDER_INTERVAL_MS = 15 * 60_000;
+
 export interface SealInput {
   documentId: Id;
   /** SHA-256 hex of the sealed file. */
@@ -418,6 +427,60 @@ export function voidEnvelope(
   const t = new Transition({ ...envelope, status: 'voided' }, now.toISOString());
   t.event('envelope.voided', { context: input.context, data: { reason } });
   notifyCancelled(t);
+  return t.result();
+}
+
+/**
+ * The sender reminds recipients whose turn it is, each with a fresh signing link. Recipients
+ * invited or reminded in the last `MIN_REMINDER_INTERVAL_MS` are skipped; naming one of them
+ * is refused. Manual reminders do not use up the automatic ones.
+ */
+export function remind(
+  envelope: Envelope,
+  input: RemindInput,
+  deps: WorkflowDeps,
+): TransitionResult {
+  const now = deps.clock.now();
+  assertOpen(envelope, now);
+  const current = currentRecipients(envelope);
+  let targets = current;
+  if (input.recipientId !== undefined) {
+    const recipient = findRecipient(envelope, input.recipientId);
+    if (!isActor(recipient) || hasActed(recipient)) {
+      throw new SignError('INVALID_STATE', `${recipient.name} has nothing left to do`, {
+        recipientId: recipient.id,
+        status: recipient.status,
+      });
+    }
+    if (!current.some((r) => r.id === recipient.id)) {
+      throw new SignError('NOT_YOUR_TURN', `${recipient.name} has not been invited yet`, {
+        recipientId: recipient.id,
+      });
+    }
+    targets = [recipient];
+  }
+  const due = targets.filter((r) => {
+    const last = r.lastRemindedAt ?? r.notifiedAt;
+    return !last || now.getTime() - Date.parse(last) >= MIN_REMINDER_INTERVAL_MS;
+  });
+  if (due.length === 0) {
+    const minutes = MIN_REMINDER_INTERVAL_MS / 60_000;
+    throw new SignError(
+      'INVALID_STATE',
+      `A link was sent less than ${minutes} minutes ago. Try again later.`,
+      { retryAfterMinutes: minutes },
+    );
+  }
+  const t = new Transition(envelope, now.toISOString());
+  for (const recipient of due) {
+    t.updateRecipient(recipient.id, { lastRemindedAt: t.at });
+    t.event('recipient.reminded', {
+      recipientId: recipient.id,
+      context: input.context,
+      data: { manual: true },
+    });
+    t.notify(recipient.id, 'reminder');
+  }
   return t.result();
 }
 
