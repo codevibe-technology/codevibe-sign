@@ -246,6 +246,10 @@ export function markAuthenticated(
   return t.result();
 }
 
+/**
+ * The recipient's values after this submission: what they sent, on top of what the sender
+ * prefilled. Read-only fields keep the sender's value.
+ */
 function collectValues(
   envelope: Envelope,
   recipient: Recipient,
@@ -255,7 +259,10 @@ function collectValues(
   const own = new Map(
     envelope.fields.filter((f) => f.recipientId === recipient.id).map((f) => [f.id, f]),
   );
-  const stored = new Map<Id, string>();
+  const stored = new Map<Id, string>(
+    envelope.values.filter((v) => own.has(v.fieldId)).map((v) => [v.fieldId, v.value]),
+  );
+  const seen = new Set<Id>();
   const invalid: { fieldId: Id; problem: string }[] = [];
 
   for (const { fieldId, value } of submitted) {
@@ -270,17 +277,29 @@ function collectValues(
         },
       );
     }
-    if (stored.has(fieldId)) {
+    if (seen.has(fieldId)) {
       invalid.push({ fieldId, problem: 'Value given more than once' });
       continue;
     }
+    seen.add(fieldId);
     if (typeof value !== 'string') {
       invalid.push({ fieldId, problem: 'Value must be a string' });
       continue;
     }
     const checked = checkFieldValue(field.type, value);
-    if (checked.ok) stored.set(fieldId, checked.value);
-    else invalid.push({ fieldId, problem: checked.problem });
+    if (!checked.ok) {
+      invalid.push({ fieldId, problem: checked.problem });
+      continue;
+    }
+    if (field.readOnly) {
+      // Echoing the sender's value back is harmless; changing it is not allowed.
+      if (checked.value === (stored.get(fieldId) ?? '')) continue;
+      throw new SignError('FIELD_NOT_YOURS', 'This field is filled in by the sender', {
+        fieldId,
+        readOnly: true,
+      });
+    }
+    stored.set(fieldId, checked.value);
   }
   if (invalid.length > 0) {
     throw new SignError('INVALID_FIELD_VALUE', invalid[0]!.problem, { fields: invalid });
@@ -329,14 +348,14 @@ export function submit(
 
   const at = now.toISOString();
   const values = collectValues(envelope, recipient, input.values, at.slice(0, 10));
+  const ownFields = new Set(
+    envelope.fields.filter((f) => f.recipientId === recipient.id).map((f) => f.id),
+  );
   const t = new Transition(
     {
       ...envelope,
       status: 'in_progress',
-      values: [
-        ...envelope.values.filter((v) => !values.some((n) => n.fieldId === v.fieldId)),
-        ...values,
-      ],
+      values: [...envelope.values.filter((v) => !ownFields.has(v.fieldId)), ...values],
     },
     at,
   );

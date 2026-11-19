@@ -5,6 +5,7 @@ import type {
   Envelope,
   Field,
   FieldType,
+  FieldValue,
   Id,
   IsoDateTime,
   PageSize,
@@ -17,8 +18,11 @@ import type {
 } from './types';
 import { SignError } from './types';
 import {
+  checkFieldValue,
   fail,
+  isFilled,
   MAX_NAME_LENGTH,
+  PREFILLABLE_FIELD_TYPES,
   pageSizeIssues,
   rectIssues,
   recipientIssues,
@@ -75,6 +79,8 @@ export interface FieldInput {
   /** Defaults to true. */
   required?: boolean;
   label?: string;
+  /** The sender prefills it and the recipient cannot change it. Text, name and checkbox only. */
+  readOnly?: boolean;
 }
 
 export interface FieldMove {
@@ -166,7 +172,20 @@ function fieldIssues(
       issues.push(...rectIssues(field.rect, document.pageSizes?.[field.page], `${path}.rect`));
     }
   }
+  if (field.readOnly && !PREFILLABLE_FIELD_TYPES.includes(field.type)) {
+    issues.push({
+      path: `${path}.readOnly`,
+      message: `Only ${PREFILLABLE_FIELD_TYPES.join(', ')} fields can be read-only`,
+    });
+  }
   return issues;
+}
+
+/** Drops values whose field no longer exists. */
+function withoutOrphanValues(envelope: Envelope): Envelope {
+  const ids = new Set(envelope.fields.map((f) => f.id));
+  const values = envelope.values.filter((v) => ids.has(v.fieldId));
+  return values.length === envelope.values.length ? envelope : { ...envelope, values };
 }
 
 export function createEnvelope(
@@ -267,11 +286,11 @@ export function removeDocument(envelope: Envelope, documentId: Id): Envelope {
   if (!envelope.documents.some((d) => d.id === documentId)) {
     fail(`documents.${documentId}`, 'Document not found in this envelope');
   }
-  return {
+  return withoutOrphanValues({
     ...envelope,
     documents: envelope.documents.filter((d) => d.id !== documentId),
     fields: envelope.fields.filter((f) => f.documentId !== documentId),
-  };
+  });
 }
 
 function defaultOrder(envelope: Envelope, role: RecipientRole): number {
@@ -349,11 +368,11 @@ export function updateRecipient(
 export function removeRecipient(envelope: Envelope, recipientId: Id): Envelope {
   assertDraft(envelope);
   findRecipient(envelope, recipientId);
-  return {
+  return withoutOrphanValues({
     ...envelope,
     recipients: envelope.recipients.filter((r) => r.id !== recipientId),
     fields: envelope.fields.filter((f) => f.recipientId !== recipientId),
-  };
+  });
 }
 
 export function addField(
@@ -370,6 +389,7 @@ export function addField(
     rect: { ...input.rect },
     required: input.required ?? true,
     ...(input.label !== undefined && { label: input.label }),
+    ...(input.readOnly === true && { readOnly: true }),
   };
   throwIf(fieldIssues(envelope, draft, 'field'));
   const field: Field = { id: deps.ids.id(), ...draft };
@@ -392,7 +412,89 @@ export function moveField(envelope: Envelope, fieldId: Id, to: FieldMove): Envel
 export function removeField(envelope: Envelope, fieldId: Id): Envelope {
   assertDraft(envelope);
   findField(envelope, fieldId);
-  return { ...envelope, fields: envelope.fields.filter((f) => f.id !== fieldId) };
+  return withoutOrphanValues({
+    ...envelope,
+    fields: envelope.fields.filter((f) => f.id !== fieldId),
+  });
+}
+
+function prefillIssues(field: Field | undefined, path: string): ValidationIssue[] {
+  if (!field) return [{ path, message: 'Field not found in this envelope' }];
+  if (!PREFILLABLE_FIELD_TYPES.includes(field.type)) {
+    return [
+      {
+        path,
+        message: `Only ${PREFILLABLE_FIELD_TYPES.join(', ')} fields can be prefilled; the recipient fills in ${field.type} fields`,
+      },
+    ];
+  }
+  return [];
+}
+
+/**
+ * Sets values the sender fills in before sending, for example an employee code. Values
+ * are checked like submitted ones; an empty value clears the field. Recipients may change
+ * prefilled values unless the field is `readOnly`.
+ */
+export function prefillFields(envelope: Envelope, values: readonly FieldValue[]): Envelope {
+  assertDraft(envelope);
+  const issues: ValidationIssue[] = [];
+  const next = new Map<Id, string>();
+  for (const { fieldId, value } of values) {
+    const path = `values.${fieldId}`;
+    const field = envelope.fields.find((f) => f.id === fieldId);
+    const found = prefillIssues(field, path);
+    if (found.length > 0) {
+      issues.push(...found);
+      continue;
+    }
+    if (next.has(fieldId)) {
+      issues.push({ path, message: 'Value given more than once' });
+      continue;
+    }
+    if (typeof value !== 'string') {
+      issues.push({ path, message: 'Value must be a string' });
+      continue;
+    }
+    const checked = checkFieldValue(field!.type, value);
+    if (checked.ok) next.set(fieldId, checked.value);
+    else issues.push({ path, message: checked.problem });
+  }
+  throwIf(issues);
+
+  const kept = envelope.values.filter((v) => !next.has(v.fieldId));
+  const set = [...next].filter(([, value]) => value !== '');
+  return {
+    ...envelope,
+    values: [...kept, ...set.map(([fieldId, value]) => ({ fieldId, value }))],
+  };
+}
+
+function valueIssues(envelope: Envelope): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  for (const { fieldId, value } of envelope.values) {
+    const path = `values.${fieldId}`;
+    const field = envelope.fields.find((f) => f.id === fieldId);
+    const found = prefillIssues(field, path);
+    if (found.length > 0) {
+      issues.push(...found);
+      continue;
+    }
+    const checked = checkFieldValue(field!.type, value);
+    if (!checked.ok) issues.push({ path, message: checked.problem });
+  }
+  const filled = new Map(envelope.values.map((v) => [v.fieldId, v.value]));
+  for (const field of envelope.fields) {
+    // Name fields fall back to the recipient's name at signing, so they never stay empty.
+    if (field.type === 'name' || !field.readOnly || !field.required) continue;
+    if (!isFilled(field, filled.get(field.id))) {
+      issues.push({
+        path: `fields.${field.id}`,
+        message: 'Prefill this read-only field; the recipient cannot fill it in',
+      });
+    }
+  }
+  return issues;
 }
 
 /** Everything that must hold before an envelope can be sent. Empty means ready. */
@@ -422,6 +524,7 @@ export function validateForSend(envelope: Envelope, now: Date): ValidationIssue[
   for (const field of envelope.fields) {
     issues.push(...fieldIssues(envelope, field, `fields.${field.id}`));
   }
+  issues.push(...valueIssues(envelope));
   issues.push(...reminderIssues(envelope.reminders), ...expiryIssues(envelope.expiresAt, now));
   return issues;
 }

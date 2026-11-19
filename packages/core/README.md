@@ -95,6 +95,7 @@ Edits are allowed only while the envelope is a `draft`.
 | `addField(envelope, input, { ids })` → `{ envelope, field }`         | Signers and approvers only; box must sit inside the page.                 |
 | `moveField(envelope, fieldId, { rect, page?, documentId? })`         |                                                                           |
 | `removeField(envelope, fieldId)` → `Envelope`                        |                                                                           |
+| `prefillFields(envelope, values)` → `Envelope`                       | Sender's values for text, name and checkbox fields; empty clears.         |
 | `validateForSend(envelope, now)` → `ValidationIssue[]`               | Empty means ready. Every signer needs a required signature field.         |
 
 ### Workflow
@@ -125,6 +126,12 @@ real PNGs (base64 or a `data:image/png;base64,` URL) of at most 512 KB and 2048 
 pixels (`MAX_IMAGE_BYTES`, `MAX_IMAGE_DIMENSION`), dates ISO,
 checkboxes `'true'` or `'false'`, text at most 1000 characters. Date-signed and name
 fields are filled in when left empty.
+
+Values the sender prefilled count towards required fields, so the signer does not have to
+send them again. A field added with `readOnly: true` keeps the sender's value: `submit`
+refuses a different value for it with `FIELD_NOT_YOURS` (`details.readOnly` is `true`),
+and `validateForSend` asks for a value on every required read-only field. Only text, name
+and checkbox fields (`PREFILLABLE_FIELD_TYPES`) can be prefilled or read-only.
 
 ### Audit log
 

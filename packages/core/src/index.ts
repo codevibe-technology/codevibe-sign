@@ -10,6 +10,7 @@ export {
   DEFAULT_REMINDERS,
   isActor,
   moveField,
+  prefillFields,
   removeDocument,
   removeField,
   removeRecipient,
@@ -90,6 +91,7 @@ export {
   MAX_NAME_LENGTH,
   MAX_REASON_LENGTH,
   MAX_TEXT_LENGTH,
+  PREFILLABLE_FIELD_TYPES,
 } from './validation';
 export type { ValidationIssue } from './validation';
 

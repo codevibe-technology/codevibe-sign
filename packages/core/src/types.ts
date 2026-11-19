@@ -52,6 +52,11 @@ export interface Field {
   rect: Rect;
   required: boolean;
   label?: string;
+  /**
+   * The sender fills this field in before sending (see `prefillFields`) and the recipient
+   * cannot change it. Allowed on text, name and checkbox fields.
+   */
+  readOnly?: boolean;
 }
 
 export interface FieldValue {

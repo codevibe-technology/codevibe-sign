@@ -12,6 +12,9 @@ export const MAX_REASON_LENGTH = 1000;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const IHDR = [0x49, 0x48, 0x44, 0x52];
 
+/** Field types a sender may fill in before sending, and so the only ones that can be read-only. */
+export const PREFILLABLE_FIELD_TYPES: readonly FieldType[] = ['text', 'name', 'checkbox'];
+
 export interface ValidationIssue {
   /** Where the problem is, for example `recipients.r1.email` or `fields.f2.rect`. */
   path: string;
