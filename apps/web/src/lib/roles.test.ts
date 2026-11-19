@@ -16,6 +16,7 @@ const matrix: Record<Permission, Role[]> = {
   'workspace.manage': ['admin', 'owner'],
   'brand.manage': ['admin', 'owner'],
   'apiKeys.manage': ['admin', 'owner'],
+  'webhooks.manage': ['admin', 'owner'],
   'team.manage': ['admin', 'owner'],
   'owners.manage': ['owner'],
   'workspace.delete': ['owner'],

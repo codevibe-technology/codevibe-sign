@@ -16,7 +16,8 @@ import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
 import { createWorkspaceMail } from './mail';
 import { createAuthenticate } from './principal';
-import { webhookTargets } from './webhooks';
+import { recordDelivery } from '../webhooks';
+import { webhookSecurity, webhookTargets } from './webhooks';
 
 export const SIGN_BASE_PATH = '/api';
 
@@ -57,6 +58,8 @@ function build(): SignServer {
         (await senderOf(sql, workspaceId, envelopeId))?.userId === userId,
     }),
     webhookTargets,
+    webhookSecurity: webhookSecurity(),
+    onWebhookDelivery: (report) => recordDelivery(sql, report),
     workspaceMail: createWorkspaceMail({
       appUrl: config.APP_URL,
       brand: (workspaceId) => getBrand(sql, workspaceId),
