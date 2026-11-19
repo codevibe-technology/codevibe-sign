@@ -13,7 +13,7 @@ You need Node 20 or later and pnpm 10 (`corepack enable` picks the version from
 
 ```sh
 git clone https://github.com/codevibe-technology/codevibe-sign.git
-cd sign
+cd codevibe-sign
 pnpm install
 pnpm build
 ```

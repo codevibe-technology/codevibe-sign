@@ -99,7 +99,7 @@ Until the first release, build the packages from the repository:
 
 ```sh
 git clone https://github.com/codevibe-technology/codevibe-sign.git
-cd sign
+cd codevibe-sign
 pnpm install
 pnpm build
 ```
