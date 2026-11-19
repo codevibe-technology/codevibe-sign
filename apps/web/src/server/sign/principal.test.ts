@@ -1,0 +1,85 @@
+import { HttpError } from '@codevibe_technology/sign-server';
+import { describe, expect, it } from 'vitest';
+import type { Role } from '@/lib/roles';
+import { createAuthenticate, inProcess } from './principal';
+
+const APP = 'https://sign.example.com';
+
+function setup(role: Role | null = 'member') {
+  return createAuthenticate({
+    appUrl: APP,
+    resolveApiKey: async (key) =>
+      key === 'cvs_good' ? { id: 'key_1', workspaceId: 'ws_a' } : null,
+    sessionUser: async (headers) => (headers.get('cookie') === 'session' ? { id: 'u1' } : null),
+    roleOf: async (userId, workspaceId) =>
+      userId === 'u1' && workspaceId === 'ws_a' ? role : null,
+  });
+}
+
+const request = (method: string, headers: Record<string, string>) =>
+  new Request(`${APP}/api/v1/envelopes`, { method, headers });
+
+const refusal = async (promise: Promise<unknown>) => {
+  const err = await promise.then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(HttpError);
+  return (err as HttpError).code;
+};
+
+describe('createAuthenticate', () => {
+  it('resolves a workspace API key', async () => {
+    const auth = setup();
+    expect(await auth(request('POST', { authorization: 'Bearer cvs_good' }))).toEqual({
+      id: 'key_1',
+      workspaceId: 'ws_a',
+    });
+    expect(await refusal(auth(request('GET', { authorization: 'Bearer cvs_bad' })))).toBe(
+      'UNAUTHORIZED',
+    );
+  });
+
+  it('falls back when there is no key and no workspace header', async () => {
+    expect(await setup()(request('GET', { cookie: 'session' }))).toBeNull();
+  });
+
+  it('acts for a signed-in member in the named workspace', async () => {
+    const principal = await setup()(
+      request('POST', { cookie: 'session', 'x-workspace': 'ws_a', origin: APP }),
+    );
+    expect(principal).toEqual({ id: 'user:u1', workspaceId: 'ws_a', readOnly: false });
+  });
+
+  it('makes viewers read-only', async () => {
+    const principal = await setup('viewer')(
+      request('GET', { cookie: 'session', 'x-workspace': 'ws_a' }),
+    );
+    expect(principal?.readOnly).toBe(true);
+  });
+
+  it('refuses writes from another origin', async () => {
+    const auth = setup();
+    for (const origin of ['https://evil.example', '']) {
+      const headers: Record<string, string> = { cookie: 'session', 'x-workspace': 'ws_a' };
+      if (origin) headers.origin = origin;
+      expect(await refusal(auth(request('POST', headers)))).toBe('FORBIDDEN');
+    }
+  });
+
+  it('refuses people outside the workspace and visitors without a session', async () => {
+    const auth = setup();
+    const outsider = request('GET', { cookie: 'session', 'x-workspace': 'ws_b' });
+    expect(await refusal(auth(outsider))).toBe('UNAUTHORIZED');
+    const anonymous = request('GET', { 'x-workspace': 'ws_a' });
+    expect(await refusal(auth(anonymous))).toBe('UNAUTHORIZED');
+  });
+
+  it('honours principals attached in-process, and only to that request', async () => {
+    const auth = setup(null);
+    const local = request('POST', {});
+    inProcess.set(local, { id: 'user:u9', workspaceId: 'ws_z' });
+    expect(await auth(local)).toEqual({ id: 'user:u9', workspaceId: 'ws_z' });
+    expect(await auth(request('POST', {}))).toBeNull();
+  });
+});
