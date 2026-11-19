@@ -4,7 +4,7 @@ import {
   type Envelope,
   type Id,
   type OtpState,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import postgres from 'postgres';
 import { VersionConflictError } from '../errors';
 import { migrations } from './migrations';

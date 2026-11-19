@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@codevibe/sign-react/styles.css';
+import '@codevibe_technology/sign-react/styles.css';
 import './app.css';
 import { App } from './App';
 

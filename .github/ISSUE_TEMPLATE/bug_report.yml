@@ -11,7 +11,7 @@ body:
     id: package
     attributes:
       label: Package and version
-      placeholder: '@codevibe/sign-server 0.3.1'
+      placeholder: '@codevibe_technology/sign-server 0.3.1'
     validations:
       required: true
   - type: textarea

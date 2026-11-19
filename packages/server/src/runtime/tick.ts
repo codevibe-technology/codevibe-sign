@@ -1,4 +1,4 @@
-import { tick as coreTick } from '@codevibe/sign-core';
+import { tick as coreTick } from '@codevibe_technology/sign-core';
 import type { Runtime } from './context';
 import { JOB_LEASE_MS, runJobs } from './jobs';
 import { mutate } from './mutate';

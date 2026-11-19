@@ -5,7 +5,7 @@ import {
   type Field,
   type FieldValue,
   type Recipient,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { pointsToPixels } from '../geometry';
 import { defaultFieldTypeLabels, mergeLabels } from '../labels';
 import type { LoadPdfOptions } from '../pdf/pdfjs';

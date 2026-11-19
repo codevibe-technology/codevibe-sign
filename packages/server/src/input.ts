@@ -8,7 +8,7 @@ import {
   type RecipientRole,
   type ReminderPolicy,
   type RoutingMode,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { validation } from './errors';
 
 type Obj = Record<string, unknown>;

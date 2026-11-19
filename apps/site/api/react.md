@@ -1,13 +1,13 @@
 ---
-title: '@codevibe/sign-react'
-description: API reference for @codevibe/sign-react - the signature pad, signing view and field placement components, themed with CSS variables.
+title: '@codevibe_technology/sign-react'
+description: API reference for @codevibe_technology/sign-react - the signature pad, signing view and field placement components, themed with CSS variables.
 ---
 
-# @codevibe/sign-react
+# @codevibe_technology/sign-react
 
 React components for electronic signatures: a signature pad (draw, type or upload), a
 signing view for recipients and a field placer for senders. They read and write the
-types from `@codevibe/sign-core` (`Field`, `FieldValue`, `Recipient`), so what the
+types from `@codevibe_technology/sign-core` (`Field`, `FieldValue`, `Recipient`), so what the
 placer emits and what the signing view submits go straight to the core workflow.
 
 No CSS framework. Styling comes from one small stylesheet driven by `--cvs-*` custom
@@ -16,7 +16,7 @@ properties, with a light and a dark palette.
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-react @codevibe/sign-core
+pnpm add @codevibe_technology/sign-react @codevibe_technology/sign-core
 # To render PDFs with the built-in renderer:
 pnpm add pdfjs-dist
 ```
@@ -25,13 +25,13 @@ React 18 or 19. `pdfjs-dist` is an optional peer dependency, loaded only when a 
 is given as a `file`; pass your own `source` to render pages another way.
 
 ```ts
-import '@codevibe/sign-react/styles.css';
+import '@codevibe_technology/sign-react/styles.css';
 ```
 
 ## Usage
 
 <!-- check:
-import type { Envelope, Field, Recipient } from '@codevibe/sign-core';
+import type { Envelope, Field, Recipient } from '@codevibe_technology/sign-core';
 declare const doc: { id: string; name: string };
 declare const envelope: Envelope;
 declare const pdfBytes: Uint8Array;
@@ -46,7 +46,7 @@ declare const setPng: (png: string | null) => void;
 -->
 
 ```tsx check
-import { FieldPlacer, SigningView, SignaturePad } from '@codevibe/sign-react';
+import { FieldPlacer, SigningView, SignaturePad } from '@codevibe_technology/sign-react';
 
 // Sender: place fields for each signer.
 const placer = (
@@ -89,7 +89,7 @@ pixels per PDF point.
 ## With the server
 
 The components never talk to a server themselves: you load the signer's page, pass it in and
-send what they return. With `@codevibe/sign-server` the contract is:
+send what they return. With `@codevibe_technology/sign-server` the contract is:
 
 - `GET /v1/sign/:token` returns `{ envelope, recipient, documents, fields, values,
 otpRequired, authenticated, canAct }`. Pass `recipient`, `fields` and `values` (as
@@ -114,8 +114,8 @@ A complete page, served from the same origin as the API:
 
 ```tsx check
 import { useEffect, useState } from 'react';
-import type { Field, FieldValue } from '@codevibe/sign-core';
-import { SigningView } from '@codevibe/sign-react';
+import type { Field, FieldValue } from '@codevibe_technology/sign-core';
+import { SigningView } from '@codevibe_technology/sign-react';
 
 interface SignerPage {
   recipient: { id: string; name: string };

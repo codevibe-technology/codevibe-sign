@@ -1,4 +1,4 @@
-# @codevibe/sign-aadhaar
+# @codevibe_technology/sign-aadhaar
 
 Aadhaar eSign for Codevibe Sign, through an eSign provider you hold an account with. It defines a
 small `EsignProvider` interface and ships an adapter for [Leegality](https://www.leegality.com).
@@ -29,7 +29,7 @@ and give this package your API credentials. Each eSign is billed to your account
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-aadhaar @codevibe/sign-core
+pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 ```
 
 Node 20 or later. The package uses `fetch` and `node:crypto`.
@@ -48,7 +48,7 @@ Node 20 or later. The package uses `fetch` and `node:crypto`.
 ## Usage
 
 <!-- check:
-import type { Envelope } from '@codevibe/sign-core';
+import type { Envelope } from '@codevibe_technology/sign-core';
 declare const envelope: Envelope;
 declare const pdf: Uint8Array;
 declare const request: { headers: Headers };
@@ -56,7 +56,7 @@ declare const rawBody: string;
 -->
 
 ```ts check
-import { createLeegalityProvider } from '@codevibe/sign-aadhaar';
+import { createLeegalityProvider } from '@codevibe_technology/sign-aadhaar';
 
 const esign = createLeegalityProvider({
   environment: 'sandbox',

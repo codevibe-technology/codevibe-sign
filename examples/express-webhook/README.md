@@ -1,7 +1,7 @@
 # Webhook receiver
 
 A plain `node:http` server that checks each delivery's `x-codevibe-signature` with
-`readWebhook` from `@codevibe/sign-client`, skips deliveries it has already handled and logs
+`readWebhook` from `@codevibe_technology/sign-client`, skips deliveries it has already handled and logs
 what happened to each envelope.
 
 ```sh
@@ -16,7 +16,7 @@ The check needs the raw body. With Express, read it with `express.raw`:
 
 ```ts
 import express from 'express';
-import { readWebhook } from '@codevibe/sign-client';
+import { readWebhook } from '@codevibe_technology/sign-client';
 
 const app = express();
 app.post('/webhooks/sign', express.raw({ type: 'application/json' }), async (req, res) => {

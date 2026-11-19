@@ -1,4 +1,4 @@
-import type { Envelope, Recipient } from '@codevibe/sign-core';
+import type { Envelope, Recipient } from '@codevibe_technology/sign-core';
 
 export interface RenderedMail {
   subject: string;

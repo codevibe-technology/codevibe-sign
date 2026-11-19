@@ -8,13 +8,13 @@ description: Reference pages for each Codevibe Sign package - core, pdf, server,
 Codevibe Sign is split into small packages with one job each. Use the whole service, or only the
 parts you need.
 
-| Package                               | What it does                                                                        | Status       |
-| ------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
-| [`@codevibe/sign-core`](./core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
-| [`@codevibe/sign-pdf`](./pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
-| [`@codevibe/sign-server`](./server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
-| [`@codevibe/sign-react`](./react)     | Signature pad, signing view and field placement components.                         | Ready to try |
-| [`@codevibe/sign-aadhaar`](./aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.             | Ready to try |
+| Package                                          | What it does                                                                        | Status       |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------ |
+| [`@codevibe_technology/sign-core`](./core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
+| [`@codevibe_technology/sign-pdf`](./pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
+| [`@codevibe_technology/sign-server`](./server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
+| [`@codevibe_technology/sign-react`](./react)     | Signature pad, signing view and field placement components.                         | Ready to try |
+| [`@codevibe_technology/sign-aadhaar`](./aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.             | Ready to try |
 
 All packages are pre-release (`0.0.0`) and their APIs may change before 0.1.
 

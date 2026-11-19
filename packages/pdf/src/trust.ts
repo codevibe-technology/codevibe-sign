@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import forge from 'node-forge';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { assertSealIdentity, certificateDer, readP12 } from './cms';
 import { checkParseLimits, type ParseLimits } from './limits';
 import { examineSeal, type SealSigner, type SealVerification } from './verify';

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkFieldValue, MAX_IMAGE_BYTES, SignError } from '@codevibe/sign-core';
+import { checkFieldValue, MAX_IMAGE_BYTES, SignError } from '@codevibe_technology/sign-core';
 import { mockPngBytes, paperCanvas, pixelsOf } from '../test/canvas';
 import {
   base64Size,

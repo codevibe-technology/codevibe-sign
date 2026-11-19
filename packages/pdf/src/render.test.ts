@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { SignError, type Field, type FieldValue } from '@codevibe/sign-core';
+import { SignError, type Field, type FieldValue } from '@codevibe_technology/sign-core';
 import { renderFields } from './render';
 import {
   A4,

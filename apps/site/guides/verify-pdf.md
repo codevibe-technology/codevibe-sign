@@ -16,13 +16,13 @@ still detecting changes.
 
 ## In code
 
-`verify` from `@codevibe/sign-pdf` checks the seal offline, against the operator certificate
+`verify` from `@codevibe_technology/sign-pdf` checks the seal offline, against the operator certificate
 you trust. Keep that certificate (or its SHA-256) wherever you verify files. It is public, so
 you can ship it with your app or publish it.
 
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { verify } from '@codevibe/sign-pdf';
+import { verify } from '@codevibe_technology/sign-pdf';
 
 const operatorCertificate = await readFile('seal-certificate.pem', 'utf8');
 const result = await verify(new Uint8Array(await readFile('offer-signed.pdf')), {
@@ -67,18 +67,18 @@ whether a file is genuine.
 
 ## Checking the audit chain
 
-The audit chain is verified with `@codevibe/sign-core`. Take the envelope's events
+The audit chain is verified with `@codevibe_technology/sign-core`. Take the envelope's events
 from your store or from `GET /v1/envelopes/:id/events`, and compare against the head printed
 on the certificate page:
 
 <!-- check:
-import type { AuditEvent } from '@codevibe/sign-core';
+import type { AuditEvent } from '@codevibe_technology/sign-core';
 declare const events: AuditEvent[];
 declare const headFromCertificate: string;
 -->
 
 ```ts check
-import { verifyChain, webCryptoHasher } from '@codevibe/sign-core';
+import { verifyChain, webCryptoHasher } from '@codevibe_technology/sign-core';
 
 const check = await verifyChain(events, webCryptoHasher, { expectedHead: headFromCertificate });
 

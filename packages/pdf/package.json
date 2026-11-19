@@ -1,8 +1,23 @@
 {
-  "name": "@codevibe/sign-pdf",
+  "name": "@codevibe_technology/sign-pdf",
   "version": "0.0.0",
   "description": "Draw signatures on PDFs, add a signing certificate page, and apply or verify a PAdES seal.",
+  "keywords": [
+    "esign",
+    "e-signature",
+    "pdf",
+    "signature",
+    "digital-signature"
+  ],
+  "homepage": "https://sign.codevibe.in?utm_source=npm&utm_medium=package&utm_campaign=sign-pdf",
+  "bugs": "https://github.com/codevibe-technology/codevibe-sign/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codevibe-technology/codevibe-sign.git",
+    "directory": "packages/pdf"
+  },
   "license": "Apache-2.0",
+  "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,28 +33,24 @@
     "dist",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/codevibe/sign.git",
-    "directory": "packages/pdf"
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [
-    "esign",
-    "e-signature",
-    "pdf",
-    "signature",
-    "digital-signature"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean --shims",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@codevibe/sign-core": "workspace:*",
+    "@codevibe_technology/sign-core": "workspace:*",
     "@pdf-lib/fontkit": "1.1.1",
     "@signpdf/placeholder-pdf-lib": "3.4.0",
     "@signpdf/signpdf": "3.4.0",

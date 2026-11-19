@@ -12,8 +12,8 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@codevibe/sign-core": "workspace:*",
-    "@codevibe/sign-react": "workspace:*",
+    "@codevibe_technology/sign-core": "workspace:*",
+    "@codevibe_technology/sign-react": "workspace:*",
     "pdfjs-dist": "4.10.38",
     "react": "19.3.1",
     "react-dom": "19.3.1"

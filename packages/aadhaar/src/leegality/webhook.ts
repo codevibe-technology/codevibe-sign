@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import type { EsignStatus, WebhookHeaders } from '../provider';
 import { PROVIDER, isRecord } from './api';
 

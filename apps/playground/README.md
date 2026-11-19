@@ -2,7 +2,7 @@
 
 A local demo of the whole flow in the browser: choose a PDF, place fields for two
 signers, send it, then sign as each person in turn. It runs the real
-`@codevibe/sign-core` workflow (draft, send, view, submit or decline, hash-chained
+`@codevibe_technology/sign-core` workflow (draft, send, view, submit or decline, hash-chained
 audit log) with in-memory state. Nothing leaves the tab.
 
 ```sh

@@ -1,4 +1,4 @@
-import type { Field, Recipient } from '@codevibe/sign-core';
+import type { Field, Recipient } from '@codevibe_technology/sign-core';
 import type { PdfSource } from '../pdf/types';
 
 /** A fake document of US Letter pages that renders blank canvases. */

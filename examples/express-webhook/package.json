@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@codevibe/sign-client": "workspace:*"
+    "@codevibe_technology/sign-client": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.19.1",

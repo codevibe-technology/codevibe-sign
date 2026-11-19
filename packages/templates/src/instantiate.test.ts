@@ -6,7 +6,7 @@ import {
   SignError,
   submit,
   webCryptoHasher,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { assertWritable, instantiate, METADATA_KEYS, readOnlyFieldIds } from './instantiate';
 import { templateVersion } from './version';
 import { clockAt, deps, issuePaths, offerTemplate, people, rejection, T0 } from './test/fixtures';

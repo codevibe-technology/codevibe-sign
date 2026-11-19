@@ -1,4 +1,4 @@
-import { MAX_IMAGE_BYTES, SignError } from '@codevibe/sign-core';
+import { MAX_IMAGE_BYTES, SignError } from '@codevibe_technology/sign-core';
 
 export interface Bounds {
   x: number;

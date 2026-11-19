@@ -27,13 +27,13 @@ available. Personal data is limited to what the certificate needs.
 ## Verifying
 
 <!-- check:
-import type { AuditEvent, Envelope } from '@codevibe/sign-core';
+import type { AuditEvent, Envelope } from '@codevibe_technology/sign-core';
 declare const events: AuditEvent[];
 declare const envelope: Envelope;
 -->
 
 ```ts check
-import { verifyChain, webCryptoHasher } from '@codevibe/sign-core';
+import { verifyChain, webCryptoHasher } from '@codevibe_technology/sign-core';
 
 const result = await verifyChain(events, webCryptoHasher, { expectedHead: envelope.auditHead });
 

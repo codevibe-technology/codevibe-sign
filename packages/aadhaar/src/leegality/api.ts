@@ -1,4 +1,4 @@
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { readLimited } from '../http';
 
 export const PROVIDER = 'Leegality';

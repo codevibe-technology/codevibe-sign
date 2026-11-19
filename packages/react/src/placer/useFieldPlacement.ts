@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Field, FieldType, Rect, Recipient } from '@codevibe/sign-core';
+import type { Field, FieldType, Rect, Recipient } from '@codevibe_technology/sign-core';
 import type { PageSize } from '../geometry';
 import {
   createField,

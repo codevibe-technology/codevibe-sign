@@ -1,6 +1,6 @@
 ---
-'@codevibe/sign-core': minor
-'@codevibe/sign-templates': minor
+'@codevibe_technology/sign-core': minor
+'@codevibe_technology/sign-templates': minor
 ---
 
 Core:

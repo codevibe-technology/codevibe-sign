@@ -1,9 +1,9 @@
 ---
-title: '@codevibe/sign-core'
-description: API reference for @codevibe/sign-core, the pure domain rules of Codevibe Sign - envelopes, workflow, audit chain, tokens and OTPs.
+title: '@codevibe_technology/sign-core'
+description: API reference for @codevibe_technology/sign-core, the pure domain rules of Codevibe Sign - envelopes, workflow, audit chain, tokens and OTPs.
 ---
 
-# @codevibe/sign-core
+# @codevibe_technology/sign-core
 
 The domain model and rules: envelopes, recipients and fields, the signing workflow, reminders
 and expiry, the hash-chained audit log, signing tokens and OTPs. No runtime dependencies and no
@@ -11,7 +11,7 @@ I/O. Time, ids, randomness and hashing are passed in as ports, so the same code 
 the browser and in tests.
 
 ```sh
-pnpm add @codevibe/sign-core
+pnpm add @codevibe_technology/sign-core
 ```
 
 Node 20 or later, or any runtime with Web Crypto.

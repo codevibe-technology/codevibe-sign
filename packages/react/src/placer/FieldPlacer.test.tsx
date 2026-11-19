@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
-import type { Field } from '@codevibe/sign-core';
+import type { Field } from '@codevibe_technology/sign-core';
 import { letterSource, recipient } from '../test/fixtures';
 import { FieldPlacer } from './FieldPlacer';
 import { useFieldPlacement } from './useFieldPlacement';

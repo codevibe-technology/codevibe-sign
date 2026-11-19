@@ -1,6 +1,6 @@
 import fontkit from '@pdf-lib/fontkit';
 import { StandardFonts, type PDFDocument, type PDFFont } from 'pdf-lib';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 
 export interface FontSet {
   regular: PDFFont;

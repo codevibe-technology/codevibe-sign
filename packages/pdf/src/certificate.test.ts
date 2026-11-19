@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { SignError, type AuditEvent, type Recipient } from '@codevibe/sign-core';
+import { SignError, type AuditEvent, type Recipient } from '@codevibe_technology/sign-core';
 import { appendCertificate } from './certificate';
 import { sha256Hex } from './inspect';
 import {

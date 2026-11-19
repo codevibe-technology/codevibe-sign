@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { assertValidTemplate, validateTemplate } from './validate';
 import { offerTemplate } from './test/fixtures';
 import type { Template } from './types';

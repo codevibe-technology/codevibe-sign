@@ -14,7 +14,7 @@ import type {
   ReminderPolicy,
   RoutingMode,
   SignErrorCode,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 export type {
   AuditAction,
@@ -35,7 +35,7 @@ export type {
   ReminderPolicy,
   RoutingMode,
   SignErrorCode,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 /** Error codes the API returns: core's codes plus the HTTP layer's own. */
 export type ApiErrorCode = SignErrorCode | 'UNAUTHORIZED' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL';

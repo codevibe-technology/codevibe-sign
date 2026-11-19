@@ -17,7 +17,7 @@ import type {
   Field,
   FieldType,
   Recipient,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 export interface PageSpec {
   size: [number, number];

@@ -1,4 +1,4 @@
-import { hashToken, isSigningTokenShape } from '@codevibe/sign-core';
+import { hashToken, isSigningTokenShape } from '@codevibe_technology/sign-core';
 import { Hono } from 'hono';
 import { deleteCookie, setCookie } from 'hono/cookie';
 import { clientIp } from '../http/client';

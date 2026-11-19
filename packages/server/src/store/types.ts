@@ -1,4 +1,10 @@
-import type { AuditEvent, Envelope, EnvelopeStore, Id, OtpState } from '@codevibe/sign-core';
+import type {
+  AuditEvent,
+  Envelope,
+  EnvelopeStore,
+  Id,
+  OtpState,
+} from '@codevibe_technology/sign-core';
 
 export interface StoredEnvelope {
   envelope: Envelope;

@@ -1,4 +1,4 @@
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 
 function parts(date: Date, timeZone: string): Record<string, string> {
   const formatter = new Intl.DateTimeFormat('en-GB', {

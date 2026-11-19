@@ -9,7 +9,7 @@ import {
   type IsoDateTime,
   type Recipient,
   type RecipientRole,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { canEncode, embedFonts, encodable, type FontSet } from './fonts';
 import { loadPdf, sha256Hex } from './inspect';
 import { maskEmail, maskPhone } from './mask';

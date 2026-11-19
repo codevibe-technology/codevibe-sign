@@ -41,7 +41,7 @@ You need a certificate and private key as a PKCS#12 (`.p12`) file.
 Anyone with the sealed PDF can check it without contacting your server:
 
 - open it in Adobe Reader and look at the signature panel; or
-- call `verify()` from `@codevibe/sign-pdf`, which checks the seal and reads the certificate
+- call `verify()` from `@codevibe_technology/sign-pdf`, which checks the seal and reads the certificate
   page.
 
 See [Verify a sealed PDF](/guides/verify-pdf).

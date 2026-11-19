@@ -1,7 +1,7 @@
 # Codevibe Sign server
 
 The standalone Codevibe Sign service as a Docker image. It reads its configuration from
-environment variables and runs `startSignServer` from `@codevibe/sign-server`: PostgreSQL
+environment variables and runs `startSignServer` from `@codevibe_technology/sign-server`: PostgreSQL
 (migrated on start), documents on disk, SMTP email and email one-time codes.
 
 ## Build and run
@@ -48,7 +48,7 @@ printed.
 - On `SIGTERM` or `SIGINT` the service stops accepting requests, waits for in-flight requests
   and background jobs, closes the database pool and exits 0 (1 if closing fails).
 - Run one process per database unless you also share rate limits and a session secret; see
-  the `@codevibe/sign-server` readme.
+  the `@codevibe_technology/sign-server` readme.
 
 ## Licence
 

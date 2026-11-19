@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { inspectPdf, sha256Hex } from './inspect';
 import { A4, makeEncryptedPdf, makePdf } from './testing/fixtures';
 

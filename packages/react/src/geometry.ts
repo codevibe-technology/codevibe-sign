@@ -1,4 +1,4 @@
-import type { PageSize, Rect } from '@codevibe/sign-core';
+import type { PageSize, Rect } from '@codevibe_technology/sign-core';
 
 export type { PageSize };
 

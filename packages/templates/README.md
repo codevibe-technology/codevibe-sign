@@ -1,17 +1,17 @@
-# @codevibe/sign-templates
+# @codevibe_technology/sign-templates
 
 Reusable signing templates for Codevibe Sign. A template describes an envelope once (documents,
 routing, reminders, expiry and the fields to fill) for roles such as `Employee` and `HR`
 rather than for named people. You turn it into a draft envelope by saying who takes each role,
 or into hundreds of drafts from a CSV file.
 
-Envelopes are built with `@codevibe/sign-core`'s builder functions, so every core rule applies
+Envelopes are built with `@codevibe_technology/sign-core`'s builder functions, so every core rule applies
 and the result is ready for core's `send`. No I/O; time, ids and hashing are passed in.
 
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-templates @codevibe/sign-core
+pnpm add @codevibe_technology/sign-templates @codevibe_technology/sign-core
 ```
 
 ## Usage
@@ -25,8 +25,8 @@ declare const pageSizes: { width: number; height: number }[];
 -->
 
 ```ts check
-import { randomIds, systemClock, webCryptoHasher } from '@codevibe/sign-core';
-import { instantiate, type Template } from '@codevibe/sign-templates';
+import { randomIds, systemClock, webCryptoHasher } from '@codevibe_technology/sign-core';
+import { instantiate, type Template } from '@codevibe_technology/sign-templates';
 
 const offer: Template = {
   id: 'offer-letter',
@@ -100,15 +100,15 @@ Ravi Kumar,ravi@example.com,EMP-1002,E1002
 HR is the same for everyone, so it goes in `defaults` instead of the file.
 
 <!-- check:
-import { randomIds, systemClock, webCryptoHasher } from '@codevibe/sign-core';
-import type { Template } from '@codevibe/sign-templates';
+import { randomIds, systemClock, webCryptoHasher } from '@codevibe_technology/sign-core';
+import type { Template } from '@codevibe_technology/sign-templates';
 declare const csvText: string;
 declare const offer: Template;
 const deps = { clock: systemClock, ids: randomIds, hasher: webCryptoHasher };
 -->
 
 ```ts check
-import { parseBulkCsv, planBulkSend } from '@codevibe/sign-templates';
+import { parseBulkCsv, planBulkSend } from '@codevibe_technology/sign-templates';
 
 const parsed = parseBulkCsv(csvText, offer);
 const plan = await planBulkSend(offer, parsed.rows, deps, {

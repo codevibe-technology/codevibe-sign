@@ -1,4 +1,4 @@
-# @codevibe/sign-pdf
+# @codevibe_technology/sign-pdf
 
 The PDF side of Codevibe Sign. It checks uploaded files, draws signatures and field
 values onto the pages, appends a signing certificate, and seals the result with a PAdES
@@ -11,13 +11,13 @@ Node 20 or later. Built on [pdf-lib](https://pdf-lib.js.org), `@signpdf` and
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-pdf @codevibe/sign-core
+pnpm add @codevibe_technology/sign-pdf @codevibe_technology/sign-core
 ```
 
 ## Usage
 
 <!-- check:
-import type { AuditEvent, Document, Envelope } from '@codevibe/sign-core';
+import type { AuditEvent, Document, Envelope } from '@codevibe_technology/sign-core';
 declare const envelope: Envelope;
 declare const document: Document;
 declare const events: AuditEvent[];
@@ -33,7 +33,7 @@ import {
   sealCertificate,
   sha256Hex,
   verify,
-} from '@codevibe/sign-pdf';
+} from '@codevibe_technology/sign-pdf';
 
 // 1. On upload: reject encrypted, broken, oversized or overly complex files (read in a
 //    worker thread under limits) and record page sizes.
@@ -70,7 +70,7 @@ const check = await verify(sealed, { trust: { fingerprints: [operator.sha256] } 
 //   signedAt, certificateSha256, seal: { ... } }
 ```
 
-All failures throw a `SignError` from `@codevibe/sign-core` with a stable `code` and,
+All failures throw a `SignError` from `@codevibe_technology/sign-core` with a stable `code` and,
 where it helps, `details` that name the field or option to fix.
 
 ## API
@@ -265,8 +265,8 @@ The standard fonts cover Latin script only. Names, titles or text in other scrip
 
 <!-- check:
 import { readFile } from 'node:fs/promises';
-import { appendCertificate, renderFields, type CertificateData } from '@codevibe/sign-pdf';
-import type { Envelope } from '@codevibe/sign-core';
+import { appendCertificate, renderFields, type CertificateData } from '@codevibe_technology/sign-pdf';
+import type { Envelope } from '@codevibe_technology/sign-core';
 declare const pdf: Uint8Array;
 declare const signed: Uint8Array;
 declare const data: CertificateData;

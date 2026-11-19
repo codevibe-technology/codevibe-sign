@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PDFDocument, PDFHexString } from 'pdf-lib';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { appendCertificate } from './certificate';
 import { renderFields } from './render';
 import { seal } from './seal';

@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@codevibe/sign-client": "workspace:*",
-    "@codevibe/sign-server": "workspace:*",
+    "@codevibe_technology/sign-client": "workspace:*",
+    "@codevibe_technology/sign-server": "workspace:*",
     "node-forge": "1.4.3",
     "pdf-lib": "1.17.1"
   },

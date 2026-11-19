@@ -47,7 +47,7 @@ required signature field.
 ## Transitions are pure
 
 Each step (`send`, `markViewed`, `submit`, `decline`, `voidEnvelope`, `tick`) is a pure
-function in `@codevibe/sign-core`. It returns:
+function in `@codevibe_technology/sign-core`. It returns:
 
 - the new `envelope`;
 - the `events` to append to the audit log;

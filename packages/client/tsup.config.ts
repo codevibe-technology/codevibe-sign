@@ -4,6 +4,6 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
-  dts: { resolve: ['@codevibe/sign-core'] },
+  dts: { resolve: ['@codevibe_technology/sign-core'] },
   clean: true,
 });

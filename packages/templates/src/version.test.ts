@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_REMINDERS, webCryptoHasher } from '@codevibe/sign-core';
+import { DEFAULT_REMINDERS, webCryptoHasher } from '@codevibe_technology/sign-core';
 import { canonicalJson, templateVersion } from './version';
 import { offerTemplate } from './test/fixtures';
 import type { Template } from './types';

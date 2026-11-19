@@ -6,7 +6,7 @@ import {
   addRecipient,
   addField,
   type Envelope,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { VersionConflictError } from '../errors';

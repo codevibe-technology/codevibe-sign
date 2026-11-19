@@ -1,5 +1,9 @@
 import { createServer } from 'node:http';
-import { readWebhook, SIGNATURE_HEADER, type WebhookDelivery } from '@codevibe/sign-client';
+import {
+  readWebhook,
+  SIGNATURE_HEADER,
+  type WebhookDelivery,
+} from '@codevibe_technology/sign-client';
 
 const port = Number(process.env.PORT ?? 4000);
 const secret = process.env.WEBHOOK_SECRET ?? 'example-webhook-secret';

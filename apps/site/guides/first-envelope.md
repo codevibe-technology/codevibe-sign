@@ -5,17 +5,17 @@ description: Build a draft envelope, add a document, a signer and a signature fi
 
 # Send your first envelope
 
-This guide uses `@codevibe/sign-core` directly, so you can see every step. With the server,
+This guide uses `@codevibe_technology/sign-core` directly, so you can see every step. With the server,
 the same steps happen behind its HTTP API.
 
 ```sh
-pnpm add @codevibe/sign-core
+pnpm add @codevibe_technology/sign-core
 ```
 
 ## 1. Create a draft
 
 ```ts check
-import { createEnvelope, randomIds, systemClock } from '@codevibe/sign-core';
+import { createEnvelope, randomIds, systemClock } from '@codevibe_technology/sign-core';
 
 const deps = { clock: systemClock, ids: randomIds };
 
@@ -32,7 +32,7 @@ Core does not read PDFs. Give it the file's hash, its page count and page sizes,
 under which you stored the bytes.
 
 <!-- check:
-import { randomIds, systemClock, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe/sign-core';
+import { randomIds, systemClock, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe_technology/sign-core';
 import { readFile } from 'node:fs/promises';
 const deps = { clock: systemClock, ids: randomIds };
 declare let envelope: Envelope;
@@ -40,7 +40,7 @@ declare const files: FileStore;
 -->
 
 ```ts check
-import { addDocument, webCryptoHasher } from '@codevibe/sign-core';
+import { addDocument, webCryptoHasher } from '@codevibe_technology/sign-core';
 
 const pdf = await readFile('offer.pdf');
 const sha256 = await webCryptoHasher.sha256(pdf);
@@ -66,7 +66,7 @@ envelope = doc.envelope;
 ## 3. Add a signer and a field
 
 <!-- check:
-import { randomIds, systemClock, webCryptoHasher, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe/sign-core';
+import { randomIds, systemClock, webCryptoHasher, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe_technology/sign-core';
 import { readFile } from 'node:fs/promises';
 const deps = { clock: systemClock, ids: randomIds };
 declare let envelope: Envelope;
@@ -74,7 +74,7 @@ declare const doc: { document: Document };
 -->
 
 ```ts check
-import { addField, addRecipient } from '@codevibe/sign-core';
+import { addField, addRecipient } from '@codevibe_technology/sign-core';
 
 const asha = addRecipient(
   envelope,
@@ -102,7 +102,7 @@ corner; see [Fields and coordinates](/concepts/fields).
 ## 4. Check and send
 
 <!-- check:
-import { randomIds, systemClock, webCryptoHasher, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe/sign-core';
+import { randomIds, systemClock, webCryptoHasher, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe_technology/sign-core';
 import { readFile } from 'node:fs/promises';
 const deps = { clock: systemClock, ids: randomIds };
 declare let envelope: Envelope;
@@ -113,7 +113,7 @@ declare function queueWebhook(effect: Effect): Promise<void>;
 -->
 
 ```ts check
-import { commitTransition, send, validateForSend } from '@codevibe/sign-core';
+import { commitTransition, send, validateForSend } from '@codevibe_technology/sign-core';
 
 const issues = validateForSend(envelope, new Date());
 if (issues.length > 0) throw new Error(issues.map((i) => `${i.path}: ${i.message}`).join('\n'));
@@ -135,7 +135,7 @@ envelope and its events together, then perform the effects.
 When Asha opens her link, passes the code check and submits:
 
 <!-- check:
-import { randomIds, systemClock, webCryptoHasher, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe/sign-core';
+import { randomIds, systemClock, webCryptoHasher, type Document, type Effect, type Envelope, type FileStore, type Recipient } from '@codevibe_technology/sign-core';
 import { readFile } from 'node:fs/promises';
 const deps = { clock: systemClock, ids: randomIds };
 declare let envelope: Envelope;
@@ -147,7 +147,7 @@ declare const signaturePng: string;
 -->
 
 ```ts check
-import { markAuthenticated, markViewed, submit } from '@codevibe/sign-core';
+import { markAuthenticated, markViewed, submit } from '@codevibe_technology/sign-core';
 
 const context = { ip, userAgent };
 let result = markViewed(envelope, { recipientId: asha.recipient.id, context }, deps);
@@ -167,7 +167,7 @@ When the last required action is done, the envelope becomes `completed` and the 
 
 ## With the server
 
-`@codevibe/sign-server` runs these steps for you behind an HTTP API: it stores the envelope,
+`@codevibe_technology/sign-server` runs these steps for you behind an HTTP API: it stores the envelope,
 emails the links and codes, fires webhooks and seals the file. Your backend makes one call to
 create and send:
 

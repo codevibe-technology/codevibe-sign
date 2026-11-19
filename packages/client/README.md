@@ -1,4 +1,4 @@
-# @codevibe/sign-client
+# @codevibe_technology/sign-client
 
 A typed client for the Codevibe Sign HTTP API. One part sends envelopes from your server,
 one part drives a signing session in the browser, and a helper checks webhook signatures.
@@ -10,14 +10,14 @@ including straight into an in-process server.
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-client
+pnpm add @codevibe_technology/sign-client
 ```
 
 ## Sending
 
 ```ts
 import { readFile } from 'node:fs/promises';
-import { createSignClient } from '@codevibe/sign-client';
+import { createSignClient } from '@codevibe_technology/sign-client';
 
 const sign = createSignClient({
   baseUrl: 'https://sign.example.com',
@@ -49,7 +49,7 @@ Field boxes are in PDF points from the top-left corner of the page. Documents ca
 In the browser, with the token from the signing link:
 
 ```ts
-import { createSignerClient } from '@codevibe/sign-client';
+import { createSignerClient } from '@codevibe_technology/sign-client';
 
 const signer = createSignerClient({ baseUrl: 'https://sign.example.com', token });
 const session = await signer.session();
@@ -73,7 +73,7 @@ page reload. `submit` sends `consent: true`: call it only after the signer has a
 ## Webhooks
 
 ```ts
-import { readWebhook } from '@codevibe/sign-client';
+import { readWebhook } from '@codevibe_technology/sign-client';
 
 const delivery = await readWebhook(secret, req.headers['x-codevibe-signature'], rawBody);
 if (delivery.type === 'envelope.completed') {
@@ -118,7 +118,7 @@ Client options: `timeoutMs` per attempt (default 30 000), `retries` (default 2),
 `retryDelayMs` backoff base (default 500). Every call takes `{ signal, idempotencyKey }`.
 
 The domain types (`Envelope`, `Recipient`, `Field`, `FieldValue`, `AuditEvent` and the rest)
-are those of `@codevibe/sign-core`, re-exported here so you need only this package.
+are those of `@codevibe_technology/sign-core`, re-exported here so you need only this package.
 
 ## Licence
 

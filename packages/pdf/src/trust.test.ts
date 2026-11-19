@@ -1,6 +1,6 @@
 import forge from 'node-forge';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { seal } from './seal';
 import { createTestCa, createTestP12, type TestCa, type TestP12 } from './testing/p12';
 import { A4, makePdf } from './testing/fixtures';

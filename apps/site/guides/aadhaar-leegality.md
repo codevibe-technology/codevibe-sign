@@ -27,11 +27,11 @@ Leegality dashboard, for the workflow you will pass as `profileId`:
 ## 2. Create the provider
 
 ```sh
-pnpm add @codevibe/sign-aadhaar @codevibe/sign-core
+pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 ```
 
 ```ts check
-import { createLeegalityProvider } from '@codevibe/sign-aadhaar';
+import { createLeegalityProvider } from '@codevibe_technology/sign-aadhaar';
 
 const esign = createLeegalityProvider({
   environment: 'sandbox',
@@ -46,8 +46,8 @@ Start with `sandbox` and switch to `production` when you go live.
 ## 3. Create a request and send the signer
 
 <!-- check:
-import { createLeegalityProvider } from '@codevibe/sign-aadhaar';
-import type { Envelope } from '@codevibe/sign-core';
+import { createLeegalityProvider } from '@codevibe_technology/sign-aadhaar';
+import type { Envelope } from '@codevibe_technology/sign-core';
 declare const esign: ReturnType<typeof createLeegalityProvider>;
 declare const envelope: Envelope;
 declare const pdf: Uint8Array;
@@ -73,7 +73,7 @@ sign with an Aadhaar OTP on Leegality's page.
 Pass the raw body exactly as received:
 
 <!-- check:
-import { createLeegalityProvider } from '@codevibe/sign-aadhaar';
+import { createLeegalityProvider } from '@codevibe_technology/sign-aadhaar';
 declare const esign: ReturnType<typeof createLeegalityProvider>;
 declare const request: { headers: Headers };
 declare const rawBody: string;

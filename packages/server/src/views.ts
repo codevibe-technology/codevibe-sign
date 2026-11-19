@@ -3,7 +3,7 @@ import {
   type AuditEvent,
   type Envelope,
   type Recipient,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 /** What a signer may see: the envelope basics and their own fields only. */
 export function signerView(

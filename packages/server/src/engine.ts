@@ -6,8 +6,8 @@ import type {
   FieldValue,
   PageSize,
   Recipient,
-} from '@codevibe/sign-core';
-import * as signPdf from '@codevibe/sign-pdf';
+} from '@codevibe_technology/sign-core';
+import * as signPdf from '@codevibe_technology/sign-pdf';
 
 export interface PdfInfo {
   pageCount: number;
@@ -25,7 +25,7 @@ export interface SealOptions {
   allowWeakKey?: boolean;
 }
 
-/** Certificates a sealed file may come from; see `verify` in `@codevibe/sign-pdf`. */
+/** Certificates a sealed file may come from; see `verify` in `@codevibe_technology/sign-pdf`. */
 export interface SealTrust {
   certificates?: (string | Uint8Array)[];
   fingerprints?: string[];
@@ -47,7 +47,7 @@ export interface CertificateInput {
 }
 
 /**
- * The PDF operations the server needs. The default is `@codevibe/sign-pdf`; tests and
+ * The PDF operations the server needs. The default is `@codevibe_technology/sign-pdf`; tests and
  * integrators with their own PDF stack can pass another implementation.
  */
 export interface PdfEngine {

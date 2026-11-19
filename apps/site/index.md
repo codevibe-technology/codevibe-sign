@@ -12,7 +12,7 @@ description: Send documents for signature in the order you choose, seal the fina
 
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { startSignServer } from '@codevibe/sign-server';
+import { startSignServer } from '@codevibe_technology/sign-server';
 
 const sign = await startSignServer({
   databaseUrl: process.env.DATABASE_URL!,

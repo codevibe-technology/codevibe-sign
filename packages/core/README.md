@@ -1,4 +1,4 @@
-# @codevibe/sign-core
+# @codevibe_technology/sign-core
 
 The domain model and rules behind Codevibe Sign: envelopes, recipients and fields, the
 signing workflow, reminders and expiry, a hash-chained audit log, signing tokens and OTPs.
@@ -11,7 +11,7 @@ passed in, so the same code runs in Node, in the browser and in tests.
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-core
+pnpm add @codevibe_technology/sign-core
 ```
 
 Node 20 or later, or any runtime with Web Crypto.
@@ -42,7 +42,7 @@ import {
   submit,
   systemClock,
   webCryptoHasher,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 const deps = { clock: systemClock, ids: randomIds };
 

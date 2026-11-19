@@ -11,7 +11,7 @@ concurrency:
 jobs:
   release:
     name: Version or publish
-    if: github.repository_owner == 'codevibe' && github.ref == 'refs/heads/main'
+    if: github.repository_owner == 'codevibe-technology' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write

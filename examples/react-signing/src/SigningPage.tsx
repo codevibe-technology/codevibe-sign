@@ -8,8 +8,12 @@ import {
   type Recipient,
   type SignerClient,
   type SigningSession,
-} from '@codevibe/sign-client';
-import { SigningView, type PdfjsModule, type ViewerDocument } from '@codevibe/sign-react';
+} from '@codevibe_technology/sign-client';
+import {
+  SigningView,
+  type PdfjsModule,
+  type ViewerDocument,
+} from '@codevibe_technology/sign-react';
 
 const pdf = { pdfjs: pdfjs as unknown as PdfjsModule, workerSrc };
 

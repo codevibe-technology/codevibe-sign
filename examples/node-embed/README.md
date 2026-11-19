@@ -1,7 +1,7 @@
 # Embedded server
 
 Starts Codevibe Sign inside a Node process with in-memory storage and a self-signed seal
-certificate, then uses `@codevibe/sign-client` to create and send a two-signer envelope and
+certificate, then uses `@codevibe_technology/sign-client` to create and send a two-signer envelope and
 prints the signing links. Nothing leaves your machine: links and one-time codes are printed
 instead of mailed.
 

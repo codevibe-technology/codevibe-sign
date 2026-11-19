@@ -2,7 +2,7 @@
 
 A Vite and React page that reads the signing token from `?token=`, asks for a one-time code
 when the signer needs one, and shows the document with `SigningView` from
-`@codevibe/sign-react`. Submitting and declining go through `createSignerClient`.
+`@codevibe_technology/sign-react`. Submitting and declining go through `createSignerClient`.
 
 ```sh
 pnpm --filter example-react-signing start

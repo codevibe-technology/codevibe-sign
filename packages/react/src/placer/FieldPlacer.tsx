@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { Field, FieldType, Recipient } from '@codevibe/sign-core';
+import type { Field, FieldType, Recipient } from '@codevibe_technology/sign-core';
 import { clientToPoints, pointsToPixels, type PageSize } from '../geometry';
 import { defaultFieldTypeLabels, mergeLabels, recipientColorIndex } from '../labels';
 import type { LoadPdfOptions } from '../pdf/pdfjs';

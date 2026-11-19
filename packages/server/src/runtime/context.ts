@@ -9,7 +9,7 @@ import {
   type Mailer,
   type OtpSender,
   type RandomSource,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { randomBytes } from 'node:crypto';
 import { nodeHasher } from '../crypto';
 import type { PdfEngine, SealTrust } from '../engine';

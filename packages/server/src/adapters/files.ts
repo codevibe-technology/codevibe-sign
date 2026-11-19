@@ -1,4 +1,4 @@
-import type { FileStore } from '@codevibe/sign-core';
+import type { FileStore } from '@codevibe_technology/sign-core';
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';

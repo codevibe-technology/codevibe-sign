@@ -1,8 +1,23 @@
 {
-  "name": "@codevibe/sign-aadhaar",
+  "name": "@codevibe_technology/sign-aadhaar",
   "version": "0.0.0",
   "description": "Aadhaar eSign through a licensed eSign provider, with your own provider account.",
+  "keywords": [
+    "esign",
+    "e-signature",
+    "pdf",
+    "signature",
+    "digital-signature"
+  ],
+  "homepage": "https://sign.codevibe.in?utm_source=npm&utm_medium=package&utm_campaign=sign-aadhaar",
+  "bugs": "https://github.com/codevibe-technology/codevibe-sign/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codevibe-technology/codevibe-sign.git",
+    "directory": "packages/aadhaar"
+  },
   "license": "Apache-2.0",
+  "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,28 +33,24 @@
     "dist",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/codevibe/sign.git",
-    "directory": "packages/aadhaar"
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [
-    "esign",
-    "e-signature",
-    "pdf",
-    "signature",
-    "digital-signature"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@codevibe/sign-core": "workspace:*"
+    "@codevibe_technology/sign-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.10.1"

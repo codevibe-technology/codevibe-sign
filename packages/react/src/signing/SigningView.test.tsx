@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { checkFieldValue, type FieldValue } from '@codevibe/sign-core';
+import { checkFieldValue, type FieldValue } from '@codevibe_technology/sign-core';
 import { field, letterSource, recipient } from '../test/fixtures';
 import { SigningView } from './SigningView';
 

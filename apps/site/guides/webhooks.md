@@ -17,7 +17,7 @@ List the endpoints in the server options. `events` names the actions a target wa
 for all of them.
 
 ```ts check
-import type { WebhookTarget } from '@codevibe/sign-server';
+import type { WebhookTarget } from '@codevibe_technology/sign-server';
 
 const webhooks: WebhookTarget[] = [
   {
@@ -89,13 +89,13 @@ The signature is HMAC-SHA256, keyed with the target's `secret`, over the string
 received. Verify it before you act on the event, and reject timestamps more than five minutes
 from your clock so a captured request cannot be replayed.
 
-`verifyWebhook(secret, header, rawBody, options?)` from `@codevibe/sign-server` does all of
+`verifyWebhook(secret, header, rawBody, options?)` from `@codevibe_technology/sign-server` does all of
 this with a constant-time comparison. `options.toleranceSeconds` changes the five-minute
 window.
 
 ```ts check
 import { createServer } from 'node:http';
-import { verifyWebhook } from '@codevibe/sign-server';
+import { verifyWebhook } from '@codevibe_technology/sign-server';
 
 const secret = process.env.SIGN_WEBHOOK_SECRET!;
 

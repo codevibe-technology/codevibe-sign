@@ -1,8 +1,8 @@
 ---
-'@codevibe/sign-pdf': minor
-'@codevibe/sign-server': minor
-'@codevibe/sign-core': minor
-'@codevibe/sign-client': patch
+'@codevibe_technology/sign-pdf': minor
+'@codevibe_technology/sign-server': minor
+'@codevibe_technology/sign-core': minor
+'@codevibe_technology/sign-client': patch
 ---
 
 PDF:

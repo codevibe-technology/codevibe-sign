@@ -1,4 +1,4 @@
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { describe, expect, it } from 'vitest';
 import { loadConfig, type Env } from './config';
 

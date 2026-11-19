@@ -35,10 +35,10 @@ importers:
 
   apps/playground:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@codevibe/sign-react':
+      '@codevibe_technology/sign-react':
         specifier: workspace:*
         version: link:../../packages/react
       pdfjs-dist:
@@ -66,10 +66,10 @@ importers:
 
   apps/server:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@codevibe/sign-server':
+      '@codevibe_technology/sign-server':
         specifier: workspace:*
         version: link:../../packages/server
     devDependencies:
@@ -85,7 +85,7 @@ importers:
 
   examples/express-webhook:
     dependencies:
-      '@codevibe/sign-client':
+      '@codevibe_technology/sign-client':
         specifier: workspace:*
         version: link:../../packages/client
     devDependencies:
@@ -98,10 +98,10 @@ importers:
 
   examples/node-embed:
     dependencies:
-      '@codevibe/sign-client':
+      '@codevibe_technology/sign-client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@codevibe/sign-server':
+      '@codevibe_technology/sign-server':
         specifier: workspace:*
         version: link:../../packages/server
       node-forge:
@@ -123,10 +123,10 @@ importers:
 
   examples/react-signing:
     dependencies:
-      '@codevibe/sign-client':
+      '@codevibe_technology/sign-client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@codevibe/sign-react':
+      '@codevibe_technology/sign-react':
         specifier: workspace:*
         version: link:../../packages/react
       pdfjs-dist:
@@ -157,7 +157,7 @@ importers:
 
   packages/aadhaar:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -167,10 +167,10 @@ importers:
 
   packages/client:
     devDependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../core
-      '@codevibe/sign-server':
+      '@codevibe_technology/sign-server':
         specifier: workspace:*
         version: link:../server
 
@@ -182,7 +182,7 @@ importers:
 
   packages/pdf:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../core
       '@pdf-lib/fontkit':
@@ -216,7 +216,7 @@ importers:
 
   packages/react:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -253,10 +253,10 @@ importers:
 
   packages/server:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../core
-      '@codevibe/sign-pdf':
+      '@codevibe_technology/sign-pdf':
         specifier: workspace:*
         version: link:../pdf
       '@hono/node-server':
@@ -290,7 +290,7 @@ importers:
 
   packages/templates:
     dependencies:
-      '@codevibe/sign-core':
+      '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../core
 

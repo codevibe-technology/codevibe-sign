@@ -5,7 +5,7 @@ import {
   type Envelope,
   type TransitionResult,
   type ValidationIssue,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { parseCsv } from './csv';
 import { buildEnvelope, type InstantiateDeps } from './instantiate';
 import type { InstantiateInput, RoleAssignment, Template, TemplateRole } from './types';

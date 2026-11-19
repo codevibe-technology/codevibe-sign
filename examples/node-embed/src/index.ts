@@ -1,4 +1,4 @@
-import { createSignClient } from '@codevibe/sign-client';
+import { createSignClient } from '@codevibe_technology/sign-client';
 import {
   consoleOtpSender,
   createSignServer,
@@ -6,7 +6,7 @@ import {
   memoryFileStore,
   memoryStore,
   type SignServerOptions,
-} from '@codevibe/sign-server';
+} from '@codevibe_technology/sign-server';
 import { samplePdf, selfSignedSeal } from './fixtures.ts';
 
 const port = Number(process.env.PORT ?? 3000);

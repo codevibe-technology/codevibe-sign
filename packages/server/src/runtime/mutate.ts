@@ -6,7 +6,7 @@ import {
   type Envelope,
   type Id,
   type TransitionResult,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { VersionConflictError } from '../errors';
 import type { Job } from '../store/types';
 import type { Runtime } from './context';

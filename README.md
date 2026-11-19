@@ -39,16 +39,16 @@ Docker. Your documents stay on your servers.
 
 ## Packages
 
-| Package                                      | What it does                                                                            |
-| -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [`@codevibe/sign-core`](packages/core)       | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O. |
-| [`@codevibe/sign-pdf`](packages/pdf)         | Draws fields, appends the certificate page, seals and verifies PDFs.                    |
-| [`@codevibe/sign-server`](packages/server)   | HTTP API and runtime with adapters for storage, files, mail and OTP.                    |
-| [`@codevibe/sign-client`](packages/client)   | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.    |
-| [`@codevibe/sign-react`](packages/react)     | Signature pad, signing view and field placement components.                             |
-| [`@codevibe/sign-aadhaar`](packages/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.                 |
-| [`apps/server`](apps/server)                 | Docker image of the standalone service.                                                 |
-| [`examples/`](examples)                      | Runnable examples: embedding the server, handling webhooks, a React signing page.       |
+| Package                                                 | What it does                                                                            |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [`@codevibe_technology/sign-core`](packages/core)       | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O. |
+| [`@codevibe_technology/sign-pdf`](packages/pdf)         | Draws fields, appends the certificate page, seals and verifies PDFs.                    |
+| [`@codevibe_technology/sign-server`](packages/server)   | HTTP API and runtime with adapters for storage, files, mail and OTP.                    |
+| [`@codevibe_technology/sign-client`](packages/client)   | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.    |
+| [`@codevibe_technology/sign-react`](packages/react)     | Signature pad, signing view and field placement components.                             |
+| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.                 |
+| [`apps/server`](apps/server)                            | Docker image of the standalone service.                                                 |
+| [`examples/`](examples)                                 | Runnable examples: embedding the server, handling webhooks, a React signing page.       |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
@@ -57,12 +57,12 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 ### Embed the server
 
 ```sh
-pnpm add @codevibe/sign-server
+pnpm add @codevibe_technology/sign-server
 ```
 
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { startSignServer } from '@codevibe/sign-server';
+import { startSignServer } from '@codevibe_technology/sign-server';
 
 const sign = await startSignServer({
   databaseUrl: process.env.DATABASE_URL!,
@@ -91,7 +91,7 @@ Your backend then creates and sends envelopes through the HTTP API with one of t
 directly or with the typed client:
 
 ```ts
-import { createSignClient } from '@codevibe/sign-client';
+import { createSignClient } from '@codevibe_technology/sign-client';
 
 const sign = createSignClient({ baseUrl: 'https://sign.example.com', apiKey });
 await sign.envelopes.create({ title: 'Offer letter', send: true, documents, recipients, fields });
@@ -102,13 +102,13 @@ The endpoints are documented in the [server package README](packages/server).
 ### Use the React components
 
 ```sh
-pnpm add @codevibe/sign-react react react-dom
+pnpm add @codevibe_technology/sign-react react react-dom
 ```
 
 ```tsx check
-import '@codevibe/sign-react/styles.css';
-import { SigningView } from '@codevibe/sign-react';
-import type { Field } from '@codevibe/sign-core';
+import '@codevibe_technology/sign-react/styles.css';
+import { SigningView } from '@codevibe_technology/sign-react';
+import type { Field } from '@codevibe_technology/sign-core';
 
 interface SignerPage {
   recipient: { id: string; name: string };
@@ -170,7 +170,7 @@ Codevibe Sign supports two kinds of signature. Under Indian law:
   valid and enforceable (Information Technology Act 2000, s.10A, with the Indian Contract Act).
   The audit trail and the sealed file are the evidence of who agreed and when. This suits offer
   letters, policies, NDAs and most business documents.
-- **Aadhaar eSign** (`@codevibe/sign-aadhaar`). An electronic signature under IT Act s.3A, using a
+- **Aadhaar eSign** (`@codevibe_technology/sign-aadhaar`). An electronic signature under IT Act s.3A, using a
   technique in the Second Schedule, issued through a licensed eSign Service Provider. Use it, or
   a DSC, where a law requires a document to be signed in that statutory sense.
 

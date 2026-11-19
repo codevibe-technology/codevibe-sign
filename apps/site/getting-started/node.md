@@ -9,12 +9,12 @@ If you already run a Node backend, you can start the signing server inside it in
 running a separate container.
 
 ```sh
-pnpm add @codevibe/sign-server
+pnpm add @codevibe_technology/sign-server
 ```
 
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { startSignServer } from '@codevibe/sign-server';
+import { startSignServer } from '@codevibe_technology/sign-server';
 
 const sign = await startSignServer({
   databaseUrl: process.env.DATABASE_URL!,
@@ -71,7 +71,7 @@ import {
   migrate,
   postgresStore,
   smtpMailer,
-} from '@codevibe/sign-server';
+} from '@codevibe_technology/sign-server';
 
 const store = postgresStore(process.env.DATABASE_URL!);
 await migrate(store.sql);
@@ -93,6 +93,6 @@ setInterval(() => void sign.tick(), 60_000);
 
 ## Using only the rules
 
-If you want your own storage, mail and HTTP layer, use `@codevibe/sign-core` directly. Every
+If you want your own storage, mail and HTTP layer, use `@codevibe_technology/sign-core` directly. Every
 step is a pure function that returns the new envelope, the audit events and the effects to
 perform. See [Send your first envelope](/guides/first-envelope).

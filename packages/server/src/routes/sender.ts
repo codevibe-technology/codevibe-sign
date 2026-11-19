@@ -9,7 +9,7 @@ import {
   type Envelope,
   type Id,
   type TransitionResult,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { Hono, type Context } from 'hono';
 import { sha256Hex } from '../crypto';
 import { applyParties } from '../draft';

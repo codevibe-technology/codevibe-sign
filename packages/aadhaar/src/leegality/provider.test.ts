@@ -1,4 +1,4 @@
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { describe, expect, it, vi } from 'vitest';
 import type { EsignRequest } from '../provider';
 import { createLeegalityProvider, type LeegalityOptions } from './provider';

@@ -12,8 +12,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch --frozen-lockfile
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --offline
-RUN pnpm --filter "@codevibe/sign-server-app..." run build
-RUN pnpm --filter @codevibe/sign-server-app deploy --prod --legacy /out
+RUN pnpm --filter "@codevibe_technology/sign-server-app..." run build
+RUN pnpm --filter @codevibe_technology/sign-server-app deploy --prod --legacy /out
 
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production

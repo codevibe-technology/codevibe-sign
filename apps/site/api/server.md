@@ -1,9 +1,9 @@
 ---
-title: '@codevibe/sign-server'
-description: API reference for @codevibe/sign-server - the HTTP API and runtime that stores envelopes, sends invitations and codes, fires webhooks and seals files.
+title: '@codevibe_technology/sign-server'
+description: API reference for @codevibe_technology/sign-server - the HTTP API and runtime that stores envelopes, sends invitations and codes, fires webhooks and seals files.
 ---
 
-# @codevibe/sign-server
+# @codevibe_technology/sign-server
 
 The HTTP API and runtime for Codevibe Sign. It stores envelopes, mails signing links and
 one-time codes, runs signing sessions, delivers signed webhooks and produces the sealed PDF
@@ -11,13 +11,13 @@ with its certificate page. It is a [Hono](https://hono.dev) app, so you can moun
 own server or run it on its own.
 
 The rules (who signs when, reminders, expiry, the audit chain) come from
-`@codevibe/sign-core`; drawing, the certificate page and the PAdES seal come from
-`@codevibe/sign-pdf`.
+`@codevibe_technology/sign-core`; drawing, the certificate page and the PAdES seal come from
+`@codevibe_technology/sign-pdf`.
 
 ## Install
 
 ```sh
-pnpm add @codevibe/sign-server
+pnpm add @codevibe_technology/sign-server
 ```
 
 Node 20 or later.
@@ -34,7 +34,7 @@ import {
   mailOtpSender,
   postgresStore,
   smtpMailer,
-} from '@codevibe/sign-server';
+} from '@codevibe_technology/sign-server';
 
 const store = postgresStore(process.env.DATABASE_URL!);
 await migrate(store.sql);

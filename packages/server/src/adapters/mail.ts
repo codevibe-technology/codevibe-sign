@@ -1,4 +1,4 @@
-import type { MailMessage, Mailer, OtpSender, Recipient } from '@codevibe/sign-core';
+import type { MailMessage, Mailer, OtpSender, Recipient } from '@codevibe_technology/sign-core';
 import nodemailer from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 

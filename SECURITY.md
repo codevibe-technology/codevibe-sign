@@ -37,7 +37,7 @@ Until 1.0, only the latest minor release is supported.
 
 ## In scope
 
-- All packages in this repository (`@codevibe/sign-*`) and the `apps/server` image.
+- All packages in this repository (`@codevibe_technology/sign-*`) and the `apps/server` image.
 - Signing-link tokens, OTP handling and rate limits.
 - The audit hash chain, the certificate page, sealing and `verify()`: anything that lets a
   changed document or audit trail pass as valid.

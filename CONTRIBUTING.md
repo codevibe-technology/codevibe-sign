@@ -12,7 +12,7 @@ You need Node 20 or later and pnpm 10 (`corepack enable` picks the version from
 `package.json`).
 
 ```sh
-git clone https://github.com/codevibe/sign.git
+git clone https://github.com/codevibe-technology/codevibe-sign.git
 cd sign
 pnpm install
 pnpm build
@@ -23,15 +23,15 @@ tests or type checks, and again after changing a package another one depends on.
 
 ## Commands
 
-| Command                             | What it does                                      |
-| ----------------------------------- | ------------------------------------------------- |
-| `pnpm build`                        | Builds every package with tsup (ESM, CJS, types). |
-| `pnpm test`                         | Runs every package's vitest suite.                |
-| `pnpm typecheck`                    | Runs `tsc --noEmit` in every package.             |
-| `pnpm lint`                         | ESLint over the repository.                       |
-| `pnpm format` / `pnpm format:check` | Prettier.                                         |
-| `pnpm --filter <package> test`      | One package, for example `@codevibe/sign-core`.   |
-| `pnpm changeset`                    | Adds a release note for your change.              |
+| Command                             | What it does                                               |
+| ----------------------------------- | ---------------------------------------------------------- |
+| `pnpm build`                        | Builds every package with tsup (ESM, CJS, types).          |
+| `pnpm test`                         | Runs every package's vitest suite.                         |
+| `pnpm typecheck`                    | Runs `tsc --noEmit` in every package.                      |
+| `pnpm lint`                         | ESLint over the repository.                                |
+| `pnpm format` / `pnpm format:check` | Prettier.                                                  |
+| `pnpm --filter <package> test`      | One package, for example `@codevibe_technology/sign-core`. |
+| `pnpm changeset`                    | Adds a release note for your change.                       |
 
 ## Making a change
 

@@ -1,4 +1,9 @@
-import { SignError, webCryptoHasher, type Clock, type IdGenerator } from '@codevibe/sign-core';
+import {
+  SignError,
+  webCryptoHasher,
+  type Clock,
+  type IdGenerator,
+} from '@codevibe_technology/sign-core';
 import type { Template } from '../types';
 
 export const T0 = '2026-03-01T10:00:00.000Z';

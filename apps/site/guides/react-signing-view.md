@@ -5,24 +5,24 @@ description: Show the signing screen inside your own React app, connect it to th
 
 # Add the React signing view
 
-`@codevibe/sign-react` provides the screens recipients and senders see: a signature pad (draw,
+`@codevibe_technology/sign-react` provides the screens recipients and senders see: a signature pad (draw,
 type or upload), the signing view, and field placement for senders. They render PDFs with
 pdf.js and are themed with CSS variables.
 
 ```sh
-pnpm add @codevibe/sign-react react react-dom pdfjs-dist
+pnpm add @codevibe_technology/sign-react react react-dom pdfjs-dist
 ```
 
 Import the stylesheet once in your app:
 
 ```ts
-import '@codevibe/sign-react/styles.css';
+import '@codevibe_technology/sign-react/styles.css';
 ```
 
 ## Talking to the server
 
 The components never talk to a server themselves: you load the signer's page, pass it in and
-send what they return. With `@codevibe/sign-server` the contract is:
+send what they return. With `@codevibe_technology/sign-server` the contract is:
 
 - `GET /v1/sign/:token` returns `{ envelope, recipient, documents, fields, values,
 otpRequired, authenticated, canAct }`. Pass `recipient`, `fields` and `values` (as
@@ -47,8 +47,8 @@ A complete page, served from the same origin as the API:
 
 ```tsx check
 import { useEffect, useState } from 'react';
-import type { Field, FieldValue } from '@codevibe/sign-core';
-import { SigningView } from '@codevibe/sign-react';
+import type { Field, FieldValue } from '@codevibe_technology/sign-core';
+import { SigningView } from '@codevibe_technology/sign-react';
 
 interface SignerPage {
   recipient: { id: string; name: string };

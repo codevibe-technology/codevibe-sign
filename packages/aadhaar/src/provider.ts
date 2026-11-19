@@ -1,4 +1,4 @@
-import type { Id, Rect, Recipient } from '@codevibe/sign-core';
+import type { Id, Rect, Recipient } from '@codevibe_technology/sign-core';
 
 export interface SignaturePosition {
   /** Zero-based page index. */

@@ -1,16 +1,16 @@
 ---
-title: '@codevibe/sign-aadhaar'
-description: API reference for @codevibe/sign-aadhaar - the EsignProvider interface and the Leegality adapter for Aadhaar eSign.
+title: '@codevibe_technology/sign-aadhaar'
+description: API reference for @codevibe_technology/sign-aadhaar - the EsignProvider interface and the Leegality adapter for Aadhaar eSign.
 ---
 
-# @codevibe/sign-aadhaar
+# @codevibe_technology/sign-aadhaar
 
 Aadhaar eSign through an eSign provider you hold an account with. It defines a small
 `EsignProvider` interface and ships an adapter for [Leegality](https://www.leegality.com). For a
 walkthrough, see [Aadhaar eSign with Leegality](/guides/aadhaar-leegality).
 
 ```sh
-pnpm add @codevibe/sign-aadhaar @codevibe/sign-core
+pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 ```
 
 Node 20 or later. The package uses `fetch` and `node:crypto`.

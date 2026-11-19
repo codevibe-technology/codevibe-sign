@@ -5,7 +5,7 @@ import {
   type Effect,
   type Id,
   type TransitionResult,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { sha256Hex } from '../crypto';
 import type { Job } from '../store/types';
 import type { Runtime } from './context';

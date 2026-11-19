@@ -1,4 +1,4 @@
-import { DEFAULT_REMINDERS, type Hasher } from '@codevibe/sign-core';
+import { DEFAULT_REMINDERS, type Hasher } from '@codevibe_technology/sign-core';
 import type { Template, TemplateRole } from './types';
 import { isActorRole } from './validate';
 

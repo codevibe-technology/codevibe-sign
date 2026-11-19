@@ -1,5 +1,5 @@
-import { SignError } from '@codevibe/sign-core';
-import type { StandaloneConfig } from '@codevibe/sign-server';
+import { SignError } from '@codevibe_technology/sign-core';
+import type { StandaloneConfig } from '@codevibe_technology/sign-server';
 
 export interface AppConfig {
   server: StandaloneConfig;

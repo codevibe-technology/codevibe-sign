@@ -1,4 +1,9 @@
-import { checkFieldValue, type Field, type FieldValue, type Recipient } from '@codevibe/sign-core';
+import {
+  checkFieldValue,
+  type Field,
+  type FieldValue,
+  type Recipient,
+} from '@codevibe_technology/sign-core';
 
 export type FieldValues = Record<string, string>;
 

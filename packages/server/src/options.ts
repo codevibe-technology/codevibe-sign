@@ -6,7 +6,7 @@ import type {
   Mailer,
   OtpSender,
   RandomSource,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import type { PdfEngine, SealTrust } from './engine';
 import type { Logger } from './errors';
 import type { RateLimiter } from './http/rate-limit';
@@ -137,6 +137,6 @@ export interface SignServerOptions {
    * addresses are still checked, but the connection cannot be pinned to the checked address.
    */
   fetch?: typeof fetch;
-  /** PDF reading, drawing and sealing. Defaults to `@codevibe/sign-pdf`. */
+  /** PDF reading, drawing and sealing. Defaults to `@codevibe_technology/sign-pdf`. */
   pdf?: PdfEngine;
 }

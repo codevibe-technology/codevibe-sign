@@ -1,5 +1,5 @@
 import type { PDFPage } from 'pdf-lib';
-import type { Rect } from '@codevibe/sign-core';
+import type { Rect } from '@codevibe_technology/sign-core';
 
 export type Rotation = 0 | 90 | 180 | 270;
 

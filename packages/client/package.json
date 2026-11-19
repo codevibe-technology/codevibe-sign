@@ -1,8 +1,23 @@
 {
-  "name": "@codevibe/sign-client",
+  "name": "@codevibe_technology/sign-client",
   "version": "0.0.0",
   "description": "Typed client for the Codevibe Sign HTTP API, signing sessions and webhooks.",
+  "keywords": [
+    "esign",
+    "e-signature",
+    "pdf",
+    "signature",
+    "api-client"
+  ],
+  "homepage": "https://sign.codevibe.in?utm_source=npm&utm_medium=package&utm_campaign=sign-client",
+  "bugs": "https://github.com/codevibe-technology/codevibe-sign/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codevibe-technology/codevibe-sign.git",
+    "directory": "packages/client"
+  },
   "license": "Apache-2.0",
+  "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,28 +33,24 @@
     "dist",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/codevibe/sign.git",
-    "directory": "packages/client"
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [
-    "esign",
-    "e-signature",
-    "pdf",
-    "signature",
-    "api-client"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
-    "@codevibe/sign-core": "workspace:*",
-    "@codevibe/sign-server": "workspace:*"
+    "@codevibe_technology/sign-core": "workspace:*",
+    "@codevibe_technology/sign-server": "workspace:*"
   }
 }

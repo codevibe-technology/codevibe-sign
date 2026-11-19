@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { drawStrokes, addPoint, type Stroke, type StrokePoint } from './strokes';
 import { imageFileToSignature, type UploadOptions } from './image';
 import {

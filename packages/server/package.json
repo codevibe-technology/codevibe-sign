@@ -1,8 +1,23 @@
 {
-  "name": "@codevibe/sign-server",
+  "name": "@codevibe_technology/sign-server",
   "version": "0.0.0",
   "description": "HTTP API and runtime for sending, signing and sealing documents.",
+  "keywords": [
+    "esign",
+    "e-signature",
+    "pdf",
+    "signature",
+    "digital-signature"
+  ],
+  "homepage": "https://sign.codevibe.in?utm_source=npm&utm_medium=package&utm_campaign=sign-server",
+  "bugs": "https://github.com/codevibe-technology/codevibe-sign/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codevibe-technology/codevibe-sign.git",
+    "directory": "packages/server"
+  },
   "license": "Apache-2.0",
+  "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,29 +33,25 @@
     "dist",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/codevibe/sign.git",
-    "directory": "packages/server"
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [
-    "esign",
-    "e-signature",
-    "pdf",
-    "signature",
-    "digital-signature"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@codevibe/sign-core": "workspace:*",
-    "@codevibe/sign-pdf": "workspace:*",
+    "@codevibe_technology/sign-core": "workspace:*",
+    "@codevibe_technology/sign-pdf": "workspace:*",
     "@hono/node-server": "2.1.5",
     "hono": "4.13.14",
     "nodemailer": "10.3.1",

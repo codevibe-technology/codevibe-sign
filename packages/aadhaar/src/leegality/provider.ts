@@ -1,4 +1,4 @@
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { readLimited, request, type FetchLike, type HttpOptions } from '../http';
 import type {
   EsignEvent,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { webCryptoHasher } from '@codevibe/sign-core';
+import { webCryptoHasher } from '@codevibe_technology/sign-core';
 import { parseBulkCsv, planBulkSend, type BulkRow } from './bulk';
 import { readOnlyFieldIds } from './instantiate';
 import { templateVersion } from './version';

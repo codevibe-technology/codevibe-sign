@@ -4,7 +4,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
-      '@codevibe/sign-core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
+      '@codevibe_technology/sign-core': fileURLToPath(
+        new URL('../core/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {

@@ -11,7 +11,7 @@ import {
   type RunningSignServer,
   type SignServerOptions,
   type StandaloneConfig,
-} from '@codevibe/sign-server';
+} from '@codevibe_technology/sign-server';
 import { describe, expect, it, vi } from 'vitest';
 import type { Env } from './config';
 import { run } from './run';

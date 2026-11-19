@@ -1,4 +1,4 @@
-import { signWebhook } from '@codevibe/sign-server';
+import { signWebhook } from '@codevibe_technology/sign-server';
 import { describe, expect, it } from 'vitest';
 import { createSignClient, readWebhook, SIGNATURE_HEADER, verifyWebhook } from '.';
 import { API_KEY, BASE_URL, WEBHOOK_SECRET, fakePdf, testServer } from './test/server';

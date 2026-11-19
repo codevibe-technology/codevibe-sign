@@ -20,7 +20,7 @@ import {
   type FieldValue,
   type PageSize,
   type TransitionResult,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 /** An envelope and its audit log, kept in memory the way a server would store them. */
 export interface Store {

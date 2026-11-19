@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { checkFieldValue } from '@codevibe/sign-core';
+import { checkFieldValue } from '@codevibe_technology/sign-core';
 import { paperCanvas } from '../test/canvas';
 import { SignaturePad } from './SignaturePad';
 

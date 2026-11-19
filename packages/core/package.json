@@ -1,8 +1,23 @@
 {
-  "name": "@codevibe/sign-core",
+  "name": "@codevibe_technology/sign-core",
   "version": "0.0.0",
   "description": "Envelopes, recipients, signing workflow and a hash-chained audit log. No I/O.",
+  "keywords": [
+    "esign",
+    "e-signature",
+    "pdf",
+    "signature",
+    "digital-signature"
+  ],
+  "homepage": "https://sign.codevibe.in?utm_source=npm&utm_medium=package&utm_campaign=sign-core",
+  "bugs": "https://github.com/codevibe-technology/codevibe-sign/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codevibe-technology/codevibe-sign.git",
+    "directory": "packages/core"
+  },
   "license": "Apache-2.0",
+  "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,21 +33,17 @@
     "dist",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "sideEffects": false,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/codevibe/sign.git",
-    "directory": "packages/core"
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [
-    "esign",
-    "e-signature",
-    "pdf",
-    "signature",
-    "digital-signature"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "test": "vitest run",

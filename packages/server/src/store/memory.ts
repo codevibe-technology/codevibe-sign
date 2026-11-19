@@ -1,4 +1,10 @@
-import { isFinal, nextTickAt, type AuditEvent, type Envelope, type Id } from '@codevibe/sign-core';
+import {
+  isFinal,
+  nextTickAt,
+  type AuditEvent,
+  type Envelope,
+  type Id,
+} from '@codevibe_technology/sign-core';
 import { VersionConflictError } from '../errors';
 import type {
   IdempotencyClaim,

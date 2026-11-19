@@ -16,7 +16,7 @@ import {
   type IdGenerator,
   type TransitionResult,
   type ValidationIssue,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import type { InstantiateInput, RoleAssignment, Template } from './types';
 import { assertValidTemplate, expiryDaysIssues, roleKey, throwIf } from './validate';
 import { resolveRoles, templateVersion } from './version';

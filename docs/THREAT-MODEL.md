@@ -24,7 +24,7 @@ Status words used below:
                                   PostgreSQL     file store
 ```
 
-- `@codevibe/sign-core` holds the rules and never does I/O. Its functions are pure, so every
+- `@codevibe_technology/sign-core` holds the rules and never does I/O. Its functions are pure, so every
   guarantee it makes depends on the server persisting what it returns, atomically.
 - The server is the only component that talks to the database, file store, mail and the network.
 - The signer's browser, uploaded PDFs, signature images and every inbound webhook are untrusted.
@@ -34,18 +34,18 @@ Status words used below:
 
 ## Assets
 
-| Asset                       | Why it matters                                                     | Where it lives                                   |
-| --------------------------- | ------------------------------------------------------------------ | ------------------------------------------------ |
-| Documents (original, final) | Confidential business and personal data; the thing being agreed to | File store, keyed by `Document.fileKey`          |
-| Signatures and field values | Evidence of intent; personal data (handwriting, names)             | `Envelope.values`, drawn into the sealed PDF     |
-| Audit trail                 | The evidence that ties a person to an action at a time             | Audit events table, `Envelope.auditHead`, PDF    |
-| Signing links (tokens)      | Bearer credential to act as a recipient                            | Email/SMS in transit; only `tokenHash` is stored |
-| OTPs                        | Second factor for `email_otp` and `sms_otp` recipients             | Sent to the recipient; only a salted hash stored |
-| Seal key (PKCS#12)          | Lets anyone holding it produce "untampered" sealed files           | Server memory; operator's secret storage         |
-| API keys                    | Full control of envelopes for a tenant                             | Integrator's backend; server configuration       |
-| Outbound webhook secrets    | Let the integrator trust event callbacks                           | Server configuration and integrator's backend    |
-| Provider tokens and salts   | Bill eSigns to the operator; verify provider callbacks             | `@codevibe/sign-aadhaar` options, server config  |
-| Personal data in metadata   | Names, email, phone, IP, user agent                                | Envelope, audit events, certificate page, logs   |
+| Asset                       | Why it matters                                                     | Where it lives                                             |
+| --------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
+| Documents (original, final) | Confidential business and personal data; the thing being agreed to | File store, keyed by `Document.fileKey`                    |
+| Signatures and field values | Evidence of intent; personal data (handwriting, names)             | `Envelope.values`, drawn into the sealed PDF               |
+| Audit trail                 | The evidence that ties a person to an action at a time             | Audit events table, `Envelope.auditHead`, PDF              |
+| Signing links (tokens)      | Bearer credential to act as a recipient                            | Email/SMS in transit; only `tokenHash` is stored           |
+| OTPs                        | Second factor for `email_otp` and `sms_otp` recipients             | Sent to the recipient; only a salted hash stored           |
+| Seal key (PKCS#12)          | Lets anyone holding it produce "untampered" sealed files           | Server memory; operator's secret storage                   |
+| API keys                    | Full control of envelopes for a tenant                             | Integrator's backend; server configuration                 |
+| Outbound webhook secrets    | Let the integrator trust event callbacks                           | Server configuration and integrator's backend              |
+| Provider tokens and salts   | Bill eSigns to the operator; verify provider callbacks             | `@codevibe_technology/sign-aadhaar` options, server config |
+| Personal data in metadata   | Names, email, phone, IP, user agent                                | Envelope, audit events, certificate page, logs             |
 
 ## Actors
 

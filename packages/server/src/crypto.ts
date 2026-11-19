@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import type { Hasher } from '@codevibe/sign-core';
+import type { Hasher } from '@codevibe_technology/sign-core';
 
 export function sha256Hex(data: Uint8Array | string): string {
   return createHash('sha256').update(data).digest('hex');

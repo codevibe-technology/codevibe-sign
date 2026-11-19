@@ -1,4 +1,4 @@
-import type { AuditAction, Envelope } from '@codevibe/sign-core';
+import type { AuditAction, Envelope } from '@codevibe_technology/sign-core';
 import { constantTimeEqual, hmacSha256Hex } from '../crypto';
 import type { Runtime } from './context';
 import { checkWebhookUrl, pinnedPost, resolveWebhookAddress } from './webhook-guard';

@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
-import { verifyChain } from '@codevibe/sign-core';
-import { verifySeal } from '@codevibe/sign-pdf';
+import { verifyChain } from '@codevibe_technology/sign-core';
+import { verifySeal } from '@codevibe_technology/sign-pdf';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {

@@ -6,7 +6,7 @@ import {
   type Envelope,
   type Id,
   type Recipient,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import type { Runtime } from './context';
 import { sealedFileKey } from './seal';
 

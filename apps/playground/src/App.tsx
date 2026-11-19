@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { currentRecipients, SignError, type Field } from '@codevibe/sign-core';
+import { currentRecipients, SignError, type Field } from '@codevibe_technology/sign-core';
 import {
   FieldPlacer,
   loadPdf,
@@ -9,7 +9,7 @@ import {
   type PdfjsModule,
   type PdfSource,
   type ViewerDocument,
-} from '@codevibe/sign-react';
+} from '@codevibe_technology/sign-react';
 import { samplePdf } from './samplePdf';
 import {
   createDraft,

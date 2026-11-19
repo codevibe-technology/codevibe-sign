@@ -25,7 +25,7 @@ declare const presentedToken: string;
 -->
 
 ```ts check
-import { createSigningToken, cryptoRandom, verifyToken } from '@codevibe/sign-core';
+import { createSigningToken, cryptoRandom, verifyToken } from '@codevibe_technology/sign-core';
 
 const { token, tokenHash } = createSigningToken(cryptoRandom);
 // Put `token` in the link. Store only `tokenHash`.
@@ -49,13 +49,13 @@ Recipients set to `email_otp` or `sms_otp` also confirm a code before they can s
 | Reissue        | Each new code replaces the previous one          |
 
 <!-- check:
-import type { OtpState } from '@codevibe/sign-core';
+import type { OtpState } from '@codevibe_technology/sign-core';
 declare const storedState: OtpState;
 declare const codeFromUser: string;
 -->
 
 ```ts check
-import { createOtp, cryptoRandom, systemClock, verifyOtp } from '@codevibe/sign-core';
+import { createOtp, cryptoRandom, systemClock, verifyOtp } from '@codevibe_technology/sign-core';
 
 const issued = createOtp(cryptoRandom, systemClock);
 // Send issued.code to the recipient. Store issued.state.

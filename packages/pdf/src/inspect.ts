@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { PDFDocument } from 'pdf-lib';
-import { SignError, type PageSize } from '@codevibe/sign-core';
+import { SignError, type PageSize } from '@codevibe_technology/sign-core';
 import { pageGeometry } from './geometry';
 import { checkParseLimits, type ParseLimits } from './limits';
 

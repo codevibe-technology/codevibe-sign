@@ -1,4 +1,4 @@
-import type { Effect, Envelope } from '@codevibe/sign-core';
+import type { Effect, Envelope } from '@codevibe_technology/sign-core';
 import type { Job } from '../store/types';
 import type { Runtime } from './context';
 import { runNotify, type NotifyPayload } from './notify';

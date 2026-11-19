@@ -1,4 +1,4 @@
-import { SignError, type SignErrorCode } from '@codevibe/sign-core';
+import { SignError, type SignErrorCode } from '@codevibe_technology/sign-core';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';

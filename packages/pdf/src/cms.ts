@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import forge from 'node-forge';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 
 const { asn1, pki } = forge;
 const { Class, Type } = asn1;

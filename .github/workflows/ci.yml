@@ -65,4 +65,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm --filter @codevibe/sign-server test
+      - run: pnpm --filter @codevibe_technology/sign-server test

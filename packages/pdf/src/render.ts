@@ -1,5 +1,10 @@
 import { degrees, rgb, type PDFDocument, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
-import { SignError, type Field, type FieldValue, type Recipient } from '@codevibe/sign-core';
+import {
+  SignError,
+  type Field,
+  type FieldValue,
+  type Recipient,
+} from '@codevibe_technology/sign-core';
 import { canEncode, embedFonts, type FontSet } from './fonts';
 import { boxFrame, clampRect, fitContain, pageGeometry, type BoxFrame } from './geometry';
 import { loadPdf } from './inspect';

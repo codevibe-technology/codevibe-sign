@@ -1,7 +1,7 @@
 import { deflateSync } from 'node:zlib';
 import { PDFDocument, PDFRawStream } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import { inspectPdf } from './inspect';
 import { checkParseLimits, DEFAULT_PARSE_LIMITS } from './limits';
 import { A4, makePdf } from './testing/fixtures';

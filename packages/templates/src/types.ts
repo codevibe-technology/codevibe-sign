@@ -6,7 +6,7 @@ import type {
   RecipientRole,
   ReminderPolicy,
   RoutingMode,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 
 export interface TemplateDocument {
   name: string;

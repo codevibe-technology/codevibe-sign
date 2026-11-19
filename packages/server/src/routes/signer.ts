@@ -15,8 +15,8 @@ import {
   type Envelope,
   type FieldValue,
   type Recipient,
-} from '@codevibe/sign-core';
-import { maskEmail, maskPhone } from '@codevibe/sign-pdf';
+} from '@codevibe_technology/sign-core';
+import { maskEmail, maskPhone } from '@codevibe_technology/sign-pdf';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { HttpError, validation } from '../errors';

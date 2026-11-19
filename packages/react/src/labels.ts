@@ -1,4 +1,4 @@
-import type { FieldType, Recipient } from '@codevibe/sign-core';
+import type { FieldType, Recipient } from '@codevibe_technology/sign-core';
 
 export const defaultFieldTypeLabels: Record<FieldType, string> = {
   signature: 'Signature',

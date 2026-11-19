@@ -6,7 +6,7 @@ import {
   memoryStore,
   type PdfEngine,
   type SignServerOptions,
-} from '@codevibe/sign-server';
+} from '@codevibe_technology/sign-server';
 
 export const API_KEY = 'test-key-0123456789abcdef';
 export const WEBHOOK_SECRET = 'whsec-0123456789abcdef';

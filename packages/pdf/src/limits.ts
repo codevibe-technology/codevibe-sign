@@ -3,7 +3,7 @@ import { Worker } from 'node:worker_threads';
 import type * as WorkerThreads from 'node:worker_threads';
 import type * as Zlib from 'node:zlib';
 import type * as PdfLib from 'pdf-lib';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 
 /** Bounds on the work one PDF may cost to read. */
 export interface ParseLimits {

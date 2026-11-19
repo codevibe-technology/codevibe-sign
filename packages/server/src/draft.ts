@@ -8,7 +8,7 @@ import {
   type Envelope,
   type Id,
   type IdGenerator,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import { validation } from './errors';
 import type { FieldSpec, RecipientSpec } from './input';
 

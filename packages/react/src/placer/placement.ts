@@ -1,4 +1,4 @@
-import type { Field, FieldType, Rect } from '@codevibe/sign-core';
+import type { Field, FieldType, Rect } from '@codevibe_technology/sign-core';
 import { clampRect, resizeRect, roundRect, snapToPageEdges, type PageSize } from '../geometry';
 
 export interface Size {

@@ -1,10 +1,10 @@
-import { seal, verifySeal } from '@codevibe/sign-pdf';
+import { seal, verifySeal } from '@codevibe_technology/sign-pdf';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultPdfEngine } from './engine';
 import { harness, PNG } from './testing/harness';
 import { makeP12, makePdf } from './testing/real-pdf';
 
-describe('end to end with @codevibe/sign-pdf', () => {
+describe('end to end with @codevibe_technology/sign-pdf', () => {
   let pdf: Uint8Array;
   let p12: Uint8Array;
 

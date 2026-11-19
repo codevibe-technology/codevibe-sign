@@ -9,7 +9,7 @@ import {
   type PageSize,
   type RecipientRole,
   type ValidationIssue,
-} from '@codevibe/sign-core';
+} from '@codevibe_technology/sign-core';
 import type { Template, TemplateDocument, TemplateField, TemplateRole } from './types';
 
 const ROUTING_MODES = ['sequential', 'parallel'];

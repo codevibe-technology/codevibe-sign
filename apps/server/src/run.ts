@@ -1,4 +1,4 @@
-import { startSignServer } from '@codevibe/sign-server';
+import { startSignServer } from '@codevibe_technology/sign-server';
 import { loadConfig, type Env } from './config';
 
 type Start = typeof startSignServer;

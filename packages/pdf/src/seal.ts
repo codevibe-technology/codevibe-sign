@@ -1,7 +1,7 @@
 import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import { SignPdf } from '@signpdf/signpdf';
 import { Signer, SUBFILTER_ETSI_CADES_DETACHED } from '@signpdf/utils';
-import { SignError } from '@codevibe/sign-core';
+import { SignError } from '@codevibe_technology/sign-core';
 import {
   assertSealIdentity,
   buildCadesSignature,
