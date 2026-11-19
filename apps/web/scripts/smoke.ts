@@ -1,12 +1,14 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import postgres from 'postgres';
 import { migrateAll } from '../src/server/migrate';
 
 /**
  * Boots the built app (`pnpm --filter web build` first) against DATABASE_URL and walks the
- * main paths over real HTTP: health, sign-in by magic link, the guards, and the API with a
- * workspace key. Exits non-zero on the first failure.
+ * main paths over real HTTP: health, sign-in by magic link, the guards, the API with a
+ * workspace key, and a signing link through to the branded signing page. Exits non-zero on the
+ * first failure.
  */
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -110,6 +112,51 @@ try {
     headers: { cookie, 'x-workspace': 'ws_other' },
   });
   check(otherWorkspace.status === 401, 'but not for a workspace they are not in');
+
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  pdf.addPage([595.28, 841.89]).drawText('Offer letter', { x: 72, y: 760, font });
+  const created = await get('/api/v1/envelopes', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      title: 'Smoke offer',
+      send: true,
+      documents: [
+        { key: 'd', name: 'offer.pdf', content: Buffer.from(await pdf.save()).toString('base64') },
+      ],
+      recipients: [{ key: 'r', name: 'Ravi', email: `ravi-${Date.now()}@example.com` }],
+      fields: [
+        { recipient: 'r', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
+      ],
+    }),
+  });
+  check(created.status === 201, 'a workspace key sends an envelope');
+  await new Promise((r) => setTimeout(r, 500));
+  const token = /\/api\/sign\/([\w-]{43})/.exec(output)?.[1];
+  check(token, 'the invitation with its signing link is printed to the console');
+  const opened = await get(`/api/sign/${token}`);
+  const linkCookie = opened.headers.get('set-cookie')?.split(';')[0] ?? '';
+  check(
+    opened.status === 303 && opened.headers.get('location') === `${base}/sign`,
+    'the signing link redirects to /sign without the token',
+  );
+  const page = await get('/sign');
+  check(page.status === 200, 'the signing page renders');
+  const view = await get('/api/v1/sign/link', { headers: { cookie: linkCookie } });
+  const signer = (await view.json()) as { workspaceId: string; recipient: { name: string } };
+  check(signer.workspaceId === workspaceId, 'the page reads the envelope through the cookie');
+  const header = await get(`/brand/${workspaceId}/signing`);
+  check(
+    header.status === 200 && ((await header.json()) as { name: string }).name === 'Smoke',
+    'the signing page gets the workspace brand',
+  );
+  const ended = await get(`/sign?state=expired&w=${workspaceId}`);
+  const endedHtml = await ended.text();
+  check(
+    endedHtml.includes('This link has expired') && endedHtml.includes('Ask Smoke'),
+    'a dead link explains itself in the sender brand',
+  );
   console.log('Smoke test passed.');
 } finally {
   app.kill('SIGTERM');
