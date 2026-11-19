@@ -1,0 +1,45 @@
+{
+  "name": "@codevibe/sign-client",
+  "version": "0.0.0",
+  "description": "Typed client for the Codevibe Sign HTTP API, signing sessions and webhooks.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codevibe/sign.git",
+    "directory": "packages/client"
+  },
+  "keywords": [
+    "esign",
+    "e-signature",
+    "pdf",
+    "signature",
+    "api-client"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@codevibe/sign-core": "workspace:*",
+    "@codevibe/sign-server": "workspace:*"
+  }
+}

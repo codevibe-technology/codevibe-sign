@@ -11,6 +11,7 @@ packages you can embed in your own product, or run as a standalone service.
 | `@codevibe/sign-core`    | Domain model and rules: envelopes, recipients, fields, the signing workflow, reminders and expiry, the hash-chained audit log, OTP policy. No I/O.                              | nothing at runtime                    |
 | `@codevibe/sign-pdf`     | PDF work: read page sizes, draw signatures and field values, append the signing certificate page, flatten, apply and verify a PAdES seal.                                       | `pdf-lib`, `@signpdf/*`, `node-forge` |
 | `@codevibe/sign-server`  | HTTP API and runtime: stores envelopes, sends invitations and OTPs, runs signing sessions, fires webhooks, produces the sealed file. Adapters for storage, files, mail and OTP. | core, pdf, `hono`                     |
+| `@codevibe/sign-client`  | Typed client for the HTTP API: sending, signing sessions, webhook checks. Uses `fetch` and Web Crypto only.                                                                     | nothing at runtime                    |
 | `@codevibe/sign-react`   | UI: signature pad (draw, type, upload), signing view for recipients, field placement for senders. Unstyled by default, themed with CSS variables.                               | core, `react` (peer)                  |
 | `@codevibe/sign-aadhaar` | Aadhaar eSign through a licensed eSign provider, using the integrator's own provider account.                                                                                   | core                                  |
 
