@@ -47,7 +47,15 @@ Node 20 or later. The package uses `fetch` and `node:crypto`.
 
 ## Usage
 
-```ts
+<!-- check:
+import type { Envelope } from '@codevibe/sign-core';
+declare const envelope: Envelope;
+declare const pdf: Uint8Array;
+declare const request: { headers: Headers };
+declare const rawBody: string;
+-->
+
+```ts check
 import { createLeegalityProvider } from '@codevibe/sign-aadhaar';
 
 const esign = createLeegalityProvider({

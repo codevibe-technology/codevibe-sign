@@ -19,7 +19,12 @@ pnpm add @codevibe/sign-templates @codevibe/sign-core
 An offer letter: the employee signs first, then HR countersigns. The employee code is filled
 in by HR and the employee cannot change it.
 
-```ts
+<!-- check:
+declare const sha256: string;
+declare const pageSizes: { width: number; height: number }[];
+-->
+
+```ts check
 import { randomIds, systemClock, webCryptoHasher } from '@codevibe/sign-core';
 import { instantiate, type Template } from '@codevibe/sign-templates';
 
@@ -94,7 +99,15 @@ Ravi Kumar,ravi@example.com,EMP-1002,E1002
 
 HR is the same for everyone, so it goes in `defaults` instead of the file.
 
-```ts
+<!-- check:
+import { randomIds, systemClock, webCryptoHasher } from '@codevibe/sign-core';
+import type { Template } from '@codevibe/sign-templates';
+declare const csvText: string;
+declare const offer: Template;
+const deps = { clock: systemClock, ids: randomIds, hasher: webCryptoHasher };
+-->
+
+```ts check
 import { parseBulkCsv, planBulkSend } from '@codevibe/sign-templates';
 
 const parsed = parseBulkCsv(csvText, offer);
