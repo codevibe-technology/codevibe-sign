@@ -77,7 +77,11 @@ export function sortFields(fields: Field[], documentOrder: string[] = []): Field
 }
 
 /** Values a recipient starts with: today's date in date fields and their name in name fields. */
-export function prefillValues(fields: Field[], recipient: Recipient, today: Date): FieldValues {
+export function prefillValues(
+  fields: Field[],
+  recipient: Pick<Recipient, 'name'>,
+  today: Date,
+): FieldValues {
   const values: FieldValues = {};
   for (const field of fields) {
     if (field.type === 'date_signed') values[field.id] = isoDate(today);

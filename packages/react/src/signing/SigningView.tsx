@@ -85,7 +85,8 @@ export interface SigningViewProps {
   documents: ViewerDocument[];
   /** Fields of the envelope; only those of `recipient` are shown and collected. */
   fields: Field[];
-  recipient: Recipient;
+  /** Only `id` and `name` are used, so the server's signer view can be passed as is. */
+  recipient: Pick<Recipient, 'id' | 'name'>;
   /** Values already saved for this recipient, for example from a previous visit. */
   initialValues?: FieldValue[];
   onSubmit: (values: FieldValue[]) => void | Promise<void>;
@@ -220,6 +221,8 @@ export function SigningView({
     setBusy(true);
     try {
       await onSubmit(toFieldValues(fields, values));
+    } catch (error) {
+      setMessage(errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -231,6 +234,9 @@ export function SigningView({
     try {
       await onDecline(reason.trim());
       setDeclining(false);
+    } catch (error) {
+      setDeclining(false);
+      setMessage(errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -469,4 +475,8 @@ export function SigningView({
       )}
     </div>
   );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : String(error);
 }
