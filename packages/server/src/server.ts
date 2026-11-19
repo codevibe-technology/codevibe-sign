@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { defaultPdfEngine } from './engine';
 import { errorHandler, HttpError } from './errors';
+import { redactPath } from './http/redact';
 import type { SignServerOptions } from './options';
 import { senderRoutes } from './routes/sender';
 import { signerRoutes } from './routes/signer';
@@ -24,6 +25,19 @@ export function createSignServer(options: SignServerOptions): SignServer {
 
   app.onError(errorHandler(rt.logger));
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404));
+
+  if (options.accessLog) {
+    app.use('*', async (c, next) => {
+      const started = Date.now();
+      await next();
+      rt.logger.info?.('request', {
+        method: c.req.method,
+        path: redactPath(c.req.path),
+        status: c.res.status,
+        ms: Date.now() - started,
+      });
+    });
+  }
 
   app.use('*', async (c, next) => {
     await next();

@@ -15,6 +15,7 @@ import { nodeHasher } from '../crypto';
 import type { PdfEngine } from '../engine';
 import { consoleLogger, type Logger } from '../errors';
 import { normalizeApiKeys, type StoredApiKey } from '../http/auth';
+import { redactingLogger } from '../http/redact';
 import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
 import type { Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
 import type { ServerStore } from '../store/types';
@@ -85,7 +86,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     hasher: options.hasher ?? nodeHasher,
     random: options.random ?? cryptoRandom,
     limiter: options.rateLimiter ?? memoryRateLimiter(),
-    logger: options.logger ?? consoleLogger,
+    logger: redactingLogger(options.logger ?? consoleLogger),
     fetch: options.fetch ?? fetch,
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     webhooks: options.webhooks ?? [],

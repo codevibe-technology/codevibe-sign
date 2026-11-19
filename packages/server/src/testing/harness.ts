@@ -51,6 +51,7 @@ export function harness(overrides: Partial<SignServerOptions> = {}) {
     logger: {
       error: (message, meta) => logs.push({ level: 'error', message, ...(meta ? { meta } : {}) }),
       warn: (message, meta) => logs.push({ level: 'warn', message, ...(meta ? { meta } : {}) }),
+      info: (message, meta) => logs.push({ level: 'info', message, ...(meta ? { meta } : {}) }),
     },
     ...overrides,
   });

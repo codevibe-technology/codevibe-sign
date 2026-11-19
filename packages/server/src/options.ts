@@ -100,7 +100,13 @@ export interface SignServerOptions {
   hasher?: Hasher;
   random?: RandomSource;
   rateLimiter?: RateLimiter;
+  /** Receives errors, warnings and (with `accessLog`) one line per request, all redacted. */
   logger?: Logger;
+  /**
+   * Log one line per request to `logger.info`: method, path with the signing token replaced by
+   * `:token` and no query string, status and duration. Off by default.
+   */
+  accessLog?: boolean;
   fetch?: typeof fetch;
   /** PDF reading, drawing and sealing. Defaults to `@codevibe/sign-pdf`. */
   pdf?: PdfEngine;

@@ -19,7 +19,7 @@ import {
 import { maskEmail, maskPhone } from '@codevibe/sign-pdf';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
-import { validation } from '../errors';
+import { HttpError, validation } from '../errors';
 import { pdfResponse, readJson } from '../http/body';
 import { clientIp, userAgent } from '../http/client';
 import { idempotency } from '../http/idempotency';
@@ -151,7 +151,17 @@ export function signerRoutes(rt: Runtime) {
       state: issued.state,
     });
     const code = issued.code;
-    await rt.otp.send(recipient, code);
+    try {
+      await rt.otp.send(recipient, code);
+    } catch (err) {
+      // An adapter's error may quote the message it tried to send, code included.
+      rt.logger.error('one-time code could not be sent', {
+        envelope: envelope.id,
+        recipient: recipient.id,
+        error: err instanceof Error ? err.name : 'Error',
+      });
+      throw new HttpError('INTERNAL', 'The one-time code could not be sent, try again');
+    }
     const sentTo =
       recipient.auth === 'sms_otp' && recipient.phone
         ? maskPhone(recipient.phone)
