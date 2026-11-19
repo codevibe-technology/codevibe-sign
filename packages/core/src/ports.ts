@@ -39,6 +39,13 @@ export interface FileStore {
 
 export interface MailMessage {
   to: string;
+  /**
+   * Display name for the sender, for example the workspace that sent the envelope. The
+   * mailer keeps its own address, so SPF and DKIM still pass.
+   */
+  fromName?: string;
+  /** Where replies go, when not to the sender address. */
+  replyTo?: string;
   subject: string;
   text: string;
   html?: string;

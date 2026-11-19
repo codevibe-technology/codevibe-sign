@@ -9,26 +9,44 @@ export interface SmtpMailerOptions {
   from: string;
 }
 
+/**
+ * The `From` header for a message: the configured address, with the message's `fromName` as
+ * the display name when it has one. Quotes, angle brackets and line breaks are dropped from the
+ * name so it cannot add an address or a header.
+ */
+export function fromHeader(from: string, fromName: string | undefined): string {
+  const name = fromName?.replace(/[\r\n"<>\\]/g, '').trim();
+  if (!name) return from;
+  const address = /<([^<>]+)>\s*$/.exec(from)?.[1] ?? from.trim();
+  return `"${name}" <${address}>`;
+}
+
+/** The nodemailer message for a `MailMessage`, sent from `from`. */
+export function nodemailerMessage(message: MailMessage, from: string) {
+  return {
+    from: fromHeader(from, message.fromName),
+    to: message.to,
+    ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+    subject: message.subject,
+    text: message.text,
+    ...(message.html ? { html: message.html } : {}),
+    ...(message.attachments
+      ? {
+          attachments: message.attachments.map((a) => ({
+            filename: a.filename,
+            content: Buffer.from(a.content),
+            contentType: a.contentType,
+          })),
+        }
+      : {}),
+  };
+}
+
 export function smtpMailer(options: SmtpMailerOptions): Mailer & { close(): void } {
   const transport = nodemailer.createTransport(options.transport);
   return {
     async send(message) {
-      await transport.sendMail({
-        from: options.from,
-        to: message.to,
-        subject: message.subject,
-        text: message.text,
-        ...(message.html ? { html: message.html } : {}),
-        ...(message.attachments
-          ? {
-              attachments: message.attachments.map((a) => ({
-                filename: a.filename,
-                content: Buffer.from(a.content),
-                contentType: a.contentType,
-              })),
-            }
-          : {}),
-      });
+      await transport.sendMail(nodemailerMessage(message, options.from));
     },
     close: () => transport.close(),
   };
