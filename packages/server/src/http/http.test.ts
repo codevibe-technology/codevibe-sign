@@ -13,8 +13,11 @@ describe('authenticate', () => {
   ]);
 
   it('returns the id of the matching key', () => {
-    expect(authenticate('Bearer second-key-0123456789', keys)).toBe('ops');
-    expect(authenticate('Bearer first-key-0123456789', keys)).toMatch(/^key_[0-9a-f]{12}$/);
+    expect(authenticate('Bearer second-key-0123456789', keys)).toEqual({
+      id: 'ops',
+      workspaceId: 'default',
+    });
+    expect(authenticate('Bearer first-key-0123456789', keys).id).toMatch(/^key_[0-9a-f]{12}$/);
   });
 
   it('rejects missing, malformed and unknown keys', () => {
@@ -46,8 +49,24 @@ describe('authenticate', () => {
     const hashed = normalizeApiKeys([
       { id: 'ci', sha256: sha256Hex('third-key-0123456789').toUpperCase() },
     ]);
-    expect(authenticate('Bearer third-key-0123456789', hashed)).toBe('ci');
+    expect(authenticate('Bearer third-key-0123456789', hashed).id).toBe('ci');
     expect(() => authenticate(`Bearer ${sha256Hex('third-key-0123456789')}`, hashed)).toThrow();
+  });
+
+  it('puts a key in its configured workspace', () => {
+    const scoped = normalizeApiKeys([
+      { id: 'acme', key: 'acme-key-0123456789', workspaceId: 'ws_acme' },
+    ]);
+    expect(authenticate('Bearer acme-key-0123456789', scoped)).toEqual({
+      id: 'acme',
+      workspaceId: 'ws_acme',
+    });
+  });
+
+  it('allows no configured keys only when told to', () => {
+    expect(() => normalizeApiKeys([])).toThrow(/At least one API key/);
+    expect(normalizeApiKeys([], true)).toEqual([]);
+    expect(() => authenticate('Bearer anything-0123456789', [])).toThrow(/not valid/);
   });
 });
 

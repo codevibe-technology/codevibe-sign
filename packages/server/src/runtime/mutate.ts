@@ -9,6 +9,7 @@ import {
 } from '@codevibe_technology/sign-core';
 import { VersionConflictError } from '../errors';
 import type { Job } from '../store/types';
+import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { Runtime } from './context';
 import { dispatchJobs, effectsToJobs } from './jobs';
 
@@ -21,22 +22,30 @@ export interface Mutation {
   changed: boolean;
 }
 
+export interface Scope {
+  /** The envelope must belong to this workspace; otherwise it is reported as not found. */
+  workspaceId: string;
+}
+
 /**
  * Loads an envelope, applies a core transition, chains its audit events and saves it
  * together with the jobs for its effects. Retries from a fresh read when another request
  * saved first; the transition is pure, so running it again is safe.
  */
-export async function mutate(rt: Runtime, id: Id, apply: Apply): Promise<Mutation> {
+export async function mutate(rt: Runtime, id: Id, apply: Apply, scope?: Scope): Promise<Mutation> {
   for (let attempt = 1; ; attempt++) {
     const stored = await rt.store.load(id);
-    if (!stored) throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
+    const owner = stored?.workspaceId ?? DEFAULT_WORKSPACE;
+    if (!stored || (scope && scope.workspaceId !== owner)) {
+      throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
+    }
     const result = await apply(structuredClone(stored.envelope));
     if (result.events.length === 0 && result.effects.length === 0) {
       return { envelope: stored.envelope, changed: false };
     }
     const nextSeq = (await rt.store.listEvents(id)).length + 1;
     const committed = await commitTransition(result, nextSeq, rt.hasher);
-    const jobs = effectsToJobs(rt, committed.envelope, committed.effects);
+    const jobs = await effectsToJobs(rt, committed.envelope, committed.effects, owner);
     try {
       await rt.store.commit(committed.envelope, committed.events, stored.version, jobs);
     } catch (err) {
@@ -48,11 +57,16 @@ export async function mutate(rt: Runtime, id: Id, apply: Apply): Promise<Mutatio
   }
 }
 
-/** Saves a brand-new envelope with its first events. */
-export async function create(rt: Runtime, result: TransitionResult): Promise<Envelope> {
+/** Saves a brand-new envelope with its first events, owned by `workspaceId`. */
+export async function create(
+  rt: Runtime,
+  result: TransitionResult,
+  workspaceId: string = DEFAULT_WORKSPACE,
+): Promise<Envelope> {
   const committed = await commitTransition(result, 1, rt.hasher);
-  const jobs = effectsToJobs(rt, committed.envelope, committed.effects);
-  await rt.store.commit(committed.envelope, committed.events, 0, jobs);
+  const jobs = await effectsToJobs(rt, committed.envelope, committed.effects, workspaceId);
+  const options = workspaceId === DEFAULT_WORKSPACE ? undefined : { workspaceId };
+  await rt.store.commit(committed.envelope, committed.events, 0, jobs, options);
   await dispatchJobs(rt, jobs);
   return committed.envelope;
 }

@@ -70,6 +70,9 @@ export async function activeSigner(
   return { envelope, recipient, expiresAt: token.expiresAt };
 }
 
+/** Signer cookies are sent only to the signer routes. */
+export const signerCookiePath = (rt: Runtime) => `${rt.basePath}/v1/sign`;
+
 /**
  * The signing token of a request: from the path, or for `/v1/sign/link/...` from the HttpOnly
  * cookie set when the signing link was opened.
@@ -243,7 +246,7 @@ export function signerRoutes(rt: Runtime) {
       httpOnly: true,
       secure: rt.secureCookies,
       sameSite: 'Strict',
-      path: '/v1/sign',
+      path: signerCookiePath(rt),
       maxAge: SESSION_TTL_MS / 1000,
     });
     return c.json({ sessionToken: session.value, expiresAt: session.expiresAt.toISOString() });

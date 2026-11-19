@@ -19,6 +19,7 @@ import { redactingLogger } from '../http/redact';
 import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
 import type { Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
 import type { ServerStore } from '../store/types';
+import type { Principal } from '../tenancy';
 import { defaultTemplates, type MailTemplates } from '../templates';
 import { checkWebhookUrl, type WebhookSecurity } from './webhook-guard';
 
@@ -41,6 +42,10 @@ export interface Runtime {
   webhooks: WebhookTarget[];
   templates: MailTemplates;
   apiKeys: StoredApiKey[];
+  authenticate?: (request: Request) => Promise<Principal | null>;
+  webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
+  /** Prefix of every route and cookie path, without a trailing slash; empty by default. */
+  basePath: string;
   sealer: Required<Omit<SealerOptions, 'trust'>>;
   /** What a sealed file must be signed by to verify; empty when the engine cannot tell. */
   sealTrust: SealTrust | null;
@@ -85,6 +90,14 @@ function sealTrust(options: SignServerOptions, pdf: PdfEngine): SealTrust | null
   return { ...extra, fingerprints: [sha256, ...(extra.fingerprints ?? [])] };
 }
 
+function normalizeBasePath(value: string | undefined): string {
+  const path = (value ?? '').replace(/\/+$/, '');
+  if (path !== '' && !/^(\/[A-Za-z0-9._~-]+)+$/.test(path)) {
+    throw new Error('basePath must look like /api');
+  }
+  return path;
+}
+
 function proxyHops(value: number | undefined): number {
   const hops = value ?? 1;
   if (!Number.isInteger(hops) || hops < 1 || hops > 20) {
@@ -122,7 +135,10 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     webhooks: options.webhooks ?? [],
     templates: { ...defaultTemplates, ...options.templates },
-    apiKeys: normalizeApiKeys(options.apiKeys),
+    apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
+    ...(options.authenticate ? { authenticate: options.authenticate } : {}),
+    ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),
+    basePath: normalizeBasePath(options.basePath),
     sealer: {
       p12: options.sealer.p12,
       passphrase: options.sealer.passphrase,

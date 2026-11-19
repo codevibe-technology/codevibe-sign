@@ -3,7 +3,12 @@ import type { Job } from '../store/types';
 import type { Runtime } from './context';
 import { runNotify, type NotifyPayload } from './notify';
 import { runSeal, type SealPayload } from './seal';
-import { buildWebhookBody, deliverWebhook, type WebhookPayload } from './webhooks';
+import {
+  buildWebhookBody,
+  deliverWebhook,
+  webhookTargetsFor,
+  type WebhookPayload,
+} from './webhooks';
 
 /** How long a claimed job is hidden from other workers. */
 export const JOB_LEASE_MS = 5 * 60 * 1000;
@@ -24,8 +29,16 @@ export const RETRY_DELAYS_MS = [
  * sealed files can be attached. Jobs start leased, because the request that created
  * them runs them straight away; `tick()` picks them up only if that run never finishes.
  */
-export function effectsToJobs(rt: Runtime, envelope: Envelope, effects: Effect[]): Job[] {
+export async function effectsToJobs(
+  rt: Runtime,
+  envelope: Envelope,
+  effects: Effect[],
+  workspaceId: string,
+): Promise<Job[]> {
   const now = rt.clock.now();
+  const targets = effects.some((e) => e.kind === 'webhook')
+    ? await webhookTargetsFor(rt, workspaceId)
+    : [];
   const job = (kind: Job['kind'], payload: object) => makeJob(rt, kind, payload);
 
   const sealing = effects.some((e) => e.kind === 'seal');
@@ -41,11 +54,12 @@ export function effectsToJobs(rt: Runtime, envelope: Envelope, effects: Effect[]
       if (effect.reason === 'completed_copy' && sealing) afterSeal.push(payload);
       else jobs.push(job('notify', payload));
     } else if (effect.kind === 'webhook') {
-      for (const target of rt.webhooks) {
+      for (const target of targets) {
         if (!target.events.includes('*') && !target.events.includes(effect.event)) continue;
         const deliveryId = rt.ids.id();
         const payload: WebhookPayload = {
           url: target.url,
+          workspaceId,
           deliveryId,
           body: buildWebhookBody(deliveryId, effect.event, envelope, now),
         };

@@ -1,5 +1,7 @@
 import type { AuditAction, Envelope } from '@codevibe_technology/sign-core';
 import { constantTimeEqual, hmacSha256Hex } from '../crypto';
+import type { WebhookTarget } from '../options';
+import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { Runtime } from './context';
 import { checkWebhookUrl, pinnedPost, resolveWebhookAddress } from './webhook-guard';
 
@@ -10,6 +12,8 @@ const MAX_RESPONSE_BYTES = 64 * 1024;
 
 export interface WebhookPayload {
   url: string;
+  /** Missing on jobs queued before workspaces: those belong to the default workspace. */
+  workspaceId?: string;
   deliveryId: string;
   body: string;
 }
@@ -75,9 +79,24 @@ export function verifyWebhook(
   return constantTimeEqual(v1, hmacSha256Hex(secret, `${t}.${body}`));
 }
 
+/**
+ * Targets that receive a workspace's events: the static `webhooks` for the default workspace,
+ * plus whatever `webhookTargets` returns for it.
+ */
+export async function webhookTargetsFor(
+  rt: Runtime,
+  workspaceId: string,
+): Promise<WebhookTarget[]> {
+  const fixed = workspaceId === DEFAULT_WORKSPACE ? rt.webhooks : [];
+  const own = rt.webhookTargets ? await rt.webhookTargets(workspaceId) : [];
+  return [...fixed, ...own];
+}
+
 export async function deliverWebhook(rt: Runtime, payload: WebhookPayload): Promise<void> {
-  const target = rt.webhooks.find((w) => w.url === payload.url);
+  const targets = await webhookTargetsFor(rt, payload.workspaceId ?? DEFAULT_WORKSPACE);
+  const target = targets.find((w) => w.url === payload.url);
   if (!target) return;
+  if (target.secret.length < 16) throw new Error(`Webhook secret for ${target.url} is too short`);
   const url = checkWebhookUrl(payload.url, rt.webhookSecurity);
   const address = await resolveWebhookAddress(url, rt.webhookSecurity);
   const timestamp = Math.floor(rt.clock.now().getTime() / 1000);
