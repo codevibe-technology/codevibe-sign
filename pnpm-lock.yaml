@@ -85,6 +85,12 @@ importers:
         specifier: workspace:*
         version: link:../pdf
 
+  packages/templates:
+    dependencies:
+      '@codevibe/sign-core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@babel/runtime@7.29.14':
