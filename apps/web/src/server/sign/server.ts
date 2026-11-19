@@ -7,12 +7,14 @@ import {
   type SignServer,
 } from '@codevibe_technology/sign-server';
 import { resolveApiKey } from '../api-keys';
+import { getBrand } from '../brand';
 import { auth } from '../auth/auth';
 import { db } from '../db';
 import { senderOf } from '../envelopes';
 import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
+import { createWorkspaceMail } from './mail';
 import { createAuthenticate } from './principal';
 import { webhookTargets } from './webhooks';
 
@@ -49,6 +51,15 @@ function build(): SignServer {
         (await senderOf(sql, workspaceId, envelopeId))?.userId === userId,
     }),
     webhookTargets,
+    workspaceMail: createWorkspaceMail({
+      appUrl: config.APP_URL,
+      brand: (workspaceId) => getBrand(sql, workspaceId),
+      workspaceName: async (workspaceId) =>
+        (
+          await sql<{ name: string }[]>`select name from app_workspaces where id = ${workspaceId}`
+        )[0]?.name ?? null,
+    }),
+    certificateNote: async (workspaceId) => (await getBrand(sql, workspaceId)).certificateFooter,
     basePath: SIGN_BASE_PATH,
     publicUrl: config.APP_URL,
     signingPageUrl: `${config.APP_URL}/sign`,
