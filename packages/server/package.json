@@ -16,7 +16,7 @@
     "url": "git+https://github.com/codevibe-technology/codevibe-sign.git",
     "directory": "packages/server"
   },
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-only",
   "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -51,15 +51,15 @@ const features = [
     text: 'One image configured with environment variables, PostgreSQL and your mail server. Documents stay with you.',
   },
   {
-    title: 'Apache-2.0',
-    text: 'Use it in commercial products, change it and read every line. No usage limits and no account with us.',
+    title: 'Open source',
+    text: 'Apache-2.0 libraries you can use in any product, and an AGPL-3.0 server and app you can self-host for free. Read every line, no usage limits.',
   },
 ];
 
 const faqs = [
   {
     q: 'Is it free?',
-    a: 'Yes. The code is Apache-2.0. You pay only for what you run it on: your server, your mail and SMS delivery, and eSign credits with your provider if you use Aadhaar eSign.',
+    a: 'Yes. The libraries are Apache-2.0 and the server and app are AGPL-3.0, free to self-host. You pay only for what you run it on: your server, your mail and SMS delivery, and eSign credits with your provider if you use Aadhaar eSign.',
   },
   {
     q: 'Can I use it in production today?',
@@ -97,7 +97,7 @@ const faqs = [
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Open source · Apache-2.0 · Pre-release</p>
+          <p class="eyebrow">Open source · Pre-release</p>
           <h1>E-signatures you run on your own servers</h1>
           <p class="lead">
             Send a PDF, collect signatures in the order you choose and get back one sealed file with

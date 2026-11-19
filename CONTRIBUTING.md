@@ -81,5 +81,7 @@ changes to sealing, verification, authentication or the audit log get a second r
 
 ## Licence
 
-By contributing you agree that your contributions are licensed under the
-[Apache License 2.0](LICENSE).
+By contributing you agree that your contributions are licensed under the licence of the part you
+change: Apache-2.0 for the libraries and AGPL-3.0-only for `packages/server` and the apps (see
+[LICENSING.md](LICENSING.md)). Changes to the server or the apps may also need a short contributor
+licence agreement, which we will link here before we accept outside pull requests to those parts.

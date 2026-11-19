@@ -140,7 +140,7 @@ export default defineConfig({
 
     footer: {
       message:
-        'Code released under the Apache License 2.0. "Codevibe", "Codevibe Sign" and "Hrvibe" are trademarks of Codevibe Technology and are not covered by the licence.',
+        'Libraries under Apache-2.0, server and apps under AGPL-3.0. "Codevibe", "Codevibe Sign" and "Hrvibe" are trademarks of Codevibe Technology and are not covered by the licences.',
       copyright: `© 2026 <a href="${CODEVIBE_URL}">Codevibe</a>`,
     },
   },

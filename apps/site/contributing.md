@@ -66,4 +66,8 @@ Keep each pull request to one concern. CI runs lint, format check, build, type c
 on Node 20 and 22. A maintainer reviews every pull request, and changes to sealing,
 verification, authentication or the audit log get a second review.
 
-By contributing you agree that your contributions are licensed under the Apache License 2.0.
+By contributing you agree that your contributions are licensed under the licence of the part you
+change: Apache-2.0 for the libraries, AGPL-3.0-only for `packages/server` and the apps (see
+[LICENSING.md](https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md)). Changes
+to the server or the apps may also need a short contributor licence agreement, which we will link here
+before we accept outside pull requests to those parts.

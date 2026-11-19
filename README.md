@@ -198,5 +198,7 @@ releases work. Everyone taking part agrees to the [Code of Conduct](CODE_OF_COND
 
 ## Licence
 
-Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). The licence does not cover the
-Codevibe names and logos; see [TRADEMARKS.md](TRADEMARKS.md).
+The libraries are Apache-2.0, so you can use them in any product. The server and the apps are
+AGPL-3.0: free to use and self-host, and if you offer a modified version to others as a hosted
+service you share your changes. [LICENSING.md](LICENSING.md) explains it in plain words. The
+licences do not cover the Codevibe names and logos; see [TRADEMARKS.md](TRADEMARKS.md).

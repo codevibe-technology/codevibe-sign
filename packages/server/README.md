@@ -211,4 +211,4 @@ anything that looks like a signing token are replaced, and fields such as `autho
 
 ## Licence
 
-Apache-2.0 © Codevibe
+AGPL-3.0-only © Codevibe. See [LICENSING.md](../../LICENSING.md).

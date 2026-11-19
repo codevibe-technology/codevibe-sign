@@ -3,7 +3,7 @@ layout: home
 markdownStyles: false
 title: Codevibe Sign
 titleTemplate: Open-source e-signatures you run yourself
-description: Send documents for signature in the order you choose, seal the final PDF with your certificate and verify it offline. Apache-2.0 TypeScript packages and a Docker image.
+description: Send documents for signature in the order you choose, seal the final PDF with your certificate and verify it offline. Open-source TypeScript packages and a Docker image.
 ---
 
 <HomePage>
