@@ -4,6 +4,7 @@ import { canEncode, embedFonts, type FontSet } from './fonts';
 import { boxFrame, clampRect, fitContain, pageGeometry, type BoxFrame } from './geometry';
 import { loadPdf } from './inspect';
 import { sanitizeDocument } from './sanitize';
+import { reencodePng } from './png';
 import { fitText, LINE_HEIGHT } from './text';
 import { assertTimeZone, formatSigningDate } from './time';
 
@@ -53,9 +54,10 @@ function decodePng(field: Field, value: string, maxBytes: number): Uint8Array {
   return bytes;
 }
 
+/** The image is re-encoded under limits first, so pdf-lib's decoder only sees a clean PNG. */
 async function embedPng(doc: PDFDocument, field: Field, bytes: Uint8Array): Promise<PDFImage> {
   try {
-    return await doc.embedPng(bytes);
+    return await doc.embedPng(reencodePng(bytes));
   } catch {
     throw new SignError('INVALID_FIELD_VALUE', 'The signature image could not be read.', {
       fieldId: field.id,
