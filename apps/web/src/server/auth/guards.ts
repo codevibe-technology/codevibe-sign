@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { can, type Permission } from '@/lib/roles';
 import { db } from '../db';
 import { findMembership, type Membership } from '../workspaces';
-import { requireUser, type SessionUser } from './session';
+import { getSessionUser, requireUser, type SessionUser } from './session';
 
 export interface WorkspaceAccess extends Membership {
   user: SessionUser;
@@ -21,4 +21,12 @@ export async function requireWorkspace(
   const membership = await findMembership(db(), user.id, { slug });
   if (!membership || !can(membership.role, permission)) notFound();
   return { ...membership, user };
+}
+
+/** For route handlers: the member and role, or null (answer 404) for anyone else. */
+export async function findWorkspaceAccess(slug: string): Promise<WorkspaceAccess | null> {
+  const user = await getSessionUser();
+  if (!user) return null;
+  const membership = await findMembership(db(), user.id, { slug });
+  return membership ? { ...membership, user } : null;
 }
