@@ -1,0 +1,155 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --canvas: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f8;
+  --line: #d9e0ea;
+  --line-strong: #b8c4d4;
+  --ink: #0d1b2a;
+  --muted: #526277;
+  --primary: #1b6ae0;
+  --primary-hover: #1557ba;
+  --primary-soft: #e3edfc;
+  --primary-ink: #ffffff;
+  --accent: #2dd4bf;
+  --accent-soft: #d5f7f2;
+  --accent-ink: #0d1b2a;
+  --danger: #c9372c;
+  --danger-soft: #fbe7e5;
+  --success: #12805c;
+  --success-soft: #dcf3ea;
+  --warning: #9a5b00;
+  --warning-soft: #fdf0d8;
+  --nav: #0d1b2a;
+  --nav-raised: #17304a;
+  --nav-ink: #e8eef6;
+  --nav-muted: #9db0c7;
+  --header: #0d1b2a;
+  --header-ink: #ffffff;
+  --shadow: 0 1px 2px rgb(13 27 42 / 0.06), 0 4px 12px rgb(13 27 42 / 0.06);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #0a1521;
+  --surface: #112236;
+  --surface-2: #17304a;
+  --line: #23405f;
+  --line-strong: #345a80;
+  --ink: #e8eef6;
+  --muted: #9db0c7;
+  --primary: #4c8df0;
+  --primary-hover: #6aa2f5;
+  --primary-soft: #16325a;
+  --primary-ink: #06101b;
+  --accent: #2dd4bf;
+  --accent-soft: #0f3d3c;
+  --accent-ink: #06101b;
+  --danger: #f07167;
+  --danger-soft: #3d1a1a;
+  --success: #4cc79a;
+  --success-soft: #0f3528;
+  --warning: #f0b04c;
+  --warning-soft: #3a2a0d;
+  --nav: #07111c;
+  --nav-raised: #17304a;
+  --nav-ink: #e8eef6;
+  --nav-muted: #8aa0b8;
+  --header: #17304a;
+  --header-ink: #ffffff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.25);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme='system'] {
+    color-scheme: dark;
+    --canvas: #0a1521;
+    --surface: #112236;
+    --surface-2: #17304a;
+    --line: #23405f;
+    --line-strong: #345a80;
+    --ink: #e8eef6;
+    --muted: #9db0c7;
+    --primary: #4c8df0;
+    --primary-hover: #6aa2f5;
+    --primary-soft: #16325a;
+    --primary-ink: #06101b;
+    --accent-soft: #0f3d3c;
+    --accent-ink: #06101b;
+    --danger: #f07167;
+    --danger-soft: #3d1a1a;
+    --success: #4cc79a;
+    --success-soft: #0f3528;
+    --warning: #f0b04c;
+    --warning-soft: #3a2a0d;
+    --nav: #07111c;
+    --nav-muted: #8aa0b8;
+    --header: #17304a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.25);
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-ink: var(--primary-ink);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-nav: var(--nav);
+  --color-nav-raised: var(--nav-raised);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-muted: var(--nav-muted);
+  --color-header: var(--header);
+  --color-header-ink: var(--header-ink);
+  --shadow-card: var(--shadow);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  html {
+    background: var(--canvas);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply min-h-dvh bg-canvas font-sans text-[15px] leading-6 text-ink;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

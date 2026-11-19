@@ -14,6 +14,8 @@ export default tseslint.config(
       '.worktrees/**',
       '**/.vitepress/cache/**',
       '**/.vitepress/dist/**',
+      '**/.next/**',
+      '**/next-env.d.ts',
     ],
   },
   js.configs.recommended,
