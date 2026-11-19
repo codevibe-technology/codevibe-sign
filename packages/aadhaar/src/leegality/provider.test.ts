@@ -83,6 +83,41 @@ describe('createLeegalityProvider options', () => {
     expect(() => createLeegalityProvider({ ...base, profileId: '' })).toThrow(SignError);
   });
 
+  it('sends the auth token only over https, except to localhost', () => {
+    const base = {
+      authToken: TOKEN,
+      privateSalt: SALT,
+      profileId: 'wf',
+      environment: 'sandbox' as const,
+    };
+    for (const baseUrl of [
+      'http://leegality.example.com/api',
+      'ftp://leegality.example.com',
+      'https://user:secret@leegality.example.com/api',
+      'not a url',
+    ]) {
+      expect(() => createLeegalityProvider({ ...base, baseUrl })).toThrow(/baseUrl/);
+    }
+    expect(() =>
+      createLeegalityProvider({ ...base, baseUrl: 'http://localhost:8080/api' }),
+    ).not.toThrow();
+    expect(() =>
+      createLeegalityProvider({ ...base, baseUrl: 'https://proxy.example.com/leegality/' }),
+    ).not.toThrow();
+  });
+
+  it('rejects a timeout that would not bound the call', () => {
+    const base = {
+      authToken: TOKEN,
+      privateSalt: SALT,
+      profileId: 'wf',
+      environment: 'sandbox' as const,
+    };
+    for (const timeoutMs of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 3_600_000]) {
+      expect(() => createLeegalityProvider({ ...base, timeoutMs })).toThrow(/timeoutMs/);
+    }
+  });
+
   it('rejects an unknown environment', () => {
     expect(() =>
       createLeegalityProvider({
@@ -203,6 +238,18 @@ describe('createRequest', () => {
     );
     const error = await caught(provider.createRequest(signRequest()));
     expect(error.details).toMatchObject({ reason: 'missing_sign_url', providerRef: 'DOC123' });
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'http://sandbox.leegality.com/sign/x',
+    'data:text/html,hi',
+    '/sign/x',
+  ])('refuses a signing link that is not https: %s', async (signUrl) => {
+    const invitees = [{ ...created.data.invitees[1], signUrl }];
+    const { provider } = setup(() => json({ ...created, data: { ...created.data, invitees } }));
+    const error = await caught(provider.createRequest(signRequest()));
+    expect(error.details).toMatchObject({ reason: 'missing_sign_url' });
   });
 
   it('refuses a JSON response that is too large to be real', async () => {

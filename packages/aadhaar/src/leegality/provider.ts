@@ -58,6 +58,31 @@ export interface LeegalityOptions {
   maxSignedDocumentBytes?: number;
 }
 
+const MAX_TIMEOUT_MS = 10 * 60 * 1000;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** The auth token travels in a header, so it must never go over plain http to a remote host. */
+function isSecureBaseUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.username || url.password) return false;
+  return (
+    url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname))
+  );
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function required(value: string | undefined, name: string): string {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new SignError('VALIDATION', `Leegality option ${name} is required`, { option: name });
@@ -125,10 +150,25 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
       },
     );
   }
+  if (!isSecureBaseUrl(baseUrl)) {
+    throw new SignError(
+      'VALIDATION',
+      'Leegality option baseUrl must be an https URL (http is allowed only for localhost)',
+      { option: 'baseUrl' },
+    );
+  }
+  const timeoutMs = options.timeoutMs ?? 30_000;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS) {
+    throw new SignError(
+      'VALIDATION',
+      `Leegality option timeoutMs must be a whole number from 1 to ${MAX_TIMEOUT_MS}`,
+      { option: 'timeoutMs' },
+    );
+  }
   const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   const http: HttpOptions = {
     fetch: fetchImpl,
-    timeoutMs: options.timeoutMs ?? 30_000,
+    timeoutMs,
     provider: PROVIDER,
   };
   const confirmWebhooks = options.confirmWebhooks ?? true;
@@ -213,7 +253,8 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
       invitees.find((i) => email !== undefined && i.email?.toLowerCase() === email) ??
       invitees.find((i) => phone !== undefined && i.phone?.slice(-10) === phone) ??
       (invitees.length === 1 ? invitees[0] : undefined);
-    if (!match?.signUrl) {
+    // The signer is sent to this URL, so anything but https (javascript:, data:, http:) is refused.
+    if (!match?.signUrl || !isHttpsUrl(match.signUrl)) {
       throw new SignError('PROVIDER_ERROR', 'Leegality did not return a signing link', {
         provider: PROVIDER,
         reason: 'missing_sign_url',
