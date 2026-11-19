@@ -253,6 +253,33 @@ describe('draft changes, send and void', () => {
     expect(h.mailer.sent.at(-1)?.subject).toMatch(/^Cancelled/);
   });
 
+  it('reminds the current signer with a fresh link, at most every 15 minutes', async () => {
+    const { h, envelope } = await draft();
+    await h.call('POST', `/v1/envelopes/${envelope.id}/send`);
+    const first = h.tokenFor('asha@example.com');
+    const early = await h.call('POST', `/v1/envelopes/${envelope.id}/remind`);
+    expect(early.status).toBe(409);
+    expect(early.json.error.message).toMatch(/15 minutes/);
+
+    h.advance(16 * 60_000);
+    const { status, json } = await h.call('POST', `/v1/envelopes/${envelope.id}/remind`, {
+      body: { recipientId: envelope.recipients[0].id },
+    });
+    expect(status).toBe(200);
+    expect(json.recipients[0].lastRemindedAt).toBeTruthy();
+    expect(h.mailer.sent.at(-1)?.to).toBe('asha@example.com');
+    expect(h.tokenFor('asha@example.com')).not.toBe(first);
+
+    const later = await h.call('POST', `/v1/envelopes/${envelope.id}/remind`, {
+      body: { recipientId: envelope.recipients[1].id },
+    });
+    expect(later.json.error.code).toBe('NOT_YOUR_TURN');
+    const bad = await h.call('POST', `/v1/envelopes/${envelope.id}/remind`, {
+      body: { recipientId: 7 },
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it('returns 404 for unknown envelopes', async () => {
     const { h } = await draft();
     const { status, json } = await h.call('GET', '/v1/envelopes/nope');

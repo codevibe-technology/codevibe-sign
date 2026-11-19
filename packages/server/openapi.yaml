@@ -445,6 +445,54 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /v1/envelopes/{id}/remind:
+    parameters:
+      - $ref: '#/components/parameters/EnvelopeId'
+    post:
+      operationId: remindRecipients
+      tags: [Envelopes]
+      summary: Remind recipients
+      description: |
+        Mails a reminder with a fresh signing link to everyone whose turn it is, or to the one
+        recipient named. Each recipient gets at most one reminder or invitation every 15
+        minutes; manual reminders do not count against the automatic ones.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                recipientId:
+                  type: string
+                  description: Remind only this recipient.
+            example:
+              recipientId: rcp_01
+      responses:
+        '200':
+          description: The envelope, with `lastRemindedAt` set on everyone reminded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+          headers:
+            Idempotent-Replayed:
+              $ref: '#/components/headers/IdempotentReplayed'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ReadOnly'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
   /v1/envelopes/{id}/events:
     parameters:
       - $ref: '#/components/parameters/EnvelopeId'

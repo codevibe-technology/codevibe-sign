@@ -208,6 +208,8 @@ describe('a full run against the server', () => {
     expect((await call('GET', '/v1/envelopes?limit=0')).status).toBe(400);
     await call('PATCH', `/v1/envelopes/${id}`, { body: { message: 'Please sign by Friday.' } });
     await call('POST', `/v1/envelopes/${id}/send`);
+    const early = await call('POST', `/v1/envelopes/${id}/remind`);
+    expect(early.json.error.code).toBe('INVALID_STATE');
 
     const token = h.tokenFor('asha@example.com');
     const link = await call('GET', `/sign/${token}`);

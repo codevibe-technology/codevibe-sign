@@ -100,6 +100,7 @@ All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
 | `PATCH /v1/envelopes/:id`                             | Change a draft: title, message, routing, recipients, fields.                                            |
 | `POST /v1/envelopes/:id/send`                         | Send it; the first signers get their links.                                                             |
 | `POST /v1/envelopes/:id/void`                         | Withdraw it (`{ "reason": "..." }`).                                                                    |
+| `POST /v1/envelopes/:id/remind`                       | Mail a fresh link to whoever's turn it is (`{ "recipientId" }` for one); at most every 15 minutes.      |
 | `GET /v1/envelopes/:id/events`                        | The audit log and whether its hash chain is intact.                                                     |
 | `GET /v1/envelopes/:id/documents/:docId`              | The sealed PDF once complete, else the original (`?version=`).                                          |
 | `GET /v1/envelopes/:id/documents/:docId/verification` | `verify()` on the stored sealed file: `{ valid, reason, signer, signedAt, certificateSha256, sha256 }`. |
