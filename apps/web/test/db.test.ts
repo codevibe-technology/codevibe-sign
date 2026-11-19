@@ -67,7 +67,12 @@ describe.skipIf(!url)('against PostgreSQL', () => {
     const runs = await Promise.all([migrateAll(sql), migrateAll(sql)]);
     expect(runs.flat()).toContain('app/0002_workspaces');
     expect(runs.flat()).toContain('0003_workspaces');
-    users = { asha: await user('Asha'), ravi: await user('Ravi'), mia: await user('Mia'), zoe: await user('Zoe') };
+    users = {
+      asha: await user('Asha'),
+      ravi: await user('Ravi'),
+      mia: await user('Mia'),
+      zoe: await user('Zoe'),
+    };
   });
 
   afterAll(async () => {
@@ -127,10 +132,15 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       const b = await createWorkspace(sql, { name: 'Acme  HR', userId: users.ravi.id });
       expect(a.slug).toMatch(/^acme-hr/);
       expect(b.slug).not.toBe(a.slug);
-      expect(await findMembership(sql, users.asha.id, { slug: a.slug })).toMatchObject({ role: 'owner' });
+      expect(await findMembership(sql, users.asha.id, { slug: a.slug })).toMatchObject({
+        role: 'owner',
+      });
       expect(await findMembership(sql, users.asha.id, { slug: b.slug })).toBeNull();
       expect(await findMembership(sql, users.ravi.id, { id: a.id })).toBeNull();
       expect((await getBrand(sql, a.id)).brandColor).toBe('#1B6AE0');
+      const mine = await listWorkspacesForUser(sql, users.asha.id);
+      expect(mine.map((m) => m.workspace.id)).toContain(a.id);
+      expect(mine.map((m) => m.workspace.id)).not.toContain(b.id);
       await rejectsWith(createWorkspace(sql, { name: '   ', userId: users.asha.id }), 'VALIDATION');
       expect(await renameWorkspace(sql, a.id, '  Acme   People ')).toBe('Acme People');
     });
@@ -146,26 +156,51 @@ describe.skipIf(!url)('against PostgreSQL', () => {
         changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id, role: 'admin' }),
         'CONFLICT',
       );
-      await rejectsWith(removeMember(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id }), 'CONFLICT');
+      await rejectsWith(
+        removeMember(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id }),
+        'CONFLICT',
+      );
       await rejectsWith(
         changeRole(sql, { workspaceId: ws.id, actor: admin, userId: users.mia.id, role: 'owner' }),
         'FORBIDDEN',
       );
-      await rejectsWith(removeMember(sql, { workspaceId: ws.id, actor: admin, userId: users.asha.id }), 'FORBIDDEN');
-      await changeRole(sql, { workspaceId: ws.id, actor: admin, userId: users.mia.id, role: 'viewer' });
+      await rejectsWith(
+        removeMember(sql, { workspaceId: ws.id, actor: admin, userId: users.asha.id }),
+        'FORBIDDEN',
+      );
+      await changeRole(sql, {
+        workspaceId: ws.id,
+        actor: admin,
+        userId: users.mia.id,
+        role: 'viewer',
+      });
       await rejectsWith(
         changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.zoe.id, role: 'viewer' }),
         'NOT_FOUND',
       );
 
-      await changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.ravi.id, role: 'owner' });
-      await changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id, role: 'member' });
+      await changeRole(sql, {
+        workspaceId: ws.id,
+        actor: owner,
+        userId: users.ravi.id,
+        role: 'owner',
+      });
+      await changeRole(sql, {
+        workspaceId: ws.id,
+        actor: owner,
+        userId: users.asha.id,
+        role: 'member',
+      });
       expect((await listMembers(sql, ws.id)).map((m) => [m.name, m.role])).toEqual([
         ['Ravi', 'owner'],
         ['Asha', 'member'],
         ['Mia', 'viewer'],
       ]);
-      await removeMember(sql, { workspaceId: ws.id, actor: { userId: users.mia.id, role: 'viewer' }, userId: users.mia.id });
+      await removeMember(sql, {
+        workspaceId: ws.id,
+        actor: { userId: users.mia.id, role: 'viewer' },
+        userId: users.mia.id,
+      });
       expect(await findMembership(sql, users.mia.id, { id: ws.id })).toBeNull();
     });
 
@@ -173,8 +208,16 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       const ws = await createWorkspace(sql, { name: 'Race', userId: users.asha.id });
       await sql`insert into app_members (workspace_id, user_id, role) values (${ws.id}, ${users.ravi.id}, 'owner')`;
       const results = await Promise.allSettled([
-        removeMember(sql, { workspaceId: ws.id, actor: { userId: users.asha.id, role: 'owner' }, userId: users.ravi.id }),
-        removeMember(sql, { workspaceId: ws.id, actor: { userId: users.ravi.id, role: 'owner' }, userId: users.asha.id }),
+        removeMember(sql, {
+          workspaceId: ws.id,
+          actor: { userId: users.asha.id, role: 'owner' },
+          userId: users.ravi.id,
+        }),
+        removeMember(sql, {
+          workspaceId: ws.id,
+          actor: { userId: users.ravi.id, role: 'owner' },
+          userId: users.asha.id,
+        }),
       ]);
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
       expect((await listMembers(sql, ws.id)).filter((m) => m.role === 'owner')).toHaveLength(1);
@@ -185,20 +228,42 @@ describe.skipIf(!url)('against PostgreSQL', () => {
     it('invites by email, accepts once, and only for that email', async () => {
       const ws = await createWorkspace(sql, { name: 'Invites', userId: users.asha.id });
       const inviter = { userId: users.asha.id, role: 'owner' as const };
-      const first = await createInvitation(sql, { workspaceId: ws.id, email: users.mia.email.toUpperCase(), role: 'member', invitedBy: inviter });
-      const again = await createInvitation(sql, { workspaceId: ws.id, email: users.mia.email, role: 'viewer', invitedBy: inviter });
+      const first = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: users.mia.email.toUpperCase(),
+        role: 'member',
+        invitedBy: inviter,
+      });
+      const again = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: users.mia.email,
+        role: 'viewer',
+        invitedBy: inviter,
+      });
       expect(await findInvitation(sql, first.token)).toMatchObject({ revokedAt: expect.any(Date) });
-      expect((await listOpenInvitations(sql, ws.id)).map((i) => [i.email, i.role])).toEqual([[users.mia.email, 'viewer']]);
-      const [stored] = await sql`select token_hash from app_invitations where id = ${again.invitation.id}`;
+      expect((await listOpenInvitations(sql, ws.id)).map((i) => [i.email, i.role])).toEqual([
+        [users.mia.email, 'viewer'],
+      ]);
+      const [stored] =
+        await sql`select token_hash from app_invitations where id = ${again.invitation.id}`;
       expect(stored?.token_hash).not.toBe(again.token);
 
       await rejectsWith(acceptInvitation(sql, again.token, users.zoe), 'FORBIDDEN');
       await rejectsWith(acceptInvitation(sql, first.token, users.mia), 'NOT_FOUND');
-      expect(await acceptInvitation(sql, again.token, users.mia)).toEqual({ workspaceSlug: ws.slug });
-      expect(await findMembership(sql, users.mia.id, { id: ws.id })).toMatchObject({ role: 'viewer' });
+      expect(await acceptInvitation(sql, again.token, users.mia)).toEqual({
+        workspaceSlug: ws.slug,
+      });
+      expect(await findMembership(sql, users.mia.id, { id: ws.id })).toMatchObject({
+        role: 'viewer',
+      });
       await rejectsWith(acceptInvitation(sql, again.token, users.mia), 'NOT_FOUND');
       await rejectsWith(
-        createInvitation(sql, { workspaceId: ws.id, email: users.mia.email, role: 'member', invitedBy: inviter }),
+        createInvitation(sql, {
+          workspaceId: ws.id,
+          email: users.mia.email,
+          role: 'member',
+          invitedBy: inviter,
+        }),
         'CONFLICT',
       );
     });
@@ -214,17 +279,32 @@ describe.skipIf(!url)('against PostgreSQL', () => {
         now: new Date(Date.now() - 8 * 86_400_000),
       });
       await rejectsWith(acceptInvitation(sql, old.token, users.zoe), 'NOT_FOUND');
-      const fresh = await createInvitation(sql, { workspaceId: ws.id, email: users.zoe.email, role: 'member', invitedBy: inviter });
+      const fresh = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: users.zoe.email,
+        role: 'member',
+        invitedBy: inviter,
+      });
       await rejectsWith(revokeInvitation(sql, 'ws_other', fresh.invitation.id), 'NOT_FOUND');
       await revokeInvitation(sql, ws.id, fresh.invitation.id);
       await rejectsWith(acceptInvitation(sql, fresh.token, users.zoe), 'NOT_FOUND');
       expect(await findInvitation(sql, "x' or 1=1 --")).toBeNull();
       await rejectsWith(
-        createInvitation(sql, { workspaceId: ws.id, email: 'x@y.co', role: 'owner', invitedBy: { userId: users.asha.id, role: 'admin' } }),
+        createInvitation(sql, {
+          workspaceId: ws.id,
+          email: 'x@y.co',
+          role: 'owner',
+          invitedBy: { userId: users.asha.id, role: 'admin' },
+        }),
         'FORBIDDEN',
       );
       await rejectsWith(
-        createInvitation(sql, { workspaceId: ws.id, email: 'not an email', role: 'member', invitedBy: inviter }),
+        createInvitation(sql, {
+          workspaceId: ws.id,
+          email: 'not an email',
+          role: 'member',
+          invitedBy: inviter,
+        }),
         'VALIDATION',
       );
     });
@@ -234,7 +314,11 @@ describe.skipIf(!url)('against PostgreSQL', () => {
     it('stores only a hash, resolves to its workspace and stops when revoked', async () => {
       const a = await createWorkspace(sql, { name: 'Keys A', userId: users.asha.id });
       const b = await createWorkspace(sql, { name: 'Keys B', userId: users.ravi.id });
-      const key = await createApiKey(sql, { workspaceId: a.id, name: 'CI', createdBy: users.asha.id });
+      const key = await createApiKey(sql, {
+        workspaceId: a.id,
+        name: 'CI',
+        createdBy: users.asha.id,
+      });
       expect(key.key).toMatch(/^cvs_[A-Za-z0-9_-]{43}$/);
       const rows = await sql`select * from app_api_keys where id = ${key.id}`;
       expect(JSON.stringify(rows)).not.toContain(key.key);
@@ -243,7 +327,10 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       const altered = `${key.key.slice(0, -1)}${key.key.endsWith('A') ? 'B' : 'A'}`;
       expect(await resolveApiKey(sql, altered)).toBeNull();
       expect(await resolveApiKey(sql, 'Bearer nonsense')).toBeNull();
-      expect((await listApiKeys(sql, a.id))[0]).toMatchObject({ name: 'CI', lastUsedAt: expect.any(Date) });
+      expect((await listApiKeys(sql, a.id))[0]).toMatchObject({
+        name: 'CI',
+        lastUsedAt: expect.any(Date),
+      });
       expect(await listApiKeys(sql, b.id)).toEqual([]);
 
       await rejectsWith(revokeApiKey(sql, b.id, key.id), 'NOT_FOUND');
@@ -259,14 +346,24 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       const a = await createWorkspace(sql, { name: 'Brand A', userId: users.asha.id });
       const b = await createWorkspace(sql, { name: 'Brand B', userId: users.asha.id });
       const files = memoryFileStore();
-      await updateBrand(sql, a.id, { brandColor: '#2dd4bf', font: 'serif', senderName: 'Acme "HR"\n' });
-      expect(await getBrand(sql, a.id)).toMatchObject({ brandColor: '#2DD4BF', font: 'serif', senderName: 'Acme HR' });
+      await updateBrand(sql, a.id, {
+        brandColor: '#2dd4bf',
+        font: 'serif',
+        senderName: 'Acme "HR"\n',
+      });
+      expect(await getBrand(sql, a.id)).toMatchObject({
+        brandColor: '#2DD4BF',
+        font: 'serif',
+        senderName: 'Acme HR',
+      });
       expect((await getBrand(sql, b.id)).brandColor).toBe('#1B6AE0');
       await rejectsWith(updateBrand(sql, a.id, { brandColor: 'teal' }), 'VALIDATION');
 
       const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
       await setLogo(sql, files, a.id, png);
-      expect((await getBrand(sql, a.id)).logoUrl).toMatch(new RegExp(`^/brand/${a.id}/logo\\?v=\\d+$`));
+      expect((await getBrand(sql, a.id)).logoUrl).toMatch(
+        new RegExp(`^/brand/${a.id}/logo\\?v=\\d+$`),
+      );
       expect(await readLogo(sql, files, a.id)).toEqual({ bytes: png, type: 'image/png' });
       expect(await readLogo(sql, files, b.id)).toBeNull();
       await removeLogo(sql, files, a.id);
@@ -274,14 +371,21 @@ describe.skipIf(!url)('against PostgreSQL', () => {
     });
 
     it('keeps personal preferences per person', async () => {
-      expect(await getPreferences(sql, users.zoe.id)).toEqual({ theme: 'system', timezone: null, locale: 'en' });
+      expect(await getPreferences(sql, users.zoe.id)).toEqual({
+        theme: 'system',
+        timezone: null,
+        locale: 'en',
+      });
       await updatePreferences(sql, users.zoe.id, { theme: 'dark' });
       expect(await updatePreferences(sql, users.zoe.id, { timezone: 'Asia/Kolkata' })).toEqual({
         theme: 'dark',
         timezone: 'Asia/Kolkata',
         locale: 'en',
       });
-      await rejectsWith(updatePreferences(sql, users.zoe.id, { timezone: 'Mars/Base' }), 'VALIDATION');
+      await rejectsWith(
+        updatePreferences(sql, users.zoe.id, { timezone: 'Mars/Base' }),
+        'VALIDATION',
+      );
       await rejectsWith(updatePreferences(sql, users.zoe.id, { theme: 'neon' }), 'VALIDATION');
       expect((await getPreferences(sql, users.mia.id)).theme).toBe('system');
     });
@@ -299,14 +403,20 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       title: 'Offer letter',
       documents: [{ key: 'offer', name: 'offer.pdf', content: document }],
       recipients: [{ key: 'asha', name: 'Asha', email: 'asha@example.com' }],
-      fields: [{ recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 }],
+      fields: [
+        { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
+      ],
     };
 
     it('keeps each workspace to its own envelopes, files and events', async () => {
       const a = await createWorkspace(sql, { name: 'Tenant A', userId: users.asha.id });
       const b = await createWorkspace(sql, { name: 'Tenant B', userId: users.ravi.id });
-      const keyA = (await createApiKey(sql, { workspaceId: a.id, name: 'A', createdBy: users.asha.id })).key;
-      const keyB = (await createApiKey(sql, { workspaceId: b.id, name: 'B', createdBy: users.ravi.id })).key;
+      const keyA = (
+        await createApiKey(sql, { workspaceId: a.id, name: 'A', createdBy: users.asha.id })
+      ).key;
+      const keyB = (
+        await createApiKey(sql, { workspaceId: b.id, name: 'B', createdBy: users.ravi.id })
+      ).key;
       const mailer = consoleMailer({ silent: true });
       const sign = createSignServer({
         store: postgresStore(sql),
@@ -348,12 +458,21 @@ describe.skipIf(!url)('against PostgreSQL', () => {
         ['POST', `/v1/envelopes/${envelope.id}/void`],
       ] as const;
       for (const [method, path] of paths) {
-        const res = await call(keyB, method, path, method === 'GET' ? undefined : { title: 'x', reason: 'x' });
+        const res = await call(
+          keyB,
+          method,
+          path,
+          method === 'GET' ? undefined : { title: 'x', reason: 'x' },
+        );
         expect(res.status, `${method} ${path}`).toBe(404);
       }
-      const listB = (await (await call(keyB, 'GET', '/v1/envelopes')).json()) as { envelopes: unknown[] };
+      const listB = (await (await call(keyB, 'GET', '/v1/envelopes')).json()) as {
+        envelopes: unknown[];
+      };
       expect(listB.envelopes).toEqual([]);
-      const listA = (await (await call(keyA, 'GET', '/v1/envelopes')).json()) as { envelopes: { id: string }[] };
+      const listA = (await (await call(keyA, 'GET', '/v1/envelopes')).json()) as {
+        envelopes: { id: string }[];
+      };
       expect(listA.envelopes.map((e) => e.id)).toEqual([envelope.id]);
       expect((await call(keyA, 'POST', `/v1/envelopes/${envelope.id}/send`, {})).status).toBe(200);
       expect(mailer.sent.at(-1)?.text).toContain(`${APP_URL}/api/sign/`);

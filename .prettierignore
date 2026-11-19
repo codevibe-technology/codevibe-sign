@@ -7,3 +7,4 @@ coverage
 **/.vitepress/dist/
 **/.next/
 apps/web/data/
+**/next-env.d.ts

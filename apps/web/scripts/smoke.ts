@@ -53,9 +53,15 @@ try {
   check(true, 'app answers /api/health');
 
   const signIn = await get('/sign-in');
-  check(signIn.status === 200 && (await signIn.text()).includes('Email me a sign-in link'), 'sign-in page renders');
+  check(
+    signIn.status === 200 && (await signIn.text()).includes('Email me a sign-in link'),
+    'sign-in page renders',
+  );
   const guarded = await get('/w/anything');
-  check([307, 308].includes(guarded.status) && guarded.headers.get('location')?.includes('/sign-in'), 'workspace pages need a session');
+  check(
+    [307, 308].includes(guarded.status) && guarded.headers.get('location')?.includes('/sign-in'),
+    'workspace pages need a session',
+  );
   const anonymousApi = await get('/api/v1/envelopes');
   check(anonymousApi.status === 401, 'API refuses calls without a key');
 
@@ -73,9 +79,15 @@ try {
   const cookie = verified.headers.get('set-cookie')?.split(';')[0] ?? '';
   check(cookie.startsWith('cvs.session_token='), 'magic link signs the person in');
   const home = await get('/', { headers: { cookie } });
-  check(home.headers.get('location')?.endsWith('/onboarding'), 'a new person is sent to onboarding');
+  check(
+    home.headers.get('location')?.endsWith('/onboarding'),
+    'a new person is sent to onboarding',
+  );
   const onboarding = await get('/onboarding', { headers: { cookie } });
-  check(onboarding.status === 200 && (await onboarding.text()).includes('Create your workspace'), 'onboarding renders');
+  check(
+    onboarding.status === 200 && (await onboarding.text()).includes('Create your workspace'),
+    'onboarding renders',
+  );
 
   const [user] = await sql<{ id: string }[]>`select id from auth_users where email = ${email}`;
   const workspaceId = `ws_${randomBytes(10).toString('hex')}`;
@@ -86,10 +98,17 @@ try {
     values (${`key_${randomBytes(10).toString('hex')}`}, ${workspaceId}, 'smoke',
       ${createHash('sha256').update(key).digest('hex')}, ${key.slice(0, 10)})`;
   const list = await get('/api/v1/envelopes', { headers: { authorization: `Bearer ${key}` } });
-  check(list.status === 200 && (await list.json()).envelopes.length === 0, 'a workspace key lists its envelopes');
-  const viaSession = await get('/api/v1/envelopes', { headers: { cookie, 'x-workspace': workspaceId } });
+  check(
+    list.status === 200 && (await list.json()).envelopes.length === 0,
+    'a workspace key lists its envelopes',
+  );
+  const viaSession = await get('/api/v1/envelopes', {
+    headers: { cookie, 'x-workspace': workspaceId },
+  });
   check(viaSession.status === 200, 'a signed-in member reaches the API for their workspace');
-  const otherWorkspace = await get('/api/v1/envelopes', { headers: { cookie, 'x-workspace': 'ws_other' } });
+  const otherWorkspace = await get('/api/v1/envelopes', {
+    headers: { cookie, 'x-workspace': 'ws_other' },
+  });
   check(otherWorkspace.status === 401, 'but not for a workspace they are not in');
   console.log('Smoke test passed.');
 } finally {
