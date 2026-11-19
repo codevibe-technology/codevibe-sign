@@ -10,27 +10,27 @@ description: Send documents for signature in the order you choose, seal the fina
 <template #code>
 <div class="vp-doc">
 
-```ts
+```ts check
 import { readFile } from 'node:fs/promises';
-import { createSignServer } from '@codevibe/sign-server';
+import { startSignServer } from '@codevibe/sign-server';
 
-const server = createSignServer({
-  databaseUrl: process.env.DATABASE_URL,
+const sign = await startSignServer({
+  databaseUrl: process.env.DATABASE_URL!,
   filesDir: './data/files',
   smtp: {
     host: 'smtp.example.com',
     port: 587,
+    secure: false,
+    user: 'sign',
+    pass: process.env.SMTP_PASS!,
     from: 'Sign <sign@example.com>',
   },
-  seal: {
-    p12: await readFile('./seal.p12'),
-    passphrase: process.env.SEAL_P12_PASSPHRASE,
-  },
-  apiKeys: [process.env.SIGN_API_KEY],
+  seal: { p12: await readFile('./seal.p12'), passphrase: process.env.SEAL_P12_PASSPHRASE! },
+  apiKeys: [process.env.SIGN_API_KEY!],
   publicUrl: 'https://sign.example.com',
 });
 
-await server.listen(3000);
+await sign.listen(3000);
 ```
 
 </div>

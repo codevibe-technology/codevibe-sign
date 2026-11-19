@@ -8,51 +8,88 @@ description: Start the Codevibe Sign server inside your own Node application and
 If you already run a Node backend, you can start the signing server inside it instead of
 running a separate container.
 
-::: warning Pre-release
-`@codevibe/sign-server` is still being built. The code below is the planned API; option names
-may change before 0.1.
-:::
-
 ```sh
 pnpm add @codevibe/sign-server
 ```
 
-```ts
+```ts check
 import { readFile } from 'node:fs/promises';
-import { createSignServer } from '@codevibe/sign-server';
+import { startSignServer } from '@codevibe/sign-server';
 
-const server = createSignServer({
-  databaseUrl: process.env.DATABASE_URL,
+const sign = await startSignServer({
+  databaseUrl: process.env.DATABASE_URL!,
   filesDir: './data/files',
   smtp: {
     host: 'smtp.example.com',
     port: 587,
+    secure: false,
     user: 'sign',
-    pass: process.env.SMTP_PASS,
+    pass: process.env.SMTP_PASS!,
     from: 'Sign <sign@example.com>',
   },
-  seal: { p12: await readFile('./seal.p12'), passphrase: process.env.SEAL_P12_PASSPHRASE },
-  apiKeys: [process.env.SIGN_API_KEY],
+  seal: { p12: await readFile('./seal.p12'), passphrase: process.env.SEAL_P12_PASSPHRASE! },
+  apiKeys: [process.env.SIGN_API_KEY!],
   publicUrl: 'https://sign.example.com',
 });
 
-await server.listen(3000);
+await sign.listen(3000);
 ```
 
-Your backend then creates and sends envelopes through the HTTP API with one of the API keys.
-The service answers `GET /health` without authentication, and `server.close()` stops accepting
-requests and lets in-flight work finish.
+`startSignServer` migrates the database, then serves the API. Your backend creates and sends
+envelopes through the [HTTP API](/api/server#sending) with one of the API keys. The service
+answers `GET /health` without authentication, runs reminders, expiry and retries on a timer,
+and `sign.close()` stops accepting requests, lets in-flight work finish and disconnects.
 
 ## Options
 
-| Option        | What it is                                                                |
-| ------------- | ------------------------------------------------------------------------- |
-| `databaseUrl` | PostgreSQL connection string.                                             |
-| `filesDir`    | Directory for original and sealed files.                                  |
-| `smtp`        | `{ host, port, secure?, user?, pass?, from }` for invitations and codes.  |
-| `seal`        | `{ p12, passphrase }`: your sealing certificate and key as PKCS#12 bytes. |
-| `apiKeys`     | Keys your backend sends to call the API. Use long random values.          |
-| `publicUrl`   | The base URL recipients open; signing links are built from it.            |
+| Option           | What it is                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `databaseUrl`    | PostgreSQL connection string.                                                         |
+| `filesDir`       | Directory for original and sealed files.                                              |
+| `smtp`           | `{ host, port, secure, user?, pass?, from }` for invitations and codes.               |
+| `seal`           | `{ p12, passphrase, reason?, location? }`: your sealing certificate as PKCS#12 bytes. |
+| `apiKeys`        | Keys your backend sends to call the API. Use long random values.                      |
+| `publicUrl`      | The base URL recipients open; signing links are built from it.                        |
+| `tickIntervalMs` | How often reminders, expiry and retries run. Default 60 seconds.                      |
+
+A second argument replaces any adapter or option `createSignServer` takes, for example
+`{ webhooks: [...], trustProxy: true }`.
+
+## Mounting the app yourself
+
+`createSignServer(options)` returns `{ app, tick, idle }` without starting anything. `app` is a
+[Hono](https://hono.dev) app you can mount in your own server; call `tick()` every minute. You
+bring the adapters:
+
+```ts check
+import { readFile } from 'node:fs/promises';
+import {
+  createSignServer,
+  listen,
+  localFileStore,
+  mailOtpSender,
+  migrate,
+  postgresStore,
+  smtpMailer,
+} from '@codevibe/sign-server';
+
+const store = postgresStore(process.env.DATABASE_URL!);
+await migrate(store.sql);
+const mailer = smtpMailer({ transport: process.env.SMTP_URL!, from: 'Sign <sign@example.com>' });
+
+const sign = createSignServer({
+  store,
+  files: localFileStore('./data/files'),
+  mailer,
+  otp: mailOtpSender(mailer),
+  sealer: { p12: await readFile('./seal.p12'), passphrase: process.env.SEAL_P12_PASSPHRASE! },
+  apiKeys: [process.env.SIGN_API_KEY!],
+  publicUrl: 'https://sign.example.com',
+});
+
+await listen(sign.app, { port: 3000 });
+setInterval(() => void sign.tick(), 60_000);
+```
 
 ## Using only the rules
 

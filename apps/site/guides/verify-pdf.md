@@ -16,25 +16,56 @@ still detecting changes.
 
 ## In code
 
-<ComingSoon pkg="@codevibe/sign-pdf" />
+`verifySeal` from `@codevibe/sign-pdf` checks the seal offline:
 
-`verify()` from `@codevibe/sign-pdf` checks the PAdES seal and reads the certificate page:
+```ts check
+import { readFile } from 'node:fs/promises';
+import { verifySeal } from '@codevibe/sign-pdf';
 
-```ts
-import { verify } from '@codevibe/sign-pdf';
+const result = await verifySeal(new Uint8Array(await readFile('offer-signed.pdf')));
 
-const result = await verify(await readFile('offer-signed.pdf'));
+if (result.valid && result.coversWholeDocument) {
+  console.log('Unchanged since it was sealed by', result.signer?.commonName, result.signedAt);
+} else if (!result.sealed) {
+  console.log('This file carries no seal');
+} else {
+  console.log('The file was changed after sealing');
+}
 ```
 
-The result will report whether the seal is valid and return the details printed on the
-certificate page, including the audit chain head.
+It checks the first signature in the file: the byte range is well formed, the message digest
+matches the signed bytes, the signing certificate matches the one embedded and the RSA
+signature verifies. The result is:
+
+| Field                 | Meaning                                                              |
+| --------------------- | -------------------------------------------------------------------- |
+| `sealed`              | The file carries a PDF signature.                                    |
+| `valid`               | The signature is intact and matches the bytes it covers.             |
+| `coversWholeDocument` | Nothing was appended after sealing.                                  |
+| `signer`              | `{ commonName?, organization? }` from the sealing certificate.       |
+| `signedAt`            | ISO time of the seal.                                                |
+| `signatureCount`      | How many signatures the file has; the first one is the one verified. |
+
+Treat `valid && coversWholeDocument` as "unchanged since sealing". `valid` does not say whether
+the certificate is trusted: compare `signer` with the operator's certificate you expect.
+
+The server also returns the hashes and the chain status for an envelope at
+`GET /v1/envelopes/:id/certificate`, and `chainValid` with every event at
+`GET /v1/envelopes/:id/events`.
 
 ## Checking the audit chain
 
-The audit chain can be verified today with `@codevibe/sign-core`. Export the envelope's events
-from your store and compare against the head printed on the certificate page:
+The audit chain is verified with `@codevibe/sign-core`. Take the envelope's events
+from your store or from `GET /v1/envelopes/:id/events`, and compare against the head printed
+on the certificate page:
 
-```ts
+<!-- check:
+import type { AuditEvent } from '@codevibe/sign-core';
+declare const events: AuditEvent[];
+declare const headFromCertificate: string;
+-->
+
+```ts check
 import { verifyChain, webCryptoHasher } from '@codevibe/sign-core';
 
 const check = await verifyChain(events, webCryptoHasher, { expectedHead: headFromCertificate });

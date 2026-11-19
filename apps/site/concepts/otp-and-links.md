@@ -14,7 +14,11 @@ Every recipient gets a private link with a random token.
 - A token belongs to one recipient on one envelope, expires and can be revoked.
 - Checks compare hashes in constant time.
 
-```ts
+<!-- check:
+declare const presentedToken: string;
+-->
+
+```ts check
 import { createSigningToken, cryptoRandom, verifyToken } from '@codevibe/sign-core';
 
 const { token, tokenHash } = createSigningToken(cryptoRandom);
@@ -36,7 +40,13 @@ Recipients set to `email_otp` or `sms_otp` also confirm a code before they can s
 | Reuse          | A code that was accepted is never accepted again |
 | Rate limits    | Per recipient and per IP address, in the server  |
 
-```ts
+<!-- check:
+import type { OtpState } from '@codevibe/sign-core';
+declare const storedState: OtpState;
+declare const codeFromUser: string;
+-->
+
+```ts check
 import { createOtp, cryptoRandom, systemClock, verifyOtp } from '@codevibe/sign-core';
 
 const issued = createOtp(cryptoRandom, systemClock);
