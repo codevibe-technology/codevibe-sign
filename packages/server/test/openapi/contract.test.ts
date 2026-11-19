@@ -286,6 +286,20 @@ describe('a full run against the server', () => {
     expect(missing).toEqual([]);
   }, 60_000);
 
+  it('accepts the create example as it is, so Test Request works', async () => {
+    const h = harness({
+      pdf: defaultPdfEngine,
+      clock: { now: () => new Date() },
+      sealer: { p12, passphrase: 'pass' },
+    });
+    const media = deref(paths['/v1/envelopes']!.post as Operation).requestBody as Json;
+    const json = (media.content as Json)['application/json'] as Json;
+    const example = deref(Object.values(json.examples as Json)[0]).value;
+    const created = await checked(h)('POST', '/v1/envelopes', { body: example });
+    expect(created.status).toBe(201);
+    expect(created.json.status).toBe('sent');
+  });
+
   it('documents the rate limit answer', async () => {
     const h = harness({ limits: { envelopesPerMinute: 0 } });
     const call = checked(h);
