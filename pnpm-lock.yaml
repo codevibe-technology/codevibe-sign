@@ -87,6 +87,15 @@ importers:
         specifier: 22.10.1
         version: 22.10.1
 
+  packages/client:
+    devDependencies:
+      '@codevibe/sign-core':
+        specifier: workspace:*
+        version: link:../core
+      '@codevibe/sign-server':
+        specifier: workspace:*
+        version: link:../server
+
   packages/core: {}
 
   packages/pdf:
