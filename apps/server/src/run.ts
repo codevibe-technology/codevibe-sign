@@ -1,10 +1,9 @@
-import { startSignServer } from '@codevibe_technology/sign-server';
-import { loadConfig, type Env } from './config';
+import { configFromEnv, startSignServer, type EnvVars } from '@codevibe_technology/sign-server';
 
 type Start = typeof startSignServer;
 
 export interface RunDeps {
-  env: Env;
+  env: EnvVars;
   start?: Start;
   /** Where SIGTERM and SIGINT handlers are registered; `process` in production. */
   signals: { once(signal: NodeJS.Signals, listener: (signal: NodeJS.Signals) => void): unknown };
@@ -22,7 +21,7 @@ export async function run(deps: RunDeps): Promise<void> {
   const log = deps.log ?? console.log;
   const error = deps.error ?? console.error;
 
-  const config = loadConfig(env);
+  const config = configFromEnv(env);
   const running = await start(
     config.server,
     config.trustProxy ? { trustProxy: true, trustedProxyHops: config.trustedProxyHops } : {},

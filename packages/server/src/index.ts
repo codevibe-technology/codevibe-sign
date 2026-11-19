@@ -6,6 +6,7 @@ export {
   type RunningSignServer,
   type ListenOptions,
 } from './node';
+export { configFromEnv, type EnvConfig, type EnvVars } from './env';
 export type {
   SignServerOptions,
   ApiKey,

@@ -59,6 +59,11 @@ setInterval(() => void sign.tick(), 60_000);
 for example `{ trustProxy: true, trustedProxyHops: 1 }`. `close()` stops accepting requests
 and waits for running work before disconnecting.
 
+`configFromEnv(process.env)` reads the same environment variables as the Docker image
+(`DATABASE_URL`, `PUBLIC_URL`, `API_KEYS`, `SEAL_P12_BASE64` and the rest) and returns
+`{ server, port, host, trustProxy, trustedProxyHops }`, where `server` is the config for
+`startSignServer`. It reports every problem at once by variable name and never prints values.
+
 ## Secure defaults
 
 These checks are on unless you turn them off, and each opt-out is meant for local

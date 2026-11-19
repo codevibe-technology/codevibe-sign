@@ -10,13 +10,13 @@ import {
   memoryStore,
   type RunningSignServer,
   type SignServerOptions,
+  type EnvVars,
   type StandaloneConfig,
 } from '@codevibe_technology/sign-server';
 import { describe, expect, it, vi } from 'vitest';
-import type { Env } from './config';
 import { run } from './run';
 
-const env: Env = {
+const env: EnvVars = {
   DATABASE_URL: 'postgres://sign:secret@db:5432/sign',
   SMTP_HOST: 'smtp.example.com',
   SMTP_FROM: 'Sign <sign@example.com>',
@@ -72,7 +72,7 @@ function memoryStart() {
   return { start, calls, close, url: () => `http://127.0.0.1:${address?.port}` };
 }
 
-function deps(start: ReturnType<typeof memoryStart>['start'], overrides: Env = {}) {
+function deps(start: ReturnType<typeof memoryStart>['start'], overrides: EnvVars = {}) {
   const signals = new EventEmitter();
   const exit = vi.fn();
   const log = vi.fn();
