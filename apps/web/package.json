@@ -20,6 +20,7 @@
     "@codevibe_technology/sign-pdf": "workspace:*",
     "@codevibe_technology/sign-react": "workspace:*",
     "@codevibe_technology/sign-server": "workspace:*",
+    "@codevibe_technology/sign-templates": "workspace:*",
     "better-auth": "1.7.18",
     "kysely": "0.29.8",
     "kysely-postgres-js": "5.0.1",
