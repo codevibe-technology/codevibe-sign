@@ -1,0 +1,153 @@
+# @codevibe/sign-server
+
+The HTTP API and runtime for Codevibe Sign. It stores envelopes, mails signing links and
+one-time codes, runs signing sessions, delivers signed webhooks and produces the sealed PDF
+with its certificate page. It is a [Hono](https://hono.dev) app, so you can mount it in your
+own server or run it on its own.
+
+The rules (who signs when, reminders, expiry, the audit chain) come from
+`@codevibe/sign-core`; drawing, the certificate page and the PAdES seal come from
+`@codevibe/sign-pdf`.
+
+## Install
+
+```sh
+pnpm add @codevibe/sign-server
+```
+
+Node 20 or later.
+
+## Standalone example
+
+```ts
+import { readFileSync } from 'node:fs';
+import {
+  createSignServer,
+  listen,
+  localFileStore,
+  migrate,
+  mailOtpSender,
+  postgresStore,
+  smtpMailer,
+} from '@codevibe/sign-server';
+
+const store = postgresStore(process.env.DATABASE_URL!);
+await migrate(store.sql);
+const mailer = smtpMailer({ transport: process.env.SMTP_URL!, from: 'Sign <sign@example.com>' });
+
+const sign = createSignServer({
+  store,
+  files: localFileStore('./data/files'),
+  mailer,
+  otp: mailOtpSender(mailer),
+  sealer: { p12: readFileSync('./seal.p12'), passphrase: process.env.SEAL_PASSPHRASE! },
+  apiKeys: [process.env.SIGN_API_KEY!],
+  publicUrl: 'https://sign.example.com',
+  webhooks: [
+    { url: 'https://hr.example.com/hooks/sign', secret: process.env.HOOK_SECRET!, events: ['*'] },
+  ],
+});
+
+await listen(sign.app, { port: 3000 });
+setInterval(() => void sign.tick(), 60_000);
+```
+
+`startSignServer(config)` does all of the above from one config object (PostgreSQL, a files
+directory, SMTP, the seal certificate, API keys and the public URL) and returns
+`{ listen(port, host), close() }`. `close()` stops accepting requests and waits for running
+work before disconnecting.
+
+## Sending
+
+All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
+`Idempotency-Key` header: a retry with the same key and body gets the first response back.
+
+| Route                                    | What it does                                                   |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| `POST /v1/envelopes`                     | Create a draft (JSON with base64 documents, or multipart).     |
+| `GET /v1/envelopes/:id`                  | The envelope.                                                  |
+| `PATCH /v1/envelopes/:id`                | Change a draft: title, message, routing, recipients, fields.   |
+| `POST /v1/envelopes/:id/send`            | Send it; the first signers get their links.                    |
+| `POST /v1/envelopes/:id/void`            | Withdraw it (`{ "reason": "..." }`).                           |
+| `GET /v1/envelopes/:id/events`           | The audit log and whether its hash chain is intact.            |
+| `GET /v1/envelopes/:id/documents/:docId` | The sealed PDF once complete, else the original (`?version=`). |
+| `GET /v1/envelopes/:id/certificate`      | Hashes, recipients and their actions, as JSON.                 |
+
+```json
+{
+  "title": "Offer letter",
+  "send": true,
+  "documents": [{ "key": "offer", "name": "offer.pdf", "content": "<base64>" }],
+  "recipients": [
+    { "key": "asha", "name": "Asha Rao", "email": "asha@example.com", "auth": "email_otp" },
+    { "key": "hr", "name": "HR", "email": "hr@example.com", "role": "viewer" }
+  ],
+  "fields": [
+    {
+      "recipient": "asha",
+      "type": "signature",
+      "page": 0,
+      "x": 72,
+      "y": 640,
+      "width": 180,
+      "height": 48
+    }
+  ]
+}
+```
+
+Field boxes are in PDF points from the top-left corner of the page. For multipart uploads,
+send the same JSON in a form field named `envelope` and the files as `documents`.
+
+## Signing
+
+Signers use the token from their link. Tokens are stored only as hashes and stop working
+once the signer has acted or the envelope is completed, declined, voided or expired.
+
+| Route                                  | What it does                                                  |
+| -------------------------------------- | ------------------------------------------------------------- |
+| `GET /v1/sign/:token`                  | The envelope basics and this signer's own fields.             |
+| `GET /v1/sign/:token/documents/:docId` | The original PDF.                                             |
+| `POST /v1/sign/:token/otp`             | Send a one-time code (OTP recipients).                        |
+| `POST /v1/sign/:token/otp/verify`      | `{ "code" }`; sets a 30-minute session cookie and returns it. |
+| `POST /v1/sign/:token/view`            | Record that the signer opened the document.                   |
+| `POST /v1/sign/:token/submit`          | `{ "consent": true, "values": [{ "fieldId", "value" }] }`.    |
+| `POST /v1/sign/:token/decline`         | `{ "reason": "..." }`.                                        |
+
+OTP recipients must verify before they can read the document or act. Send the session as
+the `cvsign_session` cookie or the `X-Sign-Session` header.
+
+## Errors
+
+Every error is JSON: `{ "error": { "code", "message", "details"? } }`. Codes are the
+`SignError` codes from core plus `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT` and `INTERNAL`.
+Validation errors list each problem in `details.issues` as `{ path, message }`, for example
+`recipients[1].email`. Stack traces never leave the server.
+
+## Webhooks
+
+Each delivery is a POST with the event, envelope id, status and recipients, signed as
+`x-codevibe-signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>">`. Check it
+with `verifyWebhook(secret, header, rawBody)`. Failed deliveries are retried from an outbox
+with backoff (30 s up to 12 h, nine attempts in all).
+
+## Background work
+
+Invitations, reminders, completion copies, webhooks and sealing are jobs in the store.
+They run right after the request (`effects: 'await'`, the default) or just after the
+response (`'background'`), and `tick()` retries the ones that failed. Call `tick()` every
+minute: it also sends due reminders and expires envelopes.
+
+## Adapters
+
+- Stores: `memoryStore()`, `postgresStore(urlOrSql)` with `migrate(sql)`. Migrations are
+  also exported as `migrations` for your own tooling.
+- Files: `localFileStore(dir)`, `memoryFileStore()`.
+- Mail: `smtpMailer({ transport, from })`, `consoleMailer()`.
+- OTP: `mailOtpSender(mailer)`, `consoleOtpSender()`. Bring your own `OtpSender` for SMS.
+- Rate limits: `memoryRateLimiter()`. Pass a shared `RateLimiter` when running more than
+  one process, and set `sessionSecret` so sessions work across them.
+
+## Licence
+
+Apache-2.0 © Codevibe
