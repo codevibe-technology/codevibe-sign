@@ -79,6 +79,14 @@ development only.
 | Logs         | Signing tokens, codes, session values, credentials and bodies are removed from every line. `accessLog: true` adds one redacted line per request. | none                                                       |
 | OTP          | 5 codes per 15 minutes and 10 per recipient over the envelope's life; each new code replaces the last; checks are saved atomically.              | `limits.otpCodesPerRecipient`                              |
 
+## OpenAPI
+
+The whole HTTP API is described in [`openapi.yaml`](https://github.com/codevibe-technology/codevibe-sign/blob/main/packages/server/openapi.yaml),
+an OpenAPI 3.1 document with every route, schema, error code and the webhook payload. Each
+server serves it, without authentication, at `GET /v1/openapi.json`. Try the routes in the
+[interactive reference](/http-api/reference), or import the
+[Postman collection](/codevibe-sign.postman_collection.json).
+
 ## Sending
 
 All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
