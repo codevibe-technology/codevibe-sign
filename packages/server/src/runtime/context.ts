@@ -12,7 +12,7 @@ import {
 } from '@codevibe/sign-core';
 import { randomBytes } from 'node:crypto';
 import { nodeHasher } from '../crypto';
-import type { PdfEngine } from '../engine';
+import type { PdfEngine, SealTrust } from '../engine';
 import { consoleLogger, type Logger } from '../errors';
 import { normalizeApiKeys, type StoredApiKey } from '../http/auth';
 import { redactingLogger } from '../http/redact';
@@ -41,7 +41,9 @@ export interface Runtime {
   webhooks: WebhookTarget[];
   templates: MailTemplates;
   apiKeys: StoredApiKey[];
-  sealer: Required<SealerOptions>;
+  sealer: Required<Omit<SealerOptions, 'trust'>>;
+  /** What a sealed file must be signed by to verify; empty when the engine cannot tell. */
+  sealTrust: SealTrust | null;
   signingUrl: (token: string) => string;
   /** Where `GET /sign/:token` sends the browser once the token is in its cookie. */
   signingPageUrl: string;
@@ -67,6 +69,21 @@ const DEFAULT_LIMITS: Required<Limits> = {
   otpCodesPerRecipient: 10,
   maxAttachmentBytes: 10 * 1024 * 1024,
 };
+
+/**
+ * Opens the seal key once at start-up, so a missing, weak or expired key stops the server
+ * instead of the first completion, and learns the certificate sealed files must carry.
+ */
+function sealTrust(options: SignServerOptions, pdf: PdfEngine): SealTrust | null {
+  if (!pdf.sealCertificate) return null;
+  const { sha256 } = pdf.sealCertificate({
+    p12: options.sealer.p12,
+    passphrase: options.sealer.passphrase,
+    allowWeakKey: options.sealer.allowWeakKey ?? false,
+  });
+  const extra = options.sealer.trust ?? {};
+  return { ...extra, fingerprints: [sha256, ...(extra.fingerprints ?? [])] };
+}
 
 function proxyHops(value: number | undefined): number {
   const hops = value ?? 1;
@@ -111,7 +128,9 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
       passphrase: options.sealer.passphrase,
       reason: options.sealer.reason ?? 'Signed and sealed by Codevibe Sign',
       location: options.sealer.location ?? '',
+      allowWeakKey: options.sealer.allowWeakKey ?? false,
     },
+    sealTrust: sealTrust(options, pdf),
     signingUrl: options.signingUrl ?? ((token) => `${publicUrl}/sign/${token}`),
     signingPageUrl: options.signingPageUrl ?? `${publicUrl}/sign`,
     secureCookies: publicUrl.startsWith('https:'),

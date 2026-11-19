@@ -13,8 +13,8 @@ export async function makePdf(pages: number): Promise<Uint8Array> {
 }
 
 /** A self-signed RSA seal certificate in a PKCS#12 file, for tests only. */
-export function makeP12(commonName: string, passphrase: string): Uint8Array {
-  const keys = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
+export function makeP12(commonName: string, passphrase: string, bits = 2048): Uint8Array {
+  const keys = forge.pki.rsa.generateKeyPair({ bits, e: 0x10001 });
   const cert = forge.pki.createCertificate();
   cert.publicKey = keys.publicKey;
   cert.serialNumber = '01';

@@ -188,6 +188,27 @@ export function senderRoutes(rt: Runtime) {
     return pdfResponse(c, bytes, document.name, sealed ? 'sealed' : 'original');
   });
 
+  app.get('/:id/documents/:docId/verification', async (c) => {
+    const envelope = await getEnvelope(rt, c.req.param('id'));
+    const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
+    if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
+    const sealed = await rt.files.get(sealedFileKey(envelope.id, document.id));
+    if (!sealed) throw new SignError('INVALID_STATE', 'The document has not been sealed yet');
+    if (!rt.sealTrust || !rt.pdf.verify) {
+      throw new SignError('INVALID_STATE', 'This server cannot verify sealed files');
+    }
+    const check = await rt.pdf.verify(sealed, { trust: rt.sealTrust });
+    return c.json({
+      documentId: document.id,
+      valid: check.valid,
+      reason: check.reason ?? null,
+      signer: check.signer ?? null,
+      signedAt: check.signedAt ?? null,
+      certificateSha256: check.certificateSha256 ?? null,
+      sha256: sha256Hex(sealed),
+    });
+  });
+
   app.get('/:id/certificate', async (c) => {
     const envelope = await getEnvelope(rt, c.req.param('id'));
     const events = await rt.store.listEvents(envelope.id);

@@ -7,7 +7,7 @@ import type {
   OtpSender,
   RandomSource,
 } from '@codevibe/sign-core';
-import type { PdfEngine } from './engine';
+import type { PdfEngine, SealTrust } from './engine';
 import type { Logger } from './errors';
 import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore } from './store/types';
@@ -36,6 +36,16 @@ export interface SealerOptions {
   passphrase: string;
   reason?: string;
   location?: string;
+  /**
+   * Seal with an RSA key under 2048 bits or a certificate signed with SHA-1. For local
+   * development with throwaway keys only; by default the server refuses to start with one.
+   */
+  allowWeakKey?: boolean;
+  /**
+   * Other certificates whose seals this server accepts when verifying, besides the current
+   * key's: earlier operator certificates after a rotation, or a root CA.
+   */
+  trust?: SealTrust;
 }
 
 export interface Limits {
