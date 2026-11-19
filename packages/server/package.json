@@ -40,7 +40,17 @@
   },
   "dependencies": {
     "@codevibe/sign-core": "workspace:*",
-    "@codevibe/sign-pdf": "workspace:*"
+    "@codevibe/sign-pdf": "workspace:*",
+    "@hono/node-server": "2.1.5",
+    "hono": "4.13.14",
+    "nodemailer": "10.3.1",
+    "postgres": "3.4.9"
   },
-  "peerDependencies": {}
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "@types/node-forge": "1.3.14",
+    "@types/nodemailer": "8.0.2",
+    "node-forge": "1.4.3",
+    "pdf-lib": "1.17.1"
+  }
 }
