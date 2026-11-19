@@ -32,7 +32,8 @@ export function fakePdfEngine(overrides: Partial<PdfEngine> = {}): PdfEngine {
       return append(pdf, `fields=${fields.length};values=${values.length}\n`);
     },
     async appendCertificate(pdf, input) {
-      return append(pdf, `certificate=${input.envelope.id};events=${input.events.length}\n`);
+      const note = input.note ? `;note=${input.note}` : '';
+      return append(pdf, `certificate=${input.envelope.id};events=${input.events.length}${note}\n`);
     },
     async seal(pdf, options) {
       return append(pdf, `sealed;reason=${options.reason}\n`);

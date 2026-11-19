@@ -42,6 +42,7 @@ export interface Runtime {
   webhooks: WebhookTarget[];
   templates: MailTemplates;
   workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
+  certificateNote?: (workspaceId: string) => Promise<string | null>;
   apiKeys: StoredApiKey[];
   authenticate?: (request: Request) => Promise<Principal | null>;
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
@@ -138,6 +139,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     webhooks: options.webhooks ?? [],
     templates: { ...defaultTemplates, ...options.templates },
     ...(options.workspaceMail ? { workspaceMail: options.workspaceMail } : {}),
+    ...(options.certificateNote ? { certificateNote: options.certificateNote } : {}),
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),

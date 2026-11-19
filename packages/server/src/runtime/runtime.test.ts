@@ -231,4 +231,34 @@ describe('sealing', () => {
     expect(sealed.status).toBe(409);
     expect(JSON.stringify(h.logs)).toMatch(/did not verify/);
   });
+
+  it("prints the workspace's note on the certificate", async () => {
+    const asked: string[] = [];
+    const h = harness({
+      certificateNote: async (workspaceId) => {
+        asked.push(workspaceId);
+        return 'Acme Pvt Ltd, CIN U72900KA2020PTC000000';
+      },
+    });
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', {
+      body: envelopeBody({
+        send: true,
+        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+        fields: [
+          { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
+        ],
+      }),
+    });
+    await h.call('POST', `/v1/sign/${h.tokenFor('asha@example.com')}/submit`, {
+      body: { consent: true, values: [{ fieldId: envelope.fields[0].id, value: PNG }] },
+    });
+    const doc = envelope.documents[0].id;
+    const sealed = await h.call(
+      'GET',
+      `/v1/envelopes/${envelope.id}/documents/${doc}?version=sealed`,
+    );
+    const text = new TextDecoder().decode(await sealed.res.arrayBuffer());
+    expect(text).toContain('note=Acme Pvt Ltd, CIN U72900KA2020PTC000000');
+    expect(asked).toEqual(['default']);
+  });
 });

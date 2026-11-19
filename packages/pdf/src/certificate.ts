@@ -26,6 +26,11 @@ export interface CertificateData {
   timeZone?: string;
   /** When the certificate was produced. Defaults to now. */
   generatedAt?: IsoDateTime;
+  /**
+   * A short line from whoever sent the envelope, printed at the end, for example a company
+   * registration number. Characters the font cannot draw become `?` rather than failing.
+   */
+  note?: string;
 }
 
 export interface CertificateOptions {
@@ -503,6 +508,12 @@ export async function appendCertificate(
       human(actor(event, names), 'recipient name'),
     ]),
   );
+
+  const note = data.note?.replace(/\s+/g, ' ').trim().slice(0, 500);
+  if (note) {
+    layout.gap(10);
+    layout.paragraph(machine(note), layout.style('label'));
+  }
 
   layout.footers(machine(envelope.id), generatedAt);
   return doc.save();

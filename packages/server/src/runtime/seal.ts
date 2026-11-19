@@ -8,6 +8,7 @@ import {
 } from '@codevibe_technology/sign-core';
 import { sha256Hex } from '../crypto';
 import type { Job } from '../store/types';
+import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { Runtime } from './context';
 import { makeJob } from './jobs';
 import { mutate } from './mutate';
@@ -38,8 +39,12 @@ export async function runSeal(
   payload: SealPayload,
   enqueue: (jobs: Job[]) => Promise<void>,
 ): Promise<void> {
-  const envelope = await rt.store.get(payload.envelopeId);
+  const stored = await rt.store.load(payload.envelopeId);
+  const envelope = stored?.envelope;
   if (!envelope || envelope.status !== 'completed') return;
+  const note = rt.certificateNote
+    ? await rt.certificateNote(stored?.workspaceId ?? DEFAULT_WORKSPACE)
+    : null;
   const history = await rt.store.listEvents(envelope.id);
   const done = sealedIds(history);
 
@@ -59,6 +64,7 @@ export async function runSeal(
       envelope,
       document,
       events: history,
+      ...(note ? { note } : {}),
     });
     const output = await rt.pdf.seal(withCertificate, {
       ...rt.sealer,

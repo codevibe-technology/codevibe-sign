@@ -137,6 +137,11 @@ export interface SignServerOptions {
    * out comes from `templates` and the defaults. Return null to use those unchanged.
    */
   workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
+  /**
+   * A short line printed at the end of the signing certificate of a workspace's envelopes,
+   * for example a company registration number. Read when the envelope is sealed.
+   */
+  certificateNote?: (workspaceId: string) => Promise<string | null>;
   /** Signs signer session tokens. Set it when more than one process serves requests. */
   sessionSecret?: string;
   /** Signing links stay valid this many days unless the envelope expires sooner. Default 30. */

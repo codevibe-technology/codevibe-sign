@@ -255,6 +255,10 @@ const sign = createSignServer({
 });
 ```
 
+`certificateNote(workspaceId)` returns a short line printed at the end of the signing
+certificate of that workspace's envelopes, for example a company registration number. It is
+read when the envelope is sealed.
+
 ## Errors
 
 Every error is JSON: `{ "error": { "code", "message", "details"? } }`. Codes are the
