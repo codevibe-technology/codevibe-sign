@@ -52,11 +52,15 @@ export interface Job {
  */
 export interface ServerStore extends EnvelopeStore {
   load(id: Id): Promise<StoredEnvelope | null>;
-  /** Like `save`, and enqueues `jobs` in the same transaction. */
+  /**
+   * Like `save`, and enqueues `jobs` in the same transaction. `expectedVersion` is required:
+   * 0 to create, otherwise the version that was loaded. Each event's `seq` must be new for
+   * its envelope.
+   */
   commit(
     envelope: Envelope,
     events: AuditEvent[],
-    expectedVersion: number | undefined,
+    expectedVersion: number,
     jobs: Job[],
   ): Promise<{ version: number }>;
   /** Hides an active envelope from `due` until `until`, or until it is saved again. */

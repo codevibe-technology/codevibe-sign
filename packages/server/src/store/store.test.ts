@@ -173,6 +173,13 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       expect(await store.getOtp(ids.envelopeId, ids.recipientId)).toBeNull();
     });
 
+    it('refuses a second audit event with the same seq', async () => {
+      const envelope = draft();
+      await store.commit(envelope, [event(envelope, 1)], 0, []);
+      await expect(store.save(envelope, [event(envelope, 1)])).rejects.toThrow();
+      expect((await store.listEvents(envelope.id)).map((e) => e.seq)).toEqual([1]);
+    });
+
     it('claims, replays and rejects idempotency keys', async () => {
       const scope = `s-${++counter}`;
       expect(await store.claimIdempotency(scope, 'k', 'f1', T0)).toEqual({ state: 'new' });

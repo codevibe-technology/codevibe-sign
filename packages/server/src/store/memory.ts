@@ -43,6 +43,12 @@ export function memoryStore(): ServerStore {
     if (expectedVersion !== undefined && expectedVersion !== current) {
       throw new VersionConflictError(envelope.id);
     }
+    const seqs = new Set((row?.events ?? []).map((e) => `${e.envelopeId}:${e.seq}`));
+    for (const event of events) {
+      const key = `${event.envelopeId}:${event.seq}`;
+      if (seqs.has(key)) throw new Error(`Audit event ${event.seq} already exists`);
+      seqs.add(key);
+    }
     const version = current + 1;
     envelopes.set(envelope.id, {
       envelope: clone(envelope),

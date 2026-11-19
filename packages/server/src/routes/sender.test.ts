@@ -272,6 +272,43 @@ describe('draft changes, send and void', () => {
     ]);
   });
 
+  it('re-applies a draft change once when another request saved first', async () => {
+    const store = memoryStore();
+    const h = harness({ store });
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', { body: envelopeBody() });
+    const commit = store.commit.bind(store);
+    let conflicts = 1;
+    store.commit = async (...args) => {
+      if (conflicts > 0) {
+        conflicts -= 1;
+        const stored = (await store.load(envelope.id))!;
+        await commit(
+          { ...stored.envelope, message: 'Saved by someone else' },
+          [],
+          stored.version,
+          [],
+        );
+      }
+      return commit(...args);
+    };
+    const res = await h.call('PATCH', `/v1/envelopes/${envelope.id}`, {
+      body: { title: 'New title' },
+    });
+    expect(res.status).toBe(200);
+    const saved = (await store.load(envelope.id))!.envelope;
+    expect(saved).toMatchObject({ title: 'New title', message: 'Saved by someone else' });
+
+    store.commit = async (...args) => {
+      const stored = (await store.load(envelope.id))!;
+      await commit(stored.envelope, [], stored.version, []);
+      return commit(...args);
+    };
+    const busy = await h.call('PATCH', `/v1/envelopes/${envelope.id}`, {
+      body: { title: 'Again' },
+    });
+    expect(busy.status).toBe(409);
+  });
+
   it('flags a chain copied from another envelope', async () => {
     const store = memoryStore();
     const h = harness({ store });
