@@ -311,7 +311,7 @@ h1 {
   line-height: 1.08;
   font-weight: 700;
   margin: 0 0 20px;
-  max-width: 14ch;
+  max-width: 17ch;
 }
 
 .lead {
