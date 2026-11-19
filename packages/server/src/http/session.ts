@@ -3,6 +3,12 @@ import { constantTimeEqual, hmacSha256Hex } from '../crypto';
 export const SESSION_COOKIE = 'cvsign_session';
 export const SESSION_HEADER = 'x-sign-session';
 export const SESSION_TTL_MS = 30 * 60 * 1000;
+/** Holds the signing token after the link is opened, so later URLs do not carry it. */
+export const LINK_COOKIE = 'cvsign_link';
+/** Path segment that stands for "the token in the link cookie" in `/v1/sign/<token>/...`. */
+export const LINK_SEGMENT = 'link';
+/** Longest a link cookie lives, however long the token itself is valid. */
+export const LINK_COOKIE_MAX_MS = 24 * 60 * 60 * 1000;
 
 interface SessionClaims {
   /** Hash of the signing token the session belongs to. */

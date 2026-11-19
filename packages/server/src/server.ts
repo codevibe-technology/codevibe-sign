@@ -5,6 +5,7 @@ import { errorHandler, HttpError } from './errors';
 import { redactPath } from './http/redact';
 import type { SignServerOptions } from './options';
 import { senderRoutes } from './routes/sender';
+import { linkRoutes } from './routes/link';
 import { signerRoutes } from './routes/signer';
 import { createRuntime } from './runtime/context';
 import { tick, type TickOptions, type TickResult } from './runtime/tick';
@@ -56,6 +57,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
   app.get('/health', (c) => c.json({ ok: true }));
   app.route('/v1/envelopes', senderRoutes(rt));
   app.route('/v1/sign', signerRoutes(rt));
+  app.route('/sign', linkRoutes(rt));
 
   return {
     app,

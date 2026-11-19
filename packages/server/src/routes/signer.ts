@@ -25,6 +25,8 @@ import { clientIp, userAgent } from '../http/client';
 import { idempotency } from '../http/idempotency';
 import { enforce } from '../http/rate-limit';
 import {
+  LINK_COOKIE,
+  LINK_SEGMENT,
   SESSION_COOKIE,
   SESSION_HEADER,
   SESSION_TTL_MS,
@@ -50,6 +52,33 @@ interface SignerContext {
 
 const tokenInvalid = () => new SignError('TOKEN_INVALID', 'This signing link is no longer valid');
 
+/**
+ * The envelope and recipient a token stands for, or null when the token is unknown, revoked,
+ * expired, or its recipient can no longer act. Reads only.
+ */
+export async function activeSigner(
+  rt: Runtime,
+  tokenHash: string,
+  now: Date,
+): Promise<{ envelope: Envelope; recipient: Recipient; expiresAt: Date } | null> {
+  const token = await rt.store.findToken(tokenHash);
+  if (!token || token.revokedAt || token.expiresAt.getTime() <= now.getTime()) return null;
+  const envelope = await rt.store.get(token.envelopeId);
+  const recipient = envelope?.recipients.find((r) => r.id === token.recipientId);
+  if (!envelope || !recipient) return null;
+  if (isFinal(envelope) || hasActed(recipient) || isExpiredAt(envelope, now)) return null;
+  return { envelope, recipient, expiresAt: token.expiresAt };
+}
+
+/**
+ * The signing token of a request: from the path, or for `/v1/sign/link/...` from the HttpOnly
+ * cookie set when the signing link was opened.
+ */
+export function tokenOf(c: Context): string {
+  const param = c.req.param('token') ?? '';
+  return param === LINK_SEGMENT ? (getCookie(c, LINK_COOKIE) ?? '') : param;
+}
+
 export function signerRoutes(rt: Runtime) {
   const app = new Hono();
 
@@ -63,7 +92,15 @@ export function signerRoutes(rt: Runtime) {
       60_000,
       rt.clock.now(),
     );
-    if (!isSigningTokenShape(c.req.param('token'))) throw tokenInvalid();
+    if (!isSigningTokenShape(tokenOf(c))) throw tokenInvalid();
+    if (c.req.param('token') === LINK_SEGMENT && c.req.method !== 'GET') {
+      // The cookie is SameSite=Strict; this also refuses cross-site requests from browsers
+      // that report where a request came from.
+      const site = c.req.header('sec-fetch-site');
+      if (site && site !== 'same-origin' && site !== 'same-site' && site !== 'none') {
+        throw tokenInvalid();
+      }
+    }
     await next();
   };
   app.use('/:token', screen);
@@ -73,25 +110,19 @@ export function signerRoutes(rt: Runtime) {
     '/:token/*',
     idempotency(
       rt.store,
-      (c) => `token:${hashToken(c.req.param('token') ?? '')}`,
+      (c) => `token:${hashToken(tokenOf(c))}`,
       () => rt.clock.now(),
     ),
   );
 
   async function resolve(c: Context): Promise<SignerContext> {
     const now = rt.clock.now();
-    const tokenHash = hashToken(c.req.param('token') ?? '');
+    const tokenHash = hashToken(tokenOf(c));
     await enforce(rt.limiter, `token:${tokenHash}`, rt.limits.signerRequestsPerMinute, 60_000, now);
 
-    const token = await rt.store.findToken(tokenHash);
-    if (!token || token.revokedAt || token.expiresAt.getTime() <= now.getTime())
-      throw tokenInvalid();
-    const envelope = await rt.store.get(token.envelopeId);
-    const recipient = envelope?.recipients.find((r) => r.id === token.recipientId);
-    if (!envelope || !recipient) throw tokenInvalid();
-    if (isFinal(envelope) || hasActed(recipient) || isExpiredAt(envelope, now)) {
-      throw tokenInvalid();
-    }
+    const active = await activeSigner(rt, tokenHash, now);
+    if (!active) throw tokenInvalid();
+    const { envelope, recipient } = active;
     const otpRequired = OTP_METHODS.has(recipient.auth);
     const session = c.req.header(SESSION_HEADER) ?? getCookie(c, SESSION_COOKIE);
     const authenticated = otpRequired && verifySession(rt.sessionSecret, session, tokenHash, now);
@@ -210,7 +241,7 @@ export function signerRoutes(rt: Runtime) {
     const session = issueSession(rt.sessionSecret, signer.tokenHash, now);
     setCookie(c, SESSION_COOKIE, session.value, {
       httpOnly: true,
-      secure: c.req.url.startsWith('https:'),
+      secure: rt.secureCookies,
       sameSite: 'Strict',
       path: '/v1/sign',
       maxAge: SESSION_TTL_MS / 1000,

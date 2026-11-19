@@ -40,6 +40,10 @@ export interface Runtime {
   apiKeys: StoredApiKey[];
   sealer: Required<SealerOptions>;
   signingUrl: (token: string) => string;
+  /** Where `GET /sign/:token` sends the browser once the token is in its cookie. */
+  signingPageUrl: string;
+  /** Cookies get `Secure` when the public URL is https. */
+  secureCookies: boolean;
   sessionSecret: string;
   tokenTtlMs: number;
   trustProxy: boolean;
@@ -100,6 +104,8 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
       location: options.sealer.location ?? '',
     },
     signingUrl: options.signingUrl ?? ((token) => `${publicUrl}/sign/${token}`),
+    signingPageUrl: options.signingPageUrl ?? `${publicUrl}/sign`,
+    secureCookies: publicUrl.startsWith('https:'),
     sessionSecret: options.sessionSecret ?? randomBytes(32).toString('hex'),
     tokenTtlMs: (options.tokenTtlDays ?? 30) * 86_400_000,
     trustProxy: options.trustProxy ?? false,

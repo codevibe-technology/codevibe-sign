@@ -78,6 +78,12 @@ export interface SignServerOptions {
   /** Base URL of the signing page. Links are `${publicUrl}/sign/<token>` unless `signingUrl` is set. */
   publicUrl: string;
   signingUrl?: (token: string) => string;
+  /**
+   * The signing page, without a token. `GET /sign/:token` stores the token in an HttpOnly
+   * cookie and redirects here; the page then calls `/v1/sign/link/...`. Default
+   * `${publicUrl}/sign`.
+   */
+  signingPageUrl?: string;
   limits?: Limits;
   webhooks?: WebhookTarget[];
   templates?: Partial<MailTemplates>;
