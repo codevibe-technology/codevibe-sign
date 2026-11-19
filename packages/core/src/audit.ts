@@ -18,7 +18,8 @@ function normalize(value: unknown): Json {
   if (Array.isArray(value))
     return value.map((item) => (item === undefined ? null : normalize(item)));
   if (typeof value === 'object') {
-    const out: { [key: string]: Json } = {};
+    // No prototype, so a `__proto__` key is kept as data instead of being swallowed by the setter.
+    const out: { [key: string]: Json } = Object.create(null) as { [key: string]: Json };
     for (const key of Object.keys(value).sort()) {
       const item = (value as Record<string, unknown>)[key];
       if (item !== undefined) out[key] = normalize(item);
