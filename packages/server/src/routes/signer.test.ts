@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { memoryRateLimiter } from '../http/rate-limit';
+import type { SignServerOptions } from '../options';
+import { memoryStore } from '../store/memory';
 import { envelopeBody, harness, PNG } from '../testing/harness';
 
-async function sent(overrides: Record<string, unknown> = {}, options = {}) {
+async function sent(
+  overrides: Record<string, unknown> = {},
+  options: Partial<SignServerOptions> = {},
+) {
   const h = harness(options);
   const { json } = await h.call('POST', '/v1/envelopes', {
     body: envelopeBody({ send: true, ...overrides }),
@@ -41,6 +47,45 @@ describe('GET /v1/sign/:token', () => {
     const { status, json } = await h.call('GET', '/v1/sign/not-a-real-token');
     expect(status).toBe(401);
     expect(json.error.code).toBe('TOKEN_INVALID');
+  });
+
+  it('refuses malformed tokens before hashing, token rate limits or the store', async () => {
+    const keys: string[] = [];
+    const counting = memoryRateLimiter();
+    let lookups = 0;
+    const store = memoryStore();
+    const findToken = store.findToken.bind(store);
+    store.findToken = (hash) => {
+      lookups += 1;
+      return findToken(hash);
+    };
+    const { h } = await sent(
+      {},
+      {
+        store,
+        rateLimiter: {
+          hit: (key, limit, windowMs, now) => {
+            keys.push(key);
+            return counting.hit(key, limit, windowMs, now);
+          },
+        },
+      },
+    );
+    keys.length = 0;
+    lookups = 0;
+    const valid = h.tokenFor('asha@example.com');
+    for (const token of ['x'.repeat(5000), `${valid}A`, valid.slice(1), `${valid.slice(1)}=`]) {
+      for (const path of [`/v1/sign/${token}`, `/v1/sign/${token}/otp/verify`]) {
+        const method = path.endsWith('verify') ? 'POST' : 'GET';
+        const res = await h.call(method, path, {
+          body: method === 'POST' ? { code: '1' } : undefined,
+        });
+        expect(res.status).toBe(401);
+        expect(res.json.error.code).toBe('TOKEN_INVALID');
+      }
+    }
+    expect(keys.every((key) => key.startsWith('ip:'))).toBe(true);
+    expect(lookups).toBe(0);
   });
 
   it('serves the document to the signer', async () => {

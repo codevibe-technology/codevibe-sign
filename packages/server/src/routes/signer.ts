@@ -4,6 +4,7 @@ import {
   decline,
   hashToken,
   hasActed,
+  isSigningTokenShape,
   isExpiredAt,
   isFinal,
   markAuthenticated,
@@ -16,7 +17,7 @@ import {
   type Recipient,
 } from '@codevibe/sign-core';
 import { maskEmail, maskPhone } from '@codevibe/sign-pdf';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { validation } from '../errors';
 import { pdfResponse, readJson } from '../http/body';
@@ -51,6 +52,22 @@ const tokenInvalid = () => new SignError('TOKEN_INVALID', 'This signing link is 
 export function signerRoutes(rt: Runtime) {
   const app = new Hono();
 
+  // Cheap checks first: the per-IP limit, then the token's shape, so junk never reaches
+  // hashing, token-keyed rate limits, idempotency records or the store.
+  const screen: MiddlewareHandler = async (c, next) => {
+    await enforce(
+      rt.limiter,
+      `ip:${clientIp(c, rt)}`,
+      rt.limits.ipRequestsPerMinute,
+      60_000,
+      rt.clock.now(),
+    );
+    if (!isSigningTokenShape(c.req.param('token'))) throw tokenInvalid();
+    await next();
+  };
+  app.use('/:token', screen);
+  app.use('/:token/*', screen);
+
   app.use(
     '/:token/*',
     idempotency(
@@ -62,8 +79,6 @@ export function signerRoutes(rt: Runtime) {
 
   async function resolve(c: Context): Promise<SignerContext> {
     const now = rt.clock.now();
-    const ip = clientIp(c, rt);
-    await enforce(rt.limiter, `ip:${ip}`, rt.limits.ipRequestsPerMinute, 60_000, now);
     const tokenHash = hashToken(c.req.param('token') ?? '');
     await enforce(rt.limiter, `token:${tokenHash}`, rt.limits.signerRequestsPerMinute, 60_000, now);
 
