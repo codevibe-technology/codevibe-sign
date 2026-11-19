@@ -277,4 +277,43 @@ describe.skipIf(!url)('postgresStore', () => {
   });
 
   contract('contract', async () => postgresStore(sql));
+
+  it('runs with a role that may only insert and read audit events', async () => {
+    const role = `sign_app_${process.pid}_${Date.now()}`;
+    const password = `pw-${Math.random().toString(36).slice(2)}`;
+    const grants = [
+      `create role ${role} login password '${password}'`,
+      `grant usage on schema ${schema} to ${role}`,
+      `grant select on ${schema}.sign_migrations to ${role}`,
+      `grant select, insert, update on ${schema}.sign_envelopes to ${role}`,
+      `grant select, insert on ${schema}.sign_audit_events to ${role}`,
+      `grant select, insert, update, delete on ${schema}.sign_tokens, ${schema}.sign_otp_challenges,
+        ${schema}.sign_idempotency, ${schema}.sign_jobs to ${role}`,
+    ];
+    for (const statement of grants) await admin.unsafe(statement);
+    const target = new URL(url!);
+    target.username = role;
+    target.password = password;
+    const app = postgres(target.toString(), {
+      max: 1,
+      onnotice: () => {},
+      connection: { search_path: schema },
+    });
+    try {
+      expect(await migrate(app)).toEqual([]);
+      const store = postgresStore(app);
+      const envelope = draft();
+      await store.commit(envelope, [event(envelope, 1)], 0, []);
+      await store.purge(T0, T0);
+      await expect(app`update sign_audit_events set data = '{}'`).rejects.toThrow(/permission/);
+      await expect(app`delete from sign_audit_events`).rejects.toThrow(/permission/);
+      await expect(app`delete from sign_envelopes`).rejects.toThrow(/permission/);
+      await expect(app`truncate sign_audit_events`).rejects.toThrow(/permission/);
+      expect(await store.listEvents(envelope.id)).toHaveLength(1);
+    } finally {
+      await app.end();
+      await admin.unsafe(`drop owned by ${role}`);
+      await admin.unsafe(`drop role ${role}`);
+    }
+  });
 });

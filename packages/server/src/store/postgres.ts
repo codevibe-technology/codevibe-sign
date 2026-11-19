@@ -26,10 +26,15 @@ export async function migrate(sql: Sql): Promise<string[]> {
   const applied: string[] = [];
   await sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(${MIGRATION_LOCK})`;
-    await tx`create table if not exists sign_migrations (
-      name text primary key,
-      applied_at timestamptz not null default now()
-    )`;
+    // Checked first so a server role without CREATE rights can start once migrations are in.
+    const [registry] = await tx<{ table: string | null }[]>`
+      select to_regclass('sign_migrations')::text as table`;
+    if (!registry?.table) {
+      await tx`create table sign_migrations (
+        name text primary key,
+        applied_at timestamptz not null default now()
+      )`;
+    }
     const rows = await tx<{ name: string }[]>`select name from sign_migrations`;
     const done = new Set(rows.map((row) => row.name));
     for (const migration of migrations) {
