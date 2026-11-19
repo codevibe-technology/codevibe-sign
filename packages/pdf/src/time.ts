@@ -50,13 +50,13 @@ export function formatInZone(date: Date, timeZone: string): string {
 }
 
 /** UTC time, followed by the local time when a zone is given. */
-export function formatMoment(value: string, timeZone?: string): string {
+export function formatMoment(value: string, timeZone?: string, separator = ' / '): string {
   const date = parseDate(value);
   if (!date) {
     return value;
   }
   const utc = formatUtc(date);
-  return timeZone && timeZone !== 'UTC' ? `${utc} / ${formatInZone(date, timeZone)}` : utc;
+  return timeZone && timeZone !== 'UTC' ? `${utc}${separator}${formatInZone(date, timeZone)}` : utc;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
