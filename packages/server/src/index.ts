@@ -20,9 +20,17 @@ export {
   type PdfInfo,
   type SealOptions,
   type CertificateInput,
+  type SealTrust,
+  type SealCheck,
 } from './engine';
 export type { TickResult, TickOptions } from './runtime/tick';
 export { signWebhook, verifyWebhook, SIGNATURE_HEADER } from './runtime/webhooks';
+export {
+  checkWebhookUrl,
+  isPublicAddress,
+  WebhookAddressError,
+  type WebhookSecurity,
+} from './runtime/webhook-guard';
 export {
   HttpError,
   VersionConflictError,

@@ -13,34 +13,51 @@ follows.
 - Each link carries 32 random bytes, encoded as base64url.
 - Only the SHA-256 of the token is stored.
 - A token belongs to one envelope, expires and can be revoked.
-- Tokens are compared in constant time.
+- Tokens are compared in constant time, and anything not shaped like a token is refused before
+  it is hashed.
+- Opening a link moves the token into an HttpOnly, SameSite=Strict cookie and redirects to a page
+  URL without it. Opening a link changes nothing, so mail scanners cannot mark a document as
+  viewed.
 
 ## One-time codes
 
 - Six digits, drawn uniformly, valid for 10 minutes.
 - Locked after 5 wrong attempts, and rate limited per recipient and per IP address.
+- At most 10 codes per recipient for one envelope; each new code replaces the last.
+- Each check is saved atomically, so guesses sent in parallel all count.
 - Stored only as a salted hash. A code that was accepted is never accepted again.
 
 ## Files
 
-- Uploaded PDFs are size-capped and parsed defensively.
-- Signature images are size-capped and re-encoded to PNG before they are drawn.
+- Uploaded PDFs are size-capped and read first in a worker thread under limits on pages,
+  objects, nesting, decompressed size and time; the worker is killed when a file goes over.
+- Before fields are drawn, scripts, automatic actions, embedded files, external links and XFA
+  are removed, forms are flattened and the pages are written into a fresh file.
+- Signature images are size-capped and re-encoded to a clean PNG, under limits, before they
+  are drawn.
 
 ## Audit trail and seal
 
 - Every action is appended to a log chained with SHA-256. Changing or removing an event breaks
   the chain, and the head is printed in the sealed PDF.
-- The final file carries a PAdES seal; any later edit makes it invalid.
+- The final file carries a PAdES seal; any later edit makes it invalid. `verify()` also checks
+  that the seal is the only signature, covers the whole file and was made with your
+  certificate.
+- The server refuses to start with a weak or expired sealing key.
 
 ## Webhooks
 
 - Outbound webhooks are signed with HMAC-SHA256 over a timestamp and the body, and retried with
   backoff.
+- They go only to `https` URLs on public addresses: the host is resolved and checked before each
+  delivery, and the connection is made to the checked address, without following redirects.
 - Inbound provider webhooks, such as Leegality's, are verified before they are trusted.
 
 ## Data
 
-- Secrets are never logged. Errors never contain documents or credentials.
+- Secrets are never logged: every server log line is redacted of tokens, codes, cookies,
+  credentials and bodies. Errors never contain documents or credentials.
+- API keys are kept only as SHA-256 hashes.
 - The audit log holds only the personal data the certificate page needs.
 - You run the service, so documents, keys and personal data stay in your infrastructure.
 

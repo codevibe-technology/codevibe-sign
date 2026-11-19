@@ -83,7 +83,9 @@ fields are filled in when left empty.
 ## Tokens and OTPs
 
 - `createSigningToken(random)` → `{ token, tokenHash }`: 32 random bytes, base64url.
-  Store only the hash. `hashToken(token)` and `verifyToken(token, hash)`.
+  Store only the hash. `hashToken(token)` and `verifyToken(token, hash)`;
+  `isSigningTokenShape(value)` checks that a value looks like an issued token (43 base64url
+  characters) before you hash or look it up.
 - `createOtp(random, clock)` → `{ code, codeHash, expiresAt, state }`: 6 digits, valid
   for 10 minutes, salted hash. Store `state`, send `code`.
 - `verifyOtp(state, code, clock)` → `{ ok, state, ... }`. Persist the returned state on

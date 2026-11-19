@@ -42,18 +42,18 @@ and `sign.close()` stops accepting requests, lets in-flight work finish and disc
 
 ## Options
 
-| Option           | What it is                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| `databaseUrl`    | PostgreSQL connection string.                                                         |
-| `filesDir`       | Directory for original and sealed files.                                              |
-| `smtp`           | `{ host, port, secure, user?, pass?, from }` for invitations and codes.               |
-| `seal`           | `{ p12, passphrase, reason?, location? }`: your sealing certificate as PKCS#12 bytes. |
-| `apiKeys`        | Keys your backend sends to call the API. Use long random values.                      |
-| `publicUrl`      | The base URL recipients open; signing links are built from it.                        |
-| `tickIntervalMs` | How often reminders, expiry and retries run. Default 60 seconds.                      |
+| Option           | What it is                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `databaseUrl`    | PostgreSQL connection string.                                                                                                                                                             |
+| `filesDir`       | Directory for original and sealed files.                                                                                                                                                  |
+| `smtp`           | `{ host, port, secure, user?, pass?, from }` for invitations and codes.                                                                                                                   |
+| `seal`           | `{ p12, passphrase, reason?, location? }`: your sealing certificate as PKCS#12 bytes. The server refuses to start with a key under RSA-2048, a SHA-1 certificate or one that has expired. |
+| `apiKeys`        | Keys your backend sends to call the API. Use long random values.                                                                                                                          |
+| `publicUrl`      | The base URL recipients open; signing links are built from it.                                                                                                                            |
+| `tickIntervalMs` | How often reminders, expiry and retries run. Default 60 seconds.                                                                                                                          |
 
 A second argument replaces any adapter or option `createSignServer` takes, for example
-`{ webhooks: [...], trustProxy: true }`.
+`{ webhooks: [...], trustProxy: true, trustedProxyHops: 1 }`.
 
 ## Mounting the app yourself
 

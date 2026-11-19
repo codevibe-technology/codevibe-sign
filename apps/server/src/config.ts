@@ -5,6 +5,8 @@ export interface AppConfig {
   server: StandaloneConfig;
   /** Read the client IP from `X-Forwarded-For`; only behind a proxy you control. */
   trustProxy: boolean;
+  /** Proxies in front of the server that append to `X-Forwarded-For`. */
+  trustedProxyHops: number;
   port: number;
   host: string;
 }
@@ -105,6 +107,8 @@ export function loadConfig(env: Env): AppConfig {
     problems.push('TRUST_PROXY must be true or false');
   }
 
+  const trustedProxyHops = integer('TRUSTED_PROXY_HOPS', 1, 1, 20);
+
   const port = integer('PORT', 3000, 1, 65535);
   const host = env.HOST?.trim() || '0.0.0.0';
 
@@ -131,6 +135,7 @@ export function loadConfig(env: Env): AppConfig {
       tickIntervalMs: tickSeconds * 1000,
     },
     trustProxy: trustRaw === 'true',
+    trustedProxyHops,
     port,
     host,
   };

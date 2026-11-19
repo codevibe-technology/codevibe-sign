@@ -2,7 +2,8 @@
 
 The PDF side of Codevibe Sign. It checks uploaded files, draws signatures and field
 values onto the pages, appends a signing certificate, and seals the result with a PAdES
-signature so any later change is detectable. It also verifies that seal.
+signature so any later change is detectable. It also verifies that seal against the
+certificate you trust.
 
 Node 20 or later. Built on [pdf-lib](https://pdf-lib.js.org), `@signpdf` and
 `node-forge`.
@@ -29,17 +30,20 @@ import {
   inspectPdf,
   renderFields,
   seal,
+  sealCertificate,
   sha256Hex,
-  verifySeal,
+  verify,
 } from '@codevibe/sign-pdf';
 
-// 1. On upload: reject encrypted, broken or oversized files and record page sizes.
+// 1. On upload: reject encrypted, broken, oversized or overly complex files (read in a
+//    worker thread under limits) and record page sizes.
 const original = new Uint8Array(await readFile('offer.pdf'));
 const { pageCount, pages } = await inspectPdf(original, { maxBytes: 10 * 1024 * 1024 });
 const sha256 = sha256Hex(original);
 // `pages` maps directly onto core's Document.pageSizes.
 
-// 2. When the envelope completes: draw every value, add the certificate, seal.
+// 2. When the envelope completes: draw every value (on a copy stripped of scripts and
+//    actions, forms flattened), add the certificate, seal.
 const signed = await renderFields(original, envelope.fields, envelope.values, envelope.recipients, {
   documentId: document.id,
   timeZone: 'Asia/Kolkata',
@@ -50,17 +54,20 @@ const withCertificate = await appendCertificate(signed, {
   events, // the envelope's audit events, in order
   timeZone: 'Asia/Kolkata',
 });
+const p12 = new Uint8Array(await readFile(process.env.SEAL_P12_PATH!));
+const passphrase = process.env.SEAL_P12_PASSPHRASE;
 const sealed = await seal(withCertificate, {
-  p12: new Uint8Array(await readFile(process.env.SEAL_P12_PATH!)),
-  passphrase: process.env.SEAL_P12_PASSPHRASE,
+  p12,
+  passphrase,
   reason: 'Signed with Codevibe Sign',
   location: 'Bengaluru, India',
 });
 
-// 3. Any time later: check the file has not changed.
-const check = await verifySeal(sealed);
-// { sealed: true, valid: true, coversWholeDocument: true,
-//   signer: { commonName, organization }, signedAt, signatureCount: 1 }
+// 3. Any time later: check the file is exactly what your certificate sealed.
+const operator = sealCertificate({ p12, passphrase }); // keep operator.sha256 or operator.pem
+const check = await verify(sealed, { trust: { fingerprints: [operator.sha256] } });
+// { valid: true, trustedBy: 'certificate', signer: { commonName, organization },
+//   signedAt, certificateSha256, seal: { ... } }
 ```
 
 All failures throw a `SignError` from `@codevibe/sign-core` with a stable `code` and,
@@ -68,14 +75,29 @@ where it helps, `details` that name the field or option to fix.
 
 ## API
 
-### `inspectPdf(bytes, { maxBytes? }) → Promise<{ pageCount, pages: { width, height }[] }>`
+### `inspectPdf(bytes, { maxBytes?, limits? }) → Promise<{ pageCount, pages: { width, height }[] }>`
 
 Page sizes are in PDF points as the page is displayed: the crop box, with width and height
 swapped for pages rotated 90 or 270 degrees. This is the space field rects live in.
 `maxBytes` defaults to 25 MB.
 
+Use it on every upload. Before the file is parsed on your thread, a worker thread reads it
+under `limits` and is terminated if it runs out of time, so one hostile file cannot block the
+event loop or exhaust memory:
+
+| Limit             | Default | Refuses                                                             |
+| ----------------- | ------- | ------------------------------------------------------------------- |
+| `maxPages`        | 500     | More pages than this.                                               |
+| `maxObjects`      | 100 000 | More indirect objects than this.                                    |
+| `maxDepth`        | 64      | Arrays and dictionaries, or the page tree, nested deeper than this. |
+| `maxDecodedBytes` | 50 MB   | Compressed streams that inflate to more than this, together.        |
+| `timeoutMs`       | 10 s    | Files that take longer to read; the worker is killed.               |
+
+The worker also has a 512 MB heap; a file that needs more is refused. `checkParseLimits(bytes,
+limits?)` runs the same check on its own, and `DEFAULT_PARSE_LIMITS` holds the defaults.
+
 Errors: `DOCUMENT_TOO_LARGE`; `DOCUMENT_INVALID` with `details.reason` of `encrypted`,
-`unreadable` or `empty`.
+`unreadable`, `empty`, `timeout` or `limit` (then `details.limit` names it, with `details.max`).
 
 ### `sha256Hex(bytes) → string`
 
@@ -85,10 +107,21 @@ Lowercase hex SHA-256.
 
 Draws each field onto its page. Rects use core's convention (points from the top-left of
 the displayed page); rotated pages and offset crop boxes are handled, and content is
-drawn upright as the reader sees it. Nothing else in the file is changed or flattened.
+drawn upright as the reader sees it.
+
+The pages are first copied into a fresh document without active content: `/OpenAction`
+and `/AA` actions, JavaScript, embedded files, launch, URI and every other action except
+in-document links, file attachment and media annotations, and XFA. Form fields are
+flattened into the page. Outlines, the structure tree and objects the pages do not use are
+left behind, and the output is a newly written file, never an incremental update. The same
+step is available on its own as `sanitizePdf(bytes)`.
 
 - `signature`, `initials`: PNG as base64 (a `data:image/png;base64,` prefix is accepted).
-  Scaled to fit the box, aspect ratio kept, centred.
+  Each image is re-encoded before it is embedded: the header must declare at most
+  2048 × 2048 pixels, the pixel data must inflate to exactly the size the header implies,
+  every chunk checksum and scanline filter must be valid, and only the header, palette,
+  transparency and freshly compressed pixels are kept. Scaled to fit the box, aspect ratio
+  kept, centred.
 - `text`, `name`, `date_signed`: Helvetica, sized down (to 6 pt) and wrapped to fit; text
   that still does not fit is cut with an ellipsis. `name` falls back to the recipient's
   name and `date_signed` to the recipient's `actedAt`. Dates print as `19 Nov 2026`.
@@ -134,27 +167,76 @@ Applies a PAdES baseline B-B signature: SubFilter `ETSI.CAdES.detached`, SHA-256
 signed attributes content-type, message-digest and signing-certificate-v2, signing time in
 the signature dictionary. The seal covers the whole file.
 
-| Option        | Purpose                                                     |
-| ------------- | ----------------------------------------------------------- |
-| `p12`         | PKCS#12 (`.p12`/`.pfx`) bytes with an RSA key and its cert. |
-| `passphrase`  | The file's passphrase.                                      |
-| `reason`      | Shown by PDF readers. Has a sensible default.               |
-| `location`    | Optional.                                                   |
-| `contactInfo` | Optional.                                                   |
-| `signingTime` | Defaults to now. Must fall inside the certificate validity. |
-| `maxBytes`    | Largest input PDF, 25 MB by default.                        |
+| Option         | Purpose                                                     |
+| -------------- | ----------------------------------------------------------- |
+| `p12`          | PKCS#12 (`.p12`/`.pfx`) bytes with an RSA key and its cert. |
+| `passphrase`   | The file's passphrase.                                      |
+| `reason`       | Shown by PDF readers. Has a sensible default.               |
+| `location`     | Optional.                                                   |
+| `contactInfo`  | Optional.                                                   |
+| `signingTime`  | Defaults to now. Must fall inside the certificate validity. |
+| `maxBytes`     | Largest input PDF, 25 MB by default.                        |
+| `allowWeakKey` | Local development only; see below.                          |
+
+The key must be RSA of at least 2048 bits and the certificate signed with SHA-256 or
+stronger, and valid (not expired, not yet to start) at the signing time. `allowWeakKey: true`
+accepts shorter keys and SHA-1 certificates, for throwaway keys in local development; never
+set it in production.
 
 The certificate is the operator's, not the signer's: it proves the file has not changed
 since sealing. Signer intent is proven by the certificate pages and the audit trail.
-Errors: `SEAL_FAILED` (bad file or passphrase, no RSA key, certificate not valid at the
-signing time) and the `DOCUMENT_*` codes above.
+Errors: `SEAL_FAILED` (bad file or passphrase, no RSA key, weak key or certificate with
+`details.keyBits` or `details.signatureAlgorithm`, certificate not valid at the signing time)
+and the `DOCUMENT_*` codes above.
+
+### `sealCertificate({ p12, passphrase?, allowWeakKey?, at? }) → SealCertificate`
+
+Opens the PKCS#12 file with the same checks as `seal()` and returns
+`{ pem, sha256, subject, notBefore, notAfter }`. Call it at start-up to fail early, and keep
+`sha256` (or `pem`) as what `verify()` should trust.
+
+### `verify(bytes, { trust, limits? }) → Promise<VerifyResult>`
+
+The check to use when deciding whether a file is genuine. `valid` is true only when:
+
+1. the file has exactly one signature, found through its form's signature field;
+2. that signature is cryptographically intact (see `verifySeal`);
+3. it covers every byte of the file, so nothing was appended after sealing;
+4. the signer certificate is one you trust: its SHA-256 is in `trust.fingerprints`, it is
+   one of `trust.certificates` (PEM or DER), or it chains through the certificates in the
+   signature to one of `trust.roots` and was valid at the signing time.
+
+`trust` must name at least one certificate, fingerprint or root. The file is read under the
+parser limits in a worker first, as in `inspectPdf`.
+
+```ts
+interface VerifyResult {
+  valid: boolean;
+  reason?:
+    | 'not_sealed'
+    | 'multiple_signatures'
+    | 'signature_invalid'
+    | 'not_whole_document'
+    | 'untrusted_signer';
+  signer?: { commonName?: string; organization?: string };
+  signedAt?: string;
+  certificateSha256?: string; // of the signer certificate
+  trustedBy?: 'certificate' | 'root';
+  seal: SealVerification; // the low-level result below
+}
+```
+
+Keep the certificates of earlier keys in `trust` after a rotation, so files they sealed
+keep verifying.
 
 ### `verifySeal(bytes) → Promise<SealVerification>`
 
-Checks the first signature in the file: the byte range is well formed, `/Contents` holds
-exactly the CMS structure (any change to it, even in padding, fails), the message digest
-matches the signed bytes, the signing-certificate-v2 hash matches the embedded
-certificate, and the RSA signature verifies.
+The low-level check `verify()` builds on. It takes the first signed signature field of the
+document's form (text that only looks like a signature dictionary is ignored), and checks
+that its byte range is well formed and brackets the `/Contents` the field declares,
+`/Contents` holds exactly the CMS structure (any change to it, even in padding, fails), the
+message digest matches the signed bytes, the signing-certificate-v2 hash matches the
+embedded certificate, and the RSA signature verifies.
 
 ```ts
 interface SealVerification {
@@ -167,8 +249,9 @@ interface SealVerification {
 }
 ```
 
-`valid` says nothing about trust in the certificate; compare `signer` with your own
-operator certificate. Treat `valid && coversWholeDocument` as "unchanged since sealing".
+`valid` says nothing about who sealed the file: anyone can seal an altered copy with their
+own key and `verifySeal` will call it valid. It also runs without parser limits. Use
+`verify()` with your operator certificate to decide whether a file is genuine.
 
 ### `maskEmail(email)`, `maskPhone(phone)`
 
@@ -207,8 +290,10 @@ with the font you choose.
 - Sealing keys must be RSA. Encrypted PDFs are rejected rather than decrypted.
 - Sealing rewrites the file; seal last, and do not seal a file that already carries
   someone else's signature.
-- `verifySeal` finds signature dictionaries by scanning the file, which works for files
-  produced here and most others, but is not a general PDF signature validator.
+- `verify` and `verifySeal` locate signatures through the form's signature fields and
+  check PAdES B-B seals like the ones produced here. They are not a general PDF signature
+  validator: no revocation checks, timestamps or long-term validation.
+- Sanitising drops document-level features such as bookmarks and the tagged structure tree.
 
 ## Licence
 

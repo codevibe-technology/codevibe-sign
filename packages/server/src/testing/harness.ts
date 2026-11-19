@@ -48,9 +48,11 @@ export function harness(overrides: Partial<SignServerOptions> = {}) {
     publicUrl: 'https://sign.example.com/',
     webhooks: [{ url: 'https://hooks.example.com/sign', secret: WEBHOOK_SECRET, events: ['*'] }],
     fetch: fetchStub,
+    webhookSecurity: { lookup: async () => ['93.184.215.14'] },
     logger: {
       error: (message, meta) => logs.push({ level: 'error', message, ...(meta ? { meta } : {}) }),
       warn: (message, meta) => logs.push({ level: 'warn', message, ...(meta ? { meta } : {}) }),
+      info: (message, meta) => logs.push({ level: 'info', message, ...(meta ? { meta } : {}) }),
     },
     ...overrides,
   });

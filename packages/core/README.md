@@ -196,7 +196,8 @@ malformed input:
 
 - `createSigningToken(random)` → `{ token, tokenHash }`: 32 random bytes, base64url.
   Store only the hash. `hashToken(token)` and `verifyToken(token, hash)`; `verifyToken`
-  refuses anything not shaped like an issued token before hashing it.
+  refuses anything not shaped like an issued token before hashing it, and
+  `isSigningTokenShape(value)` runs that shape check alone (43 base64url characters).
 - `createOtp(random, clock)` → `{ code, codeHash, expiresAt, state }`: 6 digits, valid
   for 10 minutes, salted hash. Store `state`, send `code`.
 - `verifyOtp(state, code, clock)` → `{ ok, state, ... }`. Persist the returned state on

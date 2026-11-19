@@ -21,6 +21,23 @@ export interface SealOptions {
   reason: string;
   location: string;
   signingTime: Date;
+  /** Accept weak keys; local development only. */
+  allowWeakKey?: boolean;
+}
+
+/** Certificates a sealed file may come from; see `verify` in `@codevibe/sign-pdf`. */
+export interface SealTrust {
+  certificates?: (string | Uint8Array)[];
+  fingerprints?: string[];
+  roots?: (string | Uint8Array)[];
+}
+
+export interface SealCheck {
+  valid: boolean;
+  reason?: string;
+  signer?: { commonName?: string; organization?: string };
+  signedAt?: string;
+  certificateSha256?: string;
 }
 
 export interface CertificateInput {
@@ -46,6 +63,15 @@ export interface PdfEngine {
   appendCertificate(pdf: Uint8Array, input: CertificateInput): Promise<Uint8Array>;
   /** Must be the last change to the file: anything after it breaks the seal. */
   seal(pdf: Uint8Array, options: SealOptions): Promise<Uint8Array>;
+  /**
+   * Opens the sealing key and returns the certificate's SHA-256, refusing weak or expired
+   * keys. Called once at start-up; when present, sealed files are verified against it.
+   */
+  sealCertificate?(options: { p12: Uint8Array; passphrase: string; allowWeakKey?: boolean }): {
+    sha256: string;
+  };
+  /** Checks a sealed file: one intact signature over every byte, from a trusted certificate. */
+  verify?(pdf: Uint8Array, options: { trust: SealTrust }): Promise<SealCheck>;
 }
 
 export const defaultPdfEngine: PdfEngine = {
@@ -54,4 +80,6 @@ export const defaultPdfEngine: PdfEngine = {
     signPdf.renderFields(pdf, fields, values, recipients, options),
   appendCertificate: (pdf, input) => signPdf.appendCertificate(pdf, input),
   seal: (pdf, options) => signPdf.seal(pdf, options),
+  sealCertificate: (options) => signPdf.sealCertificate(options),
+  verify: (pdf, options) => signPdf.verify(pdf, options),
 };

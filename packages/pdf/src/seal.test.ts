@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFHexString } from 'pdf-lib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe/sign-core';
 import { appendCertificate } from './certificate';
@@ -144,6 +144,37 @@ describe('seal and verifySeal', () => {
     });
   });
 
+  it('ignores /ByteRange text that no signature field references', async () => {
+    const doc = await PDFDocument.load(await makePdf([{ size: A4 }]));
+    doc.context.register(
+      doc.context.obj({ Type: 'Sig', ByteRange: [0, 10, 20, 30], Contents: PDFHexString.of('00') }),
+    );
+    const decoy = await doc.save({ useObjectStreams: false });
+    expect(Buffer.from(decoy).toString('latin1')).toContain('/ByteRange');
+    expect(await verifySeal(decoy)).toMatchObject({ sealed: false, signatureCount: 0 });
+  });
+
+  it('verifies the signature the form declares, not an earlier decoy', async () => {
+    const doc = await PDFDocument.load(await makePdf([{ size: A4 }]));
+    doc.context.register(
+      doc.context.obj({ Type: 'Sig', ByteRange: [0, 10, 20, 30], Contents: PDFHexString.of('00') }),
+    );
+    const output = await seal(await doc.save({ useObjectStreams: false }), {
+      p12: identity.p12,
+      passphrase: identity.passphrase,
+    });
+    const text = Buffer.from(output).toString('latin1');
+    expect(text.indexOf('/ByteRange [0 10 20 30]')).toBeLessThan(text.lastIndexOf('/ByteRange'));
+    expect(await verifySeal(output)).toMatchObject({ valid: true, coversWholeDocument: true });
+  });
+
+  it('counts every signed signature field', async () => {
+    const twice = await seal(sealed, { p12: identity.p12, passphrase: identity.passphrase });
+    const result = await verifySeal(twice);
+    expect(result.signatureCount).toBe(2);
+    expect(result.valid).toBe(false);
+  });
+
   it('seals with a key whose certificate is not first in the file', async () => {
     const mixed = createTestP12({ withExtraCertificate: true, commonName: 'Second Cert' });
     const output = await seal(await makePdf([{ size: A4 }]), {
@@ -168,6 +199,39 @@ describe('seal and verifySeal', () => {
     const late = await rejection(seal(pdf, { p12: expired.p12, passphrase: expired.passphrase }));
     expect(late.code).toBe('SEAL_FAILED');
     expect(late.details).toMatchObject({ notAfter: '2021-01-01T00:00:00.000Z' });
+  });
+
+  it('refuses RSA keys under 2048 bits unless weak keys are allowed', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const small = createTestP12({ bits: 1024 });
+    const error = await rejection(seal(pdf, { p12: small.p12, passphrase: small.passphrase }));
+    expect(error.code).toBe('SEAL_FAILED');
+    expect(error.details).toMatchObject({ keyBits: 1024 });
+    const output = await seal(pdf, {
+      p12: small.p12,
+      passphrase: small.passphrase,
+      allowWeakKey: true,
+    });
+    expect((await verifySeal(output)).valid).toBe(true);
+  });
+
+  it('refuses certificates signed with SHA-1', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const sha1 = createTestP12({ certificateDigest: 'sha1' });
+    const error = await rejection(seal(pdf, { p12: sha1.p12, passphrase: sha1.passphrase }));
+    expect(error.code).toBe('SEAL_FAILED');
+    expect(error.details).toMatchObject({ signatureAlgorithm: '1.2.840.113549.1.1.5' });
+  });
+
+  it('refuses a certificate that is not valid yet', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const future = createTestP12({
+      notBefore: new Date('2030-01-01T00:00:00Z'),
+      notAfter: new Date('2031-01-01T00:00:00Z'),
+    });
+    const early = await rejection(seal(pdf, { p12: future.p12, passphrase: future.passphrase }));
+    expect(early.code).toBe('SEAL_FAILED');
+    expect(early.details).toMatchObject({ notBefore: '2030-01-01T00:00:00.000Z' });
   });
 
   it('rejects input that is not a readable PDF', async () => {

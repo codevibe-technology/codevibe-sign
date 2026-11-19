@@ -1,4 +1,4 @@
-import { nextTickAt, type AuditEvent, type Envelope, type Id } from '@codevibe/sign-core';
+import { isFinal, nextTickAt, type AuditEvent, type Envelope, type Id } from '@codevibe/sign-core';
 import { VersionConflictError } from '../errors';
 import type {
   IdempotencyClaim,
@@ -42,6 +42,12 @@ export function memoryStore(): ServerStore {
     const current = row?.version ?? 0;
     if (expectedVersion !== undefined && expectedVersion !== current) {
       throw new VersionConflictError(envelope.id);
+    }
+    const seqs = new Set((row?.events ?? []).map((e) => `${e.envelopeId}:${e.seq}`));
+    for (const event of events) {
+      const key = `${event.envelopeId}:${event.seq}`;
+      if (seqs.has(key)) throw new Error(`Audit event ${event.seq} already exists`);
+      seqs.add(key);
     }
     const version = current + 1;
     envelopes.set(envelope.id, {
@@ -103,12 +109,30 @@ export function memoryStore(): ServerStore {
       }
     },
 
-    async putOtp(challenge) {
-      otps.set(otpKey(challenge.envelopeId, challenge.recipientId), clone(challenge));
+    async issueOtp({ envelopeId, recipientId, state }, maxIssued) {
+      const key = otpKey(envelopeId, recipientId);
+      const current = otps.get(key);
+      if ((current?.issued ?? 0) >= maxIssued) return null;
+      const next: OtpChallenge = {
+        envelopeId,
+        recipientId,
+        state: clone(state),
+        issued: (current?.issued ?? 0) + 1,
+        version: (current?.version ?? 0) + 1,
+      };
+      otps.set(key, next);
+      return clone(next);
     },
     async getOtp(envelopeId, recipientId) {
       const challenge = otps.get(otpKey(envelopeId, recipientId));
       return challenge ? clone(challenge) : null;
+    },
+    async updateOtp(challenge, state) {
+      const key = otpKey(challenge.envelopeId, challenge.recipientId);
+      const current = otps.get(key);
+      if (!current || current.version !== challenge.version) return false;
+      otps.set(key, { ...current, state: clone(state), version: current.version + 1 });
+      return true;
     },
 
     async claimIdempotency(scope, key, fingerprint, now): Promise<IdempotencyClaim> {
@@ -161,7 +185,8 @@ export function memoryStore(): ServerStore {
         if (token.expiresAt.getTime() <= now.getTime()) tokens.delete(hash);
       }
       for (const [k, challenge] of otps) {
-        if (Date.parse(challenge.state.expiresAt) <= now.getTime()) otps.delete(k);
+        const envelope = envelopes.get(challenge.envelopeId)?.envelope;
+        if (!envelope || isFinal(envelope)) otps.delete(k);
       }
       for (const [k, row] of idempotency) {
         if (row.createdAt.getTime() < idempotencyBefore.getTime()) idempotency.delete(k);

@@ -4,6 +4,7 @@ import {
   consoleMailer,
   consoleOtpSender,
   createSignServer,
+  defaultPdfEngine,
   listen,
   memoryFileStore,
   memoryStore,
@@ -27,6 +28,14 @@ const env: Env = {
   PORT: '1',
 };
 
+/** The PDF engine without its start-up key check, since the test seal key is a placeholder. */
+const pdf = {
+  inspectPdf: defaultPdfEngine.inspectPdf,
+  renderFields: defaultPdfEngine.renderFields,
+  appendCertificate: defaultPdfEngine.appendCertificate,
+  seal: defaultPdfEngine.seal,
+};
+
 /** A stand-in for `startSignServer` that serves the real app on memory adapters. */
 function memoryStart() {
   const calls: { config: StandaloneConfig; overrides: Partial<SignServerOptions> }[] = [];
@@ -45,6 +54,7 @@ function memoryStart() {
       sealer: config.seal,
       apiKeys: config.apiKeys,
       publicUrl: config.publicUrl,
+      pdf,
       ...overrides,
     });
     return {
@@ -97,7 +107,7 @@ describe('run', () => {
     const fake = memoryStart();
     const d = deps(fake.start, { TRUST_PROXY: 'true' });
     await run(d);
-    expect(fake.calls[0]?.overrides).toEqual({ trustProxy: true });
+    expect(fake.calls[0]?.overrides).toEqual({ trustProxy: true, trustedProxyHops: 1 });
     await fake.close();
   });
 

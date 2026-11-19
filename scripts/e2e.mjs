@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = new URL('../', import.meta.url);
 const pkg = (path) => fileURLToPath(new URL(path, root));
 const server = await import(pkg('packages/server/dist/index.js'));
-const { verifySeal } = await import(pkg('packages/pdf/dist/index.js'));
+const { verify, verifySeal } = await import(pkg('packages/pdf/dist/index.js'));
 const { verifyChain } = await import(pkg('packages/core/dist/index.js'));
 const require = createRequire(pkg('packages/server/package.json'));
 const { PDFDocument, StandardFonts } = require('pdf-lib');
@@ -45,17 +45,22 @@ function makeP12(passphrase) {
   const asn1 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], passphrase, {
     algorithm: '3des',
   });
-  return new Uint8Array(Buffer.from(forge.asn1.toDer(asn1).getBytes(), 'binary'));
+  return {
+    p12: new Uint8Array(Buffer.from(forge.asn1.toDer(asn1).getBytes(), 'binary')),
+    certificatePem: forge.pki.certificateToPem(cert),
+  };
 }
 
 const mailer = server.consoleMailer({ silent: true });
 const otp = server.consoleOtpSender({ silent: true });
+const operator = makeP12('pw');
+const stranger = makeP12('pw');
 const sign = server.createSignServer({
   store: server.memoryStore(),
   files: server.memoryFileStore(),
   mailer,
   otp,
-  sealer: { p12: makeP12('pw'), passphrase: 'pw' },
+  sealer: { p12: operator.p12, passphrase: 'pw' },
   apiKeys: [API_KEY],
   publicUrl: 'https://sign.example.com',
 });
@@ -114,6 +119,13 @@ try {
   check((await call('POST', `/v1/envelopes/${id}/send`)).json?.status === 'sent', 'send');
 
   const asha = tokenFor('asha@example.com');
+  const opened = await fetch(`${base}/sign/${asha}`, { redirect: 'manual' });
+  check(
+    opened.status === 303 &&
+      !opened.headers.get('location')?.includes(asha) &&
+      /HttpOnly/.test(opened.headers.get('set-cookie') ?? ''),
+    'opening the link swaps the token for a cookie and redirects without it',
+  );
   const lockedDoc = await call('GET', `/v1/sign/${asha}/documents/${docId}`);
   const lockedView = await call('POST', `/v1/sign/${asha}/view`);
   check(
@@ -145,8 +157,16 @@ try {
 
   const download = await call('GET', `/v1/envelopes/${id}/documents/${docId}`);
   const sealed = new Uint8Array(await download.res.arrayBuffer());
-  const seal = await verifySeal(sealed);
-  check(seal.valid && seal.coversWholeDocument, 'the sealed PDF verifies and covers every byte');
+  const trust = { certificates: [operator.certificatePem] };
+  const result = await verify(sealed, { trust });
+  check(result.valid, 'the sealed PDF verifies against the operator certificate');
+  const untrusted = await verify(sealed, { trust: { certificates: [stranger.certificatePem] } });
+  check(
+    !untrusted.valid && untrusted.reason === 'untrusted_signer' && untrusted.seal.valid,
+    'the same file is refused against another certificate',
+  );
+  const report = await call('GET', `/v1/envelopes/${id}/documents/${docId}/verification`);
+  check(report.json?.valid === true, 'the server reports the seal as valid');
 
   const events = (await call('GET', `/v1/envelopes/${id}/events`)).json;
   const hasher = server.nodeHasher;
@@ -154,8 +174,8 @@ try {
 
   const tampered = new Uint8Array(sealed);
   tampered[tampered.length >> 2] ^= 0xff;
-  const broken = await verifySeal(tampered);
-  check(!(broken.valid && broken.coversWholeDocument), 'a changed byte breaks the seal');
+  check(!(await verify(tampered, { trust })).valid, 'a changed byte breaks the seal');
+  check(!(await verifySeal(tampered)).valid, 'verifySeal sees the change too');
   events.events[1].at = '2020-01-01T00:00:00.000Z';
   check(!(await verifyChain(events.events, hasher)).valid, 'an edited event breaks the chain');
   console.log('Smoke test passed');

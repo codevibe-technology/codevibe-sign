@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { memoryRateLimiter } from '../http/rate-limit';
+import type { SignServerOptions } from '../options';
+import { memoryStore } from '../store/memory';
 import { envelopeBody, harness, PNG } from '../testing/harness';
 
-async function sent(overrides: Record<string, unknown> = {}, options = {}) {
+async function sent(
+  overrides: Record<string, unknown> = {},
+  options: Partial<SignServerOptions> = {},
+) {
   const h = harness(options);
   const { json } = await h.call('POST', '/v1/envelopes', {
     body: envelopeBody({ send: true, ...overrides }),
@@ -41,6 +47,45 @@ describe('GET /v1/sign/:token', () => {
     const { status, json } = await h.call('GET', '/v1/sign/not-a-real-token');
     expect(status).toBe(401);
     expect(json.error.code).toBe('TOKEN_INVALID');
+  });
+
+  it('refuses malformed tokens before hashing, token rate limits or the store', async () => {
+    const keys: string[] = [];
+    const counting = memoryRateLimiter();
+    let lookups = 0;
+    const store = memoryStore();
+    const findToken = store.findToken.bind(store);
+    store.findToken = (hash) => {
+      lookups += 1;
+      return findToken(hash);
+    };
+    const { h } = await sent(
+      {},
+      {
+        store,
+        rateLimiter: {
+          hit: (key, limit, windowMs, now) => {
+            keys.push(key);
+            return counting.hit(key, limit, windowMs, now);
+          },
+        },
+      },
+    );
+    keys.length = 0;
+    lookups = 0;
+    const valid = h.tokenFor('asha@example.com');
+    for (const token of ['x'.repeat(5000), `${valid}A`, valid.slice(1), `${valid.slice(1)}=`]) {
+      for (const path of [`/v1/sign/${token}`, `/v1/sign/${token}/otp/verify`]) {
+        const method = path.endsWith('verify') ? 'POST' : 'GET';
+        const res = await h.call(method, path, {
+          body: method === 'POST' ? { code: '1' } : undefined,
+        });
+        expect(res.status).toBe(401);
+        expect(res.json.error.code).toBe('TOKEN_INVALID');
+      }
+    }
+    expect(keys.every((key) => key.startsWith('ip:'))).toBe(true);
+    expect(lookups).toBe(0);
   });
 
   it('serves the document to the signer', async () => {
@@ -295,6 +340,52 @@ describe('OTP', () => {
     expect(codes.at(-1)).toBe('OTP_LOCKED');
     const right = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code } });
     expect(right.status).toBe(423);
+  });
+
+  it('counts parallel wrong guesses one by one', async () => {
+    const { h, token } = await otpEnvelope();
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const code = h.otp.sent.at(-1)!.code;
+    const wrong = code === '123456' ? '654321' : '123456';
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code: wrong } }),
+      ),
+    );
+    const errors = results.map((r) => r.json.error.code);
+    expect(errors.filter((c) => c === 'OTP_INVALID')).toHaveLength(4);
+    expect(errors.filter((c) => c === 'OTP_LOCKED')).toHaveLength(4);
+    const right = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code } });
+    expect(right.json.error.code).toBe('OTP_LOCKED');
+  });
+
+  it('invalidates the previous code when a new one is sent', async () => {
+    const { h, token } = await otpEnvelope();
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const first = h.otp.sent.at(-1)!.code;
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const second = h.otp.sent.at(-1)!.code;
+    if (first !== second) {
+      const old = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code: first } });
+      expect(old.json.error.code).toBe('OTP_INVALID');
+    }
+    const ok = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code: second } });
+    expect(ok.status).toBe(200);
+  });
+
+  it('sends at most ten codes per recipient over the life of an envelope', async () => {
+    const { h, token } = await otpEnvelope();
+    for (let i = 0; i < 10; i++) {
+      expect((await h.call('POST', `/v1/sign/${token}/otp`)).status).toBe(200);
+      h.advance(16 * 60_000);
+    }
+    const capped = await h.call('POST', `/v1/sign/${token}/otp`);
+    expect(capped.status).toBe(423);
+    expect(capped.json.error).toMatchObject({
+      code: 'OTP_LOCKED',
+      details: { reason: 'too_many_codes', max: 10 },
+    });
+    expect(h.otp.sent).toHaveLength(10);
   });
 
   it('expires codes after ten minutes', async () => {

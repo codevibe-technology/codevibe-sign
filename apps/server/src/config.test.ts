@@ -53,11 +53,13 @@ describe('loadConfig', () => {
         SEAL_LOCATION: 'Pune',
         TICK_INTERVAL_SECONDS: '15',
         TRUST_PROXY: 'TRUE',
+        TRUSTED_PROXY_HOPS: '2',
       }),
     );
     expect(config.server.seal).toMatchObject({ reason: 'Signed electronically', location: 'Pune' });
     expect(config.server.tickIntervalMs).toBe(15_000);
     expect(config.trustProxy).toBe(true);
+    expect(config.trustedProxyHops).toBe(2);
   });
 
   it('reads optional variables', () => {
@@ -127,6 +129,7 @@ describe('loadConfig', () => {
     [{ SMTP_USER: 'mailer' }, 'SMTP_USER and SMTP_PASS must be set together'],
     [{ SMTP_SECURE: 'yes' }, 'SMTP_SECURE must be true or false'],
     [{ TRUST_PROXY: '1' }, 'TRUST_PROXY must be true or false'],
+    [{ TRUSTED_PROXY_HOPS: '0' }, 'TRUSTED_PROXY_HOPS must be a whole number from 1 to 20'],
     [{ TICK_INTERVAL_SECONDS: '1' }, 'TICK_INTERVAL_SECONDS must be a whole number from 5'],
     [{ SEAL_P12_BASE64: 'not base64!' }, 'SEAL_P12_BASE64 must be base64'],
     [{ API_KEYS: ' , ' }, 'API_KEYS has no keys'],

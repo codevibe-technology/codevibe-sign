@@ -149,5 +149,9 @@ the dark palette or `data-cvs-theme="auto"` to follow the system. The full list 
 
 Serve the signing page from the same origin as the API, for example by routing `/v1/sign/*` to
 the server in your reverse proxy, so the session cookie reaches it. Set `PUBLIC_URL` on the
-server to your site, so the links in invitation emails open your page at `/sign/<token>`, or,
-when you embed the server in Node, pass `signingUrl` to build links of your own shape.
+server to your site and route `/sign/*` to the server too: links in invitation emails open
+`/sign/<token>`, which stores the token in an HttpOnly cookie and redirects to your page at
+`/sign` (or `signingPageUrl`). The page then uses `link` as its token, for example
+`createSignerClient({ baseUrl, token: 'link' })` or `GET /v1/sign/link`, so no token appears
+in its URL. When you embed the server in Node, you can instead pass `signingUrl` to build
+links of your own shape.

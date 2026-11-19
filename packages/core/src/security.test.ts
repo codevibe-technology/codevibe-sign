@@ -8,6 +8,7 @@ import {
   OTP_MAX_ATTEMPTS,
   verifyOtp,
   verifyToken,
+  isSigningTokenShape,
   type OtpState,
 } from './security';
 import { SignError } from './types';
@@ -51,6 +52,14 @@ describe('signing tokens', () => {
     expect(verifyToken(`${token} `, hashToken(`${token} `))).toBe(false);
     expect(verifyToken(token.replace(/.$/, '='), hashToken(token.replace(/.$/, '=')))).toBe(false);
     expect(verifyToken(token.slice(1), hashToken(token.slice(1)))).toBe(false);
+  });
+
+  it('tells token-shaped input from anything else', () => {
+    const { token } = createSigningToken(cryptoRandom);
+    expect(isSigningTokenShape(token)).toBe(true);
+    for (const bad of ['', token.slice(1), `${token}A`, token.replace(/.$/, '+'), 42, null]) {
+      expect(isSigningTokenShape(bad)).toBe(false);
+    }
   });
 });
 

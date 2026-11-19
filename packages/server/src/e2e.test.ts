@@ -1,4 +1,4 @@
-import { verifySeal } from '@codevibe/sign-pdf';
+import { seal, verifySeal } from '@codevibe/sign-pdf';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultPdfEngine } from './engine';
 import { harness, PNG } from './testing/harness';
@@ -83,7 +83,47 @@ describe('end to end with @codevibe/sign-pdf', () => {
     const certificate = await h.call('GET', `/v1/envelopes/${envelope.id}/certificate`);
     expect(certificate.json.chainValid).toBe(true);
     expect(certificate.json.documents[0].sealedSha256).toMatch(/^[0-9a-f]{64}$/);
+
+    const verification = await h.call(
+      'GET',
+      `/v1/envelopes/${envelope.id}/documents/${doc}/verification`,
+    );
+    expect(verification.json).toMatchObject({
+      documentId: doc,
+      valid: true,
+      reason: null,
+      signer: { commonName: 'Codevibe Sign Test Seal' },
+    });
+    expect(verification.json.certificateSha256).toMatch(/^[0-9a-f]{64}$/);
+
+    const key = `envelopes/${envelope.id}/documents/${doc}/sealed.pdf`;
+    const foreign = await seal(await makePdf(1), {
+      p12: makeP12('Codevibe Sign Test Seal', 'other'),
+      passphrase: 'other',
+    });
+    await h.files.put(key, foreign, 'application/pdf');
+    const forged = await h.call(
+      'GET',
+      `/v1/envelopes/${envelope.id}/documents/${doc}/verification`,
+    );
+    expect(forged.json).toMatchObject({ valid: false, reason: 'untrusted_signer' });
   }, 60_000);
+
+  it('refuses to start with a weak seal key unless told it is for development', () => {
+    const weak = makeP12('Weak Seal', 'weak', 1024);
+    expect(() =>
+      harness({ pdf: defaultPdfEngine, sealer: { p12: weak, passphrase: 'weak' } }),
+    ).toThrow(/2048/);
+    expect(() =>
+      harness({
+        pdf: defaultPdfEngine,
+        sealer: { p12: weak, passphrase: 'weak', allowWeakKey: true },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      harness({ pdf: defaultPdfEngine, sealer: { p12: weak, passphrase: 'wrong' } }),
+    ).toThrow();
+  });
 
   it('rejects a file that only looks like a PDF', async () => {
     const h = realHarness();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { envelopeBody, harness, PNG, WEBHOOK_SECRET } from '../testing/harness';
+import { fakePdfEngine } from '../testing/fake-pdf';
 import { RETRY_DELAYS_MS } from './jobs';
 import { signWebhook, verifyWebhook } from './webhooks';
 
@@ -197,5 +198,37 @@ describe('effects', () => {
     await h.server.tick();
     expect(completed()).toHaveLength(3);
     expect(completed()[0]?.attachments).toHaveLength(1);
+  });
+});
+
+describe('sealing', () => {
+  it('keeps a sealed file that does not verify against the operator certificate', async () => {
+    const h = harness({
+      pdf: fakePdfEngine({
+        sealCertificate: () => ({ sha256: 'a'.repeat(64) }),
+        verify: async () => ({ valid: false, reason: 'untrusted_signer' }),
+      }),
+    });
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', {
+      body: envelopeBody({
+        send: true,
+        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+        fields: [
+          { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
+        ],
+      }),
+    });
+    const field = envelope.fields[0].id;
+    const done = await h.call('POST', `/v1/sign/${h.tokenFor('asha@example.com')}/submit`, {
+      body: { consent: true, values: [{ fieldId: field, value: PNG }] },
+    });
+    expect(done.json.envelopeStatus).toBe('completed');
+    const doc = envelope.documents[0].id;
+    const sealed = await h.call(
+      'GET',
+      `/v1/envelopes/${envelope.id}/documents/${doc}?version=sealed`,
+    );
+    expect(sealed.status).toBe(409);
+    expect(JSON.stringify(h.logs)).toMatch(/did not verify/);
   });
 });

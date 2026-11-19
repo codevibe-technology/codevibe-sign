@@ -13,6 +13,9 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       for localhost.
 - [ ] Do not expose the container port directly; only the proxy should reach it. Bind it to a
       private interface or a container network.
+- [ ] Route `/sign/*` on the public host to the server, next to `/v1/sign/*`. Signing links
+      open `/sign/<token>`, which moves the token into an HttpOnly, SameSite=Strict cookie and
+      redirects to the signing page without it. Serve the signing page from the same origin.
 - [ ] Keep the database and file store off the public internet. Require TLS for the database
       connection when it crosses hosts (`sslmode=verify-full` in `DATABASE_URL`).
 - [ ] Use an SMTP relay over TLS (`SMTP_SECURE=true` on 465, or STARTTLS on 587).
@@ -20,7 +23,10 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 ## Seal key
 
 - [ ] Use a certificate made for sealing, not a TLS certificate and not a personal one: RSA 2048
-      or larger (or ECDSA P-256), SHA-256, with the organisation name your recipients expect to see.
+      or larger, signed with SHA-256, with the organisation name your recipients expect to see.
+      The server refuses to start with a shorter key, a SHA-1 certificate or an expired one.
+      `sealer.allowWeakKey` exists for throwaway keys in local development; never set it in
+      production.
 - [ ] Prefer a certificate from a CA that Adobe Reader trusts (AATL) if recipients will open the
       sealed files in Reader. A self-issued certificate still detects changes but shows as
       "unknown signer".
@@ -31,7 +37,11 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       `kubectl describe` or read the host's environment.
 - [ ] Note the certificate's expiry date and set a reminder 60 days before it.
 - [ ] Keep the public certificate of every key you have ever used, so old sealed files can still
-      be verified after rotation.
+      be verified after rotation. Pass the old ones as `sealer.trust.certificates` so the
+      server's verification route keeps accepting them, and to `verify()` wherever you check
+      files.
+- [ ] Check sealed files with `verify(bytes, { trust })`, never with `verifySeal` alone:
+      `verifySeal` accepts a seal made with any key.
 - [ ] Have a plan for a leaked key: revoke the certificate with the CA, issue a new one, restart
       the server, and tell recipients which seals to distrust.
 
@@ -45,13 +55,21 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       when someone with access leaves.
 - [ ] Call the API only from your backend. Never ship a key to a browser or mobile app.
 - [ ] Store keys in your backend's secret manager, not in source control or CI logs.
+- [ ] To keep plain keys out of the server's configuration, pass `{ id, sha256 }` with the
+      key's SHA-256 (`printf %s "$KEY" | sha256sum`). The server keeps only hashes either way.
 
 ## Outbound webhooks
 
-- [ ] Register only `https` webhook URLs on hosts you control.
-- [ ] If your deployment can reach internal services, configure the webhook host allow-list so
-      the server cannot be pointed at internal addresses. Private, loopback and link-local
-      addresses (including `169.254.169.254`, cloud metadata) are refused regardless.
+- [ ] Register only `https` webhook URLs on hosts you control. The server refuses `http`, bare
+      IP addresses, credentials in the URL and privileged ports other than 443.
+- [ ] Leave the address checks on: every delivery resolves the host and refuses loopback,
+      private, link-local (including `169.254.169.254`, cloud metadata), CGNAT, multicast and
+      reserved addresses, then connects to the address it checked. Never set
+      `webhookSecurity.allowInsecure` outside local development.
+- [ ] If webhooks must reach an internal service, list exactly those hosts in
+      `webhookSecurity.allowHosts`; every other host is then refused.
+- [ ] Let the server make the connection. A custom `fetch` keeps the URL and address checks but
+      cannot pin the connection to the checked address.
 - [ ] Verify every webhook you receive: recompute the HMAC-SHA256 over the timestamp and the raw
       body with your endpoint secret, compare in constant time, reject timestamps older than five
       minutes and event ids you have already processed.
@@ -72,8 +90,10 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 ## Rate limits behind a proxy
 
 - [ ] Tell the server how many proxies sit in front of it so it takes the client IP from the
-      right `X-Forwarded-For` entry. Trusting the header blindly lets anyone choose their own IP,
-      which defeats per-IP limits and puts false IPs in the audit trail.
+      right `X-Forwarded-For` entry: `TRUST_PROXY=true` and `TRUSTED_PROXY_HOPS` (default 1),
+      or `trustProxy` and `trustedProxyHops`. The server counts that many entries from the
+      right, the ones your proxies wrote. Trusting the header blindly lets anyone choose their
+      own IP, which defeats per-IP limits and puts false IPs in the audit trail.
 - [ ] Make the proxy overwrite (not append to) `X-Forwarded-For` from untrusted clients, or strip
       it on the edge.
 - [ ] Keep the server's per-recipient OTP and signing limits on. Add proxy limits for the public
@@ -85,8 +105,10 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 
 ## Logs and retention
 
-- [ ] Configure access logs to drop query strings and the signing path segment that holds a token,
-      and never log `Authorization`, `Cookie` or `Set-Cookie` headers.
+- [ ] Configure the proxy's access logs to drop query strings and the signing path segment that
+      holds a token (`/sign/<token>` and `/v1/sign/<token>/...`), and never log
+      `Authorization`, `Cookie` or `Set-Cookie` headers. The server's own logs are redacted
+      already; if you want its access log, set `accessLog: true` instead of logging in the proxy.
 - [ ] Do not turn on request or response body logging in the proxy or an APM agent; bodies carry
       documents, signature images and OTPs.
 - [ ] Keep application logs for as long as you need them to investigate incidents (30 to 90 days
@@ -111,8 +133,29 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 
 ## Database access
 
-- [ ] Run the server with a database role that can insert audit events but not update or delete
-      them (grant `INSERT, SELECT` on the audit table only).
+- [ ] Run the server with a database role that can insert and read audit events but never
+      change or delete them, and that cannot delete envelopes (which would remove their events
+      through the foreign key). Run migrations with a separate owner role. As a superuser:
+
+      ```sql
+      create role sign_owner login password '<long random password>';
+      create role sign_app login password '<another long random password>';
+      grant usage, create on schema public to sign_owner;
+      grant usage on schema public to sign_app;
+
+      -- Connect as sign_owner and run migrate() (or start the server once with its URL),
+      -- then, still as sign_owner:
+      grant select on sign_migrations to sign_app;
+      grant select, insert, update on sign_envelopes to sign_app;
+      grant select, insert on sign_audit_events to sign_app;
+      grant select, insert, update, delete
+        on sign_tokens, sign_otp_challenges, sign_idempotency, sign_jobs to sign_app;
+      ```
+
+      Start the server with `sign_app` in `DATABASE_URL`; on a migrated database its own
+      `migrate()` only reads `sign_migrations`. When an upgrade adds migrations, run it once
+      as `sign_owner` first and repeat the grants for any new table the release notes list.
+
 - [ ] Give administrators read-only roles by default and log every use of a write role.
 - [ ] For high-value documents, export each new audit head to a store the database administrators
       cannot write (an RFC 3161 timestamp, a write-once bucket or another system's log).
@@ -129,7 +172,11 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 
 - [ ] Send a test envelope end to end, open the sealed PDF in Adobe Reader and confirm the seal
       shows as valid and the certificate page lists the right people and times.
-- [ ] Change one byte of the sealed file and confirm `verify()` and Reader both report it.
+- [ ] Change one byte of the sealed file and confirm `verify()` and Reader both report it, and
+      that `GET /v1/envelopes/:id/documents/:docId/verification` reports the stored file as
+      valid.
+- [ ] Open a signing link and confirm the browser lands on the signing page with no token in
+      its address bar.
 - [ ] Try a wrong OTP six times and confirm the code locks.
 - [ ] Open a signing link after the envelope completes and confirm it no longer works.
 - [ ] Confirm nothing sensitive reaches the logs during those tests.

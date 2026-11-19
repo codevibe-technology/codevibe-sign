@@ -62,6 +62,10 @@ await signer.view();
 await signer.submit(values); // [{ fieldId, value }]
 ```
 
+When the signing link goes through the server's `GET /sign/:token`, the server keeps the
+token in an HttpOnly cookie and opens your page without it. Pass `token: 'link'` and serve the
+page from the same origin as the API, and the cookie stands in for the token.
+
 After `verifyOtp` the client sends the session in the `X-Sign-Session` header on every
 later call. Read `signer.sessionToken` and pass it back as `sessionToken` to resume after a
 page reload. `submit` sends `consent: true`: call it only after the signer has agreed.

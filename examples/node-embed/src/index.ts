@@ -42,6 +42,8 @@ const sign = createSignServer({
         },
       ]
     : [],
+  // The example posts webhooks to a receiver on this machine; production keeps the defaults.
+  webhookSecurity: { allowInsecure: true },
 });
 await listen(sign.app, { port });
 setInterval(() => void sign.tick(), 60_000);

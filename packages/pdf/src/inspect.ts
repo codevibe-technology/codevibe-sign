@@ -2,12 +2,18 @@ import { createHash } from 'node:crypto';
 import { PDFDocument } from 'pdf-lib';
 import { SignError, type PageSize } from '@codevibe/sign-core';
 import { pageGeometry } from './geometry';
+import { checkParseLimits, type ParseLimits } from './limits';
 
 export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 
 export interface InspectOptions {
   /** Largest accepted file in bytes. Defaults to 25 MB. */
   maxBytes?: number;
+  /**
+   * Parser limits enforced in a worker thread before the file is read on the calling thread:
+   * pages, objects, nesting depth, decoded stream bytes and time. See `DEFAULT_PARSE_LIMITS`.
+   */
+  limits?: Partial<ParseLimits>;
 }
 
 export interface PdfInfo {
@@ -51,14 +57,7 @@ function declaresEncryption(bytes: Uint8Array): boolean {
   return /\/Encrypt\s*(\d+\s+\d+\s+R|<<)/.test(Buffer.from(bytes).toString('latin1'));
 }
 
-/**
- * Loads a PDF defensively: size cap, header check, no encryption, at least one page.
- * Every failure becomes a SignError so callers can show a precise message.
- */
-export async function loadPdf(
-  bytes: Uint8Array,
-  options: InspectOptions = {},
-): Promise<PDFDocument> {
+function assertSizeAndHeader(bytes: Uint8Array, options: InspectOptions): void {
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   if (bytes.byteLength > maxBytes) {
     throw new SignError('DOCUMENT_TOO_LARGE', `The PDF is larger than ${maxBytes} bytes.`, {
@@ -69,6 +68,18 @@ export async function loadPdf(
   if (bytes.byteLength === 0 || !hasPdfHeader(bytes)) {
     throw new SignError('DOCUMENT_INVALID', 'The file is not a PDF.');
   }
+}
+
+/**
+ * Loads a PDF defensively: size cap, header check, no encryption, at least one page.
+ * Every failure becomes a SignError so callers can show a precise message. It parses on the
+ * calling thread without limits; untrusted uploads go through `inspectPdf` first.
+ */
+export async function loadPdf(
+  bytes: Uint8Array,
+  options: InspectOptions = {},
+): Promise<PDFDocument> {
+  assertSizeAndHeader(bytes, options);
 
   let doc: PDFDocument;
   try {
@@ -102,11 +113,17 @@ export async function loadPdf(
   return doc;
 }
 
-/** Reads page count and displayed page sizes, rejecting files the signing flow cannot use. */
+/**
+ * Reads page count and displayed page sizes, rejecting files the signing flow cannot use.
+ * Use it on every upload: it enforces the parser limits in a worker thread that is killed when
+ * the file takes too long, before the file is parsed here.
+ */
 export async function inspectPdf(
   bytes: Uint8Array,
   options: InspectOptions = {},
 ): Promise<PdfInfo> {
+  assertSizeAndHeader(bytes, options);
+  await checkParseLimits(bytes, options.limits);
   const doc = await loadPdf(bytes, options);
   const pages = doc.getPages().map((page) => {
     const geometry = pageGeometry(page);

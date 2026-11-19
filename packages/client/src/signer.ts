@@ -2,7 +2,10 @@ import { path, Transport, type RequestOptions, type TransportOptions } from './h
 import type { FieldValue, OtpSent, OtpSession, SignerActionResult, SigningSession } from './types';
 
 export interface SignerClientOptions extends TransportOptions {
-  /** The token from the signing link (`/sign/<token>`). */
+  /**
+   * The token from the signing link (`/sign/<token>`), or `'link'` when the server has moved
+   * it into its HttpOnly cookie (same-origin pages only).
+   */
   token: string;
   /** A session from an earlier `verifyOtp`, for example kept in `sessionStorage`. */
   sessionToken?: string;

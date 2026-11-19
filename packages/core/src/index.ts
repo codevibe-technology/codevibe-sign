@@ -86,6 +86,7 @@ export {
   createOtp,
   createSigningToken,
   hashToken,
+  isSigningTokenShape,
   OTP_DIGITS,
   OTP_MAX_ATTEMPTS,
   OTP_TTL_MS,

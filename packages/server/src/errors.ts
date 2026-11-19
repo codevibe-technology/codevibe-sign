@@ -68,14 +68,21 @@ export function validation(message: string, details?: Record<string, unknown>): 
   return new SignError('VALIDATION', message, details);
 }
 
+/**
+ * Where the server writes operational logs. Everything passed in is redacted first: signing
+ * tokens, OTPs, session values, credentials and bodies never reach it. `info` receives the
+ * access log when `accessLog` is on.
+ */
 export interface Logger {
   error(message: string, meta?: Record<string, unknown>): void;
   warn(message: string, meta?: Record<string, unknown>): void;
+  info?(message: string, meta?: Record<string, unknown>): void;
 }
 
 export const consoleLogger: Logger = {
   error: (message, meta) => console.error(message, meta ?? ''),
   warn: (message, meta) => console.warn(message, meta ?? ''),
+  info: (message, meta) => console.log(message, meta ?? ''),
 };
 
 export function toErrorBody(err: unknown): { status: ContentfulStatusCode; body: ErrorBody } {

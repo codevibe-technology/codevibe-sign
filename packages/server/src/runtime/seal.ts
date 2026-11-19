@@ -64,6 +64,14 @@ export async function runSeal(
       ...rt.sealer,
       signingTime: rt.clock.now(),
     });
+    if (rt.sealTrust && rt.pdf.verify) {
+      const check = await rt.pdf.verify(output, { trust: rt.sealTrust });
+      if (!check.valid) {
+        throw new SignError('SEAL_FAILED', `The sealed file for ${document.id} did not verify`, {
+          reason: check.reason,
+        });
+      }
+    }
     await rt.files.put(sealedFileKey(envelope.id, document.id), output, 'application/pdf');
     sealed.push({ documentId: document.id, sha256: sha256Hex(output) });
   }

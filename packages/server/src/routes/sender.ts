@@ -13,7 +13,7 @@ import {
 import { Hono, type Context } from 'hono';
 import { sha256Hex } from '../crypto';
 import { applyParties } from '../draft';
-import { validation } from '../errors';
+import { VersionConflictError, validation } from '../errors';
 import { authenticate } from '../http/auth';
 import { pdfResponse, readJson } from '../http/body';
 import { idempotency } from '../http/idempotency';
@@ -126,56 +126,26 @@ export function senderRoutes(rt: Runtime) {
   app.get('/:id', async (c) => c.json(await getEnvelope(rt, c.req.param('id'))));
 
   app.patch('/:id', async (c) => {
-    const stored = await rt.store.load(c.req.param('id'));
-    if (!stored) throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
-    const current = stored.envelope;
-    if (current.status !== 'draft') {
-      throw new SignError('INVALID_STATE', 'Only draft envelopes can be changed', {
-        status: current.status,
-      });
-    }
     const body = parseJsonObject(await readJson(c));
     if (body.documents !== undefined) {
       throw validation('Documents cannot be changed; create a new envelope instead', {
         field: 'documents',
       });
     }
-    const settings = parseSettings(body, rt.clock.now(), false);
-    let next = updateEnvelope(
-      current,
-      {
-        ...(settings.title !== undefined ? { title: settings.title } : {}),
-        ...(typeof settings.message === 'string' ? { message: settings.message } : {}),
-        ...(settings.routing ? { routing: settings.routing } : {}),
-        ...(settings.reminders ? { reminders: settings.reminders } : {}),
-        ...(settings.expiresAt ? { expiresAt: settings.expiresAt } : {}),
-        ...(settings.metadata ? { metadata: settings.metadata } : {}),
-      },
-      { clock: rt.clock },
-    );
-    if (settings.message === null) {
-      next = { ...next };
-      delete next.message;
+    // Another request may save between our read and write; the draft is then re-read and the
+    // change applied once more on top of it.
+    for (let attempt = 1; ; attempt++) {
+      const stored = await rt.store.load(c.req.param('id'));
+      if (!stored) throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
+      const next = applyDraftChange(rt, stored.envelope, body);
+      try {
+        await rt.store.commit(next, [], stored.version, []);
+      } catch (err) {
+        if (err instanceof VersionConflictError && attempt < 2) continue;
+        throw err;
+      }
+      return c.json(next);
     }
-    const documentKeys = new Map<string, Id>();
-    current.documents.forEach((d, i) => {
-      documentKeys.set(String(i), d.id);
-      documentKeys.set(d.id, d.id);
-    });
-    next = applyParties(
-      next,
-      documentKeys,
-      body.recipients !== undefined
-        ? parseRecipients(
-            body,
-            current.recipients.map((r) => r.id),
-          )
-        : undefined,
-      body.fields !== undefined ? parseFields(body) : undefined,
-      rt.ids,
-    );
-    await rt.store.commit(next, [], stored.version, []);
-    return c.json(next);
   });
 
   app.post('/:id/send', async (c) => {
@@ -196,7 +166,7 @@ export function senderRoutes(rt: Runtime) {
   app.get('/:id/events', async (c) => {
     const envelope = await getEnvelope(rt, c.req.param('id'));
     const events = await rt.store.listEvents(envelope.id);
-    const chain = await verifyChain(events, rt.hasher, expectedHead(envelope));
+    const chain = await verifyChain(events, rt.hasher, chainOptions(envelope));
     return c.json({ events, chainValid: chain.valid });
   });
 
@@ -218,18 +188,84 @@ export function senderRoutes(rt: Runtime) {
     return pdfResponse(c, bytes, document.name, sealed ? 'sealed' : 'original');
   });
 
+  app.get('/:id/documents/:docId/verification', async (c) => {
+    const envelope = await getEnvelope(rt, c.req.param('id'));
+    const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
+    if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
+    const sealed = await rt.files.get(sealedFileKey(envelope.id, document.id));
+    if (!sealed) throw new SignError('INVALID_STATE', 'The document has not been sealed yet');
+    if (!rt.sealTrust || !rt.pdf.verify) {
+      throw new SignError('INVALID_STATE', 'This server cannot verify sealed files');
+    }
+    const check = await rt.pdf.verify(sealed, { trust: rt.sealTrust });
+    return c.json({
+      documentId: document.id,
+      valid: check.valid,
+      reason: check.reason ?? null,
+      signer: check.signer ?? null,
+      signedAt: check.signedAt ?? null,
+      certificateSha256: check.certificateSha256 ?? null,
+      sha256: sha256Hex(sealed),
+    });
+  });
+
   app.get('/:id/certificate', async (c) => {
     const envelope = await getEnvelope(rt, c.req.param('id'));
     const events = await rt.store.listEvents(envelope.id);
-    const chain = await verifyChain(events, rt.hasher, expectedHead(envelope));
+    const chain = await verifyChain(events, rt.hasher, chainOptions(envelope));
     return c.json(certificateView(envelope, events, chain.valid));
   });
 
   return app;
 }
 
-const expectedHead = (envelope: Envelope) =>
-  envelope.auditHead ? { expectedHead: envelope.auditHead } : {};
+/** Every event must belong to this envelope and end at the head it records. */
+const chainOptions = (envelope: Envelope) => ({
+  envelopeId: envelope.id,
+  ...(envelope.auditHead ? { expectedHead: envelope.auditHead } : {}),
+});
+
+function applyDraftChange(rt: Runtime, current: Envelope, body: Record<string, unknown>): Envelope {
+  if (current.status !== 'draft') {
+    throw new SignError('INVALID_STATE', 'Only draft envelopes can be changed', {
+      status: current.status,
+    });
+  }
+  const settings = parseSettings(body, rt.clock.now(), false);
+  let next = updateEnvelope(
+    current,
+    {
+      ...(settings.title !== undefined ? { title: settings.title } : {}),
+      ...(typeof settings.message === 'string' ? { message: settings.message } : {}),
+      ...(settings.routing ? { routing: settings.routing } : {}),
+      ...(settings.reminders ? { reminders: settings.reminders } : {}),
+      ...(settings.expiresAt ? { expiresAt: settings.expiresAt } : {}),
+      ...(settings.metadata ? { metadata: settings.metadata } : {}),
+    },
+    { clock: rt.clock },
+  );
+  if (settings.message === null) {
+    next = { ...next };
+    delete next.message;
+  }
+  const documentKeys = new Map<string, Id>();
+  current.documents.forEach((d, i) => {
+    documentKeys.set(String(i), d.id);
+    documentKeys.set(d.id, d.id);
+  });
+  return applyParties(
+    next,
+    documentKeys,
+    body.recipients !== undefined
+      ? parseRecipients(
+          body,
+          current.recipients.map((r) => r.id),
+        )
+      : undefined,
+    body.fields !== undefined ? parseFields(body) : undefined,
+    rt.ids,
+  );
+}
 
 async function getEnvelope(rt: Runtime, id: Id): Promise<Envelope> {
   const envelope = await rt.store.get(id);

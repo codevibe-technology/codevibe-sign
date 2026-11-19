@@ -4,6 +4,7 @@ import {
   decline,
   hashToken,
   hasActed,
+  isSigningTokenShape,
   isExpiredAt,
   isFinal,
   markAuthenticated,
@@ -16,14 +17,16 @@ import {
   type Recipient,
 } from '@codevibe/sign-core';
 import { maskEmail, maskPhone } from '@codevibe/sign-pdf';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
-import { validation } from '../errors';
+import { HttpError, validation } from '../errors';
 import { pdfResponse, readJson } from '../http/body';
 import { clientIp, userAgent } from '../http/client';
 import { idempotency } from '../http/idempotency';
 import { enforce } from '../http/rate-limit';
 import {
+  LINK_COOKIE,
+  LINK_SEGMENT,
   SESSION_COOKIE,
   SESSION_HEADER,
   SESSION_TTL_MS,
@@ -37,6 +40,7 @@ import { signerView } from '../views';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const OTP_METHODS = new Set(['email_otp', 'sms_otp']);
+const OTP_SAVE_ATTEMPTS = 10;
 
 interface SignerContext {
   tokenHash: string;
@@ -48,34 +52,77 @@ interface SignerContext {
 
 const tokenInvalid = () => new SignError('TOKEN_INVALID', 'This signing link is no longer valid');
 
+/**
+ * The envelope and recipient a token stands for, or null when the token is unknown, revoked,
+ * expired, or its recipient can no longer act. Reads only.
+ */
+export async function activeSigner(
+  rt: Runtime,
+  tokenHash: string,
+  now: Date,
+): Promise<{ envelope: Envelope; recipient: Recipient; expiresAt: Date } | null> {
+  const token = await rt.store.findToken(tokenHash);
+  if (!token || token.revokedAt || token.expiresAt.getTime() <= now.getTime()) return null;
+  const envelope = await rt.store.get(token.envelopeId);
+  const recipient = envelope?.recipients.find((r) => r.id === token.recipientId);
+  if (!envelope || !recipient) return null;
+  if (isFinal(envelope) || hasActed(recipient) || isExpiredAt(envelope, now)) return null;
+  return { envelope, recipient, expiresAt: token.expiresAt };
+}
+
+/**
+ * The signing token of a request: from the path, or for `/v1/sign/link/...` from the HttpOnly
+ * cookie set when the signing link was opened.
+ */
+export function tokenOf(c: Context): string {
+  const param = c.req.param('token') ?? '';
+  return param === LINK_SEGMENT ? (getCookie(c, LINK_COOKIE) ?? '') : param;
+}
+
 export function signerRoutes(rt: Runtime) {
   const app = new Hono();
+
+  // Cheap checks first: the per-IP limit, then the token's shape, so junk never reaches
+  // hashing, token-keyed rate limits, idempotency records or the store.
+  const screen: MiddlewareHandler = async (c, next) => {
+    await enforce(
+      rt.limiter,
+      `ip:${clientIp(c, rt)}`,
+      rt.limits.ipRequestsPerMinute,
+      60_000,
+      rt.clock.now(),
+    );
+    if (!isSigningTokenShape(tokenOf(c))) throw tokenInvalid();
+    if (c.req.param('token') === LINK_SEGMENT && c.req.method !== 'GET') {
+      // The cookie is SameSite=Strict; this also refuses cross-site requests from browsers
+      // that report where a request came from.
+      const site = c.req.header('sec-fetch-site');
+      if (site && site !== 'same-origin' && site !== 'same-site' && site !== 'none') {
+        throw tokenInvalid();
+      }
+    }
+    await next();
+  };
+  app.use('/:token', screen);
+  app.use('/:token/*', screen);
 
   app.use(
     '/:token/*',
     idempotency(
       rt.store,
-      (c) => `token:${hashToken(c.req.param('token') ?? '')}`,
+      (c) => `token:${hashToken(tokenOf(c))}`,
       () => rt.clock.now(),
     ),
   );
 
   async function resolve(c: Context): Promise<SignerContext> {
     const now = rt.clock.now();
-    const ip = clientIp(c, rt.trustProxy);
-    await enforce(rt.limiter, `ip:${ip}`, rt.limits.ipRequestsPerMinute, 60_000, now);
-    const tokenHash = hashToken(c.req.param('token') ?? '');
+    const tokenHash = hashToken(tokenOf(c));
     await enforce(rt.limiter, `token:${tokenHash}`, rt.limits.signerRequestsPerMinute, 60_000, now);
 
-    const token = await rt.store.findToken(tokenHash);
-    if (!token || token.revokedAt || token.expiresAt.getTime() <= now.getTime())
-      throw tokenInvalid();
-    const envelope = await rt.store.get(token.envelopeId);
-    const recipient = envelope?.recipients.find((r) => r.id === token.recipientId);
-    if (!envelope || !recipient) throw tokenInvalid();
-    if (isFinal(envelope) || hasActed(recipient) || isExpiredAt(envelope, now)) {
-      throw tokenInvalid();
-    }
+    const active = await activeSigner(rt, tokenHash, now);
+    if (!active) throw tokenInvalid();
+    const { envelope, recipient } = active;
     const otpRequired = OTP_METHODS.has(recipient.auth);
     const session = c.req.header(SESSION_HEADER) ?? getCookie(c, SESSION_COOKIE);
     const authenticated = otpRequired && verifySession(rt.sessionSecret, session, tokenHash, now);
@@ -90,10 +137,26 @@ export function signerRoutes(rt: Runtime) {
     return signer;
   }
 
+  /**
+   * Checks the code and saves the new attempt count in one compare-and-set, re-reading on a
+   * race, so parallel wrong guesses each count against the limit.
+   */
+  async function checkOtp(envelopeId: string, recipientId: string, code: string): Promise<void> {
+    for (let attempt = 0; attempt < OTP_SAVE_ATTEMPTS; attempt++) {
+      const challenge = await rt.store.getOtp(envelopeId, recipientId);
+      if (!challenge) throw new SignError('OTP_EXPIRED', 'Ask for a code first.');
+      const check = verifyOtp(challenge.state, code, rt.clock);
+      if (!(await rt.store.updateOtp(challenge, check.state))) continue;
+      if (!check.ok) throw check.error;
+      return;
+    }
+    throw new HttpError('CONFLICT', 'Too many checks at once, try again');
+  }
+
   const deps = { clock: rt.clock };
   const context = (c: Context): AuditContext => {
     const ua = userAgent(c);
-    return { ip: clientIp(c, rt.trustProxy), ...(ua ? { userAgent: ua } : {}) };
+    return { ip: clientIp(c, rt), ...(ua ? { userAgent: ua } : {}) };
   };
 
   app.get('/:token', async (c) => {
@@ -127,22 +190,32 @@ export function signerRoutes(rt: Runtime) {
       FIFTEEN_MINUTES,
       now,
     );
-    await enforce(
-      rt.limiter,
-      `otp-send-ip:${clientIp(c, rt.trustProxy)}`,
-      sends * 4,
-      FIFTEEN_MINUTES,
-      now,
-    );
+    await enforce(rt.limiter, `otp-send-ip:${clientIp(c, rt)}`, sends * 4, FIFTEEN_MINUTES, now);
 
     const issued = createOtp(rt.random, rt.clock);
-    await rt.store.putOtp({
-      envelopeId: envelope.id,
-      recipientId: recipient.id,
-      state: issued.state,
-    });
+    const stored = await rt.store.issueOtp(
+      { envelopeId: envelope.id, recipientId: recipient.id, state: issued.state },
+      rt.limits.otpCodesPerRecipient,
+    );
+    if (!stored) {
+      throw new SignError(
+        'OTP_LOCKED',
+        'No more codes can be sent for this document. Ask the sender to send it again.',
+        { reason: 'too_many_codes', max: rt.limits.otpCodesPerRecipient },
+      );
+    }
     const code = issued.code;
-    await rt.otp.send(recipient, code);
+    try {
+      await rt.otp.send(recipient, code);
+    } catch (err) {
+      // An adapter's error may quote the message it tried to send, code included.
+      rt.logger.error('one-time code could not be sent', {
+        envelope: envelope.id,
+        recipient: recipient.id,
+        error: err instanceof Error ? err.name : 'Error',
+      });
+      throw new HttpError('INTERNAL', 'The one-time code could not be sent, try again');
+    }
     const sentTo =
       recipient.auth === 'sms_otp' && recipient.phone
         ? maskPhone(recipient.phone)
@@ -157,28 +230,18 @@ export function signerRoutes(rt: Runtime) {
     const { envelope, recipient } = signer;
     if (!signer.otpRequired) throw validation('This signing link does not use a one-time code');
     const now = rt.clock.now();
-    await enforce(
-      rt.limiter,
-      `otp-verify-ip:${clientIp(c, rt.trustProxy)}`,
-      30,
-      FIFTEEN_MINUTES,
-      now,
-    );
+    await enforce(rt.limiter, `otp-verify-ip:${clientIp(c, rt)}`, 30, FIFTEEN_MINUTES, now);
     const body = parseJsonObject(await readJson(c));
     const code = typeof body.code === 'string' ? body.code.trim() : '';
 
-    const challenge = await rt.store.getOtp(envelope.id, recipient.id);
-    if (!challenge) throw new SignError('OTP_EXPIRED', 'Ask for a code first.');
-    const check = verifyOtp(challenge.state, code, rt.clock);
-    await rt.store.putOtp({ ...challenge, state: check.state });
-    if (!check.ok) throw check.error;
+    await checkOtp(envelope.id, recipient.id, code);
     await mutate(rt, envelope.id, (current) =>
       markAuthenticated(current, { recipientId: recipient.id, context: context(c) }, deps),
     );
     const session = issueSession(rt.sessionSecret, signer.tokenHash, now);
     setCookie(c, SESSION_COOKIE, session.value, {
       httpOnly: true,
-      secure: c.req.url.startsWith('https:'),
+      secure: rt.secureCookies,
       sameSite: 'Strict',
       path: '/v1/sign',
       maxAge: SESSION_TTL_MS / 1000,

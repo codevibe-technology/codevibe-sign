@@ -73,7 +73,7 @@ function crc32(bytes: Buffer): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function chunk(type: string, data: Buffer): Buffer {
+export function pngChunk(type: string, data: Buffer): Buffer {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
   const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
@@ -97,9 +97,9 @@ export function makePng(width: number, height: number): Uint8Array {
   return new Uint8Array(
     Buffer.concat([
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-      chunk('IHDR', header),
-      chunk('IDAT', deflateSync(raw)),
-      chunk('IEND', Buffer.alloc(0)),
+      pngChunk('IHDR', header),
+      pngChunk('IDAT', deflateSync(raw)),
+      pngChunk('IEND', Buffer.alloc(0)),
     ]),
   );
 }

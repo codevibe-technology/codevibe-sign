@@ -1,9 +1,12 @@
 import type { AuditAction, Envelope } from '@codevibe/sign-core';
 import { constantTimeEqual, hmacSha256Hex } from '../crypto';
 import type { Runtime } from './context';
+import { checkWebhookUrl, pinnedPost, resolveWebhookAddress } from './webhook-guard';
 
 export const SIGNATURE_HEADER = 'x-codevibe-signature';
-const TIMEOUT_MS = 10_000;
+const CONNECT_TIMEOUT_MS = 5_000;
+const TOTAL_TIMEOUT_MS = 10_000;
+const MAX_RESPONSE_BYTES = 64 * 1024;
 
 export interface WebhookPayload {
   url: string;
@@ -75,20 +78,38 @@ export function verifyWebhook(
 export async function deliverWebhook(rt: Runtime, payload: WebhookPayload): Promise<void> {
   const target = rt.webhooks.find((w) => w.url === payload.url);
   if (!target) return;
+  const url = checkWebhookUrl(payload.url, rt.webhookSecurity);
+  const address = await resolveWebhookAddress(url, rt.webhookSecurity);
   const timestamp = Math.floor(rt.clock.now().getTime() / 1000);
-  const response = await rt.fetch(payload.url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'user-agent': 'codevibe-sign-webhooks',
-      'x-codevibe-delivery': payload.deliveryId,
-      [SIGNATURE_HEADER]: signWebhook(target.secret, payload.body, timestamp),
-    },
-    body: payload.body,
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    redirect: 'manual',
-  });
-  if (response.status < 200 || response.status >= 300) {
-    throw new Error(`Webhook ${payload.url} answered ${response.status}`);
+  const headers = {
+    'content-type': 'application/json',
+    'user-agent': 'codevibe-sign-webhooks',
+    'x-codevibe-delivery': payload.deliveryId,
+    [SIGNATURE_HEADER]: signWebhook(target.secret, payload.body, timestamp),
+  };
+  let status: number;
+  if (rt.fetch) {
+    const response = await rt.fetch(payload.url, {
+      method: 'POST',
+      headers,
+      body: payload.body,
+      signal: AbortSignal.timeout(TOTAL_TIMEOUT_MS),
+      redirect: 'manual',
+    });
+    status = response.status;
+    await response.body?.cancel().catch(() => undefined);
+  } else {
+    status = await pinnedPost({
+      url,
+      address,
+      headers,
+      body: payload.body,
+      connectTimeoutMs: CONNECT_TIMEOUT_MS,
+      totalTimeoutMs: TOTAL_TIMEOUT_MS,
+      maxResponseBytes: MAX_RESPONSE_BYTES,
+    });
+  }
+  if (status < 200 || status >= 300) {
+    throw new Error(`Webhook ${url.host} answered ${status}`);
   }
 }
