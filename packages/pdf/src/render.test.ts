@@ -196,7 +196,7 @@ describe('renderFields: text', () => {
       [{ fieldId: 'f-text', value: 'Bengaluru' }],
     );
     const [a, b, c, d, x, y] = textMatrix(content);
-    expect([a, b, c, d].map((value) => Math.round(value))).toEqual([0, 1, -1, 0]);
+    expect([a, b, c, d].map((value) => Math.round(value ?? Number.NaN))).toEqual([0, 1, -1, 0]);
     expect(y).toBeCloseTo(102);
     expect(x).toBeGreaterThan(50);
     expect(x).toBeLessThan(70);
@@ -360,7 +360,7 @@ describe('renderFields: rules', () => {
       [field('signature', { rect: { x: 495.28, y: 10, width: 200, height: 25 } })],
       [{ fieldId: 'f-signature', value: pngBase64(400, 100) }],
     );
-    const [x, , width] = imagePlacement(content);
+    const [x = 0, , width = 0] = imagePlacement(content);
     expect(x + width).toBeLessThanOrEqual(595.28 + 0.01);
   });
 
