@@ -24,8 +24,14 @@ export function hashToken(token: string): string {
   return sha256Hex(token);
 }
 
-/** Checks a presented token against a stored hash without leaking timing. */
+const TOKEN_PATTERN = new RegExp(`^[A-Za-z0-9_-]{${Math.ceil((SIGNING_TOKEN_BYTES * 4) / 3)}}$`);
+
+/**
+ * Checks a presented token against a stored hash without leaking timing. Anything that is not
+ * shaped like an issued token is refused before hashing, so oversized input costs nothing.
+ */
 export function verifyToken(token: string, tokenHash: string): boolean {
+  if (typeof token !== 'string' || !TOKEN_PATTERN.test(token)) return false;
   return constantTimeEqual(hashToken(token), tokenHash);
 }
 

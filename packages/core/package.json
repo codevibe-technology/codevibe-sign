@@ -38,6 +38,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },
-  "dependencies": {},
-  "peerDependencies": {}
+  "devDependencies": {
+    "fast-check": "4.10.1"
+  }
 }

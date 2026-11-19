@@ -10,6 +10,9 @@ export interface LeegalityWebhook {
   invitationUrl?: string;
 }
 
+/** Leegality callbacks are small JSON documents; anything larger is refused before parsing. */
+export const MAX_WEBHOOK_BYTES = 256 * 1024;
+
 function invalid(message: string): SignError {
   return new SignError('WEBHOOK_INVALID', message, { provider: PROVIDER });
 }
@@ -66,6 +69,9 @@ function statusOf(
 
 /** Parses and verifies a Leegality webhook body. Throws `WEBHOOK_INVALID` unless the mac matches. */
 export function verifyWebhook(rawBody: string | Uint8Array, privateSalt: string): LeegalityWebhook {
+  const size =
+    typeof rawBody === 'string' ? Buffer.byteLength(rawBody, 'utf8') : rawBody.byteLength;
+  if (size > MAX_WEBHOOK_BYTES) throw invalid('Webhook body is too large');
   const text = typeof rawBody === 'string' ? rawBody : new TextDecoder().decode(rawBody);
   let body: unknown;
   try {

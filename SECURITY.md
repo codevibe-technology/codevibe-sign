@@ -3,6 +3,10 @@
 Codevibe Sign handles signed agreements and personal data, so we take reports seriously and
 reply quickly.
 
+How the project defends itself, and what is left to deployers, is described in
+[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md). If you run the server, work through
+[docs/SECURITY-CHECKLIST.md](docs/SECURITY-CHECKLIST.md) before going live.
+
 ## Reporting a vulnerability
 
 Email **security@codevibe.in**. Please do not open a public issue, pull request or discussion.

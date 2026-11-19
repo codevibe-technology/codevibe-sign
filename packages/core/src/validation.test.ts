@@ -8,6 +8,7 @@ import {
   isValidEmail,
   isValidPhone,
   MAX_IMAGE_BYTES,
+  MAX_IMAGE_DIMENSION,
   MAX_TEXT_LENGTH,
   normalizePng,
   pageSizeIssues,
@@ -175,6 +176,25 @@ describe('normalizePng', () => {
       ),
     );
     expect(normalizePng(fake)).toEqual({ problem: 'Image is not a PNG' });
+  });
+
+  it('rejects a tiny PNG that declares a huge canvas', () => {
+    const withSize = (width: number, height: number) => {
+      const bytes = Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0));
+      const view = new DataView(bytes.buffer);
+      view.setUint32(16, width);
+      view.setUint32(20, height);
+      return btoa(String.fromCharCode(...bytes));
+    };
+    expect(normalizePng(withSize(50_000, 50_000))).toMatchObject({
+      problem: expect.stringContaining('pixels'),
+    });
+    expect(normalizePng(withSize(MAX_IMAGE_DIMENSION + 1, 1))).toMatchObject({
+      problem: expect.stringContaining('pixels'),
+    });
+    expect(normalizePng(withSize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION))).toHaveProperty(
+      'base64',
+    );
   });
 
   it('rejects images over the size cap', () => {

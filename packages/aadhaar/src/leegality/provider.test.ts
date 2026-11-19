@@ -2,7 +2,8 @@ import { SignError } from '@codevibe/sign-core';
 import { describe, expect, it, vi } from 'vitest';
 import type { EsignRequest } from '../provider';
 import { createLeegalityProvider, type LeegalityOptions } from './provider';
-import { computeMac } from './webhook';
+import { MAX_JSON_RESPONSE_BYTES } from './api';
+import { computeMac, MAX_WEBHOOK_BYTES } from './webhook';
 
 const SALT = 'test-private-salt';
 const TOKEN = 'test-auth-token';
@@ -80,6 +81,41 @@ describe('createLeegalityProvider options', () => {
     expect(() => createLeegalityProvider({ ...base, authToken: '' })).toThrow(SignError);
     expect(() => createLeegalityProvider({ ...base, privateSalt: ' ' })).toThrow(SignError);
     expect(() => createLeegalityProvider({ ...base, profileId: '' })).toThrow(SignError);
+  });
+
+  it('sends the auth token only over https, except to localhost', () => {
+    const base = {
+      authToken: TOKEN,
+      privateSalt: SALT,
+      profileId: 'wf',
+      environment: 'sandbox' as const,
+    };
+    for (const baseUrl of [
+      'http://leegality.example.com/api',
+      'ftp://leegality.example.com',
+      'https://user:secret@leegality.example.com/api',
+      'not a url',
+    ]) {
+      expect(() => createLeegalityProvider({ ...base, baseUrl })).toThrow(/baseUrl/);
+    }
+    expect(() =>
+      createLeegalityProvider({ ...base, baseUrl: 'http://localhost:8080/api' }),
+    ).not.toThrow();
+    expect(() =>
+      createLeegalityProvider({ ...base, baseUrl: 'https://proxy.example.com/leegality/' }),
+    ).not.toThrow();
+  });
+
+  it('rejects a timeout that would not bound the call', () => {
+    const base = {
+      authToken: TOKEN,
+      privateSalt: SALT,
+      profileId: 'wf',
+      environment: 'sandbox' as const,
+    };
+    for (const timeoutMs of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 3_600_000]) {
+      expect(() => createLeegalityProvider({ ...base, timeoutMs })).toThrow(/timeoutMs/);
+    }
   });
 
   it('rejects an unknown environment', () => {
@@ -202,6 +238,27 @@ describe('createRequest', () => {
     );
     const error = await caught(provider.createRequest(signRequest()));
     expect(error.details).toMatchObject({ reason: 'missing_sign_url', providerRef: 'DOC123' });
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'http://sandbox.leegality.com/sign/x',
+    'data:text/html,hi',
+    '/sign/x',
+  ])('refuses a signing link that is not https: %s', async (signUrl) => {
+    const invitees = [{ ...created.data.invitees[1], signUrl }];
+    const { provider } = setup(() => json({ ...created, data: { ...created.data, invitees } }));
+    const error = await caught(provider.createRequest(signRequest()));
+    expect(error.details).toMatchObject({ reason: 'missing_sign_url' });
+  });
+
+  it('refuses a JSON response that is too large to be real', async () => {
+    const { provider } = setup(() =>
+      json({ ...created, padding: 'x'.repeat(MAX_JSON_RESPONSE_BYTES) }),
+    );
+    const error = await caught(provider.createRequest(signRequest()));
+    expect(error.code).toBe('PROVIDER_ERROR');
+    expect(error.details).toMatchObject({ reason: 'malformed_response' });
   });
 
   it('maps network failures as retryable', async () => {
@@ -335,6 +392,17 @@ describe('parseWebhook', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('rejects an oversized body before parsing it or calling the provider', async () => {
+    const { provider, fetch } = setup(() => statusResponse({ signed: true }));
+    const body = webhookBody({ padding: 'x'.repeat(MAX_WEBHOOK_BYTES) });
+    const error = await caught(provider.parseWebhook({}, body));
+    expect(error.code).toBe('WEBHOOK_INVALID');
+    expect(error.message).toMatch(/too large/);
+    const bytes = await caught(provider.parseWebhook({}, new TextEncoder().encode(body)));
+    expect(bytes.code).toBe('WEBHOOK_INVALID');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('rejects a verified body whose status the provider does not confirm', async () => {
     const { provider } = setup(() => statusResponse({ signed: false }));
     const error = await caught(provider.parseWebhook({}, webhookBody()));
@@ -430,6 +498,46 @@ describe('fetchSignedDocument', () => {
     expect((await caught(big.provider.fetchSignedDocument('DOC123'))).code).toBe(
       'DOCUMENT_TOO_LARGE',
     );
+  });
+
+  it('stops reading a download that runs past the limit without a length header', async () => {
+    let pulled = 0;
+    let cancelled = false;
+    const endless = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(pulled === 1 ? signedPdf : new Uint8Array(1024));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        { headers: { 'content-type': 'application/pdf' } },
+      );
+    const { provider } = setup(routes(endless), { maxSignedDocumentBytes: 10 * 1024 });
+    const error = await caught(provider.fetchSignedDocument('DOC123'));
+    expect(error.code).toBe('DOCUMENT_TOO_LARGE');
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThan(20);
+  });
+
+  it('refuses a download whose declared length is over the limit without reading it', async () => {
+    let pulled = 0;
+    const declared = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(signedPdf);
+          },
+        }),
+        { headers: { 'content-type': 'application/pdf', 'content-length': '999999999' } },
+      );
+    const { provider } = setup(routes(declared), { maxSignedDocumentBytes: 1024 });
+    expect((await caught(provider.fetchSignedDocument('DOC123'))).code).toBe('DOCUMENT_TOO_LARGE');
+    expect(pulled).toBeLessThanOrEqual(1);
   });
 
   it('times out a download that stalls mid-body', async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { appendEvents, canonicalize, commitTransition, GENESIS_HASH, verifyChain } from './audit';
 import { webCryptoHasher as hasher } from './defaults';
-import type { Envelope, PendingAuditEvent } from './types';
+import type { AuditEvent, Envelope, PendingAuditEvent } from './types';
 
 const pending = (action: PendingAuditEvent['action'], extra: Partial<PendingAuditEvent> = {}) =>
   ({
@@ -44,6 +44,14 @@ describe('canonicalize', () => {
     expect(text).not.toContain('prevHash');
     expect(text).not.toContain('"hash"');
     expect(text).toContain('"seq":3');
+  });
+
+  it('keeps a __proto__ key in data, as JSON.parse returns it from storage', () => {
+    const stored = JSON.parse(
+      '{"envelopeId":"env-1","action":"envelope.sent","at":"2026-01-01T00:00:00.000Z","data":{"__proto__":"x"}}',
+    ) as PendingAuditEvent;
+    expect(canonicalize(stored)).toContain('"data":{"__proto__":"x"}');
+    expect(canonicalize(stored)).not.toBe(canonicalize({ ...stored, data: {} }));
   });
 
   it('rejects non-finite numbers', () => {
@@ -92,6 +100,17 @@ describe('verifyChain', () => {
       brokenAt: 1,
       reason: 'hash',
     });
+  });
+
+  it('detects a changed __proto__ value in stored data', async () => {
+    const withKey = JSON.parse(
+      '{"envelopeId":"env-1","action":"envelope.sent","at":"2026-01-01T00:00:00.000Z","data":{"routing":"parallel","__proto__":"a"}}',
+    ) as PendingAuditEvent;
+    const events = await appendEvents(undefined, 1, [sample[0]!, withKey], hasher);
+    const tampered = JSON.parse(
+      JSON.stringify(events).replace('"__proto__":"a"', '"__proto__":"b"'),
+    ) as AuditEvent[];
+    expect(await verifyChain(tampered, hasher)).toMatchObject({ valid: false, brokenAt: 1 });
   });
 
   it('detects an edited context', async () => {

@@ -121,7 +121,8 @@ first, and equal orders act together. In `parallel` routing everyone acts at onc
 Viewers never act; they receive the completed copy.
 
 Submitted values are checked against the field type: signatures and initials must be
-real PNGs (base64 or a `data:image/png;base64,` URL) of at most 512 KB, dates ISO,
+real PNGs (base64 or a `data:image/png;base64,` URL) of at most 512 KB and 2048 x 2048
+pixels (`MAX_IMAGE_BYTES`, `MAX_IMAGE_DIMENSION`), dates ISO,
 checkboxes `'true'` or `'false'`, text at most 1000 characters. Date-signed and name
 fields are filled in when left empty.
 
@@ -139,7 +140,8 @@ fields are filled in when left empty.
 ### Tokens and OTPs
 
 - `createSigningToken(random)` → `{ token, tokenHash }`: 32 random bytes, base64url.
-  Store only the hash. `hashToken(token)` and `verifyToken(token, hash)`.
+  Store only the hash. `hashToken(token)` and `verifyToken(token, hash)`; `verifyToken`
+  refuses anything not shaped like an issued token before hashing it.
 - `createOtp(random, clock)` → `{ code, codeHash, expiresAt, state }`: 6 digits, valid
   for 10 minutes, salted hash. Store `state`, send `code`.
 - `verifyOtp(state, code, clock)` → `{ ok, state, ... }`. Persist the returned state on

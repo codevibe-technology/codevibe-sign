@@ -91,6 +91,11 @@ approval). Provider failures throw `SignError('PROVIDER_ERROR')` with `details.r
 `details.retryable`; HTTP 429 throws `RATE_LIMITED`. Errors never contain the document or your
 credentials, and the package does not log.
 
+Limits: webhook bodies over 256 KB are refused before parsing, provider JSON responses over 2 MB
+and signed files over `maxSignedDocumentBytes` are cut off while streaming, and a signing link
+that is not https is treated as missing. Webhooks are not replay-protected by Leegality, so make
+your handler idempotent on `(providerRef, status)`.
+
 ### Leegality options
 
 | Option                   | Required | Notes                                                                                               |
@@ -101,9 +106,9 @@ credentials, and the package does not log.
 | `profileId`              | yes      | The Workflow ID, or a function `(request) => workflowId`.                                           |
 | `confirmWebhooks`        | no       | Default `true`. Confirms each webhook with the Check transaction status API.                        |
 | `webhookHeader`          | no       | `{ name, value }` of a static header Leegality support adds to your webhooks.                       |
-| `timeoutMs`              | no       | Default 30 000, covering the response body as well.                                                 |
+| `timeoutMs`              | no       | Default 30 000, covering the response body as well. Whole milliseconds, at most 10 minutes.         |
 | `maxSignedDocumentBytes` | no       | Default 50 MB.                                                                                      |
-| `baseUrl`, `fetch`       | no       | Overrides for proxies and tests.                                                                    |
+| `baseUrl`, `fetch`       | no       | Overrides for proxies and tests. `baseUrl` must be https (plain http only for localhost).           |
 
 ### Set up the Leegality workflow
 
