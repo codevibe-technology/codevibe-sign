@@ -20,6 +20,12 @@ import { webhookTargets } from './webhooks';
 
 export const SIGN_BASE_PATH = '/api';
 
+/**
+ * Whether this install can send one-time codes by text message. Codes go out by email only
+ * (`mailOtpSender`), so the signing page tells SMS recipients to ask for an email instead.
+ */
+export const SMS_CODES = false;
+
 function build(): SignServer {
   const config = env();
   if (!config.SEAL_P12_PATH) {
