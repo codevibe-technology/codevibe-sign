@@ -96,6 +96,14 @@ describe('verify', () => {
     expect(await verify(plain, { trust })).toMatchObject({ valid: false, reason: 'not_sealed' });
   });
 
+  it('reads the file under the parser limits', async () => {
+    const error = await verify(sealed, {
+      trust: { certificates: [operator.certificatePem] },
+      limits: { maxObjects: 2 },
+    }).catch((reason: unknown) => reason);
+    expect((error as SignError).details).toMatchObject({ limit: 'maxObjects' });
+  });
+
   it('refuses to run without anything to trust', async () => {
     const error = await verify(sealed, { trust: {} }).catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(SignError);

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import forge from 'node-forge';
 import { SignError } from '@codevibe/sign-core';
 import { assertSealIdentity, certificateDer, readP12 } from './cms';
+import { checkParseLimits, type ParseLimits } from './limits';
 import { examineSeal, type SealSigner, type SealVerification } from './verify';
 
 const { asn1, pki } = forge;
@@ -21,6 +22,8 @@ export interface VerifyTrust {
 
 export interface VerifyOptions {
   trust: VerifyTrust;
+  /** Parser limits, enforced in a worker thread before the file is read. */
+  limits?: Partial<ParseLimits>;
 }
 
 export type VerifyFailure =
@@ -155,6 +158,7 @@ export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise
     );
   }
 
+  await checkParseLimits(bytes, options.limits);
   const examination = await examineSeal(bytes);
   const seal = examination.result;
   const leafDer = examination.signerCertificateDer;
