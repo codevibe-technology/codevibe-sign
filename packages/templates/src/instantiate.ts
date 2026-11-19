@@ -4,8 +4,11 @@ import {
   addRecipient,
   checkFieldValue,
   createEnvelope,
+  prefillFields,
+  reminderIssues,
   SignError,
   validateForSend,
+  validationError,
   type Clock,
   type Envelope,
   type FieldValue,
@@ -15,14 +18,7 @@ import {
   type ValidationIssue,
 } from '@codevibe/sign-core';
 import type { InstantiateInput, RoleAssignment, Template } from './types';
-import {
-  assertValidTemplate,
-  expiryDaysIssues,
-  reminderIssues,
-  roleKey,
-  throwIf,
-  validationError,
-} from './validate';
+import { assertValidTemplate, expiryDaysIssues, roleKey, throwIf } from './validate';
 import { resolveRoles, templateVersion } from './version';
 
 const DAY_MS = 86_400_000;
@@ -31,7 +27,10 @@ const DAY_MS = 86_400_000;
 export const METADATA_KEYS = {
   templateId: 'templateId',
   templateVersion: 'templateVersion',
-  /** Comma-separated ids of fields the recipient may not change. */
+  /**
+   * Comma-separated ids of fields the recipient may not change. Only envelopes created by
+   * earlier versions carry it; read-only fields now use core's `Field.readOnly`.
+   */
   readOnlyFields: 'templateReadOnlyFields',
 } as const;
 
@@ -173,7 +172,6 @@ export function buildEnvelope(
   );
   const prefill = new Map(Object.entries(input.prefill ?? {}).map(([k, v]) => [labelKey(k), v]));
   const values: FieldValue[] = [];
-  const readOnly: string[] = [];
 
   for (const role of resolveRoles(template.roles)) {
     const person = assignments.get(roleKey(role.name))!;
@@ -208,29 +206,25 @@ export function buildEnvelope(
           type: field.type,
           page: field.page,
           rect: field.rect,
-          // Core only counts values submitted with the signature towards required fields,
-          // so a locked, already filled field cannot also be required.
-          required: locked ? false : (field.required ?? true),
+          required: field.required ?? true,
           ...(field.label !== undefined && { label: field.label }),
+          ...(locked && { readOnly: true }),
         },
         deps,
       );
       envelope = placed.envelope;
-      if (prefilled) values.push({ fieldId: placed.field.id, value: value.trim() });
-      if (locked) readOnly.push(placed.field.id);
+      if (prefilled) values.push({ fieldId: placed.field.id, value });
     }
   }
   throwIf(issues);
 
   envelope = {
-    ...envelope,
-    values,
+    ...prefillFields(envelope, values),
     metadata: {
       ...template.metadata,
       ...input.metadata,
       ...(template.id !== undefined && { [METADATA_KEYS.templateId]: template.id }),
       [METADATA_KEYS.templateVersion]: version,
-      ...(readOnly.length > 0 && { [METADATA_KEYS.readOnlyFields]: readOnly.join(',') }),
     },
   };
   const remaining = validateForSend(envelope, now);
@@ -253,15 +247,21 @@ export async function instantiate(
   return buildEnvelope(template, input, deps, version);
 }
 
-/** Ids of the fields the recipient may not change (prefilled read-only fields). */
+/**
+ * Ids of the fields the recipient may not change: fields marked `readOnly`, plus those listed
+ * under the metadata key that earlier versions of this package wrote.
+ */
 export function readOnlyFieldIds(envelope: Envelope): string[] {
   const raw = envelope.metadata?.[METADATA_KEYS.readOnlyFields];
-  return raw ? raw.split(',').filter(Boolean) : [];
+  const legacy = raw ? raw.split(',').filter(Boolean) : [];
+  const flagged = envelope.fields.filter((f) => f.readOnly).map((f) => f.id);
+  return [...new Set([...flagged, ...legacy])];
 }
 
 /**
- * Call before core's `submit`: rejects values aimed at read-only fields with
- * `INVALID_FIELD_VALUE`, the same code core uses for other bad values.
+ * Rejects values aimed at read-only fields with `INVALID_FIELD_VALUE`. Core's `submit`
+ * already refuses changes to `readOnly` fields; this also covers envelopes created by
+ * earlier versions of this package, so call it before `submit` when you still have those.
  */
 export function assertWritable(envelope: Envelope, values: readonly FieldValue[]): void {
   const locked = new Set(readOnlyFieldIds(envelope));

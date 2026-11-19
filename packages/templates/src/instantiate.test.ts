@@ -185,10 +185,45 @@ describe('instantiate: prefill', () => {
       { fieldId: code.id, value: 'EMP-0042' },
       { fieldId: joining.id, value: '2026-04-01' },
     ]);
-    expect(code.required).toBe(false);
+    expect(code).toMatchObject({ required: true, readOnly: true });
     expect(joining.required).toBe(true);
+    expect(joining).not.toHaveProperty('readOnly');
     expect(readOnlyFieldIds(envelope)).toEqual([code.id]);
-    expect(envelope.metadata?.[METADATA_KEYS.readOnlyFields]).toBe(code.id);
+    expect(envelope.metadata?.[METADATA_KEYS.readOnlyFields]).toBeUndefined();
+  });
+
+  it('lets core refuse a change to a read-only field at submit', async () => {
+    const { envelope } = await instantiate(offerTemplate(), { roles: people, prefill }, deps());
+    const sent = send(envelope, deps()).envelope;
+    const employee = sent.recipients[0]!;
+    const own = sent.fields.filter((f) => f.recipientId === employee.id);
+    const values = [
+      { fieldId: own.find((f) => f.type === 'signature')!.id, value: PNG },
+      { fieldId: own.find((f) => f.label === 'Joining date')!.id, value: '2026-04-01' },
+      { fieldId: own.find((f) => f.label === 'Employee code')!.id, value: 'EMP-9999' },
+    ];
+    try {
+      submit(sent, { recipientId: employee.id, values }, deps());
+      expect.unreachable();
+    } catch (error) {
+      expect((error as SignError).code).toBe('FIELD_NOT_YOURS');
+    }
+  });
+
+  it('still reads the metadata key earlier versions wrote', async () => {
+    const { envelope } = await instantiate(offerTemplate(), { roles: people, prefill }, deps());
+    const code = envelope.fields.find((f) => f.label === 'Employee code')!;
+    const joining = envelope.fields.find((f) => f.label === 'Joining date')!;
+    const legacy = {
+      ...envelope,
+      fields: envelope.fields.map((f) => (f.id === code.id ? { ...f, readOnly: undefined } : f)),
+      metadata: {
+        ...envelope.metadata,
+        [METADATA_KEYS.readOnlyFields]: `${code.id},${joining.id}`,
+      },
+    };
+    expect(readOnlyFieldIds(legacy)).toEqual([code.id, joining.id]);
+    expect(() => assertWritable(legacy, [{ fieldId: joining.id, value: 'x' }])).toThrow(SignError);
   });
 
   it('keeps the prefilled value through signing', async () => {

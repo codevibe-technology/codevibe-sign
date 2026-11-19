@@ -138,21 +138,23 @@ every signer role has a required signature field. Problems are reported with a p
 `prefill` sets text fields by their label (any case). The values are stored on the draft as
 `envelope.values`.
 
-- A field marked `readOnly: true` is locked: it must get a value when it is required, it is
-  placed with `required: false` (core only counts values sent with the signature), and its id
-  is listed in `envelope.metadata.templateReadOnlyFields`. Call `assertWritable(envelope,
-values)` before core's `submit` to refuse changes, and use `readOnlyFieldIds(envelope)` to
-  show those fields as plain text in your signing view.
+- A field marked `readOnly: true` is locked: it must get a value when it is required, and it
+  is placed with core's `readOnly` flag, so core's `submit` refuses any change to it with
+  `FIELD_NOT_YOURS` and counts the prefilled value towards required fields. Use
+  `readOnlyFieldIds(envelope)` to show those fields as plain text in your signing view. An
+  optional read-only field left without a value stays editable.
+- Envelopes created by earlier versions list locked fields in
+  `envelope.metadata.templateReadOnlyFields` instead. `readOnlyFieldIds` still reads that key,
+  and `assertWritable(envelope, values)` refuses changes to those fields before `submit`.
 - Any other prefilled field is a suggestion. The recipient sees it and may change it; a
   required one is still sent back with the signature.
 
 ### Metadata written to each envelope
 
-| Key                      | Value                                    |
-| ------------------------ | ---------------------------------------- |
-| `templateVersion`        | `templateVersion(template)` at creation. |
-| `templateId`             | `template.id`, when set.                 |
-| `templateReadOnlyFields` | Comma-separated ids of locked fields.    |
+| Key               | Value                                    |
+| ----------------- | ---------------------------------------- |
+| `templateVersion` | `templateVersion(template)` at creation. |
+| `templateId`      | `template.id`, when set.                 |
 
 These win over metadata with the same keys from the template or the input.
 
@@ -163,8 +165,8 @@ These win over metadata with the same keys from the template or the input.
 | `validateTemplate(template)` → `ValidationIssue[]`           | Empty means usable.                                                             |
 | `assertValidTemplate(template)`                              | Throws `SignError` `VALIDATION` with `details.issues`.                          |
 | `instantiate(template, input, { clock, ids, hasher })`       | `Promise<TransitionResult>` with a draft envelope. Throws `VALIDATION`.         |
-| `readOnlyFieldIds(envelope)` → `string[]`                    | Locked field ids.                                                               |
-| `assertWritable(envelope, values)`                           | Throws `INVALID_FIELD_VALUE` when a value targets a locked field.               |
+| `readOnlyFieldIds(envelope)` → `string[]`                    | Locked field ids, including those under the old metadata key.                   |
+| `assertWritable(envelope, values)`                           | Throws `INVALID_FIELD_VALUE` for a locked field; needed only for old envelopes. |
 | `templateVersion(template, hasher)` → `Promise<string>`      | SHA-256 hex of the canonical template.                                          |
 | `canonicalJson(value)`, `normalizeTemplate(template)`        | The pieces `templateVersion` is built from.                                     |
 | `parseCsv(text)` → `{ records, error? }`                     | RFC 4180, quotes, CRLF/LF/CR, BOM; skips empty lines; one-based line numbers.   |
