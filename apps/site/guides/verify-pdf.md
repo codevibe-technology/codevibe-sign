@@ -16,42 +16,54 @@ still detecting changes.
 
 ## In code
 
-`verifySeal` from `@codevibe/sign-pdf` checks the seal offline:
+`verify` from `@codevibe/sign-pdf` checks the seal offline, against the operator certificate
+you trust. Keep that certificate (or its SHA-256) wherever you verify files. It is public, so
+you can ship it with your app or publish it.
 
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { verifySeal } from '@codevibe/sign-pdf';
+import { verify } from '@codevibe/sign-pdf';
 
-const result = await verifySeal(new Uint8Array(await readFile('offer-signed.pdf')));
+const operatorCertificate = await readFile('seal-certificate.pem', 'utf8');
+const result = await verify(new Uint8Array(await readFile('offer-signed.pdf')), {
+  trust: { certificates: [operatorCertificate] },
+});
 
-if (result.valid && result.coversWholeDocument) {
-  console.log('Unchanged since it was sealed by', result.signer?.commonName, result.signedAt);
-} else if (!result.sealed) {
-  console.log('This file carries no seal');
+if (result.valid) {
+  console.log('Sealed by', result.signer?.commonName, 'at', result.signedAt, 'and unchanged');
 } else {
-  console.log('The file was changed after sealing');
+  console.log('Not genuine:', result.reason);
 }
 ```
 
-It checks the first signature in the file: the byte range is well formed, the message digest
-matches the signed bytes, the signing certificate matches the one embedded and the RSA
-signature verifies. The result is:
+`valid` is true only when the file has exactly one signature, the signature is intact, it
+covers every byte of the file, and it was made with a certificate in `trust`. `reason` says
+which check failed:
 
-| Field                 | Meaning                                                              |
-| --------------------- | -------------------------------------------------------------------- |
-| `sealed`              | The file carries a PDF signature.                                    |
-| `valid`               | The signature is intact and matches the bytes it covers.             |
-| `coversWholeDocument` | Nothing was appended after sealing.                                  |
-| `signer`              | `{ commonName?, organization? }` from the sealing certificate.       |
-| `signedAt`            | ISO time of the seal.                                                |
-| `signatureCount`      | How many signatures the file has; the first one is the one verified. |
+| `reason`              | Meaning                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| `not_sealed`          | The file has no signature field with a signature.                           |
+| `multiple_signatures` | More than one signature; the file was signed again after sealing.           |
+| `signature_invalid`   | The signature does not match the bytes it covers: the file was changed.     |
+| `not_whole_document`  | Bytes were appended after sealing (an incremental update).                  |
+| `untrusted_signer`    | The seal is intact but made with a certificate you did not list in `trust`. |
 
-Treat `valid && coversWholeDocument` as "unchanged since sealing". `valid` does not say whether
-the certificate is trusted: compare `signer` with the operator's certificate you expect.
+`trust` takes `certificates` (PEM or DER), `fingerprints` (SHA-256 hex) or `roots` (a CA the
+operator certificate was issued by). After a key rotation, list the old certificate too so
+older files keep verifying.
 
-The server also returns the hashes and the chain status for an envelope at
-`GET /v1/envelopes/:id/certificate`, and `chainValid` with every event at
+The server runs the same check for each sealed document at
+`GET /v1/envelopes/:id/documents/:docId/verification`, and returns the hashes and the chain
+status at `GET /v1/envelopes/:id/certificate` and `chainValid` with every event at
 `GET /v1/envelopes/:id/events`.
+
+### `verify` and `verifySeal`
+
+`verifySeal(bytes)` is the low-level check underneath. It reports whether the first
+signature is intact (`valid`), whether it covers the whole file (`coversWholeDocument`) and
+how many signatures there are, but not who made it: anyone can change a file and seal it
+again with their own key, and `verifySeal` will call that seal valid. Use `verify` to decide
+whether a file is genuine.
 
 ## Checking the audit chain
 
