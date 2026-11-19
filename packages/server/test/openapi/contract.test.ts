@@ -203,6 +203,9 @@ describe('a full run against the server', () => {
     const id = created.json.id as string;
 
     await call('GET', `/v1/envelopes/${id}`);
+    const page = await call('GET', '/v1/envelopes?limit=1&status=draft');
+    expect(page.json.envelopes[0].id).toBe(id);
+    expect((await call('GET', '/v1/envelopes?limit=0')).status).toBe(400);
     await call('PATCH', `/v1/envelopes/${id}`, { body: { message: 'Please sign by Friday.' } });
     await call('POST', `/v1/envelopes/${id}/send`);
 

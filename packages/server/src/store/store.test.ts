@@ -72,7 +72,11 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       const changed = { ...envelope, title: 'Changed' };
       expect(await store.commit(changed, [event(envelope, 2)], 1, [])).toEqual({ version: 2 });
       await expect(store.commit(changed, [], 1, [])).rejects.toBeInstanceOf(VersionConflictError);
-      expect(await store.load(envelope.id)).toEqual({ envelope: changed, version: 2 });
+      expect(await store.load(envelope.id)).toEqual({
+        envelope: changed,
+        version: 2,
+        workspaceId: 'default',
+      });
       expect((await store.listEvents(envelope.id)).map((e) => e.seq)).toEqual([1, 2]);
       expect(await store.get('missing')).toBeNull();
       expect(await store.save({ ...changed, title: 'Free' }, [])).toEqual({ version: 3 });
@@ -250,6 +254,51 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       );
       expect(leases.flat().filter((j) => j.id === id)).toHaveLength(1);
     });
+
+    it('keeps the workspace an envelope was created in', async () => {
+      const ws = `ws_${++counter}`;
+      const envelope = draft();
+      await store.commit(envelope, [event(envelope, 1)], 0, [], { workspaceId: ws });
+      await store.commit({ ...envelope, title: 'Moved?' }, [], 1, [], { workspaceId: 'other' });
+      await store.save({ ...envelope, title: 'Saved' }, []);
+      expect((await store.load(envelope.id))?.workspaceId).toBe(ws);
+      const legacy = draft();
+      await store.save(legacy, []);
+      expect((await store.load(legacy.id))?.workspaceId).toBe('default');
+    });
+
+    it('lists only the asked workspace, newest first, page by page', async () => {
+      const ws = `ws_${++counter}`;
+      const made: Envelope[] = [];
+      for (let i = 0; i < 5; i++) {
+        const envelope = {
+          ...draft(),
+          title: i === 3 ? 'Offer 100%_done' : `Policy ${i}`,
+          createdAt: new Date(T0.getTime() + i * 1000).toISOString(),
+        };
+        await store.commit(envelope, [], 0, [], { workspaceId: ws });
+        made.push(envelope);
+      }
+      const stranger = draft();
+      await store.commit(stranger, [], 0, [], { workspaceId: `${ws}_other` });
+      const sent = { ...made[1]!, status: 'sent' as const };
+      await store.save(sent, []);
+
+      const first = await store.list!(ws, { limit: 2 });
+      expect(first.envelopes.map((e) => e.id)).toEqual([made[4]!.id, made[3]!.id]);
+      const second = await store.list!(ws, { limit: 2, cursor: first.nextCursor! });
+      expect(second.envelopes.map((e) => e.id)).toEqual([made[2]!.id, made[1]!.id]);
+      const third = await store.list!(ws, { limit: 2, cursor: second.nextCursor! });
+      expect(third.envelopes.map((e) => e.id)).toEqual([made[0]!.id]);
+      expect(third.nextCursor).toBeNull();
+
+      expect((await store.list!(ws, { limit: 10, status: ['sent'] })).envelopes).toEqual([sent]);
+      const found = await store.list!(ws, { limit: 10, search: '100%_' });
+      expect(found.envelopes.map((e) => e.id)).toEqual([made[3]!.id]);
+      expect((await store.list!(ws, { limit: 10, search: '%' })).envelopes).toHaveLength(1);
+      expect((await store.list!('nobody', { limit: 10 })).envelopes).toEqual([]);
+      await expect(store.list!(ws, { limit: 1, cursor: 'nonsense' })).rejects.toThrow(/cursor/);
+    });
   });
 }
 
@@ -266,7 +315,7 @@ describe.skipIf(!url)('postgresStore', () => {
     await admin.unsafe(`create schema ${schema}`);
     sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
     const runs = await Promise.all([migrate(sql), migrate(sql), migrate(sql)]);
-    expect(runs.flat()).toEqual(['0001_init', '0002_otp_issuance']);
+    expect(runs.flat()).toEqual(['0001_init', '0002_otp_issuance', '0003_workspaces']);
     expect(await migrate(sql)).toEqual([]);
   });
 

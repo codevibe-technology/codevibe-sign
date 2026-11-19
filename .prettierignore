@@ -5,3 +5,6 @@ coverage
 .worktrees/
 **/.vitepress/cache/
 **/.vitepress/dist/
+**/.next/
+apps/web/data/
+**/next-env.d.ts

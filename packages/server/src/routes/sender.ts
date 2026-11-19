@@ -7,13 +7,14 @@ import {
   verifyChain,
   voidEnvelope,
   type Envelope,
+  type EnvelopeStatus,
   type Id,
   type TransitionResult,
 } from '@codevibe_technology/sign-core';
 import { Hono, type Context } from 'hono';
 import { sha256Hex } from '../crypto';
 import { applyParties } from '../draft';
-import { VersionConflictError, validation } from '../errors';
+import { HttpError, VersionConflictError, validation } from '../errors';
 import { authenticate } from '../http/auth';
 import { pdfResponse, readJson } from '../http/body';
 import { idempotency } from '../http/idempotency';
@@ -27,11 +28,23 @@ import {
   type UploadedDocument,
 } from '../input';
 import type { Runtime } from '../runtime/context';
+import type { EnvelopeListQuery } from '../store/types';
 import { create, mutate } from '../runtime/mutate';
 import { sealedFileKey } from '../runtime/seal';
-import { certificateView } from '../views';
+import { DEFAULT_WORKSPACE, principalScope, type Principal } from '../tenancy';
+import { certificateView, envelopeSummary } from '../views';
 
-type SenderEnv = { Variables: { apiKeyId: string } };
+type SenderEnv = { Variables: { principal: Principal } };
+
+const STATUSES: readonly EnvelopeStatus[] = [
+  'draft',
+  'sent',
+  'in_progress',
+  'completed',
+  'declined',
+  'expired',
+  'voided',
+];
 
 const originalFileKey = (envelopeId: Id, index: number) =>
   `envelopes/${envelopeId}/documents/${index}/original.pdf`;
@@ -41,22 +54,40 @@ export function senderRoutes(rt: Runtime) {
   const deps = { clock: rt.clock, ids: rt.ids };
 
   app.use('*', async (c, next) => {
-    c.set('apiKeyId', authenticate(c.req.header('authorization'), rt.apiKeys));
+    const principal =
+      (rt.authenticate ? await rt.authenticate(c.req.raw) : null) ??
+      authenticate(c.req.header('authorization'), rt.apiKeys);
+    if (!principal.id || !principal.workspaceId) {
+      throw new HttpError('UNAUTHORIZED', 'The credential has no workspace');
+    }
+    if (principal.readOnly && c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+      throw new HttpError('FORBIDDEN', 'This credential can only read envelopes');
+    }
+    c.set('principal', principal);
     await next();
   });
   app.use(
     '*',
     idempotency(
       rt.store,
-      (c) => `key:${c.get('apiKeyId')}`,
+      (c) => principalScope(c.get('principal')),
       () => rt.clock.now(),
     ),
   );
+  const scopeOf = (c: Context<SenderEnv>) => ({ workspaceId: c.get('principal').workspaceId });
+
+  app.get('/', async (c) => {
+    if (!rt.store.list) throw new SignError('INVALID_STATE', 'This store cannot list envelopes');
+    const query = parseListQuery(c.req.query());
+    const page = await rt.store.list(c.get('principal').workspaceId, query);
+    return c.json({ envelopes: page.envelopes.map(envelopeSummary), nextCursor: page.nextCursor });
+  });
 
   app.post('/', async (c) => {
     const now = rt.clock.now();
     const limit = rt.limits.envelopesPerMinute;
-    await enforce(rt.limiter, `envelopes:${c.get('apiKeyId')}`, limit, 60_000, now);
+    const scope = principalScope(c.get('principal'));
+    await enforce(rt.limiter, `envelopes:${scope}`, limit, 60_000, now);
     const { body, documents } = await readCreateBody(c, rt);
     if (new Set(documents.map((d) => d.key)).size !== documents.length) {
       throw validation('documents must have unique keys');
@@ -116,14 +147,14 @@ export function senderRoutes(rt: Runtime) {
       documents.map((upload, i) => rt.files.put(keys[i]!, upload.bytes, 'application/pdf')),
     );
     try {
-      return c.json(await create(rt, result), 201);
+      return c.json(await create(rt, result, c.get('principal').workspaceId), 201);
     } catch (err) {
       await Promise.allSettled(keys.map((key) => rt.files.delete(key)));
       throw err;
     }
   });
 
-  app.get('/:id', async (c) => c.json(await getEnvelope(rt, c.req.param('id'))));
+  app.get('/:id', async (c) => c.json(await getEnvelope(rt, c.req.param('id'), scopeOf(c))));
 
   app.patch('/:id', async (c) => {
     const body = parseJsonObject(await readJson(c));
@@ -135,8 +166,7 @@ export function senderRoutes(rt: Runtime) {
     // Another request may save between our read and write; the draft is then re-read and the
     // change applied once more on top of it.
     for (let attempt = 1; ; attempt++) {
-      const stored = await rt.store.load(c.req.param('id'));
-      if (!stored) throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
+      const stored = await loadScoped(rt, c.req.param('id'), scopeOf(c));
       const next = applyDraftChange(rt, stored.envelope, body);
       try {
         await rt.store.commit(next, [], stored.version, []);
@@ -149,7 +179,12 @@ export function senderRoutes(rt: Runtime) {
   });
 
   app.post('/:id/send', async (c) => {
-    const { envelope } = await mutate(rt, c.req.param('id'), (current) => send(current, deps));
+    const { envelope } = await mutate(
+      rt,
+      c.req.param('id'),
+      (current) => send(current, deps),
+      scopeOf(c),
+    );
     return c.json(envelope);
   });
 
@@ -157,21 +192,24 @@ export function senderRoutes(rt: Runtime) {
     const body = parseJsonObject(await readJson(c, true));
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     if (!reason) throw validation('reason is required', { field: 'reason' });
-    const { envelope } = await mutate(rt, c.req.param('id'), (current) =>
-      voidEnvelope(current, { reason }, deps),
+    const { envelope } = await mutate(
+      rt,
+      c.req.param('id'),
+      (current) => voidEnvelope(current, { reason }, deps),
+      scopeOf(c),
     );
     return c.json(envelope);
   });
 
   app.get('/:id/events', async (c) => {
-    const envelope = await getEnvelope(rt, c.req.param('id'));
+    const envelope = await getEnvelope(rt, c.req.param('id'), scopeOf(c));
     const events = await rt.store.listEvents(envelope.id);
     const chain = await verifyChain(events, rt.hasher, chainOptions(envelope));
     return c.json({ events, chainValid: chain.valid });
   });
 
   app.get('/:id/documents/:docId', async (c) => {
-    const envelope = await getEnvelope(rt, c.req.param('id'));
+    const envelope = await getEnvelope(rt, c.req.param('id'), scopeOf(c));
     const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
     if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
     const version = c.req.query('version');
@@ -189,7 +227,7 @@ export function senderRoutes(rt: Runtime) {
   });
 
   app.get('/:id/documents/:docId/verification', async (c) => {
-    const envelope = await getEnvelope(rt, c.req.param('id'));
+    const envelope = await getEnvelope(rt, c.req.param('id'), scopeOf(c));
     const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
     if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
     const sealed = await rt.files.get(sealedFileKey(envelope.id, document.id));
@@ -210,7 +248,7 @@ export function senderRoutes(rt: Runtime) {
   });
 
   app.get('/:id/certificate', async (c) => {
-    const envelope = await getEnvelope(rt, c.req.param('id'));
+    const envelope = await getEnvelope(rt, c.req.param('id'), scopeOf(c));
     const events = await rt.store.listEvents(envelope.id);
     const chain = await verifyChain(events, rt.hasher, chainOptions(envelope));
     return c.json(certificateView(envelope, events, chain.valid));
@@ -267,10 +305,43 @@ function applyDraftChange(rt: Runtime, current: Envelope, body: Record<string, u
   );
 }
 
-async function getEnvelope(rt: Runtime, id: Id): Promise<Envelope> {
-  const envelope = await rt.store.get(id);
-  if (!envelope) throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
-  return envelope;
+/**
+ * The stored envelope, if it belongs to the caller's workspace. One in another workspace is
+ * reported exactly like one that does not exist, so ids cannot be probed across workspaces.
+ */
+async function loadScoped(rt: Runtime, id: Id, scope: { workspaceId: string }) {
+  const stored = await rt.store.load(id);
+  if (!stored || (stored.workspaceId ?? DEFAULT_WORKSPACE) !== scope.workspaceId) {
+    throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
+  }
+  return stored;
+}
+
+async function getEnvelope(rt: Runtime, id: Id, scope: { workspaceId: string }) {
+  return (await loadScoped(rt, id, scope)).envelope;
+}
+
+function parseListQuery(query: Record<string, string>): EnvelopeListQuery {
+  const limit = query.limit === undefined ? 25 : Number(query.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw validation('limit must be a whole number from 1 to 100', { field: 'limit' });
+  }
+  const status = query.status
+    ?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const value of status ?? []) {
+    if (!STATUSES.includes(value as EnvelopeStatus)) {
+      throw validation(`status must be one of ${STATUSES.join(', ')}`, { field: 'status' });
+    }
+  }
+  const search = query.q?.trim().slice(0, 200);
+  return {
+    limit,
+    ...(status?.length ? { status: status as EnvelopeStatus[] } : {}),
+    ...(search ? { search } : {}),
+    ...(query.cursor ? { cursor: query.cursor } : {}),
+  };
 }
 
 async function readCreateBody(c: Context, rt: Runtime) {

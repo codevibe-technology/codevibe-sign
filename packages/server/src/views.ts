@@ -100,3 +100,26 @@ export function certificateView(
     })),
   };
 }
+
+/** One row of `GET /v1/envelopes`: enough for a list, without fields or values. */
+export function envelopeSummary(envelope: Envelope) {
+  return {
+    id: envelope.id,
+    title: envelope.title,
+    status: envelope.status,
+    createdAt: envelope.createdAt,
+    sentAt: envelope.sentAt ?? null,
+    completedAt: envelope.completedAt ?? null,
+    expiresAt: envelope.expiresAt ?? null,
+    metadata: envelope.metadata ?? {},
+    documents: envelope.documents.map((d) => ({ id: d.id, name: d.name, pageCount: d.pageCount })),
+    recipients: envelope.recipients.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email ?? null,
+      role: r.role,
+      status: r.status,
+      actedAt: r.actedAt ?? null,
+    })),
+  };
+}

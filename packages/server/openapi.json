@@ -5,7 +5,7 @@
     "title": "Codevibe Sign HTTP API",
     "version": "1",
     "summary": "Send documents for signature, sign them, seal the PDF and verify it.",
-    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n### Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status:\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n### Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n### Rate limits\n\nLimits are per API key (creating envelopes), per signing token and per client IP\n(signer routes), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
+    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n### Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status:\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS`, `FORBIDDEN` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n### Workspaces\n\nEvery envelope belongs to the workspace of the credential that created it. A sender only\nsees and acts on its own workspace's envelopes; an id from another workspace answers\n`ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for\nexample a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.\n\n### Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n### Rate limits\n\nLimits are per API key (creating envelopes), per signing token and per client IP\n(signer routes), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
     "license": {
       "name": "AGPL-3.0-only",
       "url": "https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md"
@@ -115,6 +115,54 @@
       }
     },
     "/v1/envelopes": {
+      "get": {
+        "operationId": "listEnvelopes",
+        "tags": ["Envelopes"],
+        "summary": "List envelopes",
+        "description": "The caller's workspace's envelopes, newest first, one page at a time. Pass the\n`nextCursor` of a page as `cursor` to get the next one. Each row is a summary without\nfields or values; get the envelope for those.\n",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Only these states, comma separated.",
+            "schema": { "type": "string" },
+            "example": "sent,in_progress"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive text anywhere in the title.",
+            "schema": { "type": "string", "maxLength": 200 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of envelopes.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeList" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      },
       "post": {
         "operationId": "createEnvelope",
         "tags": ["Envelopes"],
@@ -206,6 +254,7 @@
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
           "409": { "$ref": "#/components/responses/Conflict" },
           "413": { "$ref": "#/components/responses/TooLarge" },
           "422": { "$ref": "#/components/responses/Unprocessable" },
@@ -263,6 +312,7 @@
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -288,6 +338,7 @@
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
           "410": { "$ref": "#/components/responses/Gone" }
@@ -334,6 +385,7 @@
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -996,6 +1048,17 @@
         "description": "`FIELD_NOT_YOURS`: a value names a field that belongs to another recipient.",
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
       },
+      "ReadOnly": {
+        "description": "`FORBIDDEN`: the credential may only read.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": { "code": "FORBIDDEN", "message": "This credential can only read envelopes" }
+            }
+          }
+        }
+      },
       "NotFound": {
         "description": "`ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND` or `NOT_FOUND`.",
         "content": {
@@ -1121,6 +1184,7 @@
           "OTP_INVALID",
           "OTP_EXPIRED",
           "FIELD_NOT_YOURS",
+          "FORBIDDEN",
           "ENVELOPE_NOT_FOUND",
           "RECIPIENT_NOT_FOUND",
           "NOT_FOUND",
@@ -1146,6 +1210,7 @@
           "OTP_INVALID": 401,
           "OTP_EXPIRED": 401,
           "FIELD_NOT_YOURS": 403,
+          "FORBIDDEN": 403,
           "ENVELOPE_NOT_FOUND": 404,
           "RECIPIENT_NOT_FOUND": 404,
           "NOT_FOUND": 404,
@@ -1371,6 +1436,82 @@
           "value": {
             "type": "string",
             "description": "Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or\n`false`. Date: an ISO date.\n"
+          }
+        }
+      },
+      "EnvelopeSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "status",
+          "createdAt",
+          "sentAt",
+          "completedAt",
+          "expiresAt",
+          "metadata",
+          "documents",
+          "recipients"
+        ],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "title": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "sentAt": { "oneOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }] },
+          "completedAt": {
+            "oneOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "expiresAt": {
+            "oneOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+          },
+          "metadata": { "type": "object", "additionalProperties": { "type": "string" } },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "name", "pageCount"],
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "pageCount": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "name", "email", "role", "status", "actedAt"],
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "email": { "type": ["string", "null"] },
+                "role": { "$ref": "#/components/schemas/RecipientRole" },
+                "status": { "$ref": "#/components/schemas/RecipientStatus" },
+                "actedAt": {
+                  "oneOf": [{ "$ref": "#/components/schemas/Timestamp" }, { "type": "null" }]
+                }
+              }
+            }
+          }
+        }
+      },
+      "EnvelopeList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["envelopes", "nextCursor"],
+        "properties": {
+          "envelopes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EnvelopeSummary" }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "description": "Pass as `cursor` for the next page; null on the last page."
           }
         }
       },

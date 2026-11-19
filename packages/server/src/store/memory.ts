@@ -6,7 +6,10 @@ import {
   type Id,
 } from '@codevibe_technology/sign-core';
 import { VersionConflictError } from '../errors';
+import { DEFAULT_WORKSPACE } from '../tenancy';
+import { decodeCursor, encodeCursor } from './cursor';
 import type {
+  EnvelopePage,
   IdempotencyClaim,
   Job,
   OtpChallenge,
@@ -16,6 +19,7 @@ import type {
 } from './types';
 
 interface EnvelopeRow extends StoredEnvelope {
+  workspaceId: string;
   events: AuditEvent[];
   nextCheckAt: number | null;
 }
@@ -35,6 +39,16 @@ const clone = <T>(value: T): T => structuredClone(value);
 const otpKey = (envelopeId: Id, recipientId: Id) => `${envelopeId}\u0000${recipientId}`;
 const idemKey = (scope: string, key: string) => `${scope}\u0000${key}`;
 
+/** Newest first, then by id, the same order as the PostgreSQL store. */
+function compareNewest(
+  a: Pick<Envelope, 'createdAt' | 'id'>,
+  b: Pick<Envelope, 'createdAt' | 'id'>,
+): number {
+  const byTime = Date.parse(b.createdAt) - Date.parse(a.createdAt);
+  if (byTime !== 0) return byTime;
+  return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+}
+
 /** Keeps everything in process memory. For tests, demos and single-process prototypes. */
 export function memoryStore(): ServerStore {
   const envelopes = new Map<Id, EnvelopeRow>();
@@ -43,7 +57,12 @@ export function memoryStore(): ServerStore {
   const idempotency = new Map<string, IdempotencyRow>();
   const jobs = new Map<Id, JobRow>();
 
-  function write(envelope: Envelope, events: AuditEvent[], expectedVersion?: number) {
+  function write(
+    envelope: Envelope,
+    events: AuditEvent[],
+    expectedVersion?: number,
+    workspaceId?: string,
+  ) {
     const row = envelopes.get(envelope.id);
     const current = row?.version ?? 0;
     if (expectedVersion !== undefined && expectedVersion !== current) {
@@ -59,6 +78,7 @@ export function memoryStore(): ServerStore {
     envelopes.set(envelope.id, {
       envelope: clone(envelope),
       version,
+      workspaceId: row?.workspaceId ?? workspaceId ?? DEFAULT_WORKSPACE,
       events: [...(row?.events ?? []), ...clone(events)],
       nextCheckAt: nextTickAt(envelope)?.getTime() ?? null,
     });
@@ -72,15 +92,36 @@ export function memoryStore(): ServerStore {
     },
     async load(id) {
       const row = envelopes.get(id);
-      return row ? { envelope: clone(row.envelope), version: row.version } : null;
+      return row
+        ? { envelope: clone(row.envelope), version: row.version, workspaceId: row.workspaceId }
+        : null;
     },
     async save(envelope, events, expectedVersion) {
       return write(envelope, events, expectedVersion);
     },
-    async commit(envelope, events, expectedVersion, newJobs) {
-      const result = write(envelope, events, expectedVersion);
+    async commit(envelope, events, expectedVersion, newJobs, options) {
+      const result = write(envelope, events, expectedVersion, options?.workspaceId);
       for (const job of newJobs) jobs.set(job.id, { ...clone(job), done: false });
       return result;
+    },
+    async list(workspaceId, query): Promise<EnvelopePage> {
+      const after = query.cursor ? decodeCursor(query.cursor) : null;
+      const search = query.search?.toLowerCase();
+      const rows = [...envelopes.values()]
+        .filter((row) => row.workspaceId === workspaceId)
+        .filter((row) => !query.status?.length || query.status.includes(row.envelope.status))
+        .filter((row) => !search || row.envelope.title.toLowerCase().includes(search))
+        .sort((a, b) => compareNewest(a.envelope, b.envelope))
+        .filter((row) => !after || compareNewest(after, row.envelope) < 0);
+      const page = rows.slice(0, query.limit).map((row) => clone(row.envelope));
+      const last = page[page.length - 1];
+      return {
+        envelopes: page,
+        nextCursor:
+          rows.length > query.limit && last
+            ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+            : null,
+      };
     },
     async listEvents(envelopeId) {
       return clone(envelopes.get(envelopeId)?.events ?? []);

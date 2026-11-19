@@ -1,0 +1,26 @@
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { AuthFrame } from '@/components/shell/status-page';
+import { safeNext } from '@/lib/safe-next';
+import { getSessionUser } from '@/server/auth/session';
+import { env, googleEnabled } from '@/server/env';
+import { SignInForm } from './sign-in-form';
+
+export const metadata: Metadata = { title: 'Sign in' };
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const next = safeNext(params.next);
+  if (await getSessionUser()) redirect(next);
+  return (
+    <AuthFrame>
+      <h1 className="text-2xl font-bold">Sign in</h1>
+      <p className="mt-1 mb-6 text-muted">We will email you a link. No password to remember.</p>
+      <SignInForm next={next} google={googleEnabled(env())} failed={params.error !== undefined} />
+    </AuthFrame>
+  );
+}

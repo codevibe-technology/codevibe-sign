@@ -23,7 +23,8 @@ export interface SignServer {
 
 export function createSignServer(options: SignServerOptions): SignServer {
   const rt = createRuntime(options, options.pdf ?? defaultPdfEngine);
-  const app = new Hono();
+  const app = rt.basePath ? new Hono().basePath(rt.basePath) : new Hono();
+  const apiPrefix = `${rt.basePath}/v1/`;
 
   app.onError(errorHandler(rt.logger));
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, 404));
@@ -45,7 +46,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
     await next();
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'no-referrer');
-    if (c.req.path.startsWith('/v1/') && !c.res.headers.has('cache-control')) {
+    if (c.req.path.startsWith(apiPrefix) && !c.res.headers.has('cache-control')) {
       c.header('Cache-Control', 'no-store');
     }
   });

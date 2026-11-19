@@ -95,6 +95,7 @@ All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
 | Route                                                 | What it does                                                                                            |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `POST /v1/envelopes`                                  | Create a draft (JSON with base64 documents, or multipart).                                              |
+| `GET /v1/envelopes`                                   | The caller's envelopes, newest first: `?status=draft,sent&q=offer&limit=25&cursor=`.                    |
 | `GET /v1/envelopes/:id`                               | The envelope.                                                                                           |
 | `PATCH /v1/envelopes/:id`                             | Change a draft: title, message, routing, recipients, fields.                                            |
 | `POST /v1/envelopes/:id/send`                         | Send it; the first signers get their links.                                                             |
@@ -129,6 +130,50 @@ All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
 
 Field boxes are in PDF points from the top-left corner of the page. For multipart uploads,
 send the same JSON in a form field named `envelope` and the files as `documents`.
+
+## Workspaces
+
+Every envelope belongs to one workspace, fixed when it is created. A sender sees and acts on
+its own workspace's envelopes only; any other id answers `ENVELOPE_NOT_FOUND`, the same as an
+id that does not exist. A server that never mentions workspaces keeps working unchanged:
+keys without a `workspaceId`, and envelopes created before workspaces existed, belong to
+`DEFAULT_WORKSPACE` (`'default'`).
+
+```ts check
+import { createSignServer, type SignServerOptions } from '@codevibe_technology/sign-server';
+declare const base: SignServerOptions;
+declare function findKey(sha256: string): Promise<{ id: string; workspaceId: string } | null>;
+declare function hooksOf(workspaceId: string): Promise<SignServerOptions['webhooks']>;
+
+const sign = createSignServer({
+  ...base,
+  apiKeys: [{ id: 'acme-ci', key: process.env.ACME_KEY!, workspaceId: 'ws_acme' }],
+  // Keys kept in your own database, or a signed-in user's session.
+  authenticate: async (request) => {
+    const key = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    if (!key) return null;
+    const digest = Buffer.from(
+      await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)),
+    ).toString('hex');
+    return findKey(digest);
+  },
+  webhookTargets: async (workspaceId) => (await hooksOf(workspaceId)) ?? [],
+  basePath: '/api',
+});
+```
+
+- `authenticate(request)` runs before the configured keys and returns a principal
+  `{ id, workspaceId, readOnly? }`, or null to fall back to `apiKeys`. A `readOnly`
+  principal may only use `GET` routes (`FORBIDDEN` otherwise). Do not read the body in it.
+- `webhookTargets(workspaceId)` is asked when an event happens and again before each delivery,
+  so a removed target stops at once and its secret never sits in the job table. The static
+  `webhooks` receive the default workspace's events.
+- Idempotency keys and rate limits are kept per workspace and principal.
+- `basePath` serves every route under a prefix (`/api/v1/...`, `/api/sign/:token`), cookie
+  paths included, for mounting the app inside another framework.
+- Custom stores: `commit(..., { workspaceId })` on create, `load()` returning `workspaceId`,
+  and `list(workspaceId, query)` for `GET /v1/envelopes`. A store without them holds the
+  default workspace only. Migration `0003_workspaces` adds `sign_envelopes.workspace_id`.
 
 ## Signing
 

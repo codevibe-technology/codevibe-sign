@@ -11,6 +11,7 @@ import type { PdfEngine, SealTrust } from './engine';
 import type { Logger } from './errors';
 import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore } from './store/types';
+import type { Principal } from './tenancy';
 import type { WebhookSecurity } from './runtime/webhook-guard';
 import type { MailTemplates } from './templates';
 
@@ -23,11 +24,14 @@ export type ApiKey =
       /** Shown in logs and used to scope idempotency keys and rate limits. Never the secret. */
       id: string;
       key: string;
+      /** The workspace this key acts in. Default `DEFAULT_WORKSPACE`. */
+      workspaceId?: string;
     }
   | {
       id: string;
       /** `sha256(key)` as 64 hex characters, for example from `printf %s "$KEY" | sha256sum`. */
       sha256: string;
+      workspaceId?: string;
     };
 
 export interface SealerOptions {
@@ -84,9 +88,32 @@ export interface SignServerOptions {
   mailer: Mailer;
   otp: OtpSender;
   sealer: SealerOptions;
-  /** Sender credentials, checked from `Authorization: Bearer <key>`. */
+  /**
+   * Sender credentials, checked from `Authorization: Bearer <key>`. May be empty when
+   * `authenticate` is set.
+   */
   apiKeys: (ApiKey | string)[];
-  /** Base URL of the signing page. Links are `${publicUrl}/sign/<token>` unless `signingUrl` is set. */
+  /**
+   * Resolves the caller of a sender route before the configured `apiKeys` are checked, for
+   * example from keys kept in your database or from a signed-in user's session. Return null to
+   * fall back to `apiKeys`; throw `HttpError('UNAUTHORIZED', ...)` to refuse outright.
+   */
+  authenticate?: (request: Request) => Promise<Principal | null>;
+  /**
+   * The webhook targets of a workspace. Read when an event happens and again before each
+   * delivery, so a removed target stops receiving and its secret is never stored in a job.
+   * The static `webhooks` serve the default workspace.
+   */
+  webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
+  /**
+   * Path prefix the app is served under, for example `/api` when mounted inside another
+   * framework. Routes and cookie paths start with it. Default none.
+   */
+  basePath?: string;
+  /**
+   * Base URL of the server. Signing links are `${publicUrl}${basePath}/sign/<token>` unless
+   * `signingUrl` is set.
+   */
   publicUrl: string;
   signingUrl?: (token: string) => string;
   /**

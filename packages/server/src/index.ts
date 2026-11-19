@@ -52,9 +52,13 @@ export type {
 export { memoryStore } from './store/memory';
 export { postgresStore, migrate } from './store/postgres';
 export { migrations, type Migration } from './store/migrations';
+export { DEFAULT_WORKSPACE, type Principal } from './tenancy';
 export type {
   ServerStore,
   StoredEnvelope,
+  CommitOptions,
+  EnvelopeListQuery,
+  EnvelopePage,
   SigningToken,
   OtpChallenge,
   IdempotencyClaim,

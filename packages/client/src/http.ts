@@ -205,6 +205,7 @@ function toError(received: Received): SignApiError {
 
 function codeFor(status: number): ApiErrorCode {
   if (status === 401) return 'UNAUTHORIZED';
+  if (status === 403) return 'FORBIDDEN';
   if (status === 404) return 'NOT_FOUND';
   if (status === 409) return 'CONFLICT';
   if (status === 413) return 'DOCUMENT_TOO_LARGE';

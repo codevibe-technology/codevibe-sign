@@ -77,4 +77,13 @@ alter table sign_otp_challenges
   add column version integer not null default 1;
 `,
   },
+  {
+    name: '0003_workspaces',
+    sql: `
+alter table sign_envelopes
+  add column workspace_id text not null default 'default';
+create index sign_envelopes_workspace_idx
+  on sign_envelopes (workspace_id, created_at desc, id desc);
+`,
+  },
 ];

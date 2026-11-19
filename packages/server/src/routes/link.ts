@@ -5,9 +5,7 @@ import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import { LINK_COOKIE, LINK_COOKIE_MAX_MS } from '../http/session';
 import type { Runtime } from '../runtime/context';
-import { activeSigner } from './signer';
-
-const COOKIE_PATH = '/v1/sign';
+import { activeSigner, signerCookiePath } from './signer';
 
 /**
  * `GET /sign/:token`, where signing links point. It swaps the token for an HttpOnly,
@@ -18,6 +16,7 @@ const COOKIE_PATH = '/v1/sign';
  */
 export function linkRoutes(rt: Runtime) {
   const app = new Hono();
+  const cookiePath = signerCookiePath(rt);
 
   app.get('/:token', async (c) => {
     const now = rt.clock.now();
@@ -32,11 +31,11 @@ export function linkRoutes(rt: Runtime) {
         httpOnly: true,
         secure: rt.secureCookies,
         sameSite: 'Strict',
-        path: COOKIE_PATH,
+        path: cookiePath,
         maxAge: Math.max(1, Math.floor(remaining / 1000)),
       });
     } else {
-      deleteCookie(c, LINK_COOKIE, { path: COOKIE_PATH, secure: rt.secureCookies });
+      deleteCookie(c, LINK_COOKIE, { path: cookiePath, secure: rt.secureCookies });
     }
     c.header('Cache-Control', 'no-store');
     return c.redirect(rt.signingPageUrl, 303);
