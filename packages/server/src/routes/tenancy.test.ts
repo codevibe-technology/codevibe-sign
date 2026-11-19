@@ -274,6 +274,8 @@ describe('basePath', () => {
     expect(created.res.headers.get('cache-control')).toBe('no-store');
 
     const token = h.tokenFor('asha@example.com');
+    const mail = h.mailer.sent.find((m) => m.to === 'asha@example.com');
+    expect(mail?.text).toContain(`https://sign.example.com/api/sign/${token}`);
     const link = await call('GET', `/api/sign/${token}`, { key: false });
     expect(link.status).toBe(303);
     expect(link.res.headers.get('set-cookie')).toMatch(/Path=\/api\/v1\/sign/);

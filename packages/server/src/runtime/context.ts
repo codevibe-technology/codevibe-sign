@@ -108,6 +108,7 @@ function proxyHops(value: number | undefined): number {
 
 export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runtime {
   const publicUrl = options.publicUrl.replace(/\/+$/, '');
+  const basePath = normalizeBasePath(options.basePath);
   if (!/^https?:\/\//.test(publicUrl)) throw new Error('publicUrl must be an http(s) URL');
   const webhookSecurity = options.webhookSecurity ?? {};
   for (const hook of options.webhooks ?? []) {
@@ -138,7 +139,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),
-    basePath: normalizeBasePath(options.basePath),
+    basePath,
     sealer: {
       p12: options.sealer.p12,
       passphrase: options.sealer.passphrase,
@@ -147,7 +148,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
       allowWeakKey: options.sealer.allowWeakKey ?? false,
     },
     sealTrust: sealTrust(options, pdf),
-    signingUrl: options.signingUrl ?? ((token) => `${publicUrl}/sign/${token}`),
+    signingUrl: options.signingUrl ?? ((token) => `${publicUrl}${basePath}/sign/${token}`),
     signingPageUrl: options.signingPageUrl ?? `${publicUrl}/sign`,
     secureCookies: publicUrl.startsWith('https:'),
     sessionSecret: options.sessionSecret ?? randomBytes(32).toString('hex'),

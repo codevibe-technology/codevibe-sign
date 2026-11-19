@@ -110,7 +110,10 @@ export interface SignServerOptions {
    * framework. Routes and cookie paths start with it. Default none.
    */
   basePath?: string;
-  /** Base URL of the signing page. Links are `${publicUrl}/sign/<token>` unless `signingUrl` is set. */
+  /**
+   * Base URL of the server. Signing links are `${publicUrl}${basePath}/sign/<token>` unless
+   * `signingUrl` is set.
+   */
   publicUrl: string;
   signingUrl?: (token: string) => string;
   /**
