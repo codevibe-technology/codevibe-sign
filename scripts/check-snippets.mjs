@@ -56,10 +56,14 @@ try {
     files.set(file, snippet);
   });
 
+  // Each package and its subpaths (`codevibe-sign/client` is `dist/client.d.ts`).
   const packages = Object.fromEntries(
-    readdirSync(at('packages')).map((name) => {
+    readdirSync(at('packages')).flatMap((name) => {
       const manifest = JSON.parse(readFileSync(at(`packages/${name}/package.json`), 'utf8'));
-      return [manifest.name, [at(`packages/${name}/dist/index.d.ts`)]];
+      return [
+        [manifest.name, [at(`packages/${name}/dist/index.d.ts`)]],
+        [`${manifest.name}/*`, [at(`packages/${name}/dist/*.d.ts`)]],
+      ];
     }),
   );
   const react = at('packages/react/node_modules/@types/react');
