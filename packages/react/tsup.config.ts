@@ -1,3 +1,4 @@
+import { copyFile } from 'node:fs/promises';
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
@@ -6,4 +7,7 @@ export default defineConfig({
   dts: true,
   clean: true,
   external: ['pdfjs-dist'],
+  async onSuccess() {
+    await copyFile('src/styles.css', 'dist/styles.css');
+  },
 });
