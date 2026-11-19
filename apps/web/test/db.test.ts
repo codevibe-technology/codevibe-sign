@@ -1,0 +1,363 @@
+import { randomUUID } from 'node:crypto';
+import {
+  consoleMailer,
+  consoleOtpSender,
+  createSignServer,
+  memoryFileStore,
+  postgresStore,
+  type PdfEngine,
+} from '@codevibe_technology/sign-server';
+import { betterAuth } from 'better-auth';
+import { getMigrations } from 'better-auth/db/migration';
+import postgres from 'postgres';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createApiKey, listApiKeys, resolveApiKey, revokeApiKey } from '@/server/api-keys';
+import { authOptions } from '@/server/auth/config';
+import { getBrand, readLogo, removeLogo, setLogo, updateBrand } from '@/server/brand';
+import { AppError } from '@/server/errors';
+import {
+  acceptInvitation,
+  createInvitation,
+  findInvitation,
+  listOpenInvitations,
+  revokeInvitation,
+} from '@/server/invitations';
+import { changeRole, listMembers, removeMember } from '@/server/members';
+import { migrateAll } from '@/server/migrate';
+import { getPreferences, updatePreferences } from '@/server/preferences';
+import { createAuthenticate } from '@/server/sign/principal';
+import {
+  createWorkspace,
+  findMembership,
+  listWorkspacesForUser,
+  renameWorkspace,
+} from '@/server/workspaces';
+
+const url = process.env.DATABASE_URL;
+const APP_URL = 'http://localhost:3000';
+const SECRET = 'test-secret-0123456789abcdef0123456789';
+
+async function rejectsWith(promise: Promise<unknown>, code: string) {
+  const err = await promise.then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(AppError);
+  expect((err as AppError).code).toBe(code);
+  return err as AppError;
+}
+
+describe.skipIf(!url)('against PostgreSQL', () => {
+  const schema = `web_test_${process.pid}_${Date.now()}`;
+  let admin: postgres.Sql;
+  let sql: postgres.Sql;
+  let users: Record<'asha' | 'ravi' | 'mia' | 'zoe', { id: string; email: string }>;
+
+  async function user(name: string) {
+    const id = randomUUID();
+    const email = `${name.toLowerCase()}-${id.slice(0, 6)}@example.com`;
+    await sql`insert into auth_users (id, name, email) values (${id}, ${name}, ${email})`;
+    return { id, email };
+  }
+
+  beforeAll(async () => {
+    admin = postgres(url!, { max: 1, onnotice: () => {} });
+    await admin.unsafe(`create schema ${schema}`);
+    sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
+    const runs = await Promise.all([migrateAll(sql), migrateAll(sql)]);
+    expect(runs.flat()).toContain('app/0002_workspaces');
+    expect(runs.flat()).toContain('0003_workspaces');
+    users = { asha: await user('Asha'), ravi: await user('Ravi'), mia: await user('Mia'), zoe: await user('Zoe') };
+  });
+
+  afterAll(async () => {
+    await sql?.end();
+    await admin?.unsafe(`drop schema ${schema} cascade`);
+    await admin?.end();
+  });
+
+  it('migrates once and is then up to date', async () => {
+    expect(await migrateAll(sql)).toEqual([]);
+  });
+
+  describe('Better Auth', () => {
+    const options = (send: (email: string, link: string) => Promise<void>) =>
+      authOptions({ sql, appUrl: APP_URL, secret: SECRET, sendMagicLink: send });
+
+    it('finds every table and column it needs in our migration', async () => {
+      const plan = await getMigrations(options(async () => undefined));
+      expect(plan.toBeCreated.map((t) => t.table)).toEqual([]);
+      expect(plan.toBeAdded.map((t) => [t.table, Object.keys(t.fields)])).toEqual([]);
+    });
+
+    it('signs a new person in with a magic link', async () => {
+      const links: string[] = [];
+      const auth = betterAuth(options(async (_email, link) => void links.push(link)));
+      const email = `new-${randomUUID().slice(0, 6)}@example.com`;
+      const sent = await auth.handler(
+        new Request(`${APP_URL}/api/auth/sign-in/magic-link`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin: APP_URL },
+          body: JSON.stringify({ email, callbackURL: '/' }),
+        }),
+      );
+      expect(sent.status).toBe(200);
+      expect(links).toHaveLength(1);
+      const [stored] = await sql`select value from auth_verifications`;
+      expect(JSON.stringify(stored)).not.toContain(new URL(links[0]!).searchParams.get('token'));
+
+      const verified = await auth.handler(new Request(links[0]!));
+      expect([200, 302]).toContain(verified.status);
+      const cookie = verified.headers.get('set-cookie') ?? '';
+      expect(cookie).toMatch(/cvs\.session_token=/);
+      expect(cookie).toMatch(/HttpOnly/i);
+      const session = await auth.api.getSession({
+        headers: new Headers({ cookie: cookie.split(';')[0]! }),
+      });
+      expect(session?.user.email).toBe(email);
+
+      const reused = await auth.handler(new Request(links[0]!));
+      expect(reused.headers.get('set-cookie') ?? '').not.toMatch(/cvs\.session_token=[^;]+/);
+    });
+  });
+
+  describe('workspaces and members', () => {
+    it('creates a workspace with its creator as owner and a unique slug', async () => {
+      const a = await createWorkspace(sql, { name: 'Acme HR', userId: users.asha.id });
+      const b = await createWorkspace(sql, { name: 'Acme  HR', userId: users.ravi.id });
+      expect(a.slug).toMatch(/^acme-hr/);
+      expect(b.slug).not.toBe(a.slug);
+      expect(await findMembership(sql, users.asha.id, { slug: a.slug })).toMatchObject({ role: 'owner' });
+      expect(await findMembership(sql, users.asha.id, { slug: b.slug })).toBeNull();
+      expect(await findMembership(sql, users.ravi.id, { id: a.id })).toBeNull();
+      expect((await getBrand(sql, a.id)).brandColor).toBe('#1B6AE0');
+      await rejectsWith(createWorkspace(sql, { name: '   ', userId: users.asha.id }), 'VALIDATION');
+      expect(await renameWorkspace(sql, a.id, '  Acme   People ')).toBe('Acme People');
+    });
+
+    it('keeps an owner and checks who may change whom', async () => {
+      const ws = await createWorkspace(sql, { name: 'Roles', userId: users.asha.id });
+      const owner = { userId: users.asha.id, role: 'owner' as const };
+      await sql`insert into app_members (workspace_id, user_id, role)
+        values (${ws.id}, ${users.ravi.id}, 'admin'), (${ws.id}, ${users.mia.id}, 'member')`;
+      const admin = { userId: users.ravi.id, role: 'admin' as const };
+
+      await rejectsWith(
+        changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id, role: 'admin' }),
+        'CONFLICT',
+      );
+      await rejectsWith(removeMember(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id }), 'CONFLICT');
+      await rejectsWith(
+        changeRole(sql, { workspaceId: ws.id, actor: admin, userId: users.mia.id, role: 'owner' }),
+        'FORBIDDEN',
+      );
+      await rejectsWith(removeMember(sql, { workspaceId: ws.id, actor: admin, userId: users.asha.id }), 'FORBIDDEN');
+      await changeRole(sql, { workspaceId: ws.id, actor: admin, userId: users.mia.id, role: 'viewer' });
+      await rejectsWith(
+        changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.zoe.id, role: 'viewer' }),
+        'NOT_FOUND',
+      );
+
+      await changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.ravi.id, role: 'owner' });
+      await changeRole(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id, role: 'member' });
+      expect((await listMembers(sql, ws.id)).map((m) => [m.name, m.role])).toEqual([
+        ['Ravi', 'owner'],
+        ['Asha', 'member'],
+        ['Mia', 'viewer'],
+      ]);
+      await removeMember(sql, { workspaceId: ws.id, actor: { userId: users.mia.id, role: 'viewer' }, userId: users.mia.id });
+      expect(await findMembership(sql, users.mia.id, { id: ws.id })).toBeNull();
+    });
+
+    it('never lets two requests remove the last two owners together', async () => {
+      const ws = await createWorkspace(sql, { name: 'Race', userId: users.asha.id });
+      await sql`insert into app_members (workspace_id, user_id, role) values (${ws.id}, ${users.ravi.id}, 'owner')`;
+      const results = await Promise.allSettled([
+        removeMember(sql, { workspaceId: ws.id, actor: { userId: users.asha.id, role: 'owner' }, userId: users.ravi.id }),
+        removeMember(sql, { workspaceId: ws.id, actor: { userId: users.ravi.id, role: 'owner' }, userId: users.asha.id }),
+      ]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect((await listMembers(sql, ws.id)).filter((m) => m.role === 'owner')).toHaveLength(1);
+    });
+  });
+
+  describe('invitations', () => {
+    it('invites by email, accepts once, and only for that email', async () => {
+      const ws = await createWorkspace(sql, { name: 'Invites', userId: users.asha.id });
+      const inviter = { userId: users.asha.id, role: 'owner' as const };
+      const first = await createInvitation(sql, { workspaceId: ws.id, email: users.mia.email.toUpperCase(), role: 'member', invitedBy: inviter });
+      const again = await createInvitation(sql, { workspaceId: ws.id, email: users.mia.email, role: 'viewer', invitedBy: inviter });
+      expect(await findInvitation(sql, first.token)).toMatchObject({ revokedAt: expect.any(Date) });
+      expect((await listOpenInvitations(sql, ws.id)).map((i) => [i.email, i.role])).toEqual([[users.mia.email, 'viewer']]);
+      const [stored] = await sql`select token_hash from app_invitations where id = ${again.invitation.id}`;
+      expect(stored?.token_hash).not.toBe(again.token);
+
+      await rejectsWith(acceptInvitation(sql, again.token, users.zoe), 'FORBIDDEN');
+      await rejectsWith(acceptInvitation(sql, first.token, users.mia), 'NOT_FOUND');
+      expect(await acceptInvitation(sql, again.token, users.mia)).toEqual({ workspaceSlug: ws.slug });
+      expect(await findMembership(sql, users.mia.id, { id: ws.id })).toMatchObject({ role: 'viewer' });
+      await rejectsWith(acceptInvitation(sql, again.token, users.mia), 'NOT_FOUND');
+      await rejectsWith(
+        createInvitation(sql, { workspaceId: ws.id, email: users.mia.email, role: 'member', invitedBy: inviter }),
+        'CONFLICT',
+      );
+    });
+
+    it('refuses expired, withdrawn and malformed invitations', async () => {
+      const ws = await createWorkspace(sql, { name: 'Expiry', userId: users.asha.id });
+      const inviter = { userId: users.asha.id, role: 'owner' as const };
+      const old = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: users.zoe.email,
+        role: 'member',
+        invitedBy: inviter,
+        now: new Date(Date.now() - 8 * 86_400_000),
+      });
+      await rejectsWith(acceptInvitation(sql, old.token, users.zoe), 'NOT_FOUND');
+      const fresh = await createInvitation(sql, { workspaceId: ws.id, email: users.zoe.email, role: 'member', invitedBy: inviter });
+      await rejectsWith(revokeInvitation(sql, 'ws_other', fresh.invitation.id), 'NOT_FOUND');
+      await revokeInvitation(sql, ws.id, fresh.invitation.id);
+      await rejectsWith(acceptInvitation(sql, fresh.token, users.zoe), 'NOT_FOUND');
+      expect(await findInvitation(sql, "x' or 1=1 --")).toBeNull();
+      await rejectsWith(
+        createInvitation(sql, { workspaceId: ws.id, email: 'x@y.co', role: 'owner', invitedBy: { userId: users.asha.id, role: 'admin' } }),
+        'FORBIDDEN',
+      );
+      await rejectsWith(
+        createInvitation(sql, { workspaceId: ws.id, email: 'not an email', role: 'member', invitedBy: inviter }),
+        'VALIDATION',
+      );
+    });
+  });
+
+  describe('API keys', () => {
+    it('stores only a hash, resolves to its workspace and stops when revoked', async () => {
+      const a = await createWorkspace(sql, { name: 'Keys A', userId: users.asha.id });
+      const b = await createWorkspace(sql, { name: 'Keys B', userId: users.ravi.id });
+      const key = await createApiKey(sql, { workspaceId: a.id, name: 'CI', createdBy: users.asha.id });
+      expect(key.key).toMatch(/^cvs_[A-Za-z0-9_-]{43}$/);
+      const rows = await sql`select * from app_api_keys where id = ${key.id}`;
+      expect(JSON.stringify(rows)).not.toContain(key.key);
+
+      expect(await resolveApiKey(sql, key.key)).toEqual({ id: key.id, workspaceId: a.id });
+      const altered = `${key.key.slice(0, -1)}${key.key.endsWith('A') ? 'B' : 'A'}`;
+      expect(await resolveApiKey(sql, altered)).toBeNull();
+      expect(await resolveApiKey(sql, 'Bearer nonsense')).toBeNull();
+      expect((await listApiKeys(sql, a.id))[0]).toMatchObject({ name: 'CI', lastUsedAt: expect.any(Date) });
+      expect(await listApiKeys(sql, b.id)).toEqual([]);
+
+      await rejectsWith(revokeApiKey(sql, b.id, key.id), 'NOT_FOUND');
+      expect(await resolveApiKey(sql, key.key)).not.toBeNull();
+      await revokeApiKey(sql, a.id, key.id);
+      expect(await resolveApiKey(sql, key.key)).toBeNull();
+      expect(await listApiKeys(sql, a.id)).toEqual([]);
+    });
+  });
+
+  describe('brand and preferences', () => {
+    it('saves brand settings and the logo per workspace', async () => {
+      const a = await createWorkspace(sql, { name: 'Brand A', userId: users.asha.id });
+      const b = await createWorkspace(sql, { name: 'Brand B', userId: users.asha.id });
+      const files = memoryFileStore();
+      await updateBrand(sql, a.id, { brandColor: '#2dd4bf', font: 'serif', senderName: 'Acme "HR"\n' });
+      expect(await getBrand(sql, a.id)).toMatchObject({ brandColor: '#2DD4BF', font: 'serif', senderName: 'Acme HR' });
+      expect((await getBrand(sql, b.id)).brandColor).toBe('#1B6AE0');
+      await rejectsWith(updateBrand(sql, a.id, { brandColor: 'teal' }), 'VALIDATION');
+
+      const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+      await setLogo(sql, files, a.id, png);
+      expect((await getBrand(sql, a.id)).logoUrl).toMatch(new RegExp(`^/brand/${a.id}/logo\\?v=\\d+$`));
+      expect(await readLogo(sql, files, a.id)).toEqual({ bytes: png, type: 'image/png' });
+      expect(await readLogo(sql, files, b.id)).toBeNull();
+      await removeLogo(sql, files, a.id);
+      expect((await getBrand(sql, a.id)).logoUrl).toBeNull();
+    });
+
+    it('keeps personal preferences per person', async () => {
+      expect(await getPreferences(sql, users.zoe.id)).toEqual({ theme: 'system', timezone: null, locale: 'en' });
+      await updatePreferences(sql, users.zoe.id, { theme: 'dark' });
+      expect(await updatePreferences(sql, users.zoe.id, { timezone: 'Asia/Kolkata' })).toEqual({
+        theme: 'dark',
+        timezone: 'Asia/Kolkata',
+        locale: 'en',
+      });
+      await rejectsWith(updatePreferences(sql, users.zoe.id, { timezone: 'Mars/Base' }), 'VALIDATION');
+      await rejectsWith(updatePreferences(sql, users.zoe.id, { theme: 'neon' }), 'VALIDATION');
+      expect((await getPreferences(sql, users.mia.id)).theme).toBe('system');
+    });
+  });
+
+  describe('the mounted sign server', () => {
+    const pdf: PdfEngine = {
+      inspectPdf: async () => ({ pageCount: 1, pages: [{ width: 612, height: 792 }] }),
+      renderFields: async (bytes) => bytes,
+      appendCertificate: async (bytes) => bytes,
+      seal: async (bytes) => bytes,
+    };
+    const document = Buffer.from('%PDF-1.7\n').toString('base64');
+    const body = {
+      title: 'Offer letter',
+      documents: [{ key: 'offer', name: 'offer.pdf', content: document }],
+      recipients: [{ key: 'asha', name: 'Asha', email: 'asha@example.com' }],
+      fields: [{ recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 }],
+    };
+
+    it('keeps each workspace to its own envelopes, files and events', async () => {
+      const a = await createWorkspace(sql, { name: 'Tenant A', userId: users.asha.id });
+      const b = await createWorkspace(sql, { name: 'Tenant B', userId: users.ravi.id });
+      const keyA = (await createApiKey(sql, { workspaceId: a.id, name: 'A', createdBy: users.asha.id })).key;
+      const keyB = (await createApiKey(sql, { workspaceId: b.id, name: 'B', createdBy: users.ravi.id })).key;
+      const mailer = consoleMailer({ silent: true });
+      const sign = createSignServer({
+        store: postgresStore(sql),
+        files: memoryFileStore(),
+        mailer,
+        otp: consoleOtpSender({ silent: true }),
+        pdf,
+        sealer: { p12: new Uint8Array([1]), passphrase: '' },
+        apiKeys: [],
+        authenticate: createAuthenticate({
+          appUrl: APP_URL,
+          resolveApiKey: (key) => resolveApiKey(sql, key),
+          sessionUser: async () => null,
+          roleOf: async () => null,
+        }),
+        basePath: '/api',
+        publicUrl: APP_URL,
+      });
+      const call = (key: string, method: string, path: string, json?: unknown) =>
+        sign.app.request(`/api${path}`, {
+          method,
+          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
+        });
+
+      const created = await call(keyA, 'POST', '/v1/envelopes', body);
+      expect(created.status).toBe(201);
+      const envelope = (await created.json()) as { id: string; documents: { id: string }[] };
+      const [row] = await sql`select workspace_id from sign_envelopes where id = ${envelope.id}`;
+      expect(row?.workspace_id).toBe(a.id);
+
+      const paths = [
+        ['GET', `/v1/envelopes/${envelope.id}`],
+        ['GET', `/v1/envelopes/${envelope.id}/events`],
+        ['GET', `/v1/envelopes/${envelope.id}/certificate`],
+        ['GET', `/v1/envelopes/${envelope.id}/documents/${envelope.documents[0]!.id}`],
+        ['PATCH', `/v1/envelopes/${envelope.id}`],
+        ['POST', `/v1/envelopes/${envelope.id}/send`],
+        ['POST', `/v1/envelopes/${envelope.id}/void`],
+      ] as const;
+      for (const [method, path] of paths) {
+        const res = await call(keyB, method, path, method === 'GET' ? undefined : { title: 'x', reason: 'x' });
+        expect(res.status, `${method} ${path}`).toBe(404);
+      }
+      const listB = (await (await call(keyB, 'GET', '/v1/envelopes')).json()) as { envelopes: unknown[] };
+      expect(listB.envelopes).toEqual([]);
+      const listA = (await (await call(keyA, 'GET', '/v1/envelopes')).json()) as { envelopes: { id: string }[] };
+      expect(listA.envelopes.map((e) => e.id)).toEqual([envelope.id]);
+      expect((await call(keyA, 'POST', `/v1/envelopes/${envelope.id}/send`, {})).status).toBe(200);
+      expect(mailer.sent.at(-1)?.text).toContain(`${APP_URL}/api/sign/`);
+      expect((await call('cvs_wrong', 'GET', '/v1/envelopes')).status).toBe(401);
+    });
+  });
+});
