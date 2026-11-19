@@ -134,6 +134,8 @@ export interface Envelope {
 
 export type AuditAction =
   | 'envelope.created'
+  /** A draft was edited; `data.change` says what changed (see `DraftChange`). */
+  | 'envelope.updated'
   | 'envelope.sent'
   | 'envelope.completed'
   | 'envelope.declined'

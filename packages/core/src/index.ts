@@ -29,6 +29,20 @@ export type {
 } from './builder';
 
 export {
+  addDocumentWithEvents,
+  addFieldWithEvents,
+  addRecipientWithEvents,
+  moveFieldWithEvents,
+  prefillFieldsWithEvents,
+  removeDocumentWithEvents,
+  removeFieldWithEvents,
+  removeRecipientWithEvents,
+  updateEnvelopeWithEvents,
+  updateRecipientWithEvents,
+} from './edits';
+export type { DraftChange, DraftEditDeps, DraftEditOptions } from './edits';
+
+export {
   decline,
   markAuthenticated,
   markViewed,

@@ -98,6 +98,25 @@ Edits are allowed only while the envelope is a `draft`.
 | `prefillFields(envelope, values)` → `Envelope`                       | Sender's values for text, name and checkbox fields; empty clears.         |
 | `validateForSend(envelope, now)` → `ValidationIssue[]`               | Empty means ready. Every signer needs a required signature field.         |
 
+#### Recording draft edits
+
+The edits above return just the envelope, so existing callers keep working. Each has a
+`...WithEvents` twin that takes `{ clock }` (plus `ids` where it creates something) and an
+optional `{ context }`, and returns a `TransitionResult` with one `envelope.updated` event
+to commit like any other. Created items are returned alongside, for example
+`addRecipientWithEvents(...)` → `{ envelope, events, effects, recipient }`.
+
+`updateEnvelopeWithEvents`, `addDocumentWithEvents`, `removeDocumentWithEvents`,
+`addRecipientWithEvents`, `updateRecipientWithEvents`, `removeRecipientWithEvents`,
+`addFieldWithEvents`, `moveFieldWithEvents`, `removeFieldWithEvents`,
+`prefillFieldsWithEvents`.
+
+The event's `data.change` names the edit (`DraftChange`: `details.updated`,
+`document.added`, `recipient.removed`, `values.prefilled`, ...) with the ids involved;
+recipient and field edits set `recipientId`. Changed keys are listed, never their values,
+so contact details and prefilled data stay out of the log. An edit that changes nothing
+returns no event. Draft edits produce no effects.
+
 ### Workflow
 
 All take `{ clock }` and return `TransitionResult` (`{ envelope, events, effects }`).
