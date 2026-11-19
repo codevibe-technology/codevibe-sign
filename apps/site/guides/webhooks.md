@@ -5,44 +5,132 @@ description: Receive signed webhook events from the server when envelopes change
 
 # Webhooks
 
-<ComingSoon pkg="@codevibe/sign-server" />
-
 The server tells your backend when something happens to an envelope by sending a webhook. Each
-one corresponds to an audit action, such as `envelope.sent`, `recipient.signed`,
-`envelope.completed` or `document.sealed`.
+one corresponds to an audit action: `envelope.created`, `envelope.sent`, `envelope.completed`,
+`envelope.declined`, `envelope.expired`, `envelope.voided`, `recipient.notified`,
+`recipient.reminded`, `recipient.viewed`, `recipient.authenticated`, `recipient.signed`,
+`recipient.approved`, `recipient.declined` and `document.sealed`.
 
-## Signing
+## Targets
 
-Every webhook is signed with HMAC-SHA256 over a timestamp and the raw body, using a secret you
-share with the server. Verify the signature before you act on the event, and reject requests
-whose timestamp is too old, so a captured request cannot be replayed later.
+List the endpoints in the server options. `events` names the actions a target wants, or `*`
+for all of them.
 
-```ts
-import { createHmac, timingSafeEqual } from 'node:crypto';
+```ts check
+import type { WebhookTarget } from '@codevibe/sign-server';
 
-export function verifyWebhook(
-  secret: string,
-  timestamp: string,
-  rawBody: string,
-  signature: string,
-): boolean {
-  const ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp));
-  if (!Number.isFinite(ageSeconds) || ageSeconds > 300) return false;
+const webhooks: WebhookTarget[] = [
+  {
+    url: 'https://hr.example.com/hooks/sign',
+    secret: process.env.SIGN_WEBHOOK_SECRET!,
+    events: ['envelope.completed', 'envelope.declined', 'document.sealed'],
+  },
+];
+```
 
-  const expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
-  const a = Buffer.from(expected);
-  const b = Buffer.from(signature);
-  return a.length === b.length && timingSafeEqual(a, b);
+Pass them as `webhooks` to `createSignServer`, or in the `overrides` of `startSignServer`.
+
+## The request
+
+Each delivery is a `POST` with a JSON body:
+
+```json
+{
+  "id": "3f9a1c0e-…",
+  "type": "envelope.completed",
+  "createdAt": "2026-11-19T10:42:07.000Z",
+  "data": {
+    "envelope": {
+      "id": "6b2e4d71-…",
+      "title": "Offer letter",
+      "status": "completed",
+      "metadata": { "employeeId": "E42" },
+      "completedAt": "2026-11-19T10:42:07.000Z",
+      "recipients": [
+        {
+          "id": "a71d09c2-…",
+          "name": "Asha Rao",
+          "email": "asha@example.com",
+          "role": "signer",
+          "status": "signed",
+          "actedAt": "2026-11-19T10:42:06.000Z"
+        }
+      ]
+    }
+  }
 }
 ```
 
-The header names and the exact string that is signed will be confirmed here when the server is
-released.
+and these headers:
+
+| Header                 | Value                                                   |
+| ---------------------- | ------------------------------------------------------- |
+| `content-type`         | `application/json`                                      |
+| `user-agent`           | `codevibe-sign-webhooks`                                |
+| `x-codevibe-delivery`  | The delivery id, the same as `id` in the body           |
+| `x-codevibe-signature` | `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>">` |
+
+## Verifying the signature
+
+The signature is HMAC-SHA256, keyed with the target's `secret`, over the string
+`<t>.<raw body>`: the timestamp from the header, a dot, then the body bytes exactly as
+received. Verify it before you act on the event, and reject timestamps more than five minutes
+from your clock so a captured request cannot be replayed.
+
+`verifyWebhook(secret, header, rawBody, options?)` from `@codevibe/sign-server` does all of
+this with a constant-time comparison. `options.toleranceSeconds` changes the five-minute
+window.
+
+```ts check
+import { createServer } from 'node:http';
+import { verifyWebhook } from '@codevibe/sign-server';
+
+const secret = process.env.SIGN_WEBHOOK_SECRET!;
+
+createServer(async (req, res) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  const rawBody = Buffer.concat(chunks).toString('utf8');
+
+  const header = req.headers['x-codevibe-signature'];
+  if (!verifyWebhook(secret, typeof header === 'string' ? header : null, rawBody)) {
+    res.writeHead(401).end();
+    return;
+  }
+  const event = JSON.parse(rawBody) as { id: string; type: string };
+  res.writeHead(204).end();
+  // Hand the event to a queue here; answer first, work later.
+  console.log(event.type, event.id);
+}).listen(4000);
+```
+
+Parse the JSON only after the check, and never re-serialise it before verifying: a different
+key order or spacing changes the bytes and the signature no longer matches.
+
+Without the package, the check is a few lines of `node:crypto`:
+
+```ts check
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+export function verify(secret: string, header: string, rawBody: string): boolean {
+  const parts = Object.fromEntries(header.split(',').map((p) => p.trim().split('=', 2)));
+  const t = Number(parts.t);
+  if (!Number.isInteger(t) || Math.abs(Date.now() / 1000 - t) > 300) return false;
+  const expected = createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex');
+  const given = Buffer.from(String(parts.v1 ?? ''));
+  return given.length === expected.length && timingSafeEqual(given, Buffer.from(expected));
+}
+```
 
 ## Delivery
 
-- Failed deliveries are retried with backoff, so the same event can arrive more than once.
-  Make your handler idempotent, for example by storing the event's envelope id and sequence
-  number.
-- Answer quickly with a 2xx status and do slow work in the background.
-- Use the envelope's `metadata` to link events back to your own records, such as an employee id.
+- A delivery counts as done when your endpoint answers 2xx within 10 seconds. Redirects are
+  not followed.
+- Anything else is retried from an outbox with backoff, from 30 seconds up to 12 hours, nine
+  attempts in all. Each attempt is signed again with a fresh `t`; the body and the delivery id
+  stay the same.
+- The same event can therefore arrive more than once. Use the delivery id to ignore
+  duplicates.
+- Answer quickly and do slow work in the background.
+- Use the envelope's `metadata` to link events back to your own records, such as an employee
+  id.
