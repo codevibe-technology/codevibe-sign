@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { ROLES, can, canManageRole, isRole, type Permission, type Role } from './roles';
+import {
+  ROLES,
+  can,
+  canManageRole,
+  canVoidEnvelope,
+  isRole,
+  type Permission,
+  type Role,
+} from './roles';
 
 const matrix: Record<Permission, Role[]> = {
   'envelopes.read': ['viewer', 'member', 'admin', 'owner'],
   'envelopes.write': ['member', 'admin', 'owner'],
+  'envelopes.voidAny': ['admin', 'owner'],
   'workspace.manage': ['admin', 'owner'],
   'brand.manage': ['admin', 'owner'],
   'apiKeys.manage': ['admin', 'owner'],
@@ -26,6 +35,14 @@ describe('roles', () => {
     expect(canManageRole('owner', 'owner')).toBe(true);
     expect(canManageRole('member', 'viewer')).toBe(false);
     expect(canManageRole('viewer', 'viewer')).toBe(false);
+  });
+
+  it('lets members void their own envelopes and admins void any', () => {
+    expect(canVoidEnvelope('viewer', true)).toBe(false);
+    expect(canVoidEnvelope('member', true)).toBe(true);
+    expect(canVoidEnvelope('member', false)).toBe(false);
+    expect(canVoidEnvelope('admin', false)).toBe(true);
+    expect(canVoidEnvelope('owner', false)).toBe(true);
   });
 
   it('recognises only known roles', () => {

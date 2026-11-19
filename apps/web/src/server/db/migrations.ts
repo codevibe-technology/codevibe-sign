@@ -136,4 +136,16 @@ create table app_user_preferences (
 );
 `,
   },
+  {
+    name: '0003_envelope_senders',
+    sql: `
+create table app_envelope_senders (
+  envelope_id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  user_id text references auth_users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index app_envelope_senders_workspace_idx on app_envelope_senders (workspace_id, user_id);
+`,
+  },
 ];

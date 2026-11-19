@@ -5,8 +5,10 @@ import { createAuthenticate, inProcess } from './principal';
 
 const APP = 'https://sign.example.com';
 
-function setup(role: Role | null = 'member') {
+function setup(role: Role | null = 'member', sent: string[] = []) {
   return createAuthenticate({
+    isSender: async (userId, workspaceId, envelopeId) =>
+      userId === 'u1' && workspaceId === 'ws_a' && sent.includes(envelopeId),
     appUrl: APP,
     resolveApiKey: async (key) =>
       key === 'cvs_good' ? { id: 'key_1', workspaceId: 'ws_a' } : null,
@@ -81,5 +83,18 @@ describe('createAuthenticate', () => {
     inProcess.set(local, { id: 'user:u9', workspaceId: 'ws_z' });
     expect(await auth(local)).toEqual({ id: 'user:u9', workspaceId: 'ws_z' });
     expect(await auth(request('POST', {}))).toBeNull();
+  });
+
+  it('lets members void only envelopes they sent, and admins any', async () => {
+    const voiding = (id: string) =>
+      new Request(`${APP}/api/v1/envelopes/${id}/void`, {
+        method: 'POST',
+        headers: { cookie: 'session', 'x-workspace': 'ws_a', origin: APP },
+      });
+    const member = setup('member', ['env_mine']);
+    expect(await member(voiding('env_mine'))).toMatchObject({ id: 'user:u1' });
+    expect(await refusal(member(voiding('env_other')))).toBe('FORBIDDEN');
+    expect(await setup('admin')(voiding('env_other'))).toMatchObject({ id: 'user:u1' });
+    expect(await setup('viewer')(voiding('env_mine'))).toMatchObject({ readOnly: true });
   });
 });
