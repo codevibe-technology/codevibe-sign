@@ -8,6 +8,11 @@ export interface IdGenerator {
   id(): Id;
 }
 
+export interface RandomSource {
+  /** Cryptographically secure random bytes. */
+  bytes(length: number): Uint8Array;
+}
+
 export interface Hasher {
   /** Lowercase hex SHA-256. */
   sha256(data: Uint8Array | string): Promise<string>;
