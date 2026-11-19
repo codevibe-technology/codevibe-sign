@@ -1,0 +1,14 @@
+# PostgreSQL for local development only. Not for production.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sign
+      POSTGRES_PASSWORD: sign
+      POSTGRES_DB: sign
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres:/var/lib/postgresql/data
+volumes:
+  postgres:

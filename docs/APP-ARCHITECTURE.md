@@ -139,7 +139,7 @@ Each membership has one role. Higher roles include everything below them.
 | Make or remove owners, delete the workspace          |        |        |       |   ✓   |
 
 A workspace always keeps at least one owner. Permissions live in one table in
-`src/server/auth/permissions.ts`; pages, server actions and the API principal all ask it.
+`src/lib/roles.ts` (`can(role, permission)`); pages, server actions and the API principal all ask it.
 
 ### Guards
 
@@ -148,8 +148,8 @@ A workspace always keeps at least one owner. Permissions live in one table in
 - Every page and layout under `/w/[slug]` calls `requireWorkspace(slug)`, which loads the
   session, the workspace and the membership in one query and calls `notFound()` when any is
   missing.
-- Every server action goes through `action(permission, schema, handler)`
-  (`src/server/actions/action.ts`): session, membership for the workspace named in the input,
+- Every server action goes through `workspaceAction(permission, schema, handler)` or
+  `userAction(schema, handler)` (`src/server/actions/action.ts`): session, membership for the workspace named in the input,
   the permission check, then input validation. Handlers receive a typed `ActionContext` and
   never read the session themselves. Errors come back as `{ ok: false, error, field? }`, so a
   form can point at the field that needs fixing.
@@ -242,17 +242,19 @@ apps/web/src
 │  ├─ invite/[token]        accept an invitation
 │  ├─ w/[slug]/             the workspace shell: dashboard, envelopes, templates, settings
 │  ├─ sign/                 signing page (signing lane)
-│  ├─ brand/[id]/logo       public logo file
+│  ├─ brand/[workspaceId]/logo   public logo file
 │  └─ api/                  auth, v1, sign, health
 ├─ components/{ui,shell,settings}
-├─ server/                  never imported by client components ('server-only')
-│  ├─ db.ts, db/migrations.ts, migrate.ts
-│  ├─ auth/                 Better Auth, session, permissions, guards
-│  ├─ actions/              server actions, one file per area
-│  ├─ workspaces/ members/ invitations/ brand/ api-keys/ preferences/   data access
+├─ lib/                     shared by server and client: roles, brand colours, preferences
+├─ server/                  server only ('server-only')
+│  ├─ env.ts, db.ts, runtime.ts, migrate.ts, db/migrations.ts
+│  ├─ auth/                 Better Auth config and instance, session, page guards
+│  ├─ actions/              server actions, one file per area, all through action.ts
+│  ├─ workspaces.ts, members.ts, invitations.ts, brand.ts, api-keys.ts, preferences.ts
 │  ├─ sign/                 the mounted sign server, principal resolver, in-process client
 │  └─ mail.ts               app mail (magic links, invitations)
-└─ lib/                     code shared by server and client (validation, formatting)
+├─ instrumentation.ts       migrations on start and the tick timer
+└─ proxy.ts                 redirects visitors without a session cookie
 ```
 
 ## Extension points for the next lanes
