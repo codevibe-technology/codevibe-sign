@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { commitTransition, verifyChain } from './audit';
-import { isActor } from './builder';
+import { addField, isActor } from './builder';
 import { webCryptoHasher as hasher } from './defaults';
 import { currentRecipients, hasActed, isActive, isExpiredAt, isFinal } from './routing';
 import { at, clockAt, ready, T0, valuesFor } from './test/fixtures';
@@ -266,6 +266,41 @@ describe('workflow properties', () => {
         expect(statusIn(merged.envelope, b)).toBe('signed');
       }),
       { numRuns: 10 },
+    );
+  });
+
+  it('stamps date fields with the server time, whatever the signer sends', () => {
+    const r = ready({ recipients: [{ name: 'A', email: 'a@example.com' }] });
+    const added = addField(
+      r.envelope,
+      {
+        documentId: r.documentId,
+        recipientId: r.ids[0]!,
+        type: 'date_signed',
+        page: 0,
+        rect: { x: 1, y: 1, width: 5, height: 5 },
+      },
+      { ids: r.gen },
+    );
+    const live = send(added.envelope, { clock: clockAt(T0) }).envelope;
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.string(),
+          fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
+        ),
+        fc.integer({ min: 0, max: 10 * 86_400_000 }),
+        (sent, offset) => {
+          const now = new Date(Date.parse(T0) + offset).toISOString();
+          const values = [
+            ...valuesFor(live, r.ids[0]!).filter((v) => v.fieldId !== added.field.id),
+            { fieldId: added.field.id, value: sent },
+          ];
+          const result = submit(live, { recipientId: r.ids[0]!, values }, { clock: clockAt(now) });
+          const stored = result.envelope.values.find((v) => v.fieldId === added.field.id);
+          expect(stored?.value).toBe(now);
+        },
+      ),
     );
   });
 });

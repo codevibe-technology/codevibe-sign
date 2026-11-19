@@ -143,8 +143,11 @@ Viewers never act; they receive the completed copy.
 Submitted values are checked against the field type: signatures and initials must be
 real PNGs (base64 or a `data:image/png;base64,` URL) of at most 512 KB and 2048 x 2048
 pixels (`MAX_IMAGE_BYTES`, `MAX_IMAGE_DIMENSION`), dates ISO,
-checkboxes `'true'` or `'false'`, text at most 1000 characters. Date-signed and name
-fields are filled in when left empty.
+checkboxes `'true'` or `'false'`, text at most 1000 characters. Name fields are filled
+in with the recipient's name when left empty. Date-signed fields always get the server's
+time of signing as a full ISO date-time in UTC; a date the signer sends is ignored, so a
+signature cannot be back-dated. Render it in the signer's time zone if you like: the
+certificate page shows the exact UTC time from the audit log.
 
 Values the sender prefilled count towards required fields, so the signer does not have to
 send them again. A field added with `readOnly: true` keeps the sender's value: `submit`

@@ -248,13 +248,14 @@ export function markAuthenticated(
 
 /**
  * The recipient's values after this submission: what they sent, on top of what the sender
- * prefilled. Read-only fields keep the sender's value.
+ * prefilled. Read-only fields keep the sender's value, and date-signed fields always get the
+ * server's time of signing, whatever the signer sends.
  */
 function collectValues(
   envelope: Envelope,
   recipient: Recipient,
   submitted: FieldValue[],
-  today: string,
+  signedAt: string,
 ): FieldValue[] {
   const own = new Map(
     envelope.fields.filter((f) => f.recipientId === recipient.id).map((f) => [f.id, f]),
@@ -286,6 +287,8 @@ function collectValues(
       invalid.push({ fieldId, problem: 'Value must be a string' });
       continue;
     }
+    // A signer's own date could be back-dated, so it is ignored rather than refused.
+    if (field.type === 'date_signed') continue;
     const checked = checkFieldValue(field.type, value);
     if (!checked.ok) {
       invalid.push({ fieldId, problem: checked.problem });
@@ -306,9 +309,8 @@ function collectValues(
   }
 
   for (const field of own.values()) {
-    if (stored.get(field.id)) continue;
-    if (field.type === 'date_signed') stored.set(field.id, today);
-    if (field.type === 'name') stored.set(field.id, recipient.name);
+    if (field.type === 'date_signed') stored.set(field.id, signedAt);
+    if (field.type === 'name' && !stored.get(field.id)) stored.set(field.id, recipient.name);
   }
 
   const missing = [...own.values()]
@@ -347,7 +349,7 @@ export function submit(
   assertTurn(envelope, recipient);
 
   const at = now.toISOString();
-  const values = collectValues(envelope, recipient, input.values, at.slice(0, 10));
+  const values = collectValues(envelope, recipient, input.values, at);
   const ownFields = new Set(
     envelope.fields.filter((f) => f.recipientId === recipient.id).map((f) => f.id),
   );

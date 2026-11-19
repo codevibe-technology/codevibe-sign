@@ -232,10 +232,11 @@ Residual risk: length differences leak, which is harmless for fixed-length hashe
 
 ### 12. Other notes
 
-- **Back-dated `date_signed` values.** A signer may submit their own date for a `date_signed`
-  field (core accepts any real ISO date, which helps with time zones). The audit event records the
-  real time, but the drawn date can differ. Products that rely on the drawn date should ignore
-  submitted values and always use the server date, or show both on the certificate page.
+- **Back-dated `date_signed` values.** Core ignores any value a signer submits for a
+  `date_signed` field and stores the server's time of signing instead, as a full ISO date-time
+  in UTC taken from the same clock as the `recipient.signed` audit event. The drawn date is
+  formatted from that value (in the signer's time zone when the server passes one), and the
+  certificate page shows the exact UTC time of every event, so the two can always be compared.
 - **Viewers and the completed copy.** Every recipient, including viewers, is sent the completed
   copy. Senders should treat the recipient list as the distribution list.
 - **Provider signing links.** The Aadhaar adapter refuses a signing link that is not `https`, so a
