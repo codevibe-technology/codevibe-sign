@@ -1,0 +1,21 @@
+{
+  "name": "@codevibe/sign-server-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone Codevibe Sign service, configured from environment variables.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --clean",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@codevibe/sign-core": "workspace:*",
+    "@codevibe/sign-server": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.1"
+  }
+}
