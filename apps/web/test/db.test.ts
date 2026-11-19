@@ -13,7 +13,16 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApiKey, listApiKeys, resolveApiKey, revokeApiKey } from '@/server/api-keys';
 import { authOptions } from '@/server/auth/config';
-import { getBrand, readLogo, removeLogo, setLogo, updateBrand } from '@/server/brand';
+import {
+  getBrand,
+  getSigningBrand,
+  readLogo,
+  removeLogo,
+  setLogo,
+  updateBrand,
+  updateEmailSettings,
+  updateSigningSettings,
+} from '@/server/brand';
 import { AppError } from '@/server/errors';
 import {
   acceptInvitation,
@@ -378,6 +387,84 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       expect(await readLogo(sql, files, b.id)).toBeNull();
       await removeLogo(sql, files, a.id);
       expect((await getBrand(sql, a.id)).logoUrl).toBeNull();
+    });
+
+    it('saves email settings and template overrides', async () => {
+      const a = await createWorkspace(sql, { name: 'Mail A', userId: users.asha.id });
+      await updateEmailSettings(sql, a.id, {
+        senderName: 'Acme People',
+        replyTo: 'HR@Acme.test',
+        overrides: { invite: { subject: 'Sign {{document_title}}', intro: ' ' }, reminder: {} },
+      });
+      expect(await getBrand(sql, a.id)).toMatchObject({
+        senderName: 'Acme People',
+        replyTo: 'hr@acme.test',
+        emailOverrides: { invite: { subject: 'Sign {{document_title}}' } },
+      });
+      await updateEmailSettings(sql, a.id, { senderName: '', replyTo: '', overrides: {} });
+      expect(await getBrand(sql, a.id)).toMatchObject({
+        senderName: null,
+        replyTo: null,
+        emailOverrides: {},
+      });
+      expect(await getSigningBrand(sql, a.id)).toMatchObject({ name: 'Mail A', showBadge: true });
+      expect(await getSigningBrand(sql, 'ws_missing')).toBeNull();
+    });
+
+    it('keeps one workspace per signing domain and forgets verification on change', async () => {
+      const a = await createWorkspace(sql, { name: 'Domain A', userId: users.asha.id });
+      const b = await createWorkspace(sql, { name: 'Domain B', userId: users.asha.id });
+      const settings = { showBadge: false, certificateFooter: '  Acme   Pvt Ltd ' };
+      await updateSigningSettings(
+        sql,
+        a.id,
+        { ...settings, signingDomain: 'https://Sign.Acme.test/' },
+        'app.example.com',
+      );
+      expect(await getBrand(sql, a.id)).toMatchObject({
+        showBadge: false,
+        certificateFooter: 'Acme Pvt Ltd',
+        signingDomain: 'sign.acme.test',
+        signingDomainVerified: false,
+      });
+      const taken = await rejectsWith(
+        updateSigningSettings(
+          sql,
+          b.id,
+          { ...settings, signingDomain: 'sign.acme.test' },
+          'app.example.com',
+        ),
+        'CONFLICT',
+      );
+      expect(taken.field).toBe('signingDomain');
+
+      await sql`update app_brand_settings set signing_domain_verified_at = now()
+        where workspace_id = ${a.id}`;
+      await updateSigningSettings(
+        sql,
+        a.id,
+        { ...settings, signingDomain: 'sign.acme.test' },
+        'app.example.com',
+      );
+      expect((await getBrand(sql, a.id)).signingDomainVerified).toBe(true);
+      await updateSigningSettings(
+        sql,
+        a.id,
+        { ...settings, signingDomain: 'docs.acme.test' },
+        'app.example.com',
+      );
+      expect((await getBrand(sql, a.id)).signingDomainVerified).toBe(false);
+      await updateSigningSettings(
+        sql,
+        a.id,
+        { showBadge: true, certificateFooter: '', signingDomain: '' },
+        'app.example.com',
+      );
+      expect(await getBrand(sql, a.id)).toMatchObject({
+        showBadge: true,
+        certificateFooter: null,
+        signingDomain: null,
+      });
     });
 
     it('keeps personal preferences per person', async () => {
