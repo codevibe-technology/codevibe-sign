@@ -20,7 +20,7 @@ import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
 import type { Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
 import type { ServerStore } from '../store/types';
 import type { Principal } from '../tenancy';
-import { defaultTemplates, type MailTemplates } from '../templates';
+import { defaultTemplates, type MailTemplates, type WorkspaceMail } from '../templates';
 import { checkWebhookUrl, type WebhookSecurity } from './webhook-guard';
 
 export interface Runtime {
@@ -41,6 +41,7 @@ export interface Runtime {
   limits: Required<Limits>;
   webhooks: WebhookTarget[];
   templates: MailTemplates;
+  workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
   apiKeys: StoredApiKey[];
   authenticate?: (request: Request) => Promise<Principal | null>;
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
@@ -136,6 +137,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     webhooks: options.webhooks ?? [],
     templates: { ...defaultTemplates, ...options.templates },
+    ...(options.workspaceMail ? { workspaceMail: options.workspaceMail } : {}),
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),

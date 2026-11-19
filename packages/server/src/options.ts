@@ -13,7 +13,7 @@ import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore } from './store/types';
 import type { Principal } from './tenancy';
 import type { WebhookSecurity } from './runtime/webhook-guard';
-import type { MailTemplates } from './templates';
+import type { MailTemplates, WorkspaceMail } from './templates';
 
 /**
  * A sender credential: the secret itself, or its SHA-256 (hex) so the plain key never has to be
@@ -131,6 +131,12 @@ export interface SignServerOptions {
   webhooks?: WebhookTarget[];
   webhookSecurity?: WebhookSecurity;
   templates?: Partial<MailTemplates>;
+  /**
+   * Per-workspace templates and sender details, read each time an invitation, reminder,
+   * completed copy or cancellation is sent for an envelope in that workspace. What it leaves
+   * out comes from `templates` and the defaults. Return null to use those unchanged.
+   */
+  workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
   /** Signs signer session tokens. Set it when more than one process serves requests. */
   sessionSecret?: string;
   /** Signing links stay valid this many days unless the envelope expires sooner. Default 30. */
