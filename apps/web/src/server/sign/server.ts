@@ -9,6 +9,7 @@ import {
 import { resolveApiKey } from '../api-keys';
 import { auth } from '../auth/auth';
 import { db } from '../db';
+import { senderOf } from '../envelopes';
 import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
@@ -44,6 +45,8 @@ function build(): SignServer {
       sessionUser: async (headers) => (await auth().api.getSession({ headers }))?.user ?? null,
       roleOf: async (userId, workspaceId) =>
         (await findMembership(sql, userId, { id: workspaceId }))?.role ?? null,
+      isSender: async (userId, workspaceId, envelopeId) =>
+        (await senderOf(sql, workspaceId, envelopeId))?.userId === userId,
     }),
     webhookTargets,
     basePath: SIGN_BASE_PATH,

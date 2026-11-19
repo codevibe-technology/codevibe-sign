@@ -214,6 +214,35 @@
               "options": { "raw": { "language": "json" } }
             }
           }
+        },
+        {
+          "name": "Remind recipients",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/remind",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "remind"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Remind recipients\n\nMails a reminder with a fresh signing link to everyone whose turn it is, or to the one\nrecipient named. Each recipient gets at most one reminder or invitation every 15\nminutes; manual reminders do not count against the automatic ones.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"rcp_01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
         }
       ]
     },

@@ -257,11 +257,36 @@ apps/web/src
 └─ proxy.ts                 redirects visitors without a session cookie
 ```
 
+## Sending and tracking
+
+| Screen         | Route                                      | Talks to                                                                                                    |
+| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Dashboard      | `/w/[slug]`                                | SQL over `sign_envelopes` and `sign_audit_events` (`src/server/envelopes.ts`): counts, your turn, activity. |
+| Envelopes      | `/w/[slug]/envelopes`                      | First page server-side, then the browser calls `GET /api/v1/envelopes` with `X-Workspace`.                  |
+| Send (stepper) | `/w/[slug]/envelopes/new`                  | Browser: `POST`, `PATCH` and `/send` on `/api/v1/envelopes`; `?draft=<id>` reopens a draft.                 |
+| Envelope       | `/w/[slug]/envelopes/[id]`                 | In-process `signApi()`: envelope, events, certificate, seal verification.                                   |
+| Downloads      | `.../documents/[docId]`, `.../certificate` | Route handlers that check membership, then proxy the API in-process.                                        |
+| Verify         | `/w/[slug]/verify`                         | Server action: `verify()` from `sign-pdf` against this install's seal certificate.                          |
+
+- **Drafts** are created on the server when the sender leaves the recipients step (the API needs
+  someone to send to); after that every change is sent as a `PATCH` a second after it is made.
+  Documents cannot change once the draft exists.
+- **Checking uploads**: each PDF goes to a server action that runs `inspectPdf` first, so size,
+  password protection and damage are reported at upload with a sentence on how to fix them.
+  Server actions and the request proxy accept 21 MB bodies for this (`next.config.ts`).
+- **Who may void**: members void the envelopes they sent from the app, admins and owners any.
+  The sender is recorded in `app_envelope_senders` (migration `app/0003_envelope_senders`)
+  when a session call creates an envelope; envelopes created with an API key have no sender, so
+  only admins void them. The rule is enforced in the server actions and, for browser calls to
+  `/api/v1/.../void`, in the principal resolver.
+- **Reminders**: `POST /v1/envelopes/:id/remind` mails a fresh link to whoever's turn it is, at
+  most every 15 minutes per person. A recipient who is a member may ask for their own link
+  again from the dashboard whatever their role.
+
 ## Extension points for the next lanes
 
 | Lane                       | Starts from                                                                                                           |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Dashboard and send flow    | `app/w/[slug]/page.tsx`, `app/w/[slug]/envelopes/page.tsx`; `signRequest()` and `GET /v1/envelopes`.                  |
 | Signing pages and branding | `app/sign/page.tsx`; `getBrand()`; `brand` columns; per-workspace mail templates via `MailTemplates`.                 |
 | Templates and bulk send    | `app/w/[slug]/templates/page.tsx`; `@codevibe_technology/sign-templates`; a `app_templates` table keyed by workspace. |
 | Webhooks UI                | `webhookTargets()` in `src/server/sign/webhooks.ts` reads an `app_webhooks` table (to add).                           |

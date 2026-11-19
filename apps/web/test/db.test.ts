@@ -25,6 +25,15 @@ import {
 import { changeRole, listMembers, removeMember } from '@/server/members';
 import { migrateAll } from '@/server/migrate';
 import { getPreferences, updatePreferences } from '@/server/preferences';
+import {
+  envelopeCounts,
+  findSealedDocument,
+  recentActivity,
+  recordSender,
+  senderOf,
+  sentBy,
+  waitingOn,
+} from '@/server/envelopes';
 import { createAuthenticate } from '@/server/sign/principal';
 import {
   createWorkspace,
@@ -66,6 +75,7 @@ describe.skipIf(!url)('against PostgreSQL', () => {
     sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
     const runs = await Promise.all([migrateAll(sql), migrateAll(sql)]);
     expect(runs.flat()).toContain('app/0002_workspaces');
+    expect(runs.flat()).toContain('app/0003_envelope_senders');
     expect(runs.flat()).toContain('0003_workspaces');
     users = {
       asha: await user('Asha'),
@@ -477,6 +487,94 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       expect((await call(keyA, 'POST', `/v1/envelopes/${envelope.id}/send`, {})).status).toBe(200);
       expect(mailer.sent.at(-1)?.text).toContain(`${APP_URL}/api/sign/`);
       expect((await call('cvs_wrong', 'GET', '/v1/envelopes')).status).toBe(401);
+    });
+
+    it('counts, finds whose turn it is, lists activity and remembers senders', async () => {
+      const ws = await createWorkspace(sql, { name: 'Dashboard', userId: users.asha.id });
+      const other = await createWorkspace(sql, { name: 'Elsewhere', userId: users.ravi.id });
+      const key = (
+        await createApiKey(sql, { workspaceId: ws.id, name: 'D', createdBy: users.asha.id })
+      ).key;
+      const sign = createSignServer({
+        store: postgresStore(sql),
+        files: memoryFileStore(),
+        mailer: consoleMailer({ silent: true }),
+        otp: consoleOtpSender({ silent: true }),
+        pdf,
+        sealer: { p12: new Uint8Array([1]), passphrase: '' },
+        apiKeys: [],
+        authenticate: createAuthenticate({
+          appUrl: APP_URL,
+          resolveApiKey: (k) => resolveApiKey(sql, k),
+          sessionUser: async () => null,
+          roleOf: async () => null,
+        }),
+        basePath: '/api',
+        publicUrl: APP_URL,
+      });
+      const call = async (method: string, path: string, json?: unknown) =>
+        (await (
+          await sign.app.request(`/api${path}`, {
+            method,
+            headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+            ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
+          })
+        ).json()) as { id: string; documents: { id: string }[] };
+      const forAsha = {
+        ...body,
+        recipients: [{ key: 'asha', name: 'Asha', email: users.asha.email.toUpperCase() }],
+      };
+      const draft = await call('POST', '/v1/envelopes', body);
+      const mine = await call('POST', '/v1/envelopes', { ...forAsha, title: 'Yours', send: true });
+      const voided = await call('POST', '/v1/envelopes', { ...body, send: true });
+      await call('POST', `/v1/envelopes/${voided.id}/void`, { reason: 'Wrong file' });
+
+      expect(await envelopeCounts(sql, ws.id)).toEqual({
+        draft: 1,
+        waiting: 1,
+        completed: 0,
+        declined: 0,
+        expired: 0,
+        voided: 1,
+      });
+      expect(await envelopeCounts(sql, other.id)).toMatchObject({ draft: 0, waiting: 0 });
+
+      const waiting = await waitingOn(sql, ws.id, users.asha.email);
+      expect(waiting.map((w) => [w.envelopeId, w.title])).toEqual([[mine.id, 'Yours']]);
+      expect(await waitingOn(sql, other.id, users.asha.email)).toEqual([]);
+      expect(await waitingOn(sql, ws.id, users.ravi.email)).toEqual([]);
+
+      const activity = await recentActivity(sql, ws.id, 20);
+      expect(activity[0]).toMatchObject({ envelopeId: voided.id, action: 'envelope.voided' });
+      expect(activity.map((a) => a.action)).toContain('recipient.notified');
+      expect(activity.find((a) => a.action === 'recipient.notified')?.who).toBeTruthy();
+      expect(activity.every((a) => a.action !== 'envelope.updated')).toBe(true);
+      expect(await recentActivity(sql, other.id)).toEqual([]);
+
+      await recordSender(sql, { workspaceId: ws.id, envelopeId: draft.id, userId: users.asha.id });
+      await recordSender(sql, { workspaceId: ws.id, envelopeId: draft.id, userId: users.ravi.id });
+      expect(await senderOf(sql, ws.id, draft.id)).toEqual({ userId: users.asha.id, name: 'Asha' });
+      expect(await senderOf(sql, other.id, draft.id)).toBeNull();
+      expect(await senderOf(sql, ws.id, mine.id)).toBeNull();
+      expect(await sentBy(sql, ws.id, users.asha.id, [draft.id, mine.id])).toEqual(
+        new Set([draft.id]),
+      );
+      expect(await sentBy(sql, ws.id, users.asha.id, [])).toEqual(new Set());
+
+      const sha = 'c'.repeat(64);
+      const sealed = {
+        action: 'document.sealed',
+        data: { documentId: mine.documents[0]!.id, sha256: sha },
+      };
+      await sql`insert into sign_audit_events (envelope_id, seq, data)
+        values (${mine.id}, 99, ${sql.json(sealed)})`;
+      expect(await findSealedDocument(sql, ws.id, sha)).toEqual({
+        envelopeId: mine.id,
+        title: 'Yours',
+        documentName: 'offer.pdf',
+      });
+      expect(await findSealedDocument(sql, other.id, sha)).toBeNull();
+      expect(await findSealedDocument(sql, ws.id, 'd'.repeat(64))).toBeNull();
     });
   });
 });

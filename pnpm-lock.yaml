@@ -94,6 +94,12 @@ importers:
       '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@codevibe_technology/sign-pdf':
+        specifier: workspace:*
+        version: link:../../packages/pdf
+      '@codevibe_technology/sign-react':
+        specifier: workspace:*
+        version: link:../../packages/react
       '@codevibe_technology/sign-server':
         specifier: workspace:*
         version: link:../../packages/server
@@ -112,6 +118,9 @@ importers:
       next:
         specifier: 16.4.5
         version: 16.4.5(@types/node@22.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      pdfjs-dist:
+        specifier: 4.10.38
+        version: 4.10.38
       postgres:
         specifier: 3.4.9
         version: 3.4.9
@@ -167,6 +176,9 @@ importers:
       node-forge:
         specifier: 1.4.3
         version: 1.4.3
+      pdf-lib:
+        specifier: 1.17.1
+        version: 1.17.1
       tailwindcss:
         specifier: 4.3.4
         version: 4.3.4

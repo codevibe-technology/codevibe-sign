@@ -22,13 +22,14 @@ beforeEach(() => {
 });
 
 describe('Sidebar', () => {
-  it('links the four sections of the current workspace', () => {
+  it('links the sections of the current workspace', () => {
     render(<Sidebar current={acme} workspaces={[acme]} canCreate />);
     const links = within(screen.getByRole('navigation', { name: 'Main' })).getAllByRole('link');
     expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
       ['Dashboard', '/w/acme'],
       ['Envelopes', '/w/acme/envelopes'],
       ['Templates', '/w/acme/templates'],
+      ['Verify', '/w/acme/verify'],
       ['Settings', '/w/acme/settings'],
     ]);
   });

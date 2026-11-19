@@ -17,7 +17,9 @@ import {
   decline,
   markAuthenticated,
   markViewed,
+  MIN_REMINDER_INTERVAL_MS,
   recordSeal,
+  remind,
   send,
   submit,
   voidEnvelope,
@@ -683,6 +685,77 @@ describe('voidEnvelope', () => {
     } = sent();
     const voided = voidEnvelope(envelope, { reason: 'x' }, d()).envelope;
     expect(errorCode(() => sign(voided, a!))).toBe('INVALID_STATE');
+  });
+});
+
+describe('remind', () => {
+  const later = (minutes: number) => new Date(Date.parse(T0) + minutes * 60_000).toISOString();
+
+  it('reminds whoever is current with a fresh link, without using up automatic reminders', () => {
+    const {
+      envelope,
+      ids: [a],
+    } = sent();
+    const result = remind(envelope, { context: { ip: '3.3.3.3' } }, d(later(20)));
+    expect(ids(result, 'reminder')).toEqual([a]);
+    expect(result.events).toEqual([
+      {
+        envelopeId: envelope.id,
+        action: 'recipient.reminded',
+        at: later(20),
+        recipientId: a,
+        context: { ip: '3.3.3.3' },
+        data: { manual: true },
+      },
+    ]);
+    const asha = result.envelope.recipients.find((r) => r.id === a)!;
+    expect(asha.lastRemindedAt).toBe(later(20));
+    expect(asha.remindersSent).toBeUndefined();
+  });
+
+  it('waits between reminders to the same person', () => {
+    const { envelope } = sent();
+    expect(MIN_REMINDER_INTERVAL_MS).toBe(15 * 60_000);
+    expect(thrown(() => remind(envelope, {}, d(later(5)))).message).toMatch(/15 minutes/);
+    const once = remind(envelope, {}, d(later(15))).envelope;
+    expect(errorCode(() => remind(once, {}, d(later(20))))).toBe('INVALID_STATE');
+    expect(actions(remind(once, {}, d(later(31))))).toEqual(['recipient.reminded']);
+  });
+
+  it('reminds only the people whose turn it is, skipping those reminded recently', () => {
+    const {
+      envelope,
+      ids: [a, b, c],
+    } = sent(parallelThree);
+    const first = remind(envelope, { recipientId: b! }, d(later(20))).envelope;
+    const all = remind(first, {}, d(later(25)));
+    expect(ids(all, 'reminder')).toEqual([a, c]);
+  });
+
+  it('refuses recipients who are not due', () => {
+    const {
+      envelope,
+      ids: [a, b],
+    } = sent();
+    expect(errorCode(() => remind(envelope, { recipientId: b! }, d(later(20))))).toBe(
+      'NOT_YOUR_TURN',
+    );
+    expect(errorCode(() => remind(envelope, { recipientId: 'nobody' }, d(later(20))))).toBe(
+      'RECIPIENT_NOT_FOUND',
+    );
+    const signed = sign(envelope, a!).envelope;
+    expect(errorCode(() => remind(signed, { recipientId: a! }, d(later(20))))).toBe(
+      'INVALID_STATE',
+    );
+  });
+
+  it('refuses drafts, final and expired envelopes', () => {
+    const { envelope: draftEnvelope } = ready();
+    expect(errorCode(() => remind(draftEnvelope, {}, d()))).toBe('INVALID_STATE');
+    const { envelope } = sent({ expiresAt: at(5) });
+    expect(errorCode(() => remind(envelope, {}, d(at(6))))).toBe('ENVELOPE_EXPIRED');
+    const voided = voidEnvelope(envelope, { reason: 'x' }, d()).envelope;
+    expect(errorCode(() => remind(voided, {}, d(later(20))))).toBe('INVALID_STATE');
   });
 });
 

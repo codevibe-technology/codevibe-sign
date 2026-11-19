@@ -2,6 +2,7 @@ import {
   SignError,
   addDocument,
   createEnvelope,
+  remind,
   send,
   updateEnvelope,
   verifyChain,
@@ -196,6 +197,21 @@ export function senderRoutes(rt: Runtime) {
       rt,
       c.req.param('id'),
       (current) => voidEnvelope(current, { reason }, deps),
+      scopeOf(c),
+    );
+    return c.json(envelope);
+  });
+
+  app.post('/:id/remind', async (c) => {
+    const body = parseJsonObject(await readJson(c, true));
+    const recipientId = body.recipientId;
+    if (recipientId !== undefined && (typeof recipientId !== 'string' || !recipientId)) {
+      throw validation('recipientId must be the id of a recipient', { field: 'recipientId' });
+    }
+    const { envelope } = await mutate(
+      rt,
+      c.req.param('id'),
+      (current) => remind(current, recipientId ? { recipientId } : {}, deps),
       scopeOf(c),
     );
     return c.json(envelope);

@@ -17,6 +17,12 @@ const config: NextConfig = {
     'postgres',
     'nodemailer',
   ],
+  experimental: {
+    // Uploading a PDF to check it (send flow, verify page) posts the file to a server action,
+    // through the request proxy. 21 MB fits the 20 MB PDF limit plus the form around it.
+    serverActions: { bodySizeLimit: '21mb' },
+    proxyClientMaxBodySize: '21mb',
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

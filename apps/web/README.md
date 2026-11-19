@@ -1,7 +1,7 @@
 # Codevibe Sign web app
 
 The product people use: sign in, create a workspace, invite the team, set the brand, create
-API keys, and (in the next releases) send documents and follow their progress. It runs the
+API keys, send documents for signature, follow their progress and verify signed copies. It runs the
 sign API inside the same Next.js server, so one deploy serves the app at `/` and the HTTP API
 at `/api/v1`.
 
@@ -24,6 +24,15 @@ pnpm --filter web dev
 
 Open http://localhost:3000 and sign in with any email address. With `MAIL_TRANSPORT=console`
 the sign-in link is printed in the terminal running `dev`.
+
+## Sending a document
+
+**Send a document** walks through four steps: upload the PDFs, add who signs, approves or gets a
+copy (and in which order), drag the signature boxes onto the pages, then review and send. The
+draft is saved once there are recipients and after every change, so it can be closed and picked
+up later from the envelopes list. Each envelope page shows the timeline, the recipients'
+progress, the certificate and whether the seal on the signed copy checks out; **Verify** checks
+any PDF someone sends back against this workspace's seal.
 
 ## Scripts
 
