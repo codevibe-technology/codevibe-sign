@@ -153,3 +153,40 @@
     }
   }
 }
+
+/* The sign-react components (field placer) take the app's tokens, so they follow its theme. */
+.cvs-app {
+  --cvs-font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --cvs-bg: var(--canvas);
+  --cvs-surface: var(--surface);
+  --cvs-surface-muted: var(--surface-2);
+  --cvs-text: var(--ink);
+  --cvs-text-muted: var(--muted);
+  --cvs-border: var(--line);
+  --cvs-accent: var(--primary);
+  --cvs-accent-text: var(--primary-ink);
+  --cvs-focus: var(--primary);
+  --cvs-danger: var(--danger);
+  --cvs-success: var(--success);
+  --cvs-shadow: var(--shadow);
+}
+
+[data-theme='dark'] {
+  --cvs-recipient-0: #6f96ff;
+  --cvs-recipient-1: #ff8f5c;
+  --cvs-recipient-2: #4fc48b;
+  --cvs-recipient-3: #b98af0;
+  --cvs-recipient-4: #f07aa8;
+  --cvs-recipient-5: #4cc3d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme='system'] {
+    --cvs-recipient-0: #6f96ff;
+    --cvs-recipient-1: #ff8f5c;
+    --cvs-recipient-2: #4fc48b;
+    --cvs-recipient-3: #b98af0;
+    --cvs-recipient-4: #f07aa8;
+    --cvs-recipient-5: #4cc3d6;
+  }
+}
