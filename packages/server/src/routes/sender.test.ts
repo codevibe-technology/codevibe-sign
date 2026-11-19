@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { API_KEY, envelopeBody, harness } from '../testing/harness';
 import { fakePdf, fakePdfEngine } from '../testing/fake-pdf';
+import { memoryStore } from '../store/memory';
 
 describe('sender authentication', () => {
   it('rejects requests without a key', async () => {
@@ -269,6 +270,27 @@ describe('draft changes, send and void', () => {
       'envelope.sent',
       'recipient.notified',
     ]);
+  });
+
+  it('flags a chain copied from another envelope', async () => {
+    const store = memoryStore();
+    const h = harness({ store });
+    const create = () =>
+      h.call('POST', '/v1/envelopes', { body: envelopeBody({ send: true }) }).then((r) => r.json);
+    const [first, second] = [await create(), await create()];
+    const listEvents = store.listEvents.bind(store);
+    const get = store.get.bind(store);
+    store.listEvents = (id) => listEvents(id === second.id ? first.id : id);
+    store.get = async (id) => {
+      const envelope = await get(id);
+      const source = id === second.id ? await get(first.id) : null;
+      return envelope && source ? { ...envelope, auditHead: source.auditHead! } : envelope;
+    };
+    const events = await h.call('GET', `/v1/envelopes/${second.id}/events`);
+    expect(events.json.chainValid).toBe(false);
+    const certificate = await h.call('GET', `/v1/envelopes/${second.id}/certificate`);
+    expect(certificate.json.chainValid).toBe(false);
+    expect((await h.call('GET', `/v1/envelopes/${first.id}/events`)).json.chainValid).toBe(true);
   });
 
   it('serves the original document and refuses a sealed copy before completion', async () => {

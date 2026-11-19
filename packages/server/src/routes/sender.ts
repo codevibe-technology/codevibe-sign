@@ -196,7 +196,7 @@ export function senderRoutes(rt: Runtime) {
   app.get('/:id/events', async (c) => {
     const envelope = await getEnvelope(rt, c.req.param('id'));
     const events = await rt.store.listEvents(envelope.id);
-    const chain = await verifyChain(events, rt.hasher, expectedHead(envelope));
+    const chain = await verifyChain(events, rt.hasher, chainOptions(envelope));
     return c.json({ events, chainValid: chain.valid });
   });
 
@@ -221,15 +221,18 @@ export function senderRoutes(rt: Runtime) {
   app.get('/:id/certificate', async (c) => {
     const envelope = await getEnvelope(rt, c.req.param('id'));
     const events = await rt.store.listEvents(envelope.id);
-    const chain = await verifyChain(events, rt.hasher, expectedHead(envelope));
+    const chain = await verifyChain(events, rt.hasher, chainOptions(envelope));
     return c.json(certificateView(envelope, events, chain.valid));
   });
 
   return app;
 }
 
-const expectedHead = (envelope: Envelope) =>
-  envelope.auditHead ? { expectedHead: envelope.auditHead } : {};
+/** Every event must belong to this envelope and end at the head it records. */
+const chainOptions = (envelope: Envelope) => ({
+  envelopeId: envelope.id,
+  ...(envelope.auditHead ? { expectedHead: envelope.auditHead } : {}),
+});
 
 async function getEnvelope(rt: Runtime, id: Id): Promise<Envelope> {
   const envelope = await rt.store.get(id);
