@@ -60,26 +60,32 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 pnpm add @codevibe/sign-server
 ```
 
-```ts
-import { createSignServer } from '@codevibe/sign-server';
+```ts check
+import { readFile } from 'node:fs/promises';
+import { startSignServer } from '@codevibe/sign-server';
 
-const server = createSignServer({
-  databaseUrl: process.env.DATABASE_URL,
+const sign = await startSignServer({
+  databaseUrl: process.env.DATABASE_URL!,
   filesDir: './data/files',
   smtp: {
     host: 'smtp.example.com',
     port: 587,
+    secure: false,
     user: 'sign',
-    pass: process.env.SMTP_PASS,
+    pass: process.env.SMTP_PASS!,
     from: 'Sign <sign@example.com>',
   },
-  seal: { p12: await readFile('./seal.p12'), passphrase: process.env.SEAL_P12_PASSPHRASE },
-  apiKeys: [process.env.SIGN_API_KEY],
+  seal: { p12: await readFile('./seal.p12'), passphrase: process.env.SEAL_P12_PASSPHRASE! },
+  apiKeys: [process.env.SIGN_API_KEY!],
   publicUrl: 'https://sign.example.com',
 });
 
-await server.listen(3000);
+await sign.listen(3000);
 ```
+
+`startSignServer` migrates the database, sends mail over SMTP and runs reminders and retries
+on a timer. To mount the API in your own Hono or Node server instead, use `createSignServer`
+with your own adapters.
 
 Your backend then creates and sends envelopes through the HTTP API with one of those API keys,
 directly or with the typed client:
@@ -99,21 +105,40 @@ The endpoints are documented in the [server package README](packages/server).
 pnpm add @codevibe/sign-react react react-dom
 ```
 
-```tsx
+```tsx check
+import '@codevibe/sign-react/styles.css';
 import { SigningView } from '@codevibe/sign-react';
+import type { Field } from '@codevibe/sign-core';
 
-<SigningView
-  documents={[{ id: doc.id, file: pdfBytes }]}
-  fields={session.fields}
-  recipient={me}
-  onSubmit={(values) => signer.submit(values)}
-/>;
+interface SignerPage {
+  recipient: { id: string; name: string };
+  documents: { id: string; name: string }[];
+  fields: Field[];
+}
+
+export function SignPage({ token, page }: { token: string; page: SignerPage }) {
+  return (
+    <SigningView
+      documents={page.documents.map((d) => ({ ...d, file: `/v1/sign/${token}/documents/${d.id}` }))}
+      fields={page.fields}
+      recipient={page.recipient}
+      onSubmit={async (values) => {
+        await fetch(`/v1/sign/${token}/submit`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ consent: true, values }),
+        });
+      }}
+    />
+  );
+}
 ```
 
-[`examples/react-signing`](examples/react-signing) wires it to a running server with
-`createSignerClient`.
+`page` is what `GET /v1/sign/:token` returns. Recipients who sign with a one-time code verify
+it first; the [React package README](packages/react#with-the-server) has the full flow, and
+[`examples/react-signing`](examples/react-signing) does the same with `createSignerClient`.
 
-The components ship without styles. Set the CSS variables documented in the package README to
+Import the stylesheet once, then set the CSS variables documented in the package README to
 match your product.
 
 ## Self-hosting

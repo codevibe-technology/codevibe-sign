@@ -25,29 +25,48 @@ import '@codevibe/sign-react/styles.css';
 
 ## Usage
 
-```tsx
+<!-- check:
+import type { Envelope, Field, Recipient } from '@codevibe/sign-core';
+declare const doc: { id: string; name: string };
+declare const envelope: Envelope;
+declare const pdfBytes: Uint8Array;
+declare const pdfUrl: string;
+declare const fields: Field[];
+declare const setFields: (fields: Field[]) => void;
+declare const workerSrc: string;
+declare const me: Recipient;
+declare const api: { submit(values: unknown): Promise<void>; decline(reason: string): Promise<void> };
+declare const png: string | null;
+declare const setPng: (png: string | null) => void;
+-->
+
+```tsx check
 import { FieldPlacer, SigningView, SignaturePad } from '@codevibe/sign-react';
 
 // Sender: place fields for each signer.
-<FieldPlacer
-  documents={[{ id: doc.id, name: doc.name, file: pdfBytes }]}
-  recipients={envelope.recipients}
-  fields={fields}
-  onChange={setFields}
-  pdf={{ workerSrc }}
-/>
+const placer = (
+  <FieldPlacer
+    documents={[{ id: doc.id, name: doc.name, file: pdfBytes }]}
+    recipients={envelope.recipients}
+    fields={fields}
+    onChange={setFields}
+    pdf={{ workerSrc }}
+  />
+);
 
 // Recipient: fill and sign their own fields.
-<SigningView
-  documents={[{ id: doc.id, file: pdfUrl }]}
-  fields={envelope.fields}
-  recipient={me}
-  onSubmit={(values) => api.submit(values)}
-  onDecline={(reason) => api.decline(reason)}
-/>
+const signing = (
+  <SigningView
+    documents={[{ id: doc.id, file: pdfUrl }]}
+    fields={envelope.fields}
+    recipient={me}
+    onSubmit={(values) => api.submit(values)}
+    onDecline={(reason) => api.decline(reason)}
+  />
+);
 
 // Just the pad. Value is PNG base64 without the data URL prefix.
-<SignaturePad value={png} onChange={setPng} aspectRatio={3} />
+const pad = <SignaturePad value={png} onChange={setPng} aspectRatio={3} />;
 ```
 
 With pdf.js you usually need to tell it where its worker is. In Vite:
@@ -61,6 +80,114 @@ const pdf = { pdfjs, workerSrc };
 Or skip pdf.js and supply a `source`: `{ pages: PageSize[]; renderPage(pageIndex, scale, signal) }`,
 where `renderPage` resolves to a canvas, image or `ImageBitmap` drawn at `scale` device
 pixels per PDF point.
+
+## With the server
+
+The components never talk to a server themselves: you load the signer's page, pass it in and
+send what they return. With `@codevibe/sign-server` the contract is:
+
+- `GET /v1/sign/:token` returns `{ envelope, recipient, documents, fields, values,
+otpRequired, authenticated, canAct }`. Pass `recipient`, `fields` and `values` (as
+  `initialValues`) to `SigningView` as they are.
+- Recipients with `email_otp` or `sms_otp` must verify a code before anything else:
+  `POST /v1/sign/:token/otp` sends it and `POST /v1/sign/:token/otp/verify` with `{ code }`
+  returns `{ sessionToken, expiresAt }` and sets the `cvsign_session` cookie on path
+  `/v1/sign` (HTTP-only, `SameSite=Strict`, 30 minutes). Until then the document download,
+  `view`, `submit` and `decline` answer `OTP_INVALID`.
+- Send the session with every later request: the cookie works when the page is served from
+  the same origin as the API (the server sends no CORS headers), otherwise send the
+  `X-Sign-Session` header from your own proxy.
+- `POST /v1/sign/:token/view` records that the signer opened the document.
+- `POST /v1/sign/:token/submit` takes `{ "consent": true, "values": [...] }`. `consent` must be
+  `true`, so show your consent text near the Finish button; submitting is the signer's
+  agreement to it.
+- `POST /v1/sign/:token/decline` takes `{ "reason" }`.
+- Errors are `{ "error": { "code", "message" } }`. Throw from `onSubmit` or `onDecline` and
+  `SigningView` shows the message.
+
+A complete page, served from the same origin as the API:
+
+```tsx check
+import { useEffect, useState } from 'react';
+import type { Field, FieldValue } from '@codevibe/sign-core';
+import { SigningView } from '@codevibe/sign-react';
+
+interface SignerPage {
+  recipient: { id: string; name: string };
+  documents: { id: string; name: string }[];
+  fields: Field[];
+  values: FieldValue[];
+  otpRequired: boolean;
+  authenticated: boolean;
+}
+
+async function call<T>(token: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/v1/sign/${token}${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: body === undefined ? {} : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error?.message ?? 'Something went wrong');
+  return json as T;
+}
+
+export function SignPage({ token }: { token: string }) {
+  const [page, setPage] = useState<SignerPage | null>(null);
+  const [code, setCode] = useState('');
+  const [done, setDone] = useState(false);
+  const load = () => call<SignerPage>(token, '').then(setPage);
+
+  useEffect(() => void load(), [token]);
+  const locked = !page || (page.otpRequired && !page.authenticated);
+  useEffect(() => {
+    if (!locked) void call(token, '/view', {});
+  }, [locked, token]);
+
+  if (done)
+    return <p>Thank you. You will get the signed copy by email once everyone has signed.</p>;
+  if (!page) return <p>Loading…</p>;
+  if (locked) {
+    return (
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          await call(token, '/otp/verify', { code });
+          await load();
+        }}
+      >
+        <button type="button" onClick={() => void call(token, '/otp', {})}>
+          Email me a code
+        </button>
+        <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" />
+        <button type="submit">Verify</button>
+      </form>
+    );
+  }
+  return (
+    <>
+      <p>By selecting Finish you agree to sign this document electronically.</p>
+      <SigningView
+        documents={page.documents.map((d) => ({
+          ...d,
+          file: `/v1/sign/${token}/documents/${d.id}`,
+        }))}
+        fields={page.fields}
+        recipient={page.recipient}
+        initialValues={page.values}
+        onSubmit={async (values) => {
+          await call(token, '/submit', { consent: true, values });
+          setDone(true);
+        }}
+        onDecline={async (reason) => {
+          await call(token, '/decline', { reason });
+          setDone(true);
+        }}
+      />
+    </>
+  );
+}
+```
 
 ## Coordinates
 

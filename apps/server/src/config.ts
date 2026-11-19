@@ -1,27 +1,10 @@
 import { SignError } from '@codevibe/sign-core';
-
-/**
- * What `createSignServer` from `@codevibe/sign-server` is expected to accept. Kept here so the
- * environment parsing can be tested on its own.
- */
-export interface SignServerConfig {
-  databaseUrl: string;
-  filesDir: string;
-  smtp: {
-    host: string;
-    port: number;
-    secure: boolean;
-    user?: string;
-    pass?: string;
-    from: string;
-  };
-  seal: { p12: Uint8Array; passphrase: string };
-  apiKeys: string[];
-  publicUrl: string;
-}
+import type { StandaloneConfig } from '@codevibe/sign-server';
 
 export interface AppConfig {
-  server: SignServerConfig;
+  server: StandaloneConfig;
+  /** Read the client IP from `X-Forwarded-For`; only behind a proxy you control. */
+  trustProxy: boolean;
   port: number;
   host: string;
 }
@@ -83,7 +66,7 @@ export function loadConfig(env: Env): AppConfig {
   if (secureRaw && secureRaw !== 'true' && secureRaw !== 'false') {
     problems.push('SMTP_SECURE must be true or false');
   }
-  const smtp: SignServerConfig['smtp'] = {
+  const smtp: StandaloneConfig['smtp'] = {
     host: need('SMTP_HOST'),
     port: smtpPort,
     secure: secureRaw ? secureRaw === 'true' : smtpPort === 465,
@@ -115,6 +98,13 @@ export function loadConfig(env: Env): AppConfig {
     problems.push(`Each key in API_KEYS must be at least ${MIN_API_KEY_LENGTH} characters`);
   }
 
+  const tickSeconds = integer('TICK_INTERVAL_SECONDS', 60, 5, 3600);
+
+  const trustRaw = env.TRUST_PROXY?.trim().toLowerCase();
+  if (trustRaw && trustRaw !== 'true' && trustRaw !== 'false') {
+    problems.push('TRUST_PROXY must be true or false');
+  }
+
   const port = integer('PORT', 3000, 1, 65535);
   const host = env.HOST?.trim() || '0.0.0.0';
 
@@ -124,15 +114,23 @@ export function loadConfig(env: Env): AppConfig {
     });
   }
 
+  const seal: StandaloneConfig['seal'] = { p12, passphrase: passphrase ?? '' };
+  const reason = env.SEAL_REASON?.trim();
+  const location = env.SEAL_LOCATION?.trim();
+  if (reason) seal.reason = reason;
+  if (location) seal.location = location;
+
   return {
     server: {
       databaseUrl,
       filesDir: env.FILES_DIR?.trim() || '/data/files',
       smtp,
-      seal: { p12, passphrase: passphrase ?? '' },
+      seal,
       apiKeys,
       publicUrl,
+      tickIntervalMs: tickSeconds * 1000,
     },
+    trustProxy: trustRaw === 'true',
     port,
     host,
   };

@@ -1,11 +1,8 @@
 # Codevibe Sign server
 
 The standalone Codevibe Sign service as a Docker image. It reads its configuration from
-environment variables and runs `@codevibe/sign-server`.
-
-> Status: this entry is written against the planned `createSignServer` API of
-> `@codevibe/sign-server` and starts once that package exports it. Until then it validates the
-> configuration and exits with a clear error.
+environment variables and runs `startSignServer` from `@codevibe/sign-server`: PostgreSQL
+(migrated on start), documents on disk, SMTP email and email one-time codes.
 
 ## Build and run
 
@@ -34,19 +31,23 @@ The image runs as the unprivileged `node` user, stores files under `/data` and c
 | `SMTP_SECURE`            | no       | port is 465       | `true` for implicit TLS.                                               |
 | `SMTP_USER`, `SMTP_PASS` | no       |                   | Set both or neither.                                                   |
 | `FILES_DIR`              | no       | `/data/files`     | Where documents and sealed files are stored.                           |
+| `SEAL_REASON`            | no       |                   | Reason written into the PDF seal.                                      |
+| `SEAL_LOCATION`          | no       |                   | Location written into the PDF seal.                                    |
+| `TICK_INTERVAL_SECONDS`  | no       | `60`              | How often reminders, expiry and retries run (5 to 3600).               |
+| `TRUST_PROXY`            | no       | `false`           | `true` to read client IPs from `X-Forwarded-For` behind your proxy.    |
 | `PORT`, `HOST`           | no       | `3000`, `0.0.0.0` |                                                                        |
 
 All problems are reported together at start-up, by variable name only; values are never
 printed.
 
-## What it expects from `@codevibe/sign-server`
+## Running
 
-- `createSignServer(config)` returning (or resolving to) `{ listen(port, host): Promise<void>; close(): Promise<void> }`.
-- `config` shaped as `SignServerConfig` in [src/config.ts](src/config.ts):
-  `{ databaseUrl, filesDir, smtp: { host, port, secure, user?, pass?, from }, seal: { p12: Uint8Array, passphrase }, apiKeys: string[], publicUrl }`.
-- `GET /health` answering 200 when the service can take requests, without authentication.
-- `close()` stops accepting requests and finishes in-flight work; the entry calls it on
-  `SIGTERM` and `SIGINT`.
+- `GET /health` answers `200 {"ok":true}` without authentication; the image's health check
+  uses it.
+- On `SIGTERM` or `SIGINT` the service stops accepting requests, waits for in-flight requests
+  and background jobs, closes the database pool and exits 0 (1 if closing fails).
+- Run one process per database unless you also share rate limits and a session secret; see
+  the `@codevibe/sign-server` readme.
 
 ## Licence
 

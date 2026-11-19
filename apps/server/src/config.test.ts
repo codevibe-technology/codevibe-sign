@@ -34,6 +34,7 @@ describe('loadConfig', () => {
     const config = loadConfig(env());
     expect(config.port).toBe(3000);
     expect(config.host).toBe('0.0.0.0');
+    expect(config.trustProxy).toBe(false);
     expect(config.server).toEqual({
       databaseUrl: 'postgres://sign:secret@db:5432/sign',
       filesDir: '/data/files',
@@ -41,7 +42,22 @@ describe('loadConfig', () => {
       seal: { p12: new Uint8Array([0x30, 0x82, 0x01, 0x02]), passphrase: 'p12-passphrase' },
       apiKeys: [KEY_A, KEY_B],
       publicUrl: 'https://sign.example.com',
+      tickIntervalMs: 60_000,
     });
+  });
+
+  it('reads the seal reason and location, tick interval and proxy setting', () => {
+    const config = loadConfig(
+      env({
+        SEAL_REASON: ' Signed electronically ',
+        SEAL_LOCATION: 'Pune',
+        TICK_INTERVAL_SECONDS: '15',
+        TRUST_PROXY: 'TRUE',
+      }),
+    );
+    expect(config.server.seal).toMatchObject({ reason: 'Signed electronically', location: 'Pune' });
+    expect(config.server.tickIntervalMs).toBe(15_000);
+    expect(config.trustProxy).toBe(true);
   });
 
   it('reads optional variables', () => {
@@ -110,6 +126,8 @@ describe('loadConfig', () => {
     [{ PORT: 'eighty' }, 'PORT must be a whole number'],
     [{ SMTP_USER: 'mailer' }, 'SMTP_USER and SMTP_PASS must be set together'],
     [{ SMTP_SECURE: 'yes' }, 'SMTP_SECURE must be true or false'],
+    [{ TRUST_PROXY: '1' }, 'TRUST_PROXY must be true or false'],
+    [{ TICK_INTERVAL_SECONDS: '1' }, 'TICK_INTERVAL_SECONDS must be a whole number from 5'],
     [{ SEAL_P12_BASE64: 'not base64!' }, 'SEAL_P12_BASE64 must be base64'],
     [{ API_KEYS: ' , ' }, 'API_KEYS has no keys'],
     [{ API_KEYS: `${KEY_A},short` }, 'Each key in API_KEYS must be at least 32 characters'],

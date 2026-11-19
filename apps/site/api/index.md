@@ -11,9 +11,9 @@ parts you need.
 | Package                               | What it does                                                                        | Status       |
 | ------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
 | [`@codevibe/sign-core`](./core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
-| [`@codevibe/sign-pdf`](./pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Coming soon  |
-| [`@codevibe/sign-server`](./server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Coming soon  |
-| [`@codevibe/sign-react`](./react)     | Signature pad, signing view and field placement components.                         | Coming soon  |
+| [`@codevibe/sign-pdf`](./pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
+| [`@codevibe/sign-server`](./server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
+| [`@codevibe/sign-react`](./react)     | Signature pad, signing view and field placement components.                         | Ready to try |
 | [`@codevibe/sign-aadhaar`](./aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.             | Ready to try |
 
 All packages are pre-release (`0.0.0`) and their APIs may change before 0.1.
@@ -27,10 +27,10 @@ All packages are pre-release (`0.0.0`) and their APIs may change before 0.1.
 
 ## Dependencies
 
-| Package        | Depends on                            |
-| -------------- | ------------------------------------- |
-| `sign-core`    | nothing at runtime                    |
-| `sign-pdf`     | `pdf-lib`, `@signpdf/*`, `node-forge` |
-| `sign-server`  | core, pdf, `hono`                     |
-| `sign-react`   | core, `react` (peer)                  |
-| `sign-aadhaar` | core                                  |
+| Package        | Depends on                                           |
+| -------------- | ---------------------------------------------------- |
+| `sign-core`    | nothing at runtime                                   |
+| `sign-pdf`     | `pdf-lib`, `@signpdf/*`, `node-forge`                |
+| `sign-server`  | core, pdf, `hono`, `nodemailer`, `postgres`          |
+| `sign-react`   | core; `react`, `react-dom` and `pdfjs-dist` as peers |
+| `sign-aadhaar` | core                                                 |

@@ -10,9 +10,8 @@ run the standalone service as a Docker image. Either way the documents, keys and
 stay on your servers.
 
 ::: warning Pre-release
-The packages are under active development and are not published to npm yet. APIs may change
-before 0.1. `@codevibe/sign-core` and `@codevibe/sign-aadhaar` are complete; `sign-pdf`,
-`sign-server` and `sign-react` are being built.
+The packages are not published to npm yet; build them from the repository as shown below.
+APIs may still change before 0.1.
 :::
 
 ## Requirements

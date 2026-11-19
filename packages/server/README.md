@@ -19,7 +19,7 @@ Node 20 or later.
 
 ## Standalone example
 
-```ts
+```ts check
 import { readFileSync } from 'node:fs';
 import {
   createSignServer,
@@ -52,9 +52,11 @@ await listen(sign.app, { port: 3000 });
 setInterval(() => void sign.tick(), 60_000);
 ```
 
-`startSignServer(config)` does all of the above from one config object (PostgreSQL, a files
-directory, SMTP, the seal certificate, API keys and the public URL) and returns
-`{ listen(port, host), close() }`. `close()` stops accepting requests and waits for running
+`startSignServer(config, overrides?)` does all of the above from one config object
+(PostgreSQL, a files directory, SMTP, the seal certificate with optional `reason` and
+`location`, API keys, the public URL and an optional `tickIntervalMs`) and returns
+`{ server, listen(port, host?), close() }`. `overrides` replaces any built adapter or option,
+for example `{ trustProxy: true }`. `close()` stops accepting requests and waits for running
 work before disconnecting.
 
 ## Sending
@@ -100,6 +102,8 @@ Field boxes are in PDF points from the top-left corner of the page. For multipar
 send the same JSON in a form field named `envelope` and the files as `documents`.
 
 ## Signing
+
+The React package README shows a signing page built on these routes.
 
 Signers use the token from their link. Tokens are stored only as hashes and stop working
 once the signer has acted or the envelope is completed, declined, voided or expired.

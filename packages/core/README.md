@@ -18,7 +18,19 @@ Node 20 or later, or any runtime with Web Crypto.
 
 ## Usage
 
-```ts
+<!-- check:
+declare const sha256: string;
+declare const pageSizes: { width: number; height: number }[];
+declare const storedEventCount: number;
+declare const store: { save(envelope: unknown, events: unknown[]): Promise<void> };
+declare function perform(effect: unknown): Promise<void>;
+declare const fieldId: string;
+declare const pngBase64: string;
+declare const ip: string;
+declare const userAgent: string;
+-->
+
+```ts check
 import {
   addDocument,
   addField,

@@ -63,7 +63,7 @@ const faqs = [
   },
   {
     q: 'Can I use it in production today?',
-    a: 'Not yet. The project is pre-release and the APIs may change before 0.1. The core rules and the Aadhaar adapter are done; PDF sealing, the server and the React components are being built now.',
+    a: 'Not yet. Every package works end to end and is tested, but nothing is published to npm and the APIs may change before 0.1. Try it now and wait for 0.1 before you rely on it.',
   },
   {
     q: 'Do my documents leave my servers?',
@@ -156,8 +156,7 @@ const faqs = [
           </p>
           <p class="note">
             <span class="badge">Pre-release</span>
-            The server package is still being built. This is the planned API and it may change
-            before 0.1.
+            Not on npm yet; build it from the repository. The API may change before 0.1.
           </p>
           <a class="text-link" href="/getting-started/node">Read the Node guide</a>
         </div>

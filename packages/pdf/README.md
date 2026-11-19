@@ -15,7 +15,14 @@ pnpm add @codevibe/sign-pdf @codevibe/sign-core
 
 ## Usage
 
-```ts
+<!-- check:
+import type { AuditEvent, Document, Envelope } from '@codevibe/sign-core';
+declare const envelope: Envelope;
+declare const document: Document;
+declare const events: AuditEvent[];
+-->
+
+```ts check
 import { readFile } from 'node:fs/promises';
 import {
   appendCertificate,
@@ -173,7 +180,18 @@ The standard fonts cover Latin script only. Names, titles or text in other scrip
 (Devanagari, Tamil, and so on) need a font that covers them, passed as `font` to
 `renderFields` and `appendCertificate`, for example Noto Sans Devanagari:
 
-```ts
+<!-- check:
+import { readFile } from 'node:fs/promises';
+import { appendCertificate, renderFields, type CertificateData } from '@codevibe/sign-pdf';
+import type { Envelope } from '@codevibe/sign-core';
+declare const pdf: Uint8Array;
+declare const signed: Uint8Array;
+declare const data: CertificateData;
+declare const envelope: Envelope;
+const { fields, values, recipients } = envelope;
+-->
+
+```ts check
 const font = new Uint8Array(await readFile('NotoSansDevanagari-Regular.ttf'));
 await renderFields(pdf, fields, values, recipients, { font });
 await appendCertificate(signed, data, { font });

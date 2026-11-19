@@ -40,6 +40,12 @@ function encrypted(): SignError {
   );
 }
 
+function unreadable(): SignError {
+  return new SignError('DOCUMENT_INVALID', 'The PDF could not be read. It may be damaged.', {
+    reason: 'unreadable',
+  });
+}
+
 /** Encrypted files keep their trailer (or xref stream) dictionary readable, /Encrypt included. */
 function declaresEncryption(bytes: Uint8Array): boolean {
   return /\/Encrypt\s*(\d+\s+\d+\s+R|<<)/.test(Buffer.from(bytes).toString('latin1'));
@@ -77,13 +83,18 @@ export async function loadPdf(
     if (declaresEncryption(bytes)) {
       throw encrypted();
     }
-    throw new SignError('DOCUMENT_INVALID', 'The PDF could not be read. It may be damaged.', {
-      reason: 'unreadable',
-    });
+    throw unreadable();
   }
 
   if (doc.isEncrypted) {
     throw encrypted();
+  }
+  try {
+    // pdf-lib parses lazily: a missing catalog, a broken or cyclic page tree or a malformed
+    // page box only surfaces when the pages are read, so read them all here, once.
+    for (const page of doc.getPages()) pageGeometry(page);
+  } catch {
+    throw unreadable();
   }
   if (doc.getPageCount() === 0) {
     throw new SignError('DOCUMENT_INVALID', 'The PDF has no pages.', { reason: 'empty' });

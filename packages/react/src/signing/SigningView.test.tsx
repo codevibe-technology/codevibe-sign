@@ -151,6 +151,39 @@ describe('SigningView', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it('shows why the server refused a submit or decline', async () => {
+    const onSubmit = vi.fn(async () => {
+      throw new Error('Verify the one-time code first');
+    });
+    const onDecline = vi.fn(async () => {
+      throw new Error('This link is no longer valid');
+    });
+    setup({ fields: [field('city', 'text', 'r1', { y: 200 })], onSubmit, onDecline });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text, required' }), {
+      target: { value: 'Pune' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Verify the one-time code first'),
+    );
+    expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
+    const dialog = screen.getByRole('dialog', { name: 'Decline to sign' });
+    fireEvent.change(within(dialog).getByLabelText(/why you are declining/), {
+      target: { value: 'Wrong figure' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('This link is no longer valid'),
+    );
+  });
+
+  it('accepts the recipient as the server sends it', () => {
+    setup({ recipient: { id: 'r1', name: 'Asha Rao' } });
+    expect(screen.getAllByRole('button', { name: /^Signature/ })).toHaveLength(1);
+  });
+
   it('starts from saved values', () => {
     setup({ initialValues: [{ fieldId: 'city', value: 'Nagpur' }] });
     expect(screen.getByRole('textbox', { name: 'Text, required' })).toHaveValue('Nagpur');
