@@ -1,6 +1,7 @@
 import type {
   AuditEvent,
   Envelope,
+  EnvelopeStatus,
   EnvelopeStore,
   Id,
   OtpState,
@@ -10,6 +11,34 @@ export interface StoredEnvelope {
   envelope: Envelope;
   /** Starts at 1 on first save and grows by one on every save. */
   version: number;
+  /**
+   * The workspace that owns the envelope, fixed when it is created. A store that predates
+   * workspaces may leave it out; the envelope then belongs to `DEFAULT_WORKSPACE`.
+   */
+  workspaceId?: string;
+}
+
+export interface CommitOptions {
+  /** Owner of a new envelope (`expectedVersion` 0). Ignored on later saves. Default `DEFAULT_WORKSPACE`. */
+  workspaceId?: string;
+}
+
+export interface EnvelopeListQuery {
+  /** Only envelopes in one of these states. */
+  status?: EnvelopeStatus[];
+  /** Case-insensitive match anywhere in the title. */
+  search?: string;
+  /** Page size, 1 to 100. */
+  limit: number;
+  /** `nextCursor` from the previous page. */
+  cursor?: string;
+}
+
+export interface EnvelopePage {
+  /** Newest first. */
+  envelopes: Envelope[];
+  /** Pass as `cursor` for the next page; null on the last one. */
+  nextCursor: string | null;
 }
 
 export interface SigningToken {
@@ -68,7 +97,13 @@ export interface ServerStore extends EnvelopeStore {
     events: AuditEvent[],
     expectedVersion: number,
     jobs: Job[],
+    options?: CommitOptions,
   ): Promise<{ version: number }>;
+  /**
+   * One page of a workspace's envelopes, newest first. Optional for custom stores;
+   * `GET /v1/envelopes` needs it.
+   */
+  list?(workspaceId: string, query: EnvelopeListQuery): Promise<EnvelopePage>;
   /** Hides an active envelope from `due` until `until`, or until it is saved again. */
   deferCheck(id: Id, until: Date): Promise<void>;
 

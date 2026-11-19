@@ -7,8 +7,10 @@ import {
 } from '@codevibe_technology/sign-core';
 import postgres from 'postgres';
 import { VersionConflictError } from '../errors';
+import { DEFAULT_WORKSPACE } from '../tenancy';
+import { decodeCursor, encodeCursor } from './cursor';
 import { migrations } from './migrations';
-import type { IdempotencyClaim, Job, JobKind, ServerStore } from './types';
+import type { EnvelopePage, IdempotencyClaim, Job, JobKind, ServerStore } from './types';
 
 type Sql = postgres.Sql;
 type Json = postgres.JSONValue;
@@ -59,20 +61,26 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
     events: AuditEvent[],
     expectedVersion: number | undefined,
     jobs: Job[],
+    workspaceId: string = DEFAULT_WORKSPACE,
   ): Promise<{ version: number }> {
     const nextCheck = nextTickAt(envelope) ?? null;
+    const createdAt = new Date(envelope.createdAt);
     return sql.begin(async (tx) => {
       let rows: { version: number }[];
       if (expectedVersion === 0) {
         rows = await tx<{ version: number }[]>`
-          insert into sign_envelopes (id, status, data, version, next_check_at)
-          values (${envelope.id}, ${envelope.status}, ${tx.json(asJson(envelope))}, 1, ${nextCheck})
+          insert into sign_envelopes
+            (id, status, data, version, next_check_at, workspace_id, created_at)
+          values (${envelope.id}, ${envelope.status}, ${tx.json(asJson(envelope))}, 1, ${nextCheck},
+            ${workspaceId}, ${createdAt})
           on conflict (id) do nothing
           returning version`;
       } else if (expectedVersion === undefined) {
         rows = await tx<{ version: number }[]>`
-          insert into sign_envelopes (id, status, data, version, next_check_at)
-          values (${envelope.id}, ${envelope.status}, ${tx.json(asJson(envelope))}, 1, ${nextCheck})
+          insert into sign_envelopes
+            (id, status, data, version, next_check_at, workspace_id, created_at)
+          values (${envelope.id}, ${envelope.status}, ${tx.json(asJson(envelope))}, 1, ${nextCheck},
+            ${workspaceId}, ${createdAt})
           on conflict (id) do update set
             status = excluded.status, data = excluded.data, next_check_at = excluded.next_check_at,
             version = sign_envelopes.version + 1, updated_at = now()
@@ -110,13 +118,37 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
       return rows[0]?.data ?? null;
     },
     async load(id) {
-      const rows = await sql<{ data: Envelope; version: number }[]>`
-        select data, version from sign_envelopes where id = ${id}`;
+      const rows = await sql<{ data: Envelope; version: number; workspace_id: string }[]>`
+        select data, version, workspace_id from sign_envelopes where id = ${id}`;
       const row = rows[0];
-      return row ? { envelope: row.data, version: row.version } : null;
+      return row
+        ? { envelope: row.data, version: row.version, workspaceId: row.workspace_id }
+        : null;
     },
     save: (envelope, events, expectedVersion) => write(envelope, events, expectedVersion, []),
-    commit: write,
+    commit: (envelope, events, expectedVersion, jobs, options) =>
+      write(envelope, events, expectedVersion, jobs, options?.workspaceId),
+    async list(workspaceId, query): Promise<EnvelopePage> {
+      const after = query.cursor ? decodeCursor(query.cursor) : null;
+      const pattern = query.search ? `%${query.search.replace(/[\\%_]/g, '\\$&')}%` : null;
+      const rows = await sql<{ data: Envelope; created_at: Date; id: string }[]>`
+        select data, created_at, id from sign_envelopes
+        where workspace_id = ${workspaceId}
+          ${query.status?.length ? sql`and status in ${sql(query.status)}` : sql``}
+          ${pattern ? sql`and data->>'title' ilike ${pattern}` : sql``}
+          ${after ? sql`and (created_at, id) < (${new Date(after.createdAt)}, ${after.id})` : sql``}
+        order by created_at desc, id desc
+        limit ${query.limit + 1}`;
+      const page = rows.slice(0, query.limit);
+      const last = page[page.length - 1];
+      return {
+        envelopes: page.map((row) => row.data),
+        nextCursor:
+          rows.length > query.limit && last
+            ? encodeCursor({ createdAt: last.created_at.toISOString(), id: last.id })
+            : null,
+      };
+    },
     async listEvents(envelopeId) {
       const rows = await sql<{ data: AuditEvent }[]>`
         select data from sign_audit_events where envelope_id = ${envelopeId} order by seq`;
