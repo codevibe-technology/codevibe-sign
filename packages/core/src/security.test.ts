@@ -43,6 +43,15 @@ describe('signing tokens', () => {
     expect(verifyToken(token + 'x', tokenHash)).toBe(false);
     expect(verifyToken('', tokenHash)).toBe(false);
   });
+
+  it('refuses malformed or oversized tokens without hashing them', () => {
+    const { token } = createSigningToken(cryptoRandom);
+    const huge = 'A'.repeat(5_000_000);
+    expect(verifyToken(huge, hashToken(huge))).toBe(false);
+    expect(verifyToken(`${token} `, hashToken(`${token} `))).toBe(false);
+    expect(verifyToken(token.replace(/.$/, '='), hashToken(token.replace(/.$/, '=')))).toBe(false);
+    expect(verifyToken(token.slice(1), hashToken(token.slice(1)))).toBe(false);
+  });
 });
 
 describe('createOtp', () => {
