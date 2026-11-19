@@ -117,12 +117,14 @@ The chain is `hash = sha256(prevHash + canonicalize(event))` from a genesis valu
 property tests check it is stable under key order, a fixed point under re-parsing, and keeps
 every key (a `__proto__` key used to vanish; fixed).
 
-**What the chain detects**, given the expected head (`verifyChain(events, hasher, { expectedHead })`):
+**What the chain detects**, given the expected head and envelope id
+(`verifyChain(events, hasher, { expectedHead, envelopeId })`):
 
 - any change to any field of any event, including context and data;
 - removing, duplicating or reordering events, and changing `seq`, `prevHash` or `hash`;
 - events cut off the end (only with `expectedHead`; without it, a truncated chain still verifies);
-- events from another envelope mixed in.
+- events from another envelope mixed in, or a whole log from another envelope (only with
+  `envelopeId`).
 
 All of these are covered by property tests in `audit.property.test.ts`.
 
@@ -142,8 +144,9 @@ All of these are covered by property tests in `audit.property.test.ts`.
 - `at`, `ip` and `userAgent` are what the server observed. The chain proves they were not changed
   after writing, not that they were true. Behind a proxy, the IP is only as good as the proxy's
   `X-Forwarded-For` handling (see the checklist).
-- `verifyChain` takes the envelope id from the first event. Callers must also check it equals the
-  envelope they are verifying, or a whole chain from another envelope would pass.
+- Without options, `verifyChain` takes the envelope id from the first event, so a whole chain
+  copied from another envelope would pass. Pass `{ envelopeId }` with the id of the envelope
+  being verified (alongside `expectedHead`) to rule that out.
 
 Residual risk: before an envelope completes, a DBA can rewrite its history undetectably, because
 no copy of the head has left the database yet. Mitigation for high-value use: timestamp heads
