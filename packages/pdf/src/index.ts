@@ -3,6 +3,7 @@ export type { InspectOptions, PdfInfo } from './inspect';
 export { checkParseLimits, DEFAULT_PARSE_LIMITS } from './limits';
 export type { ParseLimits } from './limits';
 export { renderFields } from './render';
+export { sanitizePdf } from './sanitize';
 export type { RenderOptions } from './render';
 export { appendCertificate } from './certificate';
 export type { CertificateData, CertificateOptions } from './certificate';

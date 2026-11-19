@@ -3,6 +3,7 @@ import { SignError, type Field, type FieldValue, type Recipient } from '@codevib
 import { canEncode, embedFonts, type FontSet } from './fonts';
 import { boxFrame, clampRect, fitContain, pageGeometry, type BoxFrame } from './geometry';
 import { loadPdf } from './inspect';
+import { sanitizeDocument } from './sanitize';
 import { fitText, LINE_HEIGHT } from './text';
 import { assertTimeZone, formatSigningDate } from './time';
 
@@ -139,8 +140,9 @@ function textFor(
 /**
  * Draws every field value onto the original pages: signature and initials images,
  * text, names and dates, and checkboxes. Field rects use core's top-left origin as the
- * page is displayed; rotated pages and offset crop boxes are handled. Nothing else in
- * the document is changed or flattened.
+ * page is displayed; rotated pages and offset crop boxes are handled. The pages are first
+ * copied into a fresh document without active content and with form fields flattened (see
+ * `sanitizeDocument`), so the file that is sealed holds only what the signer saw.
  */
 export async function renderFields(
   pdfBytes: Uint8Array,
@@ -152,7 +154,7 @@ export async function renderFields(
   if (options.timeZone) {
     assertTimeZone(options.timeZone);
   }
-  const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
+  const doc = await sanitizeDocument(await loadPdf(pdfBytes, { maxBytes: options.maxBytes }));
   let fonts: FontSet | undefined;
   const pages = doc.getPages();
   const valueByField = new Map(values.map((entry) => [entry.fieldId, entry.value]));
