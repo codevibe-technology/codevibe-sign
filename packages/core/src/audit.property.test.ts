@@ -223,6 +223,25 @@ describe('audit chain properties', () => {
     );
   });
 
+  it('a complete log of another envelope verifies only without the envelope id', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(pendingEvent('env-2'), { minLength: 1, maxLength: 6 }),
+        async (input) => {
+          const log = await appendEvents(undefined, 1, input, hasher);
+          const head = log.at(-1)!.hash;
+          expect((await verifyChain(log, hasher, { expectedHead: head })).valid).toBe(true);
+          expect(
+            await verifyChain(log, hasher, { expectedHead: head, envelopeId: 'env-1' }),
+          ).toEqual({ valid: false, brokenAt: 0, reason: 'envelope' });
+          expect(
+            (await verifyChain(log, hasher, { expectedHead: head, envelopeId: 'env-2' })).valid,
+          ).toBe(true);
+        },
+      ),
+    );
+  });
+
   it('appending in batches gives the same chain as appending at once', async () => {
     await fc.assert(
       fc.asyncProperty(chainInput, fc.nat(), async (input, cut) => {

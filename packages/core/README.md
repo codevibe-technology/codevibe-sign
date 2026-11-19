@@ -174,8 +174,11 @@ malformed input:
 - `appendEvents(prevHead, seqStart, events, hasher)` → `Promise<AuditEvent[]>`
 - `commitTransition(result, nextSeq, hasher)`: chains a transition's events and sets
   `envelope.auditHead`.
-- `verifyChain(events, hasher, { expectedHead? })` → `{ valid: true, head }` or
-  `{ valid: false, brokenAt, reason }`.
+- `verifyChain(events, hasher, { expectedHead?, envelopeId? })` → `{ valid: true, head }`
+  or `{ valid: false, brokenAt, reason }`. Pass `expectedHead` (`envelope.auditHead`) to
+  catch events cut off the end, and `envelopeId` to check that every event belongs to the
+  envelope you are verifying (`reason: 'envelope'`). Without `envelopeId` the events only
+  have to agree with each other, so a whole log copied from another envelope would pass.
 
 ### Tokens and OTPs
 

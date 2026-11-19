@@ -165,6 +165,22 @@ describe('verifyChain', () => {
     });
   });
 
+  it('checks every event against the expected envelope id when given', async () => {
+    const events = await appendEvents(undefined, 1, sample, hasher);
+    expect(await verifyChain(events, hasher, { envelopeId: 'env-1' })).toMatchObject({
+      valid: true,
+    });
+    expect(await verifyChain(events, hasher, { envelopeId: 'env-2' })).toEqual({
+      valid: false,
+      brokenAt: 0,
+      reason: 'envelope',
+    });
+    expect(await verifyChain([], hasher, { envelopeId: 'env-2' })).toEqual({
+      valid: true,
+      head: GENESIS_HASH,
+    });
+  });
+
   it('detects a truncated tail when the expected head is given', async () => {
     const events = await appendEvents(undefined, 1, sample, hasher);
     const head = events[2]!.hash;

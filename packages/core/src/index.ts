@@ -80,7 +80,7 @@ export {
   hashEvent,
   verifyChain,
 } from './audit';
-export type { ChainVerification, CommittedTransition } from './audit';
+export type { ChainVerification, CommittedTransition, VerifyChainOptions } from './audit';
 
 export {
   createOtp,
