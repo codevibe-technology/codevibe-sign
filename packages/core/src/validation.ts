@@ -12,12 +12,16 @@ export const MAX_REASON_LENGTH = 1000;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const IHDR = [0x49, 0x48, 0x44, 0x52];
 
+/** Field types a sender may fill in before sending, and so the only ones that can be read-only. */
+export const PREFILLABLE_FIELD_TYPES: readonly FieldType[] = ['text', 'name', 'checkbox'];
+
 export interface ValidationIssue {
   /** Where the problem is, for example `recipients.r1.email` or `fields.f2.rect`. */
   path: string;
   message: string;
 }
 
+/** A `VALIDATION` error listing every issue in `details.issues`. */
 export function validationError(issues: ValidationIssue[]): SignError {
   const first = issues[0];
   const message = first ? `${first.message} (${first.path})` : 'Invalid input';
@@ -83,6 +87,7 @@ export function recipientIssues(recipient: Recipient, path: string): ValidationI
   return issues;
 }
 
+/** Problems with a reminder policy: whole days, and a gap between repeated reminders. */
 export function reminderIssues(policy: ReminderPolicy, path = 'reminders'): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const wholeDays = (n: number) => Number.isInteger(n) && n >= 0;
@@ -110,12 +115,16 @@ export function reminderIssues(policy: ReminderPolicy, path = 'reminders'): Vali
   return issues;
 }
 
+/**
+ * Problems with a field box: finite numbers, a positive size, and inside `page` when its
+ * size is known. Safe to call on untrusted input.
+ */
 export function rectIssues(
   rect: Rect,
   page: PageSize | undefined,
   path: string,
 ): ValidationIssue[] {
-  const values = [rect.x, rect.y, rect.width, rect.height];
+  const values: unknown[] = [rect?.x, rect?.y, rect?.width, rect?.height];
   if (!values.every(Number.isFinite)) {
     return [{ path, message: 'Position and size must be finite numbers' }];
   }
@@ -135,16 +144,19 @@ export function rectIssues(
   return issues;
 }
 
+/** Problems with a document's page sizes: one positive size per page. Safe on untrusted input. */
 export function pageSizeIssues(
   sizes: PageSize[],
   pageCount: number,
   path: string,
 ): ValidationIssue[] {
+  if (!Array.isArray(sizes)) return [{ path, message: 'Page sizes must be a list' }];
   if (sizes.length !== pageCount) {
     return [{ path, message: `Expected ${pageCount} page sizes, got ${sizes.length}` }];
   }
   const bad = sizes.findIndex(
-    (s) => !Number.isFinite(s.width) || !Number.isFinite(s.height) || s.width <= 0 || s.height <= 0,
+    (s) =>
+      !Number.isFinite(s?.width) || !Number.isFinite(s?.height) || s.width <= 0 || s.height <= 0,
   );
   return bad === -1
     ? []

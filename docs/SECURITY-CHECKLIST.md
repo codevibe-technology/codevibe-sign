@@ -105,7 +105,8 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 - [ ] Keep at least one copy write-once (object lock or an equivalent) for the retention period.
       This protects the audit trail from someone with database access rewriting it.
 - [ ] Test a restore every quarter, and after restoring, run `verifyChain` over a sample of
-      envelopes with `expectedHead` set to the head printed on their sealed certificates.
+      envelopes with `expectedHead` set to the head printed on their sealed certificates and
+      `envelopeId` set to the envelope's id.
 - [ ] Never edit audit rows by hand, even to "fix" data. Record a correction as a new event.
 
 ## Database access

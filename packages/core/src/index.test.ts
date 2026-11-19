@@ -116,6 +116,19 @@ describe('public api', () => {
     });
   });
 
+  it('exports the validators other packages reuse', () => {
+    const page = { width: 612, height: 792 };
+    expect(core.rectIssues({ x: 600, y: 0, width: 20, height: 10 }, page, 'r')).toHaveLength(1);
+    expect(core.pageSizeIssues([page], 1, 'p')).toEqual([]);
+    expect(core.reminderIssues({ firstAfterDays: 1, everyDays: 0, max: 2 }, 'x')[0]!.path).toBe(
+      'x.everyDays',
+    );
+    const error = core.validationError([{ path: 'title', message: 'Title is required' }]);
+    expect(error).toBeInstanceOf(core.SignError);
+    expect(error.code).toBe('VALIDATION');
+    expect(error.message).toBe('Title is required (title)');
+  });
+
   it('exports SignError with stable codes', () => {
     const error = new core.SignError('NOT_YOUR_TURN', 'wait');
     expect(error).toBeInstanceOf(Error);

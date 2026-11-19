@@ -1,12 +1,13 @@
 import {
   MAX_NAME_LENGTH,
-  SignError,
+  pageSizeIssues as corePageSizeIssues,
+  rectIssues,
+  reminderIssues,
+  validationError,
   type AuthMethod,
   type FieldType,
   type PageSize,
-  type Rect,
   type RecipientRole,
-  type ReminderPolicy,
   type ValidationIssue,
 } from '@codevibe/sign-core';
 import type { Template, TemplateDocument, TemplateField, TemplateRole } from './types';
@@ -23,12 +24,6 @@ const FIELD_TYPES: readonly FieldType[] = [
   'checkbox',
 ];
 
-export function validationError(issues: ValidationIssue[]): SignError {
-  const first = issues[0];
-  const message = first ? `${first.message} (${first.path})` : 'Invalid input';
-  return new SignError('VALIDATION', message, { issues });
-}
-
 export function throwIf(issues: ValidationIssue[]): void {
   if (issues.length > 0) throw validationError(issues);
 }
@@ -36,8 +31,6 @@ export function throwIf(issues: ValidationIssue[]): void {
 export const roleKey = (name: string): string => name.trim().toLowerCase();
 
 export const isActorRole = (role: TemplateRole): boolean => (role.type ?? 'signer') !== 'viewer';
-
-const wholeDays = (n: number) => Number.isInteger(n) && n >= 0;
 
 function textIssues(value: unknown, path: string, label: string): ValidationIssue[] {
   if (typeof value !== 'string' || !value.trim()) {
@@ -49,32 +42,6 @@ function textIssues(value: unknown, path: string, label: string): ValidationIssu
   return [];
 }
 
-export function reminderIssues(policy: ReminderPolicy, path: string): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  if (!wholeDays(policy.firstAfterDays)) {
-    issues.push({
-      path: `${path}.firstAfterDays`,
-      message: 'Must be a whole number of days, 0 or more',
-    });
-  }
-  if (!wholeDays(policy.everyDays)) {
-    issues.push({
-      path: `${path}.everyDays`,
-      message: 'Must be a whole number of days, 0 or more',
-    });
-  }
-  if (!wholeDays(policy.max)) {
-    issues.push({ path: `${path}.max`, message: 'Must be a whole number, 0 or more' });
-  }
-  if (policy.firstAfterDays > 0 && policy.max > 1 && policy.everyDays < 1) {
-    issues.push({
-      path: `${path}.everyDays`,
-      message: 'Set at least 1 day between reminders when more than one is allowed',
-    });
-  }
-  return issues;
-}
-
 export function expiryDaysIssues(days: number | undefined, path: string): ValidationIssue[] {
   if (days === undefined || (Number.isInteger(days) && days >= 1)) return [];
   return [{ path, message: 'Expiry must be a whole number of days, at least 1' }];
@@ -84,13 +51,7 @@ function pageSizeIssues(sizes: unknown, path: string): ValidationIssue[] {
   if (!Array.isArray(sizes) || sizes.length === 0) {
     return [{ path, message: 'Give the size of every page (at least one)' }];
   }
-  const bad = (sizes as PageSize[]).findIndex(
-    (s) =>
-      !Number.isFinite(s?.width) || !Number.isFinite(s?.height) || s.width <= 0 || s.height <= 0,
-  );
-  return bad === -1
-    ? []
-    : [{ path: `${path}.${bad}`, message: 'Page width and height must be greater than 0' }];
+  return corePageSizeIssues(sizes as PageSize[], sizes.length, path);
 }
 
 function documentIssues(documents: TemplateDocument[]): ValidationIssue[] {
@@ -116,27 +77,6 @@ function documentIssues(documents: TemplateDocument[]): ValidationIssue[] {
     }
     issues.push(...pageSizeIssues(doc.pageSizes, `${path}.pageSizes`));
   });
-  return issues;
-}
-
-function rectIssues(rect: Rect, page: PageSize | undefined, path: string): ValidationIssue[] {
-  const values = [rect?.x, rect?.y, rect?.width, rect?.height];
-  if (!values.every((v) => typeof v === 'number' && Number.isFinite(v))) {
-    return [{ path, message: 'Position and size must be finite numbers' }];
-  }
-  const issues: ValidationIssue[] = [];
-  if (rect.width <= 0 || rect.height <= 0) {
-    issues.push({ path, message: 'Width and height must be greater than 0' });
-  }
-  if (rect.x < 0 || rect.y < 0) {
-    issues.push({ path, message: 'The box starts outside the page' });
-  }
-  if (page && (rect.x + rect.width > page.width || rect.y + rect.height > page.height)) {
-    issues.push({
-      path,
-      message: `The box runs past the page edge (page is ${page.width} x ${page.height} pt)`,
-    });
-  }
   return issues;
 }
 

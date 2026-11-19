@@ -52,6 +52,11 @@ export interface Field {
   rect: Rect;
   required: boolean;
   label?: string;
+  /**
+   * The sender fills this field in before sending (see `prefillFields`) and the recipient
+   * cannot change it. Allowed on text, name and checkbox fields.
+   */
+  readOnly?: boolean;
 }
 
 export interface FieldValue {
@@ -129,6 +134,8 @@ export interface Envelope {
 
 export type AuditAction =
   | 'envelope.created'
+  /** A draft was edited; `data.change` says what changed (see `DraftChange`). */
+  | 'envelope.updated'
   | 'envelope.sent'
   | 'envelope.completed'
   | 'envelope.declined'

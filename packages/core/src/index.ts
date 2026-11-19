@@ -10,6 +10,7 @@ export {
   DEFAULT_REMINDERS,
   isActor,
   moveField,
+  prefillFields,
   removeDocument,
   removeField,
   removeRecipient,
@@ -26,6 +27,20 @@ export type {
   RecipientInput,
   RecipientPatch,
 } from './builder';
+
+export {
+  addDocumentWithEvents,
+  addFieldWithEvents,
+  addRecipientWithEvents,
+  moveFieldWithEvents,
+  prefillFieldsWithEvents,
+  removeDocumentWithEvents,
+  removeFieldWithEvents,
+  removeRecipientWithEvents,
+  updateEnvelopeWithEvents,
+  updateRecipientWithEvents,
+} from './edits';
+export type { DraftChange, DraftEditDeps, DraftEditOptions } from './edits';
 
 export {
   decline,
@@ -65,7 +80,7 @@ export {
   hashEvent,
   verifyChain,
 } from './audit';
-export type { ChainVerification, CommittedTransition } from './audit';
+export type { ChainVerification, CommittedTransition, VerifyChainOptions } from './audit';
 
 export {
   createOtp,
@@ -90,6 +105,11 @@ export {
   MAX_NAME_LENGTH,
   MAX_REASON_LENGTH,
   MAX_TEXT_LENGTH,
+  pageSizeIssues,
+  PREFILLABLE_FIELD_TYPES,
+  rectIssues,
+  reminderIssues,
+  validationError,
 } from './validation';
 export type { ValidationIssue } from './validation';
 

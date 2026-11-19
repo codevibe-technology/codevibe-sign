@@ -303,13 +303,13 @@ describe('submit values', () => {
     expect(result.envelope.values).toEqual([
       { fieldId: signature, value: PNG },
       { fieldId: text, value: 'note' },
-      { fieldId: date, value: at(1).slice(0, 10) },
+      { fieldId: date, value: at(1) },
       { fieldId: name, value: 'Asha Rao' },
     ]);
     expect(result.events[0]!.data).toEqual({ fields: 4 });
   });
 
-  it('accepts a date the signer gives', () => {
+  it('uses the server time for date fields, whatever the signer sends', () => {
     const r = ready({ recipients: [{ name: 'A', email: 'a@example.com' }] });
     const field = addField(
       r.envelope,
@@ -327,8 +327,18 @@ describe('submit values', () => {
       ...valuesFor(envelope, r.ids[0]!).filter((v) => v.fieldId !== field.field.id),
       { fieldId: field.field.id, value: '2026-02-28' },
     ];
-    const result = submit(envelope, { recipientId: r.ids[0]!, values }, d());
-    expect(result.envelope.values).toContainEqual({ fieldId: field.field.id, value: '2026-02-28' });
+    const result = submit(envelope, { recipientId: r.ids[0]!, values }, d(at(2)));
+    expect(result.envelope.values).toContainEqual({ fieldId: field.field.id, value: at(2) });
+    expect(result.envelope.values).not.toContainEqual({
+      fieldId: field.field.id,
+      value: '2026-02-28',
+    });
+
+    const garbage = values.map((v) =>
+      v.fieldId === field.field.id ? { ...v, value: 'not a date' } : v,
+    );
+    const ignored = submit(envelope, { recipientId: r.ids[0]!, values: garbage }, d(at(2)));
+    expect(ignored.envelope.values).toContainEqual({ fieldId: field.field.id, value: at(2) });
   });
 
   it('requires every required field', () => {

@@ -95,7 +95,27 @@ Edits are allowed only while the envelope is a `draft`.
 | `addField(envelope, input, { ids })` → `{ envelope, field }`         | Signers and approvers only; box must sit inside the page.                 |
 | `moveField(envelope, fieldId, { rect, page?, documentId? })`         |                                                                           |
 | `removeField(envelope, fieldId)` → `Envelope`                        |                                                                           |
+| `prefillFields(envelope, values)` → `Envelope`                       | Sender's values for text, name and checkbox fields; empty clears.         |
 | `validateForSend(envelope, now)` → `ValidationIssue[]`               | Empty means ready. Every signer needs a required signature field.         |
+
+#### Recording draft edits
+
+The edits above return just the envelope, so existing callers keep working. Each has a
+`...WithEvents` twin that takes `{ clock }` (plus `ids` where it creates something) and an
+optional `{ context }`, and returns a `TransitionResult` with one `envelope.updated` event
+to commit like any other. Created items are returned alongside, for example
+`addRecipientWithEvents(...)` → `{ envelope, events, effects, recipient }`.
+
+`updateEnvelopeWithEvents`, `addDocumentWithEvents`, `removeDocumentWithEvents`,
+`addRecipientWithEvents`, `updateRecipientWithEvents`, `removeRecipientWithEvents`,
+`addFieldWithEvents`, `moveFieldWithEvents`, `removeFieldWithEvents`,
+`prefillFieldsWithEvents`.
+
+The event's `data.change` names the edit (`DraftChange`: `details.updated`,
+`document.added`, `recipient.removed`, `values.prefilled`, ...) with the ids involved;
+recipient and field edits set `recipientId`. Changed keys are listed, never their values,
+so contact details and prefilled data stay out of the log. An edit that changes nothing
+returns no event. Draft edits produce no effects.
 
 ### Workflow
 
@@ -123,8 +143,28 @@ Viewers never act; they receive the completed copy.
 Submitted values are checked against the field type: signatures and initials must be
 real PNGs (base64 or a `data:image/png;base64,` URL) of at most 512 KB and 2048 x 2048
 pixels (`MAX_IMAGE_BYTES`, `MAX_IMAGE_DIMENSION`), dates ISO,
-checkboxes `'true'` or `'false'`, text at most 1000 characters. Date-signed and name
-fields are filled in when left empty.
+checkboxes `'true'` or `'false'`, text at most 1000 characters. Name fields are filled
+in with the recipient's name when left empty. Date-signed fields always get the server's
+time of signing as a full ISO date-time in UTC; a date the signer sends is ignored, so a
+signature cannot be back-dated. Render it in the signer's time zone if you like: the
+certificate page shows the exact UTC time from the audit log.
+
+Values the sender prefilled count towards required fields, so the signer does not have to
+send them again. A field added with `readOnly: true` keeps the sender's value: `submit`
+refuses a different value for it with `FIELD_NOT_YOURS` (`details.readOnly` is `true`),
+and `validateForSend` asks for a value on every required read-only field. Only text, name
+and checkbox fields (`PREFILLABLE_FIELD_TYPES`) can be prefilled or read-only.
+
+### Validators
+
+The checks the builder uses are exported for packages that validate their own input
+first, such as templates. Each returns `ValidationIssue[]` (empty means fine) and copes with
+malformed input:
+
+- `rectIssues(rect, pageSize | undefined, path)`: finite, positive, inside the page.
+- `pageSizeIssues(sizes, pageCount, path)`: one positive size per page.
+- `reminderIssues(policy, path?)`: whole days, and a gap when more than one reminder.
+- `validationError(issues)` → `SignError` with code `VALIDATION`.
 
 ### Audit log
 
@@ -134,8 +174,11 @@ fields are filled in when left empty.
 - `appendEvents(prevHead, seqStart, events, hasher)` → `Promise<AuditEvent[]>`
 - `commitTransition(result, nextSeq, hasher)`: chains a transition's events and sets
   `envelope.auditHead`.
-- `verifyChain(events, hasher, { expectedHead? })` → `{ valid: true, head }` or
-  `{ valid: false, brokenAt, reason }`.
+- `verifyChain(events, hasher, { expectedHead?, envelopeId? })` → `{ valid: true, head }`
+  or `{ valid: false, brokenAt, reason }`. Pass `expectedHead` (`envelope.auditHead`) to
+  catch events cut off the end, and `envelopeId` to check that every event belongs to the
+  envelope you are verifying (`reason: 'envelope'`). Without `envelopeId` the events only
+  have to agree with each other, so a whole log copied from another envelope would pass.
 
 ### Tokens and OTPs
 

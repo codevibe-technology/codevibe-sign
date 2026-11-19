@@ -84,17 +84,24 @@ export type ChainVerification =
       reason: 'seq' | 'prev_hash' | 'hash' | 'envelope' | 'head';
     };
 
-/**
- * Recomputes every hash from the genesis value. Pass `expectedHead` (for example
- * `envelope.auditHead`) to also detect events cut off the end of the log.
- */
+export interface VerifyChainOptions {
+  /** For example `envelope.auditHead`; detects events cut off the end of the log. */
+  expectedHead?: string;
+  /**
+   * The envelope the log must belong to. Without it, every event only has to match the
+   * first one, so a complete log of a different envelope would still verify.
+   */
+  envelopeId?: string;
+}
+
+/** Recomputes every hash from the genesis value, and checks the options given. */
 export async function verifyChain(
   events: readonly AuditEvent[],
   hasher: Hasher,
-  options: { expectedHead?: string } = {},
+  options: VerifyChainOptions = {},
 ): Promise<ChainVerification> {
   let prevHash = GENESIS_HASH;
-  const envelopeId = events[0]?.envelopeId;
+  const envelopeId = options.envelopeId ?? events[0]?.envelopeId;
   for (const [index, event] of events.entries()) {
     if (event.seq !== index + 1) return { valid: false, brokenAt: index, reason: 'seq' };
     if (event.envelopeId !== envelopeId)
