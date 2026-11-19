@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EsignRequest } from '../provider';
 import { createLeegalityProvider, type LeegalityOptions } from './provider';
 import { MAX_JSON_RESPONSE_BYTES } from './api';
-import { computeMac } from './webhook';
+import { computeMac, MAX_WEBHOOK_BYTES } from './webhook';
 
 const SALT = 'test-private-salt';
 const TOKEN = 'test-auth-token';
@@ -342,6 +342,17 @@ describe('parseWebhook', () => {
     const { provider, fetch } = setup(() => statusResponse({ signed: true }));
     const error = await caught(provider.parseWebhook({}, body));
     expect(error.code).toBe('WEBHOOK_INVALID');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized body before parsing it or calling the provider', async () => {
+    const { provider, fetch } = setup(() => statusResponse({ signed: true }));
+    const body = webhookBody({ padding: 'x'.repeat(MAX_WEBHOOK_BYTES) });
+    const error = await caught(provider.parseWebhook({}, body));
+    expect(error.code).toBe('WEBHOOK_INVALID');
+    expect(error.message).toMatch(/too large/);
+    const bytes = await caught(provider.parseWebhook({}, new TextEncoder().encode(body)));
+    expect(bytes.code).toBe('WEBHOOK_INVALID');
     expect(fetch).not.toHaveBeenCalled();
   });
 
