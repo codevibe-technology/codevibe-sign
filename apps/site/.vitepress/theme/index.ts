@@ -2,6 +2,7 @@ import DefaultTheme from 'vitepress/theme';
 import type { Theme } from 'vitepress';
 import HomePage from './components/HomePage.vue';
 import ComingSoon from './components/ComingSoon.vue';
+import HttpApiReference from './components/HttpApiReference.vue';
 import './style.css';
 
 export default {
@@ -9,5 +10,6 @@ export default {
   enhanceApp({ app }) {
     app.component('HomePage', HomePage);
     app.component('ComingSoon', ComingSoon);
+    app.component('HttpApiReference', HttpApiReference);
   },
 } satisfies Theme;
