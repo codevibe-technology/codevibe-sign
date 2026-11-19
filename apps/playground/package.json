@@ -1,0 +1,27 @@
+{
+  "name": "playground",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A local demo of sending and signing a PDF, entirely in the browser.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@codevibe/sign-core": "workspace:*",
+    "@codevibe/sign-react": "workspace:*",
+    "pdfjs-dist": "4.10.38",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "4.7.0",
+    "vite": "5.4.21"
+  }
+}
