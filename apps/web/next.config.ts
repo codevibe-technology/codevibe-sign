@@ -10,7 +10,9 @@ const securityHeaders = [
 const config: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  // Node-only packages with native or dynamic requires are loaded at runtime, not bundled.
+  // Node-only packages are loaded at runtime, not bundled. Turbopack applies this only to
+  // packages it finds under node_modules: in this repo the sign packages link to packages/*
+  // and are bundled anyway, which they support; installed from npm they stay external.
   serverExternalPackages: [
     '@codevibe_technology/sign-server',
     '@codevibe_technology/sign-pdf',
