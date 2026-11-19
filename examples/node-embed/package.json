@@ -1,0 +1,23 @@
+{
+  "name": "example-node-embed",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Run Codevibe Sign inside a Node process, send an envelope and print the signing links.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@codevibe/sign-client": "workspace:*",
+    "@codevibe/sign-server": "workspace:*",
+    "node-forge": "1.4.3",
+    "pdf-lib": "1.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "@types/node-forge": "1.3.14",
+    "tsx": "4.19.2"
+  }
+}
