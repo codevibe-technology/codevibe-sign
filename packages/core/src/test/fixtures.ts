@@ -67,6 +67,7 @@ export function ready(options: ReadyOptions = {}): {
   envelope: Envelope;
   ids: string[];
   documentId: string;
+  gen: IdGenerator;
 } {
   const start = draft(options);
   let envelope = start.envelope;
@@ -106,7 +107,7 @@ export function ready(options: ReadyOptions = {}): {
       ).envelope;
     }
   }
-  return { envelope, ids, documentId: start.documentId };
+  return { envelope, ids, documentId: start.documentId, gen: start.ids };
 }
 
 export function fieldsOf(envelope: Envelope, recipientId: string) {
