@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SignServerOptions } from '../options';
 import { memoryStore } from '../store/memory';
-import { envelopeBody, harness, PNG } from '../testing/harness';
+import { API_KEY, envelopeBody, harness, PNG } from '../testing/harness';
 
 async function sent(options: Partial<SignServerOptions> = {}) {
   const store = memoryStore();
@@ -76,8 +76,80 @@ describe('GET /sign/:token', () => {
     for (const token of ['A'.repeat(43), 'not-a-token']) {
       const res = await h.server.app.request(`/sign/${token}`);
       expect(res.status).toBe(303);
-      expect(res.headers.get('location')).toBe('https://app.example.com/signing');
+      expect(res.headers.get('location')).toBe('https://app.example.com/signing?state=invalid');
       expect(res.headers.get('set-cookie')).toMatch(/cvsign_link=;.*Max-Age=0/);
     }
+  });
+});
+
+describe('a link that no longer works', () => {
+  const location = (res: Response) => new URL(res.headers.get('location') ?? '');
+
+  async function reopen(h: Awaited<ReturnType<typeof sent>>['h'], token: string) {
+    const res = await h.server.app.request(`/sign/${token}`);
+    expect(res.status).toBe(303);
+    expect(cookieFrom(res)).toBe('');
+    return location(res).searchParams;
+  }
+
+  it('says the recipient has already signed, and whose brand to show', async () => {
+    const { h, envelope, token } = await sent();
+    const field = envelope.fields[0].id;
+    await h.call('POST', `/v1/sign/${token}/submit`, {
+      body: { consent: true, values: [{ fieldId: field, value: PNG }] },
+    });
+    const params = await reopen(h, token);
+    expect(params.get('state')).toBe('signed');
+    expect(params.get('w')).toBe('default');
+  });
+
+  it('tells completed, declined and voided envelopes apart', async () => {
+    const completed = await sent({
+      apiKeys: [API_KEY, { id: 'k', key: 'k'.repeat(24), workspaceId: 'ws_a' }],
+    });
+    const auth = { authorization: `Bearer ${'k'.repeat(24)}` };
+    const one = await completed.h.call('POST', '/v1/envelopes', {
+      headers: auth,
+      body: envelopeBody({
+        send: true,
+        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'solo@example.com' }],
+        fields: [
+          { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
+        ],
+      }),
+    });
+    const solo = completed.h.tokenFor('solo@example.com');
+    await completed.h.call('POST', `/v1/sign/${solo}/submit`, {
+      body: { consent: true, values: [{ fieldId: one.json.fields[0].id, value: PNG }] },
+    });
+    const done = await reopen(completed.h, solo);
+    expect(done.get('state')).toBe('completed');
+    expect(done.get('w')).toBe('ws_a');
+
+    const declined = await sent();
+    await declined.h.call('POST', `/v1/sign/${declined.token}/decline`, {
+      body: { reason: 'Wrong salary' },
+    });
+    expect((await reopen(declined.h, declined.token)).get('state')).toBe('declined');
+
+    const voided = await sent();
+    await voided.h.call('POST', `/v1/envelopes/${voided.envelope.id}/void`, {
+      body: { reason: 'Mistake' },
+    });
+    expect((await reopen(voided.h, voided.token)).get('state')).toBe('voided');
+  });
+
+  it('says a link has expired once it is past its time', async () => {
+    const { h, token } = await sent();
+    h.advance(31 * 86_400_000);
+    expect((await reopen(h, token)).get('state')).toBe('expired');
+  });
+
+  it('keeps a query string the signing page already has', async () => {
+    const { h } = await sent({ signingPageUrl: 'https://app.example.com/signing?lang=en' });
+    const res = await h.server.app.request(`/sign/${'A'.repeat(43)}`);
+    expect(res.headers.get('location')).toBe(
+      'https://app.example.com/signing?lang=en&state=invalid',
+    );
   });
 });

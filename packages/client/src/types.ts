@@ -143,6 +143,8 @@ export interface Certificate {
 
 /** What a signer sees: the envelope basics and their own fields. */
 export interface SigningSession {
+  /** The workspace that sent the envelope, for its brand. */
+  workspaceId: string;
   envelope: {
     id: Id;
     title: string;

@@ -339,6 +339,41 @@
       "description": "What the recipient's browser calls. `{token}` is the signing token from the link,\nor the literal `link` to use the token held in the `cvsign_link` cookie.",
       "item": [
         {
+          "name": "Follow the envelope after signing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/receipt",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", "receipt"]
+            },
+            "description": "Follow the envelope after signing\n\nFor a recipient who has signed or approved. The submit call hands back a receipt, as\nthe `cvsign_receipt` cookie and the `X-Sign-Receipt` header, valid for 7 days. With it\nthe recipient can see where the envelope stands, how many people it is still waiting\nfor (not who), and which documents are sealed and ready to download. The signing link\nitself stops working once the recipient has acted.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Download your signed copy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/receipt/documents/:docId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", "receipt", "documents", ":docId"],
+              "variable": [
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Download your signed copy\n\nThe sealed PDF, once everyone has acted and the seal is applied. Before that the\nanswer is `INVALID_STATE`; poll `GET /v1/sign/receipt` until the document's `sealed`\nis `true`.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
           "name": "Open a signing session",
           "request": {
             "method": "GET",
@@ -604,7 +639,7 @@
                 }
               ]
             },
-            "description": "Open a signing link\n\nWhere signing links point. Stores the token in an HttpOnly, SameSite=Strict\n`cvsign_link` cookie (path `/v1/sign`, at most 24 hours) and redirects to the signing\npage, whose URL carries no token. The page then calls `/v1/sign/link/...` from the same\norigin. An unknown or used token clears the cookie and redirects all the same. This\nroute only reads: opening a link does not mark the document as viewed.",
+            "description": "Open a signing link\n\nWhere signing links point. Stores the token in an HttpOnly, SameSite=Strict\n`cvsign_link` cookie (path `/v1/sign`, at most 24 hours) and redirects to the signing\npage, whose URL carries no token. The page then calls `/v1/sign/link/...` from the same\norigin. An unknown or used token clears the cookie and redirects all the same, adding\n`?state=` with the reason (`signed`, `completed`, `declined`, `voided`, `expired` or\n`invalid`) and, when the envelope is known, `&w=<workspaceId>` so the page can explain\nit in the sender's brand. This route only reads: opening a link does not mark the\ndocument as viewed.",
             "auth": { "type": "noauth" }
           }
         }

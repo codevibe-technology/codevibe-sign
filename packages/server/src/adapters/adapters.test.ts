@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { defaultTemplates } from '../templates';
 import { localFileStore } from './files';
-import { consoleMailer, mailOtpSender } from './mail';
+import { consoleMailer, fromHeader, mailOtpSender, nodemailerMessage } from './mail';
 
 describe('localFileStore', () => {
   let dir: string | undefined;
@@ -38,6 +38,34 @@ describe('localFileStore', () => {
 });
 
 describe('mail', () => {
+  it('uses the display name but keeps the configured address', () => {
+    expect(fromHeader('Codevibe Sign <sign@example.com>', 'Acme HR')).toBe(
+      '"Acme HR" <sign@example.com>',
+    );
+    expect(fromHeader('sign@example.com', 'Acme')).toBe('"Acme" <sign@example.com>');
+    expect(fromHeader('Codevibe Sign <sign@example.com>', undefined)).toBe(
+      'Codevibe Sign <sign@example.com>',
+    );
+    expect(fromHeader('Codevibe Sign <sign@example.com>', '  ')).toBe(
+      'Codevibe Sign <sign@example.com>',
+    );
+  });
+
+  it('drops characters that could add an address or a header to the name', () => {
+    expect(fromHeader('sign@example.com', 'Evil" <x@evil.test>\r\nBcc: y@evil.test')).toBe(
+      '"Evil x@evil.testBcc: y@evil.test" <sign@example.com>',
+    );
+  });
+
+  it('passes reply-to through and leaves it out when unset', () => {
+    const base = { to: 'a@example.com', subject: 'Hi', text: 'Hello' };
+    expect(nodemailerMessage({ ...base, replyTo: 'hr@acme.test' }, 'sign@x.test')).toMatchObject({
+      from: 'sign@x.test',
+      replyTo: 'hr@acme.test',
+    });
+    expect(nodemailerMessage(base, 'sign@x.test')).not.toHaveProperty('replyTo');
+  });
+
   it('sends OTP codes by email', async () => {
     const mailer = consoleMailer({ silent: true });
     await mailOtpSender(mailer).send(

@@ -48,3 +48,54 @@ export function verifySession(
     return false;
   }
 }
+
+/** Proof that a recipient finished signing, kept so they can fetch the sealed copy later. */
+export const RECEIPT_COOKIE = 'cvsign_receipt';
+export const RECEIPT_HEADER = 'x-sign-receipt';
+export const RECEIPT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface ReceiptClaims {
+  k: 'receipt';
+  e: string;
+  r: string;
+  exp: number;
+}
+
+export function issueReceipt(
+  secret: string,
+  envelopeId: string,
+  recipientId: string,
+  now: Date,
+): { value: string; expiresAt: Date } {
+  const expiresAt = new Date(now.getTime() + RECEIPT_TTL_MS);
+  const claims: ReceiptClaims = {
+    k: 'receipt',
+    e: envelopeId,
+    r: recipientId,
+    exp: expiresAt.getTime(),
+  };
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return { value: `${payload}.${hmacSha256Hex(secret, payload)}`, expiresAt };
+}
+
+/** The envelope and recipient a receipt names, or null when it is forged, malformed or old. */
+export function verifyReceipt(
+  secret: string,
+  value: string | undefined,
+  now: Date,
+): { envelopeId: string; recipientId: string } | null {
+  if (!value || value.length > 1024) return null;
+  const [payload, signature, extra] = value.split('.');
+  if (!payload || !signature || extra !== undefined) return null;
+  if (!constantTimeEqual(signature, hmacSha256Hex(secret, payload))) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as ReceiptClaims;
+    if (claims.k !== 'receipt' || typeof claims.e !== 'string' || typeof claims.r !== 'string') {
+      return null;
+    }
+    if (typeof claims.exp !== 'number' || claims.exp <= now.getTime()) return null;
+    return { envelopeId: claims.e, recipientId: claims.r };
+  } catch {
+    return null;
+  }
+}

@@ -44,6 +44,8 @@ export interface CertificateInput {
   envelope: Envelope;
   document: Document;
   events: AuditEvent[];
+  /** The workspace's line for the end of the certificate, from `certificateNote`. */
+  note?: string;
 }
 
 /**

@@ -33,6 +33,15 @@ export interface MailTemplates {
   cancelled(ctx: MailContext): RenderedMail;
 }
 
+/** How one workspace's emails read and whom they appear to come from. */
+export interface WorkspaceMail {
+  /** Replace some or all templates; the server's templates fill in the rest. */
+  templates?: Partial<MailTemplates>;
+  /** Display name on the `From` header. The address stays the mailer's own. */
+  fromName?: string;
+  replyTo?: string;
+}
+
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')

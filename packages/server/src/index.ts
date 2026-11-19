@@ -48,6 +48,7 @@ export type {
   MailContext,
   LinkMailContext,
   CompletedMailContext,
+  WorkspaceMail,
 } from './templates';
 export { memoryStore } from './store/memory';
 export { postgresStore, migrate } from './store/postgres';
@@ -71,6 +72,7 @@ export {
   consoleMailer,
   consoleOtpSender,
   mailOtpSender,
+  fromHeader,
   type SmtpMailerOptions,
 } from './adapters/mail';
 export { nodeHasher } from './crypto';

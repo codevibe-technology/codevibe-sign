@@ -618,6 +618,56 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/sign/receipt:
+    get:
+      operationId: getSigningReceipt
+      tags: [Signing]
+      summary: Follow the envelope after signing
+      description: |
+        For a recipient who has signed or approved. The submit call hands back a receipt, as
+        the `cvsign_receipt` cookie and the `X-Sign-Receipt` header, valid for 7 days. With it
+        the recipient can see where the envelope stands, how many people it is still waiting
+        for (not who), and which documents are sealed and ready to download. The signing link
+        itself stops working once the recipient has acted.
+      security:
+        - signerReceipt: []
+        - signerReceiptCookie: []
+      responses:
+        '200':
+          description: The receipt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningReceipt'
+        '401':
+          $ref: '#/components/responses/SignerUnauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/sign/receipt/documents/{docId}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      operationId: getReceiptDocument
+      tags: [Signing]
+      summary: Download your signed copy
+      description: |
+        The sealed PDF, once everyone has acted and the seal is applied. Before that the
+        answer is `INVALID_STATE`; poll `GET /v1/sign/receipt` until the document's `sealed`
+        is `true`.
+      security:
+        - signerReceipt: []
+        - signerReceiptCookie: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Pdf'
+        '401':
+          $ref: '#/components/responses/SignerUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/sign/{token}:
     parameters:
       - $ref: '#/components/parameters/SigningToken'
@@ -852,7 +902,27 @@ paths:
                   value: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==
       responses:
         '200':
-          $ref: '#/components/responses/SignerStatus'
+          description: |
+            Where the envelope and this recipient stand now, with a receipt for following the
+            envelope and downloading the signed copy (`GET /v1/sign/receipt`).
+          headers:
+            X-Sign-Receipt:
+              description: The receipt. Send it back as `X-Sign-Receipt`.
+              schema:
+                type: string
+            Set-Cookie:
+              description: '`cvsign_receipt=<receipt>; Path=/v1/sign; HttpOnly; SameSite=Strict; Max-Age=604800`'
+              schema:
+                type: string
+            Idempotent-Replayed:
+              $ref: '#/components/headers/IdempotentReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignerActionResult'
+              example:
+                envelopeStatus: in_progress
+                recipientStatus: signed
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -923,15 +993,18 @@ paths:
         Where signing links point. Stores the token in an HttpOnly, SameSite=Strict
         `cvsign_link` cookie (path `/v1/sign`, at most 24 hours) and redirects to the signing
         page, whose URL carries no token. The page then calls `/v1/sign/link/...` from the same
-        origin. An unknown or used token clears the cookie and redirects all the same. This
-        route only reads: opening a link does not mark the document as viewed.
+        origin. An unknown or used token clears the cookie and redirects all the same, adding
+        `?state=` with the reason (`signed`, `completed`, `declined`, `voided`, `expired` or
+        `invalid`) and, when the envelope is known, `&w=<workspaceId>` so the page can explain
+        it in the sender's brand. This route only reads: opening a link does not mark the
+        document as viewed.
       security: []
       responses:
         '303':
           description: Redirect to the signing page.
           headers:
             Location:
-              description: The signing page, without the token.
+              description: The signing page, without the token; for a dead link with `?state=`.
               schema:
                 type: string
                 format: uri
@@ -1032,6 +1105,18 @@ components:
       description: |
         Holds the signing token after `GET /sign/{token}`. Used when the path has `link` in
         place of the token. Requests other than GET must come from the same site.
+    signerReceipt:
+      type: apiKey
+      in: header
+      name: X-Sign-Receipt
+      description: |
+        The receipt from a successful `POST /v1/sign/{token}/submit`. Valid for 7 days, for
+        that recipient and envelope only.
+    signerReceiptCookie:
+      type: apiKey
+      in: cookie
+      name: cvsign_receipt
+      description: The same receipt as an HttpOnly cookie, set by `submit` for browsers.
   parameters:
     EnvelopeId:
       name: id
@@ -1104,14 +1189,7 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            additionalProperties: false
-            required: [envelopeStatus, recipientStatus]
-            properties:
-              envelopeStatus:
-                $ref: '#/components/schemas/EnvelopeStatus'
-              recipientStatus:
-                $ref: '#/components/schemas/RecipientStatus'
+            $ref: '#/components/schemas/SignerActionResult'
           example:
             envelopeStatus: in_progress
             recipientStatus: signed
@@ -1867,11 +1945,87 @@ components:
                       type: [string, 'null']
                     userAgent:
                       type: [string, 'null']
+    SignerActionResult:
+      type: object
+      additionalProperties: false
+      required: [envelopeStatus, recipientStatus]
+      properties:
+        envelopeStatus:
+          $ref: '#/components/schemas/EnvelopeStatus'
+        recipientStatus:
+          $ref: '#/components/schemas/RecipientStatus'
+    SigningReceipt:
+      type: object
+      additionalProperties: false
+      required: [workspaceId, envelope, recipient, waitingFor, documents]
+      properties:
+        workspaceId:
+          type: string
+          description: The workspace that sent the envelope, for its brand.
+        envelope:
+          type: object
+          additionalProperties: false
+          required: [id, title, status, completedAt]
+          properties:
+            id:
+              $ref: '#/components/schemas/Id'
+            title:
+              type: string
+            status:
+              $ref: '#/components/schemas/EnvelopeStatus'
+            completedAt:
+              type: [string, 'null']
+              format: date-time
+        recipient:
+          type: object
+          additionalProperties: false
+          required: [id, name, role, status]
+          properties:
+            id:
+              $ref: '#/components/schemas/Id'
+            name:
+              type: string
+            role:
+              $ref: '#/components/schemas/RecipientRole'
+            status:
+              $ref: '#/components/schemas/RecipientStatus'
+        waitingFor:
+          type: integer
+          minimum: 0
+          description: Signers and approvers who have not acted yet.
+        documents:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, sealed]
+            properties:
+              id:
+                $ref: '#/components/schemas/Id'
+              name:
+                type: string
+              sealed:
+                type: boolean
+                description: The signed copy is ready to download.
     SignerView:
       type: object
       additionalProperties: false
-      required: [envelope, recipient, documents, fields, values, otpRequired, authenticated, canAct]
+      required:
+        [
+          workspaceId,
+          envelope,
+          recipient,
+          documents,
+          fields,
+          values,
+          otpRequired,
+          authenticated,
+          canAct,
+        ]
       properties:
+        workspaceId:
+          type: string
+          description: The workspace that sent the envelope, for its brand.
         envelope:
           type: object
           additionalProperties: false

@@ -61,6 +61,18 @@ async function rejection(promise: Promise<unknown>): Promise<SignError> {
 }
 
 describe('appendCertificate', () => {
+  it("prints the sender's note at the end, on one line", async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const output = await appendCertificate(pdf, {
+      envelope: envelope({ recipients: [signer] }),
+      document: document(),
+      events,
+      note: 'Acme Pvt Ltd\nCIN U72900KA2020PTC000000 ✓',
+    });
+    const text = (await certificateText(output, 1)).join('\n');
+    expect(text).toContain('Acme Pvt Ltd CIN U72900KA2020PTC000000 ?');
+  });
+
   it('appends A4 pages after the document', async () => {
     const pdf = await makePdf([{ size: A4 }, { size: [612, 792] }]);
     const output = await appendCertificate(pdf, {

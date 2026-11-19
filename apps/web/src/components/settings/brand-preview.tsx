@@ -7,12 +7,14 @@ export function BrandPreview({
   font,
   senderName,
   workspaceName,
+  showBadge = true,
 }: {
   logoUrl: string | null;
   brandColor: string;
   font: BrandFont;
   senderName: string;
   workspaceName: string;
+  showBadge?: boolean;
 }) {
   const ink = textOn(brandColor);
   const from = senderName.trim() || workspaceName;
@@ -46,7 +48,9 @@ export function BrandPreview({
         </p>
         <div className="h-16 rounded-md border border-[#D9E0EA] bg-white" />
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-[#526277]">Secured by Codevibe Sign</span>
+          <span className="text-xs text-[#526277]">
+            {showBadge ? 'Secured by Codevibe Sign' : ''}
+          </span>
           <span
             className="shrink-0 rounded-md px-3 py-1.5 text-sm font-semibold whitespace-nowrap"
             style={{ background: brandColor, color: ink }}

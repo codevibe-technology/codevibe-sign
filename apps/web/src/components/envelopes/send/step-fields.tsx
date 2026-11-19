@@ -1,37 +1,14 @@
 'use client';
 
 import type { Field, Recipient } from '@codevibe_technology/sign-core';
-import {
-  FieldPlacer,
-  type LoadPdfOptions,
-  type PdfjsModule,
-  type ViewerDocument,
-} from '@codevibe_technology/sign-react';
+import { FieldPlacer, type ViewerDocument } from '@codevibe_technology/sign-react';
 import { CheckCircle2, CircleAlert } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { usePdfjs } from '@/components/pdf/use-pdfjs';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DraftDocument, DraftRecipient, Problems } from '@/lib/send-flow';
 import { RecipientDot, colorIndex } from './step-recipients';
-
-/** pdf.js and its worker, loaded in the browser on first use. */
-function usePdfjs(): LoadPdfOptions | null {
-  const [options, setOptions] = useState<LoadPdfOptions | null>(null);
-  useEffect(() => {
-    let live = true;
-    void import('pdfjs-dist').then((pdfjs) => {
-      if (!live) return;
-      setOptions({
-        pdfjs: pdfjs as unknown as PdfjsModule,
-        workerSrc: new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString(),
-      });
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  return options;
-}
 
 const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
   id: r.id,

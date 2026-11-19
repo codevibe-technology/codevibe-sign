@@ -15,6 +15,7 @@ export interface BrandValues {
   brandColor: string;
   font: BrandFont;
   senderName: string;
+  showBadge: boolean;
 }
 
 export function BrandForm({
@@ -26,7 +27,6 @@ export function BrandForm({
 }) {
   const [color, setColor] = useState(brand.brandColor);
   const [font, setFont] = useState<BrandFont>(brand.font);
-  const [senderName, setSenderName] = useState(brand.senderName);
   const [localLogo, setLocalLogo] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const save = useAction();
@@ -35,10 +35,9 @@ export function BrandForm({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    save.run(
-      () => updateBrandAction({ workspaceId: workspace.id, brandColor: color, font, senderName }),
-      { success: 'Brand saved' },
-    );
+    save.run(() => updateBrandAction({ workspaceId: workspace.id, brandColor: color, font }), {
+      success: 'Brand saved',
+    });
   }
 
   function upload(selected: File | undefined) {
@@ -57,7 +56,7 @@ export function BrandForm({
     <form onSubmit={submit} noValidate>
       <Card>
         <CardHeader
-          title="Brand"
+          title="Look"
           description="How your signing pages and emails look to the people you send documents to."
         />
         <CardBody className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
@@ -139,21 +138,6 @@ export function BrandForm({
                 </NativeSelect>
               )}
             </Field>
-            <Field
-              label="Email sender name"
-              hint={`Emails come from "${senderName.trim() || workspace.name}". The address stays ours so they reach the inbox.`}
-              error={save.errors.senderName}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  maxLength={60}
-                  placeholder={workspace.name}
-                  value={senderName}
-                  onChange={(e) => setSenderName(e.target.value)}
-                />
-              )}
-            </Field>
           </div>
           <div>
             <p className="mb-2 text-sm font-semibold">Preview</p>
@@ -161,8 +145,9 @@ export function BrandForm({
               logoUrl={shownLogo}
               brandColor={previewColor}
               font={font}
-              senderName={senderName}
+              senderName={brand.senderName}
               workspaceName={workspace.name}
+              showBadge={brand.showBadge}
             />
           </div>
         </CardBody>

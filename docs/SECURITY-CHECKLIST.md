@@ -178,5 +178,8 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 - [ ] Open a signing link and confirm the browser lands on the signing page with no token in
       its address bar.
 - [ ] Try a wrong OTP six times and confirm the code locks.
-- [ ] Open a signing link after the envelope completes and confirm it no longer works.
+- [ ] Open a signing link after the envelope completes and confirm it no longer works and the
+      page says the document is complete.
+- [ ] Sign in a private window, close it, and confirm the signed copy can no longer be
+      downloaded from that browser.
 - [ ] Confirm nothing sensitive reaches the logs during those tests.

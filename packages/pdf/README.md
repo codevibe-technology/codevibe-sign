@@ -145,7 +145,7 @@ checkbox value, or characters the font cannot draw), `RECIPIENT_NOT_FOUND`, `VAL
 ### `appendCertificate(pdfBytes, data, options?) → Promise<Uint8Array>`
 
 Appends one or more A4 pages titled "Signing certificate". `data` is
-`{ envelope, document, events, timeZone?, generatedAt? }` using core's types. The pages
+`{ envelope, document, events, timeZone?, generatedAt?, note? }` using core's types. The pages
 show:
 
 - envelope id, title, status and its key times;
@@ -154,7 +154,9 @@ show:
 - each recipient: name, role, email or phone masked lightly (`s****@example.com`,
   `+91******3210`), authentication method, status, IP address and user agent of their
   decisive action, and when they viewed, signed or approved, or declined (with the reason);
-- the audit chain head and every event with its time, action and who did it.
+- the audit chain head and every event with its time, action and who did it;
+- `note`, when given: one line from the sender at the end, such as a company registration
+  number. Characters the font cannot draw become `?`.
 
 Times are shown in UTC, followed by the given time zone. Long values wrap; tables continue
 on new pages with their header repeated.
