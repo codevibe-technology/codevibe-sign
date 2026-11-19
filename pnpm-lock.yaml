@@ -169,6 +169,12 @@ importers:
         specifier: workspace:*
         version: link:../pdf
 
+  packages/templates:
+    dependencies:
+      '@codevibe/sign-core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@adobe/css-tools@4.5.0':

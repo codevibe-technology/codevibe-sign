@@ -1,0 +1,44 @@
+{
+  "name": "@codevibe/sign-templates",
+  "version": "0.0.0",
+  "description": "Reusable signing templates with roles, prefilled fields and bulk send from CSV.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codevibe/sign.git",
+    "directory": "packages/templates"
+  },
+  "keywords": [
+    "esign",
+    "e-signature",
+    "templates",
+    "bulk-send",
+    "signature"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@codevibe/sign-core": "workspace:*"
+  }
+}
