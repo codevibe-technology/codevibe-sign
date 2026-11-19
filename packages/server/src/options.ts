@@ -11,6 +11,7 @@ import type { PdfEngine } from './engine';
 import type { Logger } from './errors';
 import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore } from './store/types';
+import type { WebhookSecurity } from './runtime/webhook-guard';
 import type { MailTemplates } from './templates';
 
 /**
@@ -85,7 +86,13 @@ export interface SignServerOptions {
    */
   signingPageUrl?: string;
   limits?: Limits;
+  /**
+   * Webhook targets. URLs must be https on a public host name; each delivery resolves the
+   * host, refuses private, loopback, link-local and reserved addresses, and connects to the
+   * address it checked. Relax this for local development with `webhookSecurity`.
+   */
   webhooks?: WebhookTarget[];
+  webhookSecurity?: WebhookSecurity;
   templates?: Partial<MailTemplates>;
   /** Signs signer session tokens. Set it when more than one process serves requests. */
   sessionSecret?: string;
@@ -115,6 +122,10 @@ export interface SignServerOptions {
    * `:token` and no query string, status and duration. Off by default.
    */
   accessLog?: boolean;
+  /**
+   * Sends webhooks through this `fetch` instead of the built-in client. The URL and resolved
+   * addresses are still checked, but the connection cannot be pinned to the checked address.
+   */
   fetch?: typeof fetch;
   /** PDF reading, drawing and sealing. Defaults to `@codevibe/sign-pdf`. */
   pdf?: PdfEngine;

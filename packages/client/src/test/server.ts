@@ -64,6 +64,7 @@ export function testServer(overrides: Partial<SignServerOptions> = {}) {
     apiKeys: [API_KEY],
     publicUrl: BASE_URL,
     webhooks: [{ url: 'https://hooks.example.com/sign', secret: WEBHOOK_SECRET, events: ['*'] }],
+    webhookSecurity: { lookup: async () => ['93.184.215.14'] },
     fetch: (async (_url: string | URL | Request, init?: RequestInit) => {
       deliveries.push({ headers: new Headers(init?.headers), body: String(init?.body) });
       return new Response(null, { status: 204 });

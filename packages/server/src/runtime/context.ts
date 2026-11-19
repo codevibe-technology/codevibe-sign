@@ -20,6 +20,7 @@ import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
 import type { Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
 import type { ServerStore } from '../store/types';
 import { defaultTemplates, type MailTemplates } from '../templates';
+import { checkWebhookUrl, type WebhookSecurity } from './webhook-guard';
 
 export interface Runtime {
   store: ServerStore;
@@ -33,7 +34,9 @@ export interface Runtime {
   random: RandomSource;
   limiter: RateLimiter;
   logger: Logger;
-  fetch: typeof fetch;
+  /** Set only when the integrator passed `fetch`; otherwise webhooks use a pinned connection. */
+  fetch?: typeof fetch;
+  webhookSecurity: WebhookSecurity;
   limits: Required<Limits>;
   webhooks: WebhookTarget[];
   templates: MailTemplates;
@@ -76,8 +79,13 @@ function proxyHops(value: number | undefined): number {
 export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runtime {
   const publicUrl = options.publicUrl.replace(/\/+$/, '');
   if (!/^https?:\/\//.test(publicUrl)) throw new Error('publicUrl must be an http(s) URL');
+  const webhookSecurity = options.webhookSecurity ?? {};
   for (const hook of options.webhooks ?? []) {
-    if (!/^https?:\/\//.test(hook.url)) throw new Error(`Webhook URL ${hook.url} must be http(s)`);
+    try {
+      checkWebhookUrl(hook.url, webhookSecurity);
+    } catch (err) {
+      throw new Error(`${err instanceof Error ? err.message : 'Invalid webhook URL'}: ${hook.url}`);
+    }
     if (hook.secret.length < 16) throw new Error(`Webhook secret for ${hook.url} is too short`);
   }
   return {
@@ -92,7 +100,8 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     random: options.random ?? cryptoRandom,
     limiter: options.rateLimiter ?? memoryRateLimiter(),
     logger: redactingLogger(options.logger ?? consoleLogger),
-    fetch: options.fetch ?? fetch,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+    webhookSecurity,
     limits: { ...DEFAULT_LIMITS, ...options.limits },
     webhooks: options.webhooks ?? [],
     templates: { ...defaultTemplates, ...options.templates },
