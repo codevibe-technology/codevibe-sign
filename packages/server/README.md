@@ -192,22 +192,68 @@ links first change nothing: a recipient is marked as having viewed only when the
 The routes also accept the token itself in the path. Anything not shaped like an issued token
 (43 base64url characters) is refused with `TOKEN_INVALID` before it is hashed or looked up.
 Tokens are stored only as hashes and stop working once the signer has acted or the envelope
-is completed, declined, voided or expired.
+is completed, declined, voided or expired. A link that no longer works still redirects to
+`signingPageUrl`, with `?state=` saying why (`signed`, `completed`, `declined`, `voided`,
+`expired` or `invalid`) and `&w=<workspaceId>` when the envelope is known, so the page can
+explain it in the sender's brand.
 
-| Route                                  | What it does                                                  |
-| -------------------------------------- | ------------------------------------------------------------- |
-| `GET /v1/sign/:token`                  | The envelope basics and this signer's own fields.             |
-| `GET /v1/sign/:token/documents/:docId` | The original PDF.                                             |
-| `POST /v1/sign/:token/otp`             | Send a one-time code (OTP recipients).                        |
-| `POST /v1/sign/:token/otp/verify`      | `{ "code" }`; sets a 30-minute session cookie and returns it. |
-| `POST /v1/sign/:token/view`            | Record that the signer opened the document.                   |
-| `POST /v1/sign/:token/submit`          | `{ "consent": true, "values": [{ "fieldId", "value" }] }`.    |
-| `POST /v1/sign/:token/decline`         | `{ "reason": "..." }`.                                        |
+| Route                                   | What it does                                                  |
+| --------------------------------------- | ------------------------------------------------------------- |
+| `GET /v1/sign/:token`                   | The envelope basics and this signer's own fields.             |
+| `GET /v1/sign/:token/documents/:docId`  | The original PDF.                                             |
+| `POST /v1/sign/:token/otp`              | Send a one-time code (OTP recipients).                        |
+| `POST /v1/sign/:token/otp/verify`       | `{ "code" }`; sets a 30-minute session cookie and returns it. |
+| `POST /v1/sign/:token/view`             | Record that the signer opened the document.                   |
+| `POST /v1/sign/:token/submit`           | `{ "consent": true, "values": [{ "fieldId", "value" }] }`.    |
+| `POST /v1/sign/:token/decline`          | `{ "reason": "..." }`.                                        |
+| `GET /v1/sign/receipt`                  | After signing: status, people still to act, sealed documents. |
+| `GET /v1/sign/receipt/documents/:docId` | After signing: the sealed copy, once everyone has acted.      |
 
 OTP recipients must verify before they can read the document or act. Send the session as
 the `cvsign_session` cookie or the `X-Sign-Session` header. Each new code replaces the
 previous one; after 10 codes for one envelope, `POST /otp` answers `OTP_LOCKED` with
 `details.reason: 'too_many_codes'` and the sender has to send the envelope again.
+
+A successful submit hands back a receipt, as an HttpOnly `cvsign_receipt` cookie and the
+`X-Sign-Receipt` header, valid for 7 days. It lets the signer follow the envelope to
+completion and download their sealed copy from the receipt routes, without keeping the
+signing link alive.
+
+## Email per workspace
+
+`templates` replaces the default emails for the whole server. `workspaceMail(workspaceId)`
+goes further: it is asked each time an invitation, reminder, completed copy or cancellation
+is sent, and may return templates, a `fromName` and a `replyTo` for that workspace. What it
+leaves out comes from `templates` and the defaults; null keeps them unchanged. `fromName`
+only changes the display name: `smtpMailer` keeps its own address, so SPF and DKIM still
+pass.
+
+```ts check
+import {
+  createSignServer,
+  defaultTemplates,
+  type SignServerOptions,
+} from '@codevibe_technology/sign-server';
+declare const base: SignServerOptions;
+declare function brandOf(workspaceId: string): Promise<{ name: string; replyTo?: string }>;
+
+const sign = createSignServer({
+  ...base,
+  workspaceMail: async (workspaceId) => {
+    const brand = await brandOf(workspaceId);
+    return {
+      fromName: brand.name,
+      ...(brand.replyTo ? { replyTo: brand.replyTo } : {}),
+      templates: {
+        invite: (ctx) => {
+          const mail = defaultTemplates.invite(ctx);
+          return { ...mail, subject: `${brand.name}: ${mail.subject}` };
+        },
+      },
+    };
+  },
+});
+```
 
 ## Errors
 
@@ -255,7 +301,8 @@ minute: it also sends due reminders and expires envelopes.
   also exported as `migrations` for your own tooling. A custom `ServerStore` must make
   `issueOtp` and `updateOtp` atomic and refuse a second audit event with the same `seq`.
 - Files: `localFileStore(dir)`, `memoryFileStore()`.
-- Mail: `smtpMailer({ transport, from })`, `consoleMailer()`.
+- Mail: `smtpMailer({ transport, from })`, `consoleMailer()`. `fromHeader(from, name)` builds
+  the `From` header the SMTP mailer sends.
 - OTP: `mailOtpSender(mailer)`, `consoleOtpSender()`. Bring your own `OtpSender` for SMS.
 - Rate limits: `memoryRateLimiter()`. Pass a shared `RateLimiter` when running more than
   one process, and set `sessionSecret` so sessions work across them.
