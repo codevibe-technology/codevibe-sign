@@ -208,8 +208,8 @@ describe('a full run against the server', () => {
     expect((await call('GET', '/v1/envelopes?limit=0')).status).toBe(400);
     await call('PATCH', `/v1/envelopes/${id}`, { body: { message: 'Please sign by Friday.' } });
     await call('POST', `/v1/envelopes/${id}/send`);
-    const early = await call('POST', `/v1/envelopes/${id}/remind`);
-    expect(early.json.error.code).toBe('INVALID_STATE');
+    const notDue = await call('POST', `/v1/envelopes/${id}/remind`);
+    expect(notDue.json.error.code).toBe('INVALID_STATE');
 
     const token = h.tokenFor('asha@example.com');
     const link = await call('GET', `/sign/${token}`);
@@ -231,13 +231,23 @@ describe('a full run against the server', () => {
       fieldId: f.id,
       value: f.type === 'signature' ? PNG : new Date().toISOString().slice(0, 10),
     }));
-    await call('POST', `/v1/sign/${token}/submit`, { headers, body: { consent: true, values } });
+    const signed = await call('POST', `/v1/sign/${token}/submit`, {
+      headers,
+      body: { consent: true, values },
+    });
+    const receipt = { 'x-sign-receipt': signed.res.headers.get('x-sign-receipt')! };
+    const docId = created.json.documents[0].id as string;
+    const waiting = await call('GET', '/v1/sign/receipt', { headers: receipt });
+    expect(waiting.json.waitingFor).toBe(1);
+    const early = await call('GET', `/v1/sign/receipt/documents/${docId}`, { headers: receipt });
+    expect(early.json.error.code).toBe('INVALID_STATE');
     const approved = await call('POST', `/v1/sign/${h.tokenFor('ravi@example.com')}/submit`, {
       body: { consent: true, values: [] },
     });
     expect(approved.json.envelopeStatus).toBe('completed');
+    const copy = await call('GET', `/v1/sign/receipt/documents/${docId}`, { headers: receipt });
+    expect(copy.res.headers.get('content-type')).toBe('application/pdf');
 
-    const docId = created.json.documents[0].id as string;
     const sealed = await call('GET', `/v1/envelopes/${id}/documents/${docId}?version=sealed`);
     expect(sealed.res.headers.get('content-type')).toBe('application/pdf');
     await call('GET', `/v1/envelopes/${id}/documents/${docId}/verification`);
@@ -274,8 +284,9 @@ describe('a full run against the server', () => {
       await call('PATCH', `/v1/envelopes/${id}`, { body: { title: 'Late' } }),
       await call('POST', '/v1/envelopes', { body: { ...body, recipients: [] } }),
       await call('GET', `/v1/sign/${'x'.repeat(43)}`),
+      await call('GET', '/v1/sign/receipt', { headers: { 'x-sign-receipt': 'forged.receipt' } }),
     ];
-    expect(failures.map((f) => f.status)).toEqual([401, 404, 409, 400, 401]);
+    expect(failures.map((f) => f.status)).toEqual([401, 404, 409, 400, 401, 401]);
 
     for (const delivery of h.deliveries) {
       const header = delivery.headers['x-codevibe-signature'];

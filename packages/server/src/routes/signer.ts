@@ -27,15 +27,20 @@ import { enforce } from '../http/rate-limit';
 import {
   LINK_COOKIE,
   LINK_SEGMENT,
+  RECEIPT_COOKIE,
+  RECEIPT_HEADER,
+  RECEIPT_TTL_MS,
   SESSION_COOKIE,
   SESSION_HEADER,
   SESSION_TTL_MS,
+  issueReceipt,
   issueSession,
   verifySession,
 } from '../http/session';
 import { parseJsonObject } from '../input';
 import type { Runtime } from '../runtime/context';
 import { mutate } from '../runtime/mutate';
+import { DEFAULT_WORKSPACE } from '../tenancy';
 import { signerView } from '../views';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
@@ -46,6 +51,7 @@ interface SignerContext {
   tokenHash: string;
   envelope: Envelope;
   recipient: Recipient;
+  workspaceId: string;
   otpRequired: boolean;
   authenticated: boolean;
 }
@@ -60,14 +66,70 @@ export async function activeSigner(
   rt: Runtime,
   tokenHash: string,
   now: Date,
-): Promise<{ envelope: Envelope; recipient: Recipient; expiresAt: Date } | null> {
+): Promise<{
+  envelope: Envelope;
+  recipient: Recipient;
+  workspaceId: string;
+  expiresAt: Date;
+} | null> {
   const token = await rt.store.findToken(tokenHash);
   if (!token || token.revokedAt || token.expiresAt.getTime() <= now.getTime()) return null;
-  const envelope = await rt.store.get(token.envelopeId);
-  const recipient = envelope?.recipients.find((r) => r.id === token.recipientId);
-  if (!envelope || !recipient) return null;
+  const stored = await rt.store.load(token.envelopeId);
+  const recipient = stored?.envelope.recipients.find((r) => r.id === token.recipientId);
+  if (!stored || !recipient) return null;
+  const { envelope } = stored;
   if (isFinal(envelope) || hasActed(recipient) || isExpiredAt(envelope, now)) return null;
-  return { envelope, recipient, expiresAt: token.expiresAt };
+  return {
+    envelope,
+    recipient,
+    workspaceId: stored.workspaceId ?? DEFAULT_WORKSPACE,
+    expiresAt: token.expiresAt,
+  };
+}
+
+/** Why a signing link no longer opens the document, or `active` when it still does. */
+export type LinkState =
+  | 'active'
+  | 'signed'
+  | 'completed'
+  | 'declined'
+  | 'voided'
+  | 'expired'
+  | 'invalid';
+
+/**
+ * What became of a signing link, so the page a dead link lands on can say why. It tells the
+ * holder of the link no more than the emails they were sent. Reads only.
+ */
+export async function linkState(
+  rt: Runtime,
+  tokenHash: string,
+  now: Date,
+): Promise<{ state: LinkState; workspaceId?: string }> {
+  const token = await rt.store.findToken(tokenHash);
+  if (!token) return { state: 'invalid' };
+  const stored = await rt.store.load(token.envelopeId);
+  const recipient = stored?.envelope.recipients.find((r) => r.id === token.recipientId);
+  if (!stored || !recipient) return { state: 'invalid' };
+  const { envelope } = stored;
+  const workspaceId = stored.workspaceId ?? DEFAULT_WORKSPACE;
+  const state: LinkState =
+    envelope.status === 'voided'
+      ? 'voided'
+      : envelope.status === 'declined'
+        ? 'declined'
+        : envelope.status === 'completed'
+          ? 'completed'
+          : envelope.status === 'expired'
+            ? 'expired'
+            : hasActed(recipient)
+              ? 'signed'
+              : isExpiredAt(envelope, now) || token.expiresAt.getTime() <= now.getTime()
+                ? 'expired'
+                : token.revokedAt
+                  ? 'invalid'
+                  : 'active';
+  return { state, workspaceId };
 }
 
 /** Signer cookies are sent only to the signer routes. */
@@ -125,11 +187,11 @@ export function signerRoutes(rt: Runtime) {
 
     const active = await activeSigner(rt, tokenHash, now);
     if (!active) throw tokenInvalid();
-    const { envelope, recipient } = active;
+    const { envelope, recipient, workspaceId } = active;
     const otpRequired = OTP_METHODS.has(recipient.auth);
     const session = c.req.header(SESSION_HEADER) ?? getCookie(c, SESSION_COOKIE);
     const authenticated = otpRequired && verifySession(rt.sessionSecret, session, tokenHash, now);
-    return { tokenHash, envelope, recipient, otpRequired, authenticated };
+    return { tokenHash, envelope, recipient, workspaceId, otpRequired, authenticated };
   }
 
   async function resolveForAction(c: Context): Promise<SignerContext> {
@@ -165,7 +227,7 @@ export function signerRoutes(rt: Runtime) {
   app.get('/:token', async (c) => {
     const signer = await resolve(c);
     return c.json(
-      signerView(signer.envelope, signer.recipient, {
+      signerView(signer.envelope, signer.recipient, signer.workspaceId, {
         required: signer.otpRequired,
         authenticated: signer.authenticated,
       }),
@@ -275,6 +337,15 @@ export function signerRoutes(rt: Runtime) {
     const result = await mutate(rt, envelope.id, (current) =>
       submit(current, { recipientId: recipient.id, values, context: context(c) }, deps),
     );
+    const receipt = issueReceipt(rt.sessionSecret, envelope.id, recipient.id, rt.clock.now());
+    setCookie(c, RECEIPT_COOKIE, receipt.value, {
+      httpOnly: true,
+      secure: rt.secureCookies,
+      sameSite: 'Strict',
+      path: signerCookiePath(rt),
+      maxAge: RECEIPT_TTL_MS / 1000,
+    });
+    c.header(RECEIPT_HEADER, receipt.value);
     return c.json(statusOf(result.envelope, recipient));
   });
 

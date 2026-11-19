@@ -1,5 +1,6 @@
 import {
   currentRecipients,
+  hasActed,
   type AuditEvent,
   type Envelope,
   type Recipient,
@@ -9,11 +10,13 @@ import {
 export function signerView(
   envelope: Envelope,
   recipient: Recipient,
+  workspaceId: string,
   auth: { required: boolean; authenticated: boolean },
 ) {
   const fields = envelope.fields.filter((f) => f.recipientId === recipient.id);
   const fieldIds = new Set(fields.map((f) => f.id));
   return {
+    workspaceId,
     envelope: {
       id: envelope.id,
       title: envelope.title,
@@ -35,6 +38,39 @@ export function signerView(
     otpRequired: auth.required,
     authenticated: auth.authenticated,
     canAct: currentRecipients(envelope).some((r) => r.id === recipient.id),
+  };
+}
+
+/**
+ * What a recipient who has signed may still see: where the envelope stands, how many people it
+ * is waiting for (not who), and which documents are sealed and ready to download.
+ */
+export function receiptView(
+  envelope: Envelope,
+  recipient: Recipient,
+  workspaceId: string,
+  sealed: ReadonlySet<string>,
+) {
+  return {
+    workspaceId,
+    envelope: {
+      id: envelope.id,
+      title: envelope.title,
+      status: envelope.status,
+      completedAt: envelope.completedAt ?? null,
+    },
+    recipient: {
+      id: recipient.id,
+      name: recipient.name,
+      role: recipient.role,
+      status: recipient.status,
+    },
+    waitingFor: envelope.recipients.filter((r) => r.role !== 'viewer' && !hasActed(r)).length,
+    documents: envelope.documents.map((d) => ({
+      id: d.id,
+      name: d.name,
+      sealed: sealed.has(d.id),
+    })),
   };
 }
 
