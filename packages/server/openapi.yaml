@@ -22,7 +22,7 @@ info:
     | ------ | ----- |
     | 400 | `VALIDATION` |
     | 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |
-    | 403 | `FIELD_NOT_YOURS` |
+    | 403 | `FIELD_NOT_YOURS`, `FORBIDDEN` |
     | 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |
     | 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |
     | 410 | `ENVELOPE_EXPIRED` |
@@ -35,6 +35,13 @@ info:
 
     Validation errors list each problem in `details.issues` as `{ path, message }`, for
     example `recipients[1].email`. Stack traces never leave the server.
+
+    ### Workspaces
+
+    Every envelope belongs to the workspace of the credential that created it. A sender only
+    sees and acts on its own workspace's envelopes; an id from another workspace answers
+    `ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for
+    example a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.
 
     ### Retries
 
@@ -141,6 +148,57 @@ paths:
         '304':
           description: Unchanged since the `ETag` in `If-None-Match`.
   /v1/envelopes:
+    get:
+      operationId: listEnvelopes
+      tags: [Envelopes]
+      summary: List envelopes
+      description: |
+        The caller's workspace's envelopes, newest first, one page at a time. Pass the
+        `nextCursor` of a page as `cursor` to get the next one. Each row is a summary without
+        fields or values; get the envelope for those.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Only these states, comma separated.
+          schema:
+            type: string
+          example: sent,in_progress
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive text anywhere in the title.
+          schema:
+            type: string
+            maxLength: 200
+        - name: limit
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          required: false
+          description: The `nextCursor` of the previous page.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: One page of envelopes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
     post:
       operationId: createEnvelope
       tags: [Envelopes]
@@ -230,6 +288,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ReadOnly'
         '409':
           $ref: '#/components/responses/Conflict'
         '413':
@@ -296,6 +356,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ReadOnly'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -328,6 +390,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ReadOnly'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -375,6 +439,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ReadOnly'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -1044,6 +1110,16 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    ReadOnly:
+      description: '`FORBIDDEN`: the credential may only read.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: This credential can only read envelopes
     NotFound:
       description: '`ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND` or `NOT_FOUND`.'
       content:
@@ -1178,6 +1254,7 @@ components:
         - OTP_INVALID
         - OTP_EXPIRED
         - FIELD_NOT_YOURS
+        - FORBIDDEN
         - ENVELOPE_NOT_FOUND
         - RECIPIENT_NOT_FOUND
         - NOT_FOUND
@@ -1202,6 +1279,7 @@ components:
         OTP_INVALID: 401
         OTP_EXPIRED: 401
         FIELD_NOT_YOURS: 403
+        FORBIDDEN: 403
         ENVELOPE_NOT_FOUND: 404
         RECIPIENT_NOT_FOUND: 404
         NOT_FOUND: 404
@@ -1459,6 +1537,94 @@ components:
           description: |
             Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or
             `false`. Date: an ISO date.
+    EnvelopeSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          title,
+          status,
+          createdAt,
+          sentAt,
+          completedAt,
+          expiresAt,
+          metadata,
+          documents,
+          recipients,
+        ]
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/EnvelopeStatus'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        sentAt:
+          oneOf:
+            - $ref: '#/components/schemas/Timestamp'
+            - type: 'null'
+        completedAt:
+          oneOf:
+            - $ref: '#/components/schemas/Timestamp'
+            - type: 'null'
+        expiresAt:
+          oneOf:
+            - $ref: '#/components/schemas/Timestamp'
+            - type: 'null'
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        documents:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, pageCount]
+            properties:
+              id:
+                $ref: '#/components/schemas/Id'
+              name:
+                type: string
+              pageCount:
+                type: integer
+                minimum: 1
+        recipients:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, email, role, status, actedAt]
+            properties:
+              id:
+                $ref: '#/components/schemas/Id'
+              name:
+                type: string
+              email:
+                type: [string, 'null']
+              role:
+                $ref: '#/components/schemas/RecipientRole'
+              status:
+                $ref: '#/components/schemas/RecipientStatus'
+              actedAt:
+                oneOf:
+                  - $ref: '#/components/schemas/Timestamp'
+                  - type: 'null'
+    EnvelopeList:
+      type: object
+      additionalProperties: false
+      required: [envelopes, nextCursor]
+      properties:
+        envelopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvelopeSummary'
+        nextCursor:
+          type: [string, 'null']
+          description: Pass as `cursor` for the next page; null on the last page.
     Envelope:
       type: object
       additionalProperties: false
