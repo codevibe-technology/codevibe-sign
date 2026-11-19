@@ -30,6 +30,18 @@ const webhooks: WebhookTarget[] = [
 
 Pass them as `webhooks` to `createSignServer`, or in the `overrides` of `startSignServer`.
 
+The server checks each URL when it starts and again before every delivery: it must be
+`https` on a host name (not an IP address), without credentials or a privileged port other
+than 443. At delivery the host is resolved, and the request is refused if any address is
+loopback, private, link-local (including `169.254.169.254`), CGNAT, multicast or reserved,
+in IPv4 or IPv6. The connection goes to the address that was checked, redirects are not
+followed, and only the status code of the answer matters.
+
+To deliver to an internal service, list it in `webhookSecurity.allowHosts`; only listed hosts
+are then accepted, wherever they resolve. For a receiver on your own machine during
+development, set `webhookSecurity: { allowInsecure: true }`, which also allows `http://` and
+local addresses. Never set it in production.
+
 ## The request
 
 Each delivery is a `POST` with a JSON body:

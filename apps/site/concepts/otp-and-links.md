@@ -12,7 +12,13 @@ Every recipient gets a private link with a random token.
 - 32 random bytes, encoded as base64url.
 - Only the SHA-256 of the token is stored. The token itself exists only in the email or SMS.
 - A token belongs to one recipient on one envelope, expires and can be revoked.
-- Checks compare hashes in constant time.
+- Checks compare hashes in constant time. Anything not shaped like a token
+  (`isSigningTokenShape`) is refused before it is hashed.
+- Opening the link (`GET /sign/<token>`) only reads. The server moves the token into an
+  HttpOnly, SameSite=Strict cookie and redirects to a page URL without it, so the token does
+  not stay in the browser history or leak in `Referer` headers. Mail scanners that open links
+  in advance change nothing; the recipient counts as having viewed the document only when the
+  signing page says so.
 
 <!-- check:
 declare const presentedToken: string;
@@ -39,6 +45,8 @@ Recipients set to `email_otp` or `sms_otp` also confirm a code before they can s
 | Storage        | Salted hash only; the code itself is not kept    |
 | Reuse          | A code that was accepted is never accepted again |
 | Rate limits    | Per recipient and per IP address, in the server  |
+| Codes per link | 5 per 15 minutes, 10 over the envelope's life    |
+| Reissue        | Each new code replaces the previous one          |
 
 <!-- check:
 import type { OtpState } from '@codevibe/sign-core';
@@ -57,5 +65,7 @@ const check = verifyOtp(storedState, codeFromUser, systemClock);
 if (!check.ok) throw check.error; // OTP_INVALID, OTP_EXPIRED or OTP_LOCKED
 ```
 
-Saving the returned state on every call is what makes the attempt limit work. After a code is
-accepted, call `markAuthenticated` so the check is recorded in the audit log.
+Saving the returned state on every call is what makes the attempt limit work. Save it only if
+the stored state has not changed since you read it (the server compares a version number), or
+two guesses sent at the same moment would both count as the first. After a code is accepted,
+call `markAuthenticated` so the check is recorded in the audit log.
