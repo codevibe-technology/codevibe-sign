@@ -32,7 +32,9 @@ jobs:
       - run: pnpm format:check
       - run: pnpm build
       - run: pnpm typecheck
+      - run: pnpm check:snippets
       - run: pnpm test
+      - run: pnpm e2e
 
   postgres:
     name: PostgreSQL store
