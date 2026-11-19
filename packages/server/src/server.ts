@@ -6,6 +6,7 @@ import { redactPath } from './http/redact';
 import type { SignServerOptions } from './options';
 import { senderRoutes } from './routes/sender';
 import { linkRoutes } from './routes/link';
+import { openApiRoutes } from './routes/openapi';
 import { signerRoutes } from './routes/signer';
 import { createRuntime } from './runtime/context';
 import { tick, type TickOptions, type TickResult } from './runtime/tick';
@@ -44,7 +45,9 @@ export function createSignServer(options: SignServerOptions): SignServer {
     await next();
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'no-referrer');
-    if (c.req.path.startsWith('/v1/')) c.header('Cache-Control', 'no-store');
+    if (c.req.path.startsWith('/v1/') && !c.res.headers.has('cache-control')) {
+      c.header('Cache-Control', 'no-store');
+    }
   });
 
   const tooLarge = () => {
@@ -55,6 +58,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
   app.use('/v1/sign/*', bodyLimit({ maxSize: SIGNER_BODY_LIMIT, onError: tooLarge }));
 
   app.get('/health', (c) => c.json({ ok: true }));
+  app.route('/v1/openapi.json', openApiRoutes());
   app.route('/v1/envelopes', senderRoutes(rt));
   app.route('/v1/sign', signerRoutes(rt));
   app.route('/sign', linkRoutes(rt));
