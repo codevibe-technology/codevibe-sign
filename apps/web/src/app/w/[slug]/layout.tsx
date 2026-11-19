@@ -1,0 +1,30 @@
+import type { ReactNode } from 'react';
+import { AppShell } from '@/components/shell/app-shell';
+import { requireWorkspace } from '@/server/auth/guards';
+import { db } from '@/server/db';
+import { env } from '@/server/env';
+import { listWorkspacesForUser } from '@/server/workspaces';
+
+export default async function WorkspaceLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const access = await requireWorkspace(slug);
+  const memberships = await listWorkspacesForUser(db(), access.user.id);
+  return (
+    <AppShell
+      user={{ name: access.user.name, email: access.user.email }}
+      sidebar={{
+        current: access.workspace,
+        workspaces: memberships.map((m) => m.workspace),
+        canCreate: !env().SINGLE_WORKSPACE,
+      }}
+    >
+      {children}
+    </AppShell>
+  );
+}
