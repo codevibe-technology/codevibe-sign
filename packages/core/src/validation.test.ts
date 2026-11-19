@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PNG } from './test/fixtures';
-import type { Field, Recipient } from './types';
+import type { Field, PageSize, Recipient, Rect } from './types';
 import {
   checkFieldValue,
   isFilled,
@@ -131,6 +131,15 @@ describe('rectIssues', () => {
     expect(rectIssues({ x: 0, y: 0, width: Infinity, height: 10 }, page, 'f')).toHaveLength(1);
   });
 
+  it('reports a missing box or a non-number instead of throwing', () => {
+    const missing = undefined as unknown as Rect;
+    const text = { x: '1', y: 0, width: 10, height: 10 } as unknown as Rect;
+    expect(rectIssues(missing, page, 'f')).toEqual([
+      { path: 'f', message: 'Position and size must be finite numbers' },
+    ]);
+    expect(rectIssues(text, page, 'f')).toHaveLength(1);
+  });
+
   it('only checks the far edges when the page size is known', () => {
     expect(rectIssues({ x: 5000, y: 5000, width: 10, height: 10 }, undefined, 'f')).toEqual([]);
   });
@@ -141,6 +150,11 @@ describe('pageSizeIssues', () => {
     expect(pageSizeIssues([page], 1, 'p')).toEqual([]);
     expect(pageSizeIssues([page], 2, 'p')).toHaveLength(1);
     expect(pageSizeIssues([page, { width: 0, height: 1 }], 2, 'p')[0]!.path).toBe('p.1');
+  });
+
+  it('reports malformed input instead of throwing', () => {
+    expect(pageSizeIssues(null as unknown as PageSize[], 1, 'p')[0]!.path).toBe('p');
+    expect(pageSizeIssues([page, null as unknown as PageSize], 2, 'p')[0]!.path).toBe('p.1');
   });
 });
 

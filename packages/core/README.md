@@ -133,6 +133,17 @@ refuses a different value for it with `FIELD_NOT_YOURS` (`details.readOnly` is `
 and `validateForSend` asks for a value on every required read-only field. Only text, name
 and checkbox fields (`PREFILLABLE_FIELD_TYPES`) can be prefilled or read-only.
 
+### Validators
+
+The checks the builder uses are exported for packages that validate their own input
+first, such as templates. Each returns `ValidationIssue[]` (empty means fine) and copes with
+malformed input:
+
+- `rectIssues(rect, pageSize | undefined, path)`: finite, positive, inside the page.
+- `pageSizeIssues(sizes, pageCount, path)`: one positive size per page.
+- `reminderIssues(policy, path?)`: whole days, and a gap when more than one reminder.
+- `validationError(issues)` → `SignError` with code `VALIDATION`.
+
 ### Audit log
 
 `hash = sha256(prevHash + canonicalize(event))`, starting from `GENESIS_HASH` (64 zeros).
