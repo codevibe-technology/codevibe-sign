@@ -1,0 +1,19 @@
+{
+  "name": "example-express-webhook",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Receive and verify Codevibe Sign webhooks in a plain Node HTTP server.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@codevibe/sign-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "tsx": "4.19.2"
+  }
+}
