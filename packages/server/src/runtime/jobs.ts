@@ -4,8 +4,9 @@ import type { Runtime } from './context';
 import { runNotify, type NotifyPayload } from './notify';
 import { runSeal, type SealPayload } from './seal';
 import {
+  attemptWebhook,
   buildWebhookBody,
-  deliverWebhook,
+  reportWebhook,
   webhookTargetsFor,
   type WebhookPayload,
 } from './webhooks';
@@ -94,14 +95,18 @@ export async function runJobs(rt: Runtime, jobs: Job[]): Promise<number> {
   return failed;
 }
 
+function retryTime(rt: Runtime, job: Job): Date | null {
+  const delay = RETRY_DELAYS_MS[job.attempts];
+  return delay === undefined ? null : new Date(rt.clock.now().getTime() + delay);
+}
+
 async function runJob(rt: Runtime, job: Job): Promise<boolean> {
   try {
     await handle(rt, job);
     await rt.store.completeJob(job.id);
     return true;
   } catch (err) {
-    const delay = RETRY_DELAYS_MS[job.attempts];
-    const retryAt = delay === undefined ? null : new Date(rt.clock.now().getTime() + delay);
+    const retryAt = retryTime(rt, job);
     await rt.store.failJob(job.id, describe(err), retryAt);
     const meta = { job: job.id, kind: job.kind, attempt: job.attempts + 1, error: describe(err) };
     if (retryAt) rt.logger.warn('job failed, will retry', meta);
@@ -115,12 +120,19 @@ function handle(rt: Runtime, job: Job): Promise<void> {
     case 'notify':
       return runNotify(rt, job.payload as unknown as NotifyPayload);
     case 'webhook':
-      return deliverWebhook(rt, job.payload as unknown as WebhookPayload);
+      return runWebhook(rt, job);
     case 'seal':
       return runSeal(rt, job.payload as unknown as SealPayload, (more) =>
         rt.store.enqueue(more).then(() => dispatchJobs(rt, more)),
       );
   }
+}
+
+async function runWebhook(rt: Runtime, job: Job): Promise<void> {
+  const payload = job.payload as unknown as WebhookPayload;
+  const { report, error } = await attemptWebhook(rt, payload, job.attempts + 1, retryTime(rt, job));
+  await reportWebhook(rt, report);
+  if (error !== null) throw error;
 }
 
 export function makeJob(rt: Runtime, kind: Job['kind'], payload: object, leased = true): Job {

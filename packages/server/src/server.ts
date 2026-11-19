@@ -3,7 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { defaultPdfEngine } from './engine';
 import { errorHandler, HttpError } from './errors';
 import { redactPath } from './http/redact';
-import type { SignServerOptions } from './options';
+import type { SignServerOptions, WebhookDeliveryReport } from './options';
 import { senderRoutes } from './routes/sender';
 import { linkRoutes } from './routes/link';
 import { openApiRoutes } from './routes/openapi';
@@ -11,6 +11,12 @@ import { receiptRoutes } from './routes/receipt';
 import { signerRoutes } from './routes/signer';
 import { createRuntime } from './runtime/context';
 import { tick, type TickOptions, type TickResult } from './runtime/tick';
+import {
+  attemptWebhook,
+  buildTestWebhookBody,
+  reportWebhook,
+  type WebhookPayload,
+} from './runtime/webhooks';
 
 const SIGNER_BODY_LIMIT = 10 * 1024 * 1024;
 
@@ -20,6 +26,22 @@ export interface SignServer {
   tick(options?: TickOptions): Promise<TickResult>;
   /** Resolves when background effects started so far have finished. */
   idle(): Promise<void>;
+  /**
+   * Posts a `webhook.test` event to one of the workspace's targets now and says how it went.
+   * Nothing is queued: a failed test is not retried. The report also goes to
+   * `onWebhookDelivery`.
+   */
+  sendTestWebhook(input: { workspaceId: string; url: string }): Promise<WebhookDeliveryReport>;
+  /**
+   * Posts an earlier delivery again now, with the same id and body, for example after the
+   * receiver was fixed. The target is looked up again, so its current secret signs it.
+   */
+  redeliverWebhook(input: {
+    workspaceId: string;
+    url: string;
+    deliveryId: string;
+    body: string;
+  }): Promise<WebhookDeliveryReport>;
 }
 
 export function createSignServer(options: SignServerOptions): SignServer {
@@ -67,9 +89,22 @@ export function createSignServer(options: SignServerOptions): SignServer {
   app.route('/v1/sign', signerRoutes(rt));
   app.route('/sign', linkRoutes(rt));
 
+  const deliverNow = async (payload: WebhookPayload) => {
+    const { report } = await attemptWebhook(rt, payload, 1, null);
+    await reportWebhook(rt, report);
+    return report;
+  };
+
   return {
     app,
     tick: (tickOptions) => tick(rt, tickOptions),
+    sendTestWebhook({ workspaceId, url }) {
+      const deliveryId = rt.ids.id();
+      const body = buildTestWebhookBody(deliveryId, rt.clock.now());
+      return deliverNow({ url, workspaceId, deliveryId, body });
+    },
+    redeliverWebhook: ({ workspaceId, url, deliveryId, body }) =>
+      deliverNow({ url, workspaceId, deliveryId, body }),
     async idle() {
       while (rt.inflight.size > 0) await Promise.allSettled([...rt.inflight]);
     },

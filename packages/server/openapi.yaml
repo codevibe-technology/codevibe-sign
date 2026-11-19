@@ -1078,6 +1078,49 @@ webhooks:
       responses:
         '2XX':
           description: Received. Answer quickly; any other status, or no answer in 10 s, is retried.
+  testEvent:
+    post:
+      operationId: testEvent
+      summary: Test event
+      description: |
+        Sent when someone asks for a test delivery, for example with "Send test event" in the
+        app, to check that the receiver is reachable and verifies signatures. It is signed and
+        carries the same headers as an envelope event, but has no envelope and is never
+        retried. Answer it like any other delivery.
+      parameters:
+        - name: x-codevibe-signature
+          in: header
+          required: true
+          description: '`t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>">`.'
+          schema:
+            type: string
+            pattern: '^t=\d+,v1=[0-9a-f]{64}$'
+        - name: x-codevibe-delivery
+          in: header
+          required: true
+          description: The delivery id, the same as `id` in the body.
+          schema:
+            type: string
+        - name: user-agent
+          in: header
+          required: true
+          schema:
+            const: codevibe-sign-webhooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookTestEvent'
+            example:
+              id: 9c2e4b7a-1d3f-4a6e-8b0c-5e7f9a1b3d24
+              type: webhook.test
+              createdAt: '2026-03-02T09:20:00.000Z'
+              data:
+                message: This is a test event from Codevibe Sign. Answer with any 2xx status.
+      responses:
+        '2XX':
+          description: Received.
 components:
   securitySchemes:
     apiKey:
@@ -2291,6 +2334,25 @@ components:
           description: Replaces all fields.
           items:
             $ref: '#/components/schemas/NewField'
+    WebhookTestEvent:
+      type: object
+      additionalProperties: false
+      required: [id, type, createdAt, data]
+      properties:
+        id:
+          type: string
+          description: The delivery id.
+        type:
+          const: webhook.test
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        data:
+          type: object
+          additionalProperties: false
+          required: [message]
+          properties:
+            message:
+              type: string
     WebhookEvent:
       type: object
       additionalProperties: false

@@ -1,6 +1,6 @@
 import type { AuditAction, Envelope } from '@codevibe_technology/sign-core';
 import { constantTimeEqual, hmacSha256Hex } from '../crypto';
-import type { WebhookTarget } from '../options';
+import type { WebhookDeliveryReport, WebhookTarget } from '../options';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { Runtime } from './context';
 import { checkWebhookUrl, pinnedPost, resolveWebhookAddress } from './webhook-guard';
@@ -92,10 +92,37 @@ export async function webhookTargetsFor(
   return [...fixed, ...own];
 }
 
-export async function deliverWebhook(rt: Runtime, payload: WebhookPayload): Promise<void> {
+/** The receiver answered, but not with a 2xx status. */
+export class WebhookStatusError extends Error {
+  constructor(
+    readonly host: string,
+    readonly status: number,
+  ) {
+    super(`Webhook ${host} answered ${status}`);
+    this.name = 'WebhookStatusError';
+  }
+}
+
+export const TEST_EVENT = 'webhook.test';
+
+/** A delivery that only checks the receiver: no envelope, just a fixed message. */
+export function buildTestWebhookBody(deliveryId: string, now: Date): string {
+  return JSON.stringify({
+    id: deliveryId,
+    type: TEST_EVENT,
+    createdAt: now.toISOString(),
+    data: { message: 'This is a test event from Codevibe Sign. Answer with any 2xx status.' },
+  });
+}
+
+/**
+ * Posts one delivery. Returns the receiver's status, or null when the workspace no longer has
+ * a target with this URL (it was removed or turned off), in which case nothing is sent.
+ */
+export async function deliverWebhook(rt: Runtime, payload: WebhookPayload): Promise<number | null> {
   const targets = await webhookTargetsFor(rt, payload.workspaceId ?? DEFAULT_WORKSPACE);
   const target = targets.find((w) => w.url === payload.url);
-  if (!target) return;
+  if (!target) return null;
   if (target.secret.length < 16) throw new Error(`Webhook secret for ${target.url} is too short`);
   const url = checkWebhookUrl(payload.url, rt.webhookSecurity);
   const address = await resolveWebhookAddress(url, rt.webhookSecurity);
@@ -128,7 +155,68 @@ export async function deliverWebhook(rt: Runtime, payload: WebhookPayload): Prom
       maxResponseBytes: MAX_RESPONSE_BYTES,
     });
   }
-  if (status < 200 || status >= 300) {
-    throw new Error(`Webhook ${url.host} answered ${status}`);
+  if (status < 200 || status >= 300) throw new WebhookStatusError(url.host, status);
+  return status;
+}
+
+function eventOf(body: string): string {
+  try {
+    const type = (JSON.parse(body) as { type?: unknown }).type;
+    return typeof type === 'string' ? type : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Delivers once and describes what happened, without throwing for a failed delivery.
+ * `retryAt` is when the caller will try again, if it will.
+ */
+export async function attemptWebhook(
+  rt: Runtime,
+  payload: WebhookPayload,
+  attempt: number,
+  retryAt: Date | null,
+): Promise<{ report: WebhookDeliveryReport; error: unknown }> {
+  const at = rt.clock.now();
+  const started = Date.now();
+  let status: number | null = null;
+  let outcome: WebhookDeliveryReport['outcome'];
+  let error: unknown = null;
+  try {
+    status = await deliverWebhook(rt, payload);
+    outcome = status === null ? 'skipped' : 'delivered';
+  } catch (err) {
+    error = err;
+    outcome = 'failed';
+    if (err instanceof WebhookStatusError) status = err.status;
+  }
+  const report: WebhookDeliveryReport = {
+    deliveryId: payload.deliveryId,
+    workspaceId: payload.workspaceId ?? DEFAULT_WORKSPACE,
+    url: payload.url,
+    event: eventOf(payload.body),
+    body: payload.body,
+    attempt,
+    outcome,
+    status,
+    error: error === null ? null : error instanceof Error ? error.message : String(error),
+    retryAt: outcome === 'failed' ? retryAt : null,
+    at,
+    durationMs: Date.now() - started,
+  };
+  return { report, error };
+}
+
+/** Hands a report to `onWebhookDelivery`; a failing hook is logged, never thrown. */
+export async function reportWebhook(rt: Runtime, report: WebhookDeliveryReport): Promise<void> {
+  if (!rt.onWebhookDelivery) return;
+  try {
+    await rt.onWebhookDelivery(report);
+  } catch (err) {
+    rt.logger.error('onWebhookDelivery failed', {
+      delivery: report.deliveryId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { envelopeBody, harness, PNG, WEBHOOK_SECRET } from '../testing/harness';
 import { fakePdfEngine } from '../testing/fake-pdf';
 import { RETRY_DELAYS_MS } from './jobs';
-import { signWebhook, verifyWebhook } from './webhooks';
+import type { WebhookDeliveryReport } from '../options';
+import { signWebhook, TEST_EVENT, verifyWebhook } from './webhooks';
 
 const DAY = 86_400_000;
 
@@ -81,6 +82,144 @@ describe('webhooks', () => {
     expect(result.failedJobs).toBe(0);
     h.advance(DAY);
     expect((await h.server.tick()).jobs).toBe(0);
+  });
+
+  it('reports every attempt with its status and the next retry', async () => {
+    const reports: WebhookDeliveryReport[] = [];
+    const h = harness({ onWebhookDelivery: (r) => void reports.push(r) });
+    h.setWebhookStatus(500);
+    await h.call('POST', '/v1/envelopes', { body: envelopeBody({ send: true }) });
+    expect(reports.length).toBe(h.deliveries.length);
+    const first = reports[0]!;
+    expect(first).toMatchObject({
+      workspaceId: 'default',
+      url: 'https://hooks.example.com/sign',
+      attempt: 1,
+      outcome: 'failed',
+      status: 500,
+      error: 'Webhook hooks.example.com answered 500',
+    });
+    expect(first.body).toBe(h.deliveries[0]!.body);
+    expect(first.event).toBe(JSON.parse(first.body).type);
+    expect(first.retryAt?.getTime()).toBe(first.at.getTime() + RETRY_DELAYS_MS[0]!);
+
+    h.setWebhookStatus(204);
+    h.advance(RETRY_DELAYS_MS[0]!);
+    await h.server.tick();
+    const retried = reports.find((r) => r.deliveryId === first.deliveryId && r.attempt === 2);
+    expect(retried).toMatchObject({
+      outcome: 'delivered',
+      status: 204,
+      error: null,
+      retryAt: null,
+    });
+  });
+
+  it('reports the last attempt without a retry time', async () => {
+    const reports: WebhookDeliveryReport[] = [];
+    const h = harness({
+      onWebhookDelivery: (r) => void reports.push(r),
+      webhooks: [
+        { url: 'https://hooks.example.com/a', secret: WEBHOOK_SECRET, events: ['envelope.sent'] },
+      ],
+    });
+    h.setWebhookStatus(500);
+    await h.call('POST', '/v1/envelopes', { body: envelopeBody({ send: true }) });
+    for (const delay of RETRY_DELAYS_MS) {
+      h.advance(delay);
+      await h.server.tick();
+    }
+    const last = reports.at(-1)!;
+    expect(last.attempt).toBe(RETRY_DELAYS_MS.length + 1);
+    expect(last.outcome).toBe('failed');
+    expect(last.retryAt).toBeNull();
+  });
+
+  it('keeps delivering when the report hook throws', async () => {
+    const h = harness({
+      onWebhookDelivery: () => {
+        throw new Error('log is down');
+      },
+    });
+    await h.call('POST', '/v1/envelopes', { body: envelopeBody({ send: true }) });
+    expect(h.deliveries.length).toBeGreaterThan(0);
+    expect(h.logs.some((l) => l.message === 'onWebhookDelivery failed')).toBe(true);
+    expect((await h.server.tick()).failedJobs).toBe(0);
+  });
+
+  it('reports a delivery whose target was removed as skipped', async () => {
+    const reports: WebhookDeliveryReport[] = [];
+    let targets = [{ url: 'https://hooks.example.com/w', secret: WEBHOOK_SECRET, events: ['*'] }];
+    const h = harness({
+      webhooks: [],
+      webhookTargets: async () => targets,
+      onWebhookDelivery: (r) => void reports.push(r),
+      authenticate: async () => ({ id: 'k', workspaceId: 'ws_1' }),
+    });
+    h.setWebhookStatus(500);
+    await h.call('POST', '/v1/envelopes', { body: envelopeBody({ send: true }) });
+    const sent = h.deliveries.length;
+    targets = [];
+    h.advance(RETRY_DELAYS_MS[0]!);
+    await h.server.tick();
+    expect(h.deliveries.length).toBe(sent);
+    expect(reports.at(-1)).toMatchObject({ workspaceId: 'ws_1', outcome: 'skipped', status: null });
+  });
+
+  it('sends a test event to a target now, signed, without queueing a retry', async () => {
+    const reports: WebhookDeliveryReport[] = [];
+    const h = harness({ onWebhookDelivery: (r) => void reports.push(r) });
+    const report = await h.server.sendTestWebhook({
+      workspaceId: 'default',
+      url: 'https://hooks.example.com/sign',
+    });
+    expect(report).toMatchObject({ outcome: 'delivered', status: 200, event: TEST_EVENT });
+    expect(reports).toEqual([report]);
+    const delivery = h.deliveries[0]!;
+    expect(JSON.parse(delivery.body)).toMatchObject({
+      id: report.deliveryId,
+      type: 'webhook.test',
+    });
+    expect(delivery.headers['x-codevibe-delivery']).toBe(report.deliveryId);
+    expect(
+      verifyWebhook(WEBHOOK_SECRET, delivery.headers['x-codevibe-signature'], delivery.body, {
+        now: new Date('2026-03-02T09:00:00Z'),
+      }),
+    ).toBe(true);
+
+    h.setWebhookStatus(404);
+    const failed = await h.server.sendTestWebhook({
+      workspaceId: 'default',
+      url: 'https://hooks.example.com/sign',
+    });
+    expect(failed).toMatchObject({ outcome: 'failed', status: 404, retryAt: null });
+    h.advance(DAY);
+    expect((await h.server.tick()).jobs).toBe(0);
+
+    const unknown = await h.server.sendTestWebhook({
+      workspaceId: 'default',
+      url: 'https://elsewhere.example.com/',
+    });
+    expect(unknown.outcome).toBe('skipped');
+    expect(h.deliveries).toHaveLength(2);
+  });
+
+  it('redelivers the same body under the same id', async () => {
+    const h = harness();
+    const original = JSON.stringify({ id: 'd_1', type: 'envelope.completed', data: {} });
+    const report = await h.server.redeliverWebhook({
+      workspaceId: 'default',
+      url: 'https://hooks.example.com/sign',
+      deliveryId: 'd_1',
+      body: original,
+    });
+    expect(report).toMatchObject({
+      deliveryId: 'd_1',
+      outcome: 'delivered',
+      event: 'envelope.completed',
+    });
+    expect(h.deliveries[0]!.body).toBe(original);
+    expect(h.deliveries[0]!.headers['x-codevibe-delivery']).toBe('d_1');
   });
 
   it('checks the signature format and age on the receiving side', () => {
