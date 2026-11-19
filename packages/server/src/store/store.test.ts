@@ -167,6 +167,40 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       expect(after.map((j) => j.id)).not.toContain(a);
       expect(after.map((j) => j.id)).not.toContain(b);
     });
+
+    it('lets exactly one of several racing writers win', async () => {
+      const envelope = draft();
+      const created = await Promise.allSettled(
+        Array.from({ length: 5 }, () => store.commit(envelope, [event(envelope, 1)], 0, [])),
+      );
+      expect(created.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      for (const r of created.filter((r) => r.status === 'rejected')) {
+        expect((r as PromiseRejectedResult).reason).toBeInstanceOf(VersionConflictError);
+      }
+
+      const updated = await Promise.allSettled(
+        Array.from({ length: 5 }, () => store.commit(envelope, [event(envelope, 2)], 1, [])),
+      );
+      expect(updated.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await store.listEvents(envelope.id)).toHaveLength(2);
+    });
+
+    it('claims an idempotency key and leases a job only once under concurrency', async () => {
+      const scope = `race-${++counter}`;
+      const claims = await Promise.all(
+        Array.from({ length: 5 }, () => store.claimIdempotency(scope, 'k', 'f', T0)),
+      );
+      expect(claims.filter((c) => c.state === 'new')).toHaveLength(1);
+
+      const id = `job-race-${counter}`;
+      const at = new Date(T0.getTime() - 60_000);
+      await store.enqueue([job(id, at)]);
+      const lease = new Date(T0.getTime() + 300_000);
+      const leases = await Promise.all(
+        Array.from({ length: 5 }, () => store.claimJobs(T0, 100, lease)),
+      );
+      expect(leases.flat().filter((j) => j.id === id)).toHaveLength(1);
+    });
   });
 }
 
@@ -182,7 +216,8 @@ describe.skipIf(!url)('postgresStore', () => {
     admin = postgres(url!, { max: 1, onnotice: () => {} });
     await admin.unsafe(`create schema ${schema}`);
     sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
-    expect(await migrate(sql)).toEqual(['0001_init']);
+    const runs = await Promise.all([migrate(sql), migrate(sql), migrate(sql)]);
+    expect(runs.flat()).toEqual(['0001_init']);
     expect(await migrate(sql)).toEqual([]);
   });
 
