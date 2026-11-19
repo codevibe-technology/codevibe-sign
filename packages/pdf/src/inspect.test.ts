@@ -84,6 +84,82 @@ describe('inspectPdf', () => {
     expect(error.code).toBe('DOCUMENT_INVALID');
   });
 
+  describe('malformed files behind a PDF header', () => {
+    const latin1 = (text: string) => new Uint8Array(Buffer.from(text, 'latin1'));
+    const tree = (pages: string, extra = '') =>
+      latin1(
+        '%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n' +
+          `2 0 obj\n${pages}\nendobj\n${extra}trailer\n<< /Root 1 0 R >>\n%%EOF`,
+      );
+    const onePage = async () => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      return doc.save({ useObjectStreams: false });
+    };
+
+    it.each<[string, () => Promise<Uint8Array> | Uint8Array]>([
+      ['only the header', () => latin1('%PDF-1.7\n')],
+      ['text garbage after the header', () => latin1('%PDF-1.7\n' + 'x'.repeat(500))],
+      [
+        'binary garbage after the header',
+        () =>
+          latin1(
+            '%PDF-1.4\n' +
+              String.fromCharCode(...Array.from({ length: 2000 }, (_, i) => (i * 37) % 256)),
+          ),
+      ],
+      ['a file cut in half', async () => (await onePage()).subarray(0, 400)],
+      ['a file cut after the header', async () => (await onePage()).subarray(0, 40)],
+      [
+        'no trailer root',
+        () => latin1('%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< >>\n%%EOF'),
+      ],
+      [
+        'a huge object number with no xref',
+        () =>
+          latin1(
+            '%PDF-1.7\n999999999 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n' +
+              'trailer\n<< /Root 999999999 0 R /Size 1000000000 >>\n%%EOF',
+          ),
+      ],
+      ['a page tree that is a number', () => tree('42')],
+      ['a page tree without kids', () => tree('<< /Type /Pages /Count 1 >>')],
+      ['a cyclic page tree', () => tree('<< /Type /Pages /Kids [2 0 R] /Count 1 >>')],
+      [
+        'a page box that is not numbers',
+        () =>
+          tree(
+            '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 (a) 5] >>\nendobj\n',
+          ),
+      ],
+    ])('rejects %s as unreadable', async (_name, make) => {
+      const error = await rejection(inspectPdf(await make()));
+      expect(error.code).toBe('DOCUMENT_INVALID');
+      expect(error.details).toEqual({ reason: 'unreadable' });
+    });
+
+    it('rejects an empty page tree with a huge count as empty', async () => {
+      const error = await rejection(
+        inspectPdf(tree('<< /Type /Pages /Kids [] /Count 99999999 >>')),
+      );
+      expect(error.details).toEqual({ reason: 'empty' });
+    });
+
+    it('recovers a file whose xref is missing or claims too many objects', async () => {
+      const text = Buffer.from(await onePage()).toString('latin1');
+      for (const broken of [
+        text.replace(/xref[\s\S]*$/, ''),
+        text.replace(/xref\n0 \d+/, 'xref\n0 999999999'),
+      ]) {
+        await expect(inspectPdf(latin1(broken))).resolves.toEqual({
+          pageCount: 1,
+          pages: [{ width: A4[0], height: A4[1] }],
+        });
+      }
+    });
+  });
+
   it('rejects PDFs without pages', async () => {
     const empty = await (await PDFDocument.create()).save({ addDefaultPage: false });
     const error = await rejection(inspectPdf(empty));
