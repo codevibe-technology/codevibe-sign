@@ -1,7 +1,7 @@
 import { SignError } from '@codevibe_technology/sign-core';
-import type { StandaloneConfig } from '@codevibe_technology/sign-server';
+import type { StandaloneConfig } from './node';
 
-export interface AppConfig {
+export interface EnvConfig {
   server: StandaloneConfig;
   /** Read the client IP from `X-Forwarded-For`; only behind a proxy you control. */
   trustProxy: boolean;
@@ -11,12 +11,12 @@ export interface AppConfig {
   host: string;
 }
 
-export type Env = Record<string, string | undefined>;
+export type EnvVars = Record<string, string | undefined>;
 
 const MIN_API_KEY_LENGTH = 32;
 
 /** Reads and validates every variable, then reports all problems at once by variable name. */
-export function loadConfig(env: Env): AppConfig {
+export function configFromEnv(env: EnvVars): EnvConfig {
   const problems: string[] = [];
 
   function need(name: string): string {

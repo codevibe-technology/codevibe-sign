@@ -11,3 +11,4 @@ coverage/
 *.pfx
 **/.vitepress/cache/
 **/.vitepress/dist/
+.README.md.prepack

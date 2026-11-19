@@ -41,6 +41,7 @@ Docker. Your documents stay on your servers.
 
 | Package                                                 | What it does                                                                            |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [`codevibe-sign`](packages/codevibe-sign)               | The one to install: all of the below behind subpath imports, plus the CLI.              |
 | [`@codevibe_technology/sign-core`](packages/core)       | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O. |
 | [`@codevibe_technology/sign-pdf`](packages/pdf)         | Draws fields, appends the certificate page, seals and verifies PDFs.                    |
 | [`@codevibe_technology/sign-server`](packages/server)   | HTTP API and runtime with adapters for storage, files, mail and OTP.                    |
@@ -54,15 +55,32 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 ## Quick start
 
-### Embed the server
+### Try it in a minute
 
 ```sh
-pnpm add @codevibe_technology/sign-server
+npx codevibe-sign start --memory
 ```
+
+This runs the server with everything in memory: a generated seal certificate, emails and
+one-time codes printed to the terminal, and a fresh API key. Send it a PDF with the `curl`
+command it prints, sign through the link that appears in its output, then check the sealed
+file with `npx codevibe-sign verify signed.pdf`. Nothing is saved when it stops.
+
+### Install
+
+```sh
+npm i codevibe-sign
+```
+
+One package with subpath imports, so each bundle only carries what it uses:
+`codevibe-sign/server`, `codevibe-sign/client`, `codevibe-sign/pdf`, `codevibe-sign/core` and
+`codevibe-sign/react`. The [package README](packages/codevibe-sign) lists the CLI commands.
+
+### Embed the server
 
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { startSignServer } from '@codevibe_technology/sign-server';
+import { startSignServer } from 'codevibe-sign/server';
 
 const sign = await startSignServer({
   databaseUrl: process.env.DATABASE_URL!,
@@ -91,7 +109,7 @@ Your backend then creates and sends envelopes through the HTTP API with one of t
 directly or with the typed client:
 
 ```ts
-import { createSignClient } from '@codevibe_technology/sign-client';
+import { createSignClient } from 'codevibe-sign/client';
 
 const sign = createSignClient({ baseUrl: 'https://sign.example.com', apiKey });
 await sign.envelopes.create({ title: 'Offer letter', send: true, documents, recipients, fields });
@@ -102,13 +120,13 @@ The endpoints are documented in the [server package README](packages/server).
 ### Use the React components
 
 ```sh
-pnpm add @codevibe_technology/sign-react react react-dom
+npm i codevibe-sign react react-dom
 ```
 
 ```tsx check
-import '@codevibe_technology/sign-react/styles.css';
-import { SigningView } from '@codevibe_technology/sign-react';
-import type { Field } from '@codevibe_technology/sign-core';
+import 'codevibe-sign/react/styles.css';
+import { SigningView } from 'codevibe-sign/react';
+import type { Field } from 'codevibe-sign/core';
 
 interface SignerPage {
   recipient: { id: string; name: string };
@@ -146,7 +164,8 @@ match your product.
 `apps/server` builds a Docker image that runs the standalone service from environment
 variables: a PostgreSQL `DATABASE_URL`, a directory for files, SMTP settings, your sealing
 certificate as a PKCS#12 file and the API keys your backend uses. See
-[apps/server/README.md](apps/server/README.md). You run it, so documents, keys and personal data
+[apps/server/README.md](apps/server/README.md). Without Docker, `npx codevibe-sign start` runs
+the same service from the same variables. You run it, so documents, keys and personal data
 never leave your infrastructure.
 
 ## Security

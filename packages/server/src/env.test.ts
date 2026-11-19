@@ -1,12 +1,12 @@
 import { SignError } from '@codevibe_technology/sign-core';
 import { describe, expect, it } from 'vitest';
-import { loadConfig, type Env } from './config';
+import { configFromEnv, type EnvVars } from './env';
 
 const KEY_A = 'a'.repeat(40);
 const KEY_B = 'b'.repeat(32);
 const P12 = Buffer.from([0x30, 0x82, 0x01, 0x02]).toString('base64');
 
-function env(overrides: Env = {}): Env {
+function env(overrides: EnvVars = {}): EnvVars {
   return {
     DATABASE_URL: 'postgres://sign:secret@db:5432/sign',
     SMTP_HOST: 'smtp.example.com',
@@ -19,9 +19,9 @@ function env(overrides: Env = {}): Env {
   };
 }
 
-function problems(overrides: Env): string[] {
+function problems(overrides: EnvVars): string[] {
   try {
-    loadConfig(env(overrides));
+    configFromEnv(env(overrides));
   } catch (error) {
     if (error instanceof SignError) return (error.details?.problems as string[]) ?? [];
     throw error;
@@ -29,9 +29,9 @@ function problems(overrides: Env): string[] {
   return [];
 }
 
-describe('loadConfig', () => {
+describe('configFromEnv', () => {
   it('builds the server config with defaults', () => {
-    const config = loadConfig(env());
+    const config = configFromEnv(env());
     expect(config.port).toBe(3000);
     expect(config.host).toBe('0.0.0.0');
     expect(config.trustProxy).toBe(false);
@@ -47,7 +47,7 @@ describe('loadConfig', () => {
   });
 
   it('reads the seal reason and location, tick interval and proxy setting', () => {
-    const config = loadConfig(
+    const config = configFromEnv(
       env({
         SEAL_REASON: ' Signed electronically ',
         SEAL_LOCATION: 'Pune',
@@ -63,7 +63,7 @@ describe('loadConfig', () => {
   });
 
   it('reads optional variables', () => {
-    const config = loadConfig(
+    const config = configFromEnv(
       env({
         FILES_DIR: '/srv/files',
         SMTP_PORT: '465',
@@ -85,21 +85,21 @@ describe('loadConfig', () => {
   });
 
   it('lets SMTP_SECURE override the port default', () => {
-    expect(loadConfig(env({ SMTP_PORT: '465', SMTP_SECURE: 'false' })).server.smtp.secure).toBe(
+    expect(configFromEnv(env({ SMTP_PORT: '465', SMTP_SECURE: 'false' })).server.smtp.secure).toBe(
       false,
     );
-    expect(loadConfig(env({ SMTP_SECURE: 'true' })).server.smtp.secure).toBe(true);
+    expect(configFromEnv(env({ SMTP_SECURE: 'true' })).server.smtp.secure).toBe(true);
   });
 
   it('allows an empty passphrase but not a missing one', () => {
-    expect(loadConfig(env({ SEAL_P12_PASSPHRASE: '' })).server.seal.passphrase).toBe('');
+    expect(configFromEnv(env({ SEAL_P12_PASSPHRASE: '' })).server.seal.passphrase).toBe('');
     expect(problems({ SEAL_P12_PASSPHRASE: undefined })).toEqual([
       'SEAL_P12_PASSPHRASE is required',
     ]);
   });
 
   it('reports every missing variable at once', () => {
-    expect(() => loadConfig({})).toThrow(SignError);
+    expect(() => configFromEnv({})).toThrow(SignError);
     const all = problems({
       DATABASE_URL: undefined,
       SMTP_HOST: undefined,
@@ -140,7 +140,7 @@ describe('loadConfig', () => {
 
   it('never puts secret values in the error', () => {
     try {
-      loadConfig(env({ API_KEYS: 'short-secret-key', SMTP_USER: 'mailer', SMTP_PORT: 'x' }));
+      configFromEnv(env({ API_KEYS: 'short-secret-key', SMTP_USER: 'mailer', SMTP_PORT: 'x' }));
       expect.unreachable();
     } catch (error) {
       const text = JSON.stringify({
