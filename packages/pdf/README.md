@@ -94,7 +94,11 @@ event loop or exhaust memory:
 | `timeoutMs`       | 10 s    | Files that take longer to read; the worker is killed.               |
 
 The worker also has a 512 MB heap; a file that needs more is refused. `checkParseLimits(bytes,
-limits?)` runs the same check on its own, and `DEFAULT_PARSE_LIMITS` holds the defaults.
+limits?)` runs the same check on its own, and `DEFAULT_PARSE_LIMITS` holds the defaults. The
+worker ships inline with its own copy of pdf-lib, so it runs the same whether your app loads this
+package from `node_modules` or a bundler (Next.js, webpack, esbuild) inlines it. If the worker
+cannot start at all, the check throws a plain `Error`, not `DOCUMENT_INVALID`: the fault is the
+host's, not the file's.
 
 Errors: `DOCUMENT_TOO_LARGE`; `DOCUMENT_INVALID` with `details.reason` of `encrypted`,
 `unreadable`, `empty`, `timeout` or `limit` (then `details.limit` names it, with `details.max`).
