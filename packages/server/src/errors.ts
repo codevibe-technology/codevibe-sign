@@ -4,7 +4,13 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 /** Codes the HTTP layer adds on top of the domain codes from core. */
-export type HttpErrorCode = SignErrorCode | 'UNAUTHORIZED' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL';
+export type HttpErrorCode =
+  | SignErrorCode
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'INTERNAL';
 
 export interface ErrorBody {
   error: { code: HttpErrorCode; message: string; details?: Record<string, unknown> };
@@ -17,6 +23,7 @@ const STATUS: Record<HttpErrorCode, ContentfulStatusCode> = {
   OTP_INVALID: 401,
   OTP_EXPIRED: 401,
   FIELD_NOT_YOURS: 403,
+  FORBIDDEN: 403,
   ENVELOPE_NOT_FOUND: 404,
   RECIPIENT_NOT_FOUND: 404,
   NOT_FOUND: 404,
