@@ -1,0 +1,29 @@
+{
+  "name": "codevibe-sign",
+  "private": true,
+  "description": "Open-source electronic signatures for documents: send, sign, seal and verify.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/** run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@changesets/cli": "2.27.10",
+    "@eslint/js": "9.15.0",
+    "eslint": "9.15.0",
+    "prettier": "3.3.3",
+    "tsup": "8.3.5",
+    "typescript": "5.6.3",
+    "typescript-eslint": "8.15.0",
+    "vitest": "2.1.8"
+  },
+  "type": "module"
+}

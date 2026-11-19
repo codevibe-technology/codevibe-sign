@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.worktrees/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+*.p12
+*.pfx
