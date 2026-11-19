@@ -1,0 +1,16 @@
+{
+  "name": "site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Website and documentation for Codevibe Sign.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4"
+  }
+}
