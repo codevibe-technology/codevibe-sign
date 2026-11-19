@@ -201,6 +201,39 @@ describe('seal and verifySeal', () => {
     expect(late.details).toMatchObject({ notAfter: '2021-01-01T00:00:00.000Z' });
   });
 
+  it('refuses RSA keys under 2048 bits unless weak keys are allowed', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const small = createTestP12({ bits: 1024 });
+    const error = await rejection(seal(pdf, { p12: small.p12, passphrase: small.passphrase }));
+    expect(error.code).toBe('SEAL_FAILED');
+    expect(error.details).toMatchObject({ keyBits: 1024 });
+    const output = await seal(pdf, {
+      p12: small.p12,
+      passphrase: small.passphrase,
+      allowWeakKey: true,
+    });
+    expect((await verifySeal(output)).valid).toBe(true);
+  });
+
+  it('refuses certificates signed with SHA-1', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const sha1 = createTestP12({ certificateDigest: 'sha1' });
+    const error = await rejection(seal(pdf, { p12: sha1.p12, passphrase: sha1.passphrase }));
+    expect(error.code).toBe('SEAL_FAILED');
+    expect(error.details).toMatchObject({ signatureAlgorithm: '1.2.840.113549.1.1.5' });
+  });
+
+  it('refuses a certificate that is not valid yet', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const future = createTestP12({
+      notBefore: new Date('2030-01-01T00:00:00Z'),
+      notAfter: new Date('2031-01-01T00:00:00Z'),
+    });
+    const early = await rejection(seal(pdf, { p12: future.p12, passphrase: future.passphrase }));
+    expect(early.code).toBe('SEAL_FAILED');
+    expect(early.details).toMatchObject({ notBefore: '2030-01-01T00:00:00.000Z' });
+  });
+
   it('rejects input that is not a readable PDF', async () => {
     const error = await rejection(
       seal(new Uint8Array([1, 2, 3]), { p12: identity.p12, passphrase: identity.passphrase }),

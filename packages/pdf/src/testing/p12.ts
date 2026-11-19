@@ -8,6 +8,10 @@ export interface TestP12Options {
   notAfter?: Date;
   /** Also put an unrelated CA certificate in the file, ahead of the signing one. */
   withExtraCertificate?: boolean;
+  /** RSA key size. Defaults to 2048. */
+  bits?: number;
+  /** Digest the certificate is signed with. Defaults to SHA-256. */
+  certificateDigest?: 'sha1' | 'sha256';
 }
 
 export interface TestP12 {
@@ -22,6 +26,7 @@ function selfSigned(
   organization: string,
   notBefore: Date,
   notAfter: Date,
+  digest: 'sha1' | 'sha256' = 'sha256',
 ): forge.pki.Certificate {
   const cert = forge.pki.createCertificate();
   cert.publicKey = keys.publicKey;
@@ -39,7 +44,7 @@ function selfSigned(
     { name: 'basicConstraints', cA: false },
     { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
   ]);
-  cert.sign(keys.privateKey, forge.md.sha256.create());
+  cert.sign(keys.privateKey, digest === 'sha1' ? forge.md.sha1.create() : forge.md.sha256.create());
   return cert;
 }
 
@@ -48,13 +53,14 @@ export function createTestP12(options: TestP12Options = {}): TestP12 {
   const passphrase = options.passphrase ?? 'test-passphrase';
   const notBefore = options.notBefore ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
   const notAfter = options.notAfter ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-  const keys = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
+  const keys = forge.pki.rsa.generateKeyPair({ bits: options.bits ?? 2048, e: 0x10001 });
   const cert = selfSigned(
     keys,
     options.commonName ?? 'Codevibe Sign Test Seal',
     options.organization ?? 'Codevibe Test',
     notBefore,
     notAfter,
+    options.certificateDigest,
   );
   const chain = [cert];
   if (options.withExtraCertificate) {

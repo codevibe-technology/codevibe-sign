@@ -2,7 +2,13 @@ import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import { SignPdf } from '@signpdf/signpdf';
 import { Signer, SUBFILTER_ETSI_CADES_DETACHED } from '@signpdf/utils';
 import { SignError } from '@codevibe/sign-core';
-import { buildCadesSignature, certificateDer, readP12, type SigningIdentity } from './cms';
+import {
+  assertSealIdentity,
+  buildCadesSignature,
+  certificateDer,
+  readP12,
+  type SigningIdentity,
+} from './cms';
 import { loadPdf } from './inspect';
 
 export interface SealOptions {
@@ -17,6 +23,11 @@ export interface SealOptions {
   signingTime?: Date;
   /** Largest accepted input PDF, in bytes. Defaults to 25 MB. */
   maxBytes?: number;
+  /**
+   * Accept RSA keys shorter than 2048 bits and certificates signed with SHA-1 or MD5. Only for
+   * local development with throwaway keys; never in production.
+   */
+  allowWeakKey?: boolean;
 }
 
 const DEFAULT_REASON = 'Sealed to show the document has not changed since signing';
@@ -41,19 +52,13 @@ function placeholderSize(identity: SigningIdentity): number {
 /**
  * Applies a PAdES baseline B-B seal (ETSI.CAdES.detached, SHA-256, RSA) with the
  * operator's certificate. The seal covers the whole file; any later change to it
- * makes the seal invalid.
+ * makes the seal invalid. Refuses RSA keys under 2048 bits, certificates signed with
+ * anything weaker than SHA-256, and certificates not valid at the signing time.
  */
 export async function seal(pdfBytes: Uint8Array, options: SealOptions): Promise<Uint8Array> {
   const identity = readP12(options.p12, options.passphrase ?? '');
   const signingTime = options.signingTime ?? new Date();
-  const { notBefore, notAfter } = identity.certificate.validity;
-  if (signingTime < notBefore || signingTime > notAfter) {
-    throw new SignError(
-      'SEAL_FAILED',
-      `The sealing certificate is valid from ${notBefore.toISOString()} to ${notAfter.toISOString()}, not at the signing time.`,
-      { option: 'p12', notBefore: notBefore.toISOString(), notAfter: notAfter.toISOString() },
-    );
-  }
+  assertSealIdentity(identity, signingTime, options.allowWeakKey ?? false);
 
   const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
   const commonName = identity.certificate.subject.getField('CN') as { value?: string } | null;

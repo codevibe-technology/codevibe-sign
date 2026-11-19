@@ -85,6 +85,47 @@ export function readP12(p12: Uint8Array, passphrase: string): SigningIdentity {
   };
 }
 
+const MIN_RSA_BITS = 2048;
+
+/** Certificate signature algorithms accepted for a seal certificate: SHA-256 or stronger. */
+const STRONG_CERTIFICATE_SIGNATURES = new Set([
+  '1.2.840.113549.1.1.10',
+  '1.2.840.113549.1.1.11',
+  '1.2.840.113549.1.1.12',
+  '1.2.840.113549.1.1.13',
+]);
+
+/**
+ * Refuses identities that should not seal documents: RSA keys under 2048 bits, certificates
+ * signed with SHA-1 or MD5 (unless `allowWeak`), and certificates not valid at `at`.
+ */
+export function assertSealIdentity(identity: SigningIdentity, at: Date, allowWeak: boolean): void {
+  const bits = identity.key.n.bitLength();
+  if (!allowWeak && bits < MIN_RSA_BITS) {
+    throw new SignError(
+      'SEAL_FAILED',
+      `The sealing key is RSA-${bits}. Use an RSA key of at least ${MIN_RSA_BITS} bits.`,
+      { option: 'p12', keyBits: bits },
+    );
+  }
+  const algorithm = identity.certificate.signatureOid ?? '';
+  if (!allowWeak && !STRONG_CERTIFICATE_SIGNATURES.has(algorithm)) {
+    throw new SignError(
+      'SEAL_FAILED',
+      'The sealing certificate is signed with a weak algorithm. Use a certificate signed with SHA-256 or stronger.',
+      { option: 'p12', signatureAlgorithm: algorithm },
+    );
+  }
+  const { notBefore, notAfter } = identity.certificate.validity;
+  if (at < notBefore || at > notAfter) {
+    throw new SignError(
+      'SEAL_FAILED',
+      `The sealing certificate is valid from ${notBefore.toISOString()} to ${notAfter.toISOString()}, not at the signing time.`,
+      { option: 'p12', notBefore: notBefore.toISOString(), notAfter: notAfter.toISOString() },
+    );
+  }
+}
+
 export function certificateDer(certificate: forge.pki.Certificate): string {
   return asn1.toDer(pki.certificateToAsn1(certificate)).getBytes();
 }
