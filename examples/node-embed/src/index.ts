@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createSignClient } from '@codevibe_technology/sign-client';
 import {
   consoleOtpSender,
@@ -7,12 +8,21 @@ import {
   memoryStore,
   type SignServerOptions,
 } from '@codevibe_technology/sign-server';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { samplePdf, selfSignedSeal } from './fixtures.ts';
 
 const port = Number(process.env.PORT ?? 3000);
 const signingPage = process.env.SIGNING_PAGE ?? 'http://localhost:5173';
 const webhookUrl = process.env.WEBHOOK_URL;
-const apiKey = process.env.SIGN_API_KEY ?? 'example-api-key-change-me';
+const apiKey = process.env.SIGN_API_KEY ?? randomBytes(24).toString('base64url');
+// The docs site, its local preview and the published docs may call this server from a browser.
+const corsOrigins = (
+  process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:4173,https://sign.codevibe.in'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Prints the signing links instead of mailing them. Use smtpMailer() for real mail.
 const mailer: SignServerOptions['mailer'] = {
@@ -45,7 +55,27 @@ const sign = createSignServer({
   // The example posts webhooks to a receiver on this machine; production keeps the defaults.
   webhookSecurity: { allowInsecure: true },
 });
-await listen(sign.app, { port });
+
+// The server sends no CORS headers; this wrapper adds them for the origins above only.
+const app = new Hono();
+app.use('*', async (c, next) => {
+  // Lets a public page such as the published docs reach this server on localhost.
+  if (c.req.header('access-control-request-private-network') === 'true') {
+    c.header('Access-Control-Allow-Private-Network', 'true');
+  }
+  await next();
+});
+app.use(
+  '*',
+  cors({
+    origin: corsOrigins,
+    allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Sign-Session'],
+    exposeHeaders: ['Retry-After', 'Idempotent-Replayed', 'Content-Disposition', 'ETag'],
+    maxAge: 600,
+  }),
+);
+app.all('*', (c) => sign.app.fetch(c.req.raw, c.env));
+await listen(app, { port });
 setInterval(() => void sign.tick(), 60_000);
 
 const client = createSignClient({ baseUrl: `http://localhost:${port}`, apiKey });
@@ -63,7 +93,9 @@ const envelope = await client.envelopes.create({
   ],
 });
 
+console.log(`API key: ${apiKey}`);
 console.log(`Server on http://localhost:${port}, envelope ${envelope.id} sent.`);
+console.log(`CORS allowed for ${corsOrigins.join(', ')}`);
 console.log('Asha signs first and her one-time code is printed here; Ravi gets his link after.');
 console.log(
   `Once signed: curl -H "Authorization: Bearer ${apiKey}" -o signed.pdf ` +

@@ -1,5 +1,8 @@
-import { writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { copyFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Plugin } from 'vite';
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { CODEVIBE_URL, GITHUB_URL, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from './site';
 
@@ -7,6 +10,32 @@ function pageUrl(relativePath: string): string {
   const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html');
   return new URL(path, `${SITE_URL}/`).href;
 }
+
+/** Files from the repository served at the site root: the API description and its collection. */
+const downloads: Record<string, string> = {
+  'openapi.json': fileURLToPath(new URL('../../../packages/server/openapi.json', import.meta.url)),
+  'codevibe-sign.postman_collection.json': fileURLToPath(
+    new URL('../../../docs/postman/codevibe-sign.postman_collection.json', import.meta.url),
+  ),
+};
+
+function serveDownloads(): Plugin {
+  return {
+    name: 'codevibe-downloads',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const file = downloads[(req.url ?? '').split('?')[0]!.slice(1)];
+        if (!file) return next();
+        res.setHeader('Content-Type', 'application/json');
+        res.end(readFileSync(file));
+      });
+    },
+  };
+}
+
+// `SIGN_SERVER=http://localhost:3000 pnpm --filter site dev` serves a local API under the docs'
+// own origin, so the reference can call it without CORS.
+const signServer = process.env.SIGN_SERVER;
 
 const fonts =
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap';
@@ -52,6 +81,14 @@ export default defineConfig({
   async buildEnd({ outDir }) {
     const robots = `User-agent: *\nAllow: /\n\nSitemap: ${new URL('/sitemap.xml', SITE_URL).href}\n`;
     await writeFile(join(outDir, 'robots.txt'), robots);
+    for (const [name, file] of Object.entries(downloads)) await copyFile(file, join(outDir, name));
+  },
+
+  vite: {
+    plugins: [serveDownloads()],
+    ...(signServer
+      ? { server: { proxy: { '/v1': signServer, '/health': signServer, '/sign/': signServer } } }
+      : {}),
   },
 
   markdown: {
@@ -66,7 +103,8 @@ export default defineConfig({
       { text: 'Get started', link: '/getting-started/', activeMatch: '^/getting-started/' },
       { text: 'Concepts', link: '/concepts/envelopes', activeMatch: '^/concepts/' },
       { text: 'Guides', link: '/guides/first-envelope', activeMatch: '^/guides/' },
-      { text: 'API', link: '/api/', activeMatch: '^/api/' },
+      { text: 'HTTP API', link: '/http-api/', activeMatch: '^/http-api/' },
+      { text: 'Packages', link: '/api/', activeMatch: '^/api/' },
       {
         text: 'More',
         items: [
@@ -108,6 +146,14 @@ export default defineConfig({
           { text: 'Verify a sealed PDF', link: '/guides/verify-pdf' },
           { text: 'Aadhaar eSign with Leegality', link: '/guides/aadhaar-leegality' },
           { text: 'Webhooks', link: '/guides/webhooks' },
+        ],
+      },
+      {
+        text: 'HTTP API',
+        items: [
+          { text: 'Overview', link: '/http-api/' },
+          { text: 'Interactive reference', link: '/http-api/reference' },
+          { text: 'Run a local sandbox', link: '/http-api/sandbox' },
         ],
       },
       {

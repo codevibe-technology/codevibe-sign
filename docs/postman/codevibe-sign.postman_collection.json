@@ -1,0 +1,581 @@
+{
+  "info": {
+    "name": "Codevibe Sign HTTP API",
+    "description": "Send documents for signature, sign them, seal the PDF and verify it.\n\nGenerated from the OpenAPI document. Set `baseUrl` and `apiKey` first.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "apiKey", "value": "" },
+    { "key": "envelopeId", "value": "" },
+    { "key": "docId", "value": "" },
+    { "key": "token", "value": "" },
+    { "key": "signerSession", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Envelopes",
+      "description": "Create, change, send and withdraw envelopes. Sender API key required.",
+      "item": [
+        {
+          "name": "Create an envelope",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes"]
+            },
+            "description": "Create an envelope\n\nCreates a draft with its documents, recipients and fields, and sends it at once when\n`send` is `true`. Send the PDFs either as base64 in JSON, or as a multipart upload with\nthe envelope JSON in a form field named `envelope` and the files as `documents`.\n\nThe example carries a real one-page PDF, so it works as it is in Test Request.\n\nEach PDF is checked: at most 20 MB by default, at most 20 per envelope, and it must\nopen as a PDF. Field boxes are in PDF points from the top-left corner of the page and\nmust fit on it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Offer letter\",\n  \"message\": \"Please sign by Friday.\",\n  \"send\": true,\n  \"routing\": \"sequential\",\n  \"documents\": [\n    {\n      \"key\": \"offer\",\n      \"name\": \"offer.pdf\",\n      \"content\": \"JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCA5OQo+PgpzdHJlYW0KeJwr5HIK4TJQAMGidC59j9ScstSSzOREXXMDSwsTCwNzC0sFIwOFkDQuIxOFEB8uQ7BSQwVzIwVzM6B4LpeNiZsZCJiaGxkZmDkDaRNzExDPTiEkiytEi8s1hCuQCwDoMxbjCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM2Nwo+PgpzdHJlYW0KeJzVUl1LwzAUfc+vuI/64PLR9EvGYFtbBRHHJiiKD1kbRmUk0qYy/703bTfZg/gs4ZDce889yW0PBwYCpIQA4gQkhIGAECIuYTol9PHrQwNdqZ1uCb2rqxZescpgDW+ELm1nHHAym5Ef7lI5tbc7MjQB9+QjY9XYqit1A9MiLwrGYsZYJBERYyLDfYlIEQJjrIkEz4hYjsBcHDAWzLFWDIjiocfXe2449ue4IzfynGzgymSIT/f6u/JBQ/z1nnRG6L2tMuU0XGTXgomIc57iEoK9XOLnaLRy9v8O17+/tubXCc/+c2GNI3TTbV0f+iQndKFa7StAb/X+U7u6VITmprRVbXZAn2ozN219TJwresN42zTau6r3DV3r1nZNiUbyvF7ZH07iVzFLE5w8TlL07mg1+vywfddlT/VhfnA3G+enGhI+d6+rWi3sAf3McIVpOBEJJJJPUAm9PTfGOu/23ufG4Zt8FI3eR4lvH/rHKAplbmRzdHJlYW0KZW5kb2JqCgo4IDAgb2JqCjw8Ci9TaXplIDkKL1Jvb3QgMiAwIFIKL0luZm8gMyAwIFIKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL1hSZWYKL0xlbmd0aCA0MAovVyBbIDEgMiAyIF0KL0luZGV4IFsgMCA5IF0KPj4Kc3RyZWFtCnicFcSxEQAgDAOxt8MdLaOzD8MlWIWAbrMhKTlVWuKAeD9fGGEqA5YKZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjY1NgolJUVPRg==\"\n    }\n  ],\n  \"recipients\": [\n    {\n      \"key\": \"asha\",\n      \"name\": \"Asha Rao\",\n      \"email\": \"asha@example.com\",\n      \"auth\": \"email_otp\"\n    },\n    {\n      \"key\": \"ravi\",\n      \"name\": \"Ravi Kumar\",\n      \"email\": \"ravi@example.com\"\n    },\n    {\n      \"key\": \"hr\",\n      \"name\": \"HR Team\",\n      \"email\": \"hr@example.com\",\n      \"role\": \"viewer\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"recipient\": \"asha\",\n      \"document\": \"offer\",\n      \"type\": \"signature\",\n      \"page\": 0,\n      \"x\": 72,\n      \"y\": 640,\n      \"width\": 180,\n      \"height\": 48\n    },\n    {\n      \"recipient\": \"ravi\",\n      \"type\": \"signature\",\n      \"page\": 0,\n      \"x\": 320,\n      \"y\": 640,\n      \"width\": 180,\n      \"height\": 48\n    }\n  ],\n  \"metadata\": {\n    \"employeeId\": \"E-1042\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('envelopeId', body.id);",
+                  "if (body.documents?.[0]) pm.collectionVariables.set('docId', body.documents[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an envelope (multipart upload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes"]
+            },
+            "description": "Create an envelope\n\nCreates a draft with its documents, recipients and fields, and sends it at once when\n`send` is `true`. Send the PDFs either as base64 in JSON, or as a multipart upload with\nthe envelope JSON in a form field named `envelope` and the files as `documents`.\n\nThe example carries a real one-page PDF, so it works as it is in Test Request.\n\nEach PDF is checked: at most 20 MB by default, at most 20 per envelope, and it must\nopen as a PDF. Field boxes are in PDF points from the top-left corner of the page and\nmust fit on it.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "envelope",
+                  "value": "{\"title\":\"Offer letter\",\"send\":true,\"recipients\":[{\"key\":\"asha\",\"name\":\"Asha Rao\",\"email\":\"asha@example.com\"}],\"fields\":[{\"recipient\":\"asha\",\"page\":0,\"x\":72,\"y\":640,\"width\":180,\"height\":48}]}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                { "key": "documents", "type": "file", "src": [] }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get an envelope",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Get an envelope\n\nThe envelope with its documents, recipients, fields and the values entered so far."
+          }
+        },
+        {
+          "name": "Change a draft",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Change a draft\n\nChanges a draft envelope. Only the properties you send change. `recipients` and\n`fields`, when sent, replace the whole list: pass a recipient's `id` to keep it (its\nsigning order and details are updated), leave it out to remove it. Fields name their\nrecipient by `key` or `id` and their document by `id` or position (`\"0\"`).\nDocuments cannot be changed; create a new envelope instead. Send `\"message\": null`\nto remove the message.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Offer letter (revised)\",\n  \"expiresInDays\": 14\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Send a draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "send"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Send a draft\n\nSends the draft. In sequential routing the recipients with the lowest `order` get their\nsigning links; in parallel routing everyone does. Viewers get a copy once it is complete.\nThe envelope needs at least one signer or approver, and every signer needs a signature\nfield."
+          }
+        },
+        {
+          "name": "Withdraw an envelope",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/void",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "void"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Withdraw an envelope\n\nWithdraws a sent envelope that is not yet final. Signing links stop working and\nrecipients already invited are told it was withdrawn.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"The offer was sent to the wrong address.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit and files",
+      "description": "The audit log, the certificate, and the original and sealed PDFs.",
+      "item": [
+        {
+          "name": "Audit log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "events"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Audit log\n\nEvery action on the envelope, oldest first, and whether the hash chain is intact: each\nevent's `hash` is `sha256(prevHash + canonical(event))` and the last one must equal the\nenvelope's `auditHead`."
+          }
+        },
+        {
+          "name": "Download a PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/documents/:docId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "documents", ":docId"],
+              "query": [
+                {
+                  "key": "version",
+                  "value": "",
+                  "description": "`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`."
+          }
+        },
+        {
+          "name": "Verify the sealed PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/documents/:docId/verification",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "documents", ":docId", "verification"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Verify the sealed PDF\n\nRuns the seal check on the stored sealed file against the operator certificate and any\nolder certificates the server trusts."
+          }
+        },
+        {
+          "name": "Signing certificate",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/certificate",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "certificate"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Signing certificate\n\nWhat the certificate page of the sealed PDF shows, as JSON: the hash of each document\nbefore and after sealing, each recipient with the authentication they used and every\naction they took, and the head of the audit chain."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signing",
+      "description": "What the recipient's browser calls. `{token}` is the signing token from the link,\nor the literal `link` to use the token held in the `cvsign_link` cookie.",
+      "item": [
+        {
+          "name": "Open a signing session",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Sign-Session",
+                "value": "{{signerSession}}",
+                "description": "For recipients who sign with a one-time code, after otp/verify.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Open a signing session\n\nThe envelope basics, the recipient, their own fields and values, and what they still\nneed to do. For recipients who sign with a one-time code, `otpRequired` is `true` and\n`authenticated` says whether a valid session came with the request. `canAct` is\n`false` while it is someone else's turn.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Download the original PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Sign-Session",
+                "value": "{{signerSession}}",
+                "description": "For recipients who sign with a one-time code, after otp/verify.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/documents/:docId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "documents", ":docId"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                },
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Download the original PDF\n\nThe document to sign. Recipients who sign with a one-time code must verify it first.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Send a one-time code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "otp"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Send a one-time code\n\nSends a new six-digit code by email or SMS, valid for 10 minutes, and replaces the\nprevious one. At most 5 codes per 15 minutes and 10 per recipient over the envelope's\nlife; after that the answer is `OTP_LOCKED` with `details.reason: \"too_many_codes\"`\nand the sender has to send the envelope again.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Verify the one-time code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/otp/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "otp", "verify"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Verify the one-time code\n\nChecks the code. On success the server sets a 30-minute `cvsign_session` cookie\n(HttpOnly, SameSite=Strict, path `/v1/sign`) and also returns the session, which you\ncan send as `X-Sign-Session` instead. Five wrong guesses lock the code (`OTP_LOCKED`);\nask for a new one.",
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"482913\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.sessionToken) pm.collectionVariables.set('signerSession', body.sessionToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record that the document was opened",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              {
+                "key": "X-Sign-Session",
+                "value": "{{signerSession}}",
+                "description": "For recipients who sign with a one-time code, after otp/verify.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/view",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "view"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Record that the document was opened\n\nMarks the recipient as having viewed the document. Call it when the page shows the\ndocument, not when the link is opened, so mail scanners that follow links change\nnothing.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Sign or approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              {
+                "key": "X-Sign-Session",
+                "value": "{{signerSession}}",
+                "description": "For recipients who sign with a one-time code, after otp/verify.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "submit"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Sign or approve\n\nSubmits the recipient's field values and their consent to sign electronically. Signers\nmust fill every required field; approvers send an empty `values` list. When the last\nrequired recipient acts, the envelope completes and the sealed PDF is produced.",
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consent\": true,\n  \"values\": [\n    {\n      \"fieldId\": \"e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94\",\n      \"value\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Decline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              {
+                "key": "X-Sign-Session",
+                "value": "{{signerSession}}",
+                "description": "For recipients who sign with a one-time code, after otp/verify.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/decline",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "decline"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Decline\n\nDeclines to sign. The envelope becomes `declined` and everyone already invited is told.",
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"The joining date is wrong.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Open a signing link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sign/:token",
+              "host": ["{{baseUrl}}"],
+              "path": ["sign", ":token"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the email."
+                }
+              ]
+            },
+            "description": "Open a signing link\n\nWhere signing links point. Stores the token in an HttpOnly, SameSite=Strict\n`cvsign_link` cookie (path `/v1/sign`, at most 24 hours) and redirects to the signing\npage, whose URL carries no token. The page then calls `/v1/sign/link/...` from the same\norigin. An unknown or used token clears the cookie and redirects all the same. This\nroute only reads: opening a link does not mark the document as viewed.",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Service",
+      "description": "Health and this document.",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Health check\n\nAnswers as long as the process serves requests. It does not touch the store.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "This document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/openapi.json",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "openapi.json"]
+            },
+            "description": "This document\n\nThe OpenAPI 3.1 description of this server's API. Public and cacheable: send the\n`ETag` back as `If-None-Match` to get `304 Not Modified` while it is unchanged.",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    }
+  ]
+}

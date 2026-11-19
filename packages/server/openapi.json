@@ -1,0 +1,1855 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "Codevibe Sign HTTP API",
+    "version": "1",
+    "summary": "Send documents for signature, sign them, seal the PDF and verify it.",
+    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n### Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status:\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n### Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n### Rate limits\n\nLimits are per API key (creating envelopes), per signing token and per client IP\n(signer routes), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
+    "license": {
+      "name": "AGPL-3.0-only",
+      "url": "https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md"
+    },
+    "contact": { "name": "Codevibe", "url": "https://sign.codevibe.in" }
+  },
+  "externalDocs": {
+    "description": "Guides and package reference",
+    "url": "https://sign.codevibe.in"
+  },
+  "servers": [
+    {
+      "url": "{baseUrl}",
+      "description": "Your Codevibe Sign server",
+      "variables": {
+        "baseUrl": {
+          "default": "http://localhost:3000",
+          "description": "Where the server listens, without a trailing slash."
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Envelopes",
+      "description": "Create, change, send and withdraw envelopes. Sender API key required."
+    },
+    {
+      "name": "Audit and files",
+      "description": "The audit log, the certificate, and the original and sealed PDFs."
+    },
+    {
+      "name": "Signing",
+      "description": "What the recipient's browser calls. `{token}` is the signing token from the link,\nor the literal `link` to use the token held in the `cvsign_link` cookie.\n"
+    },
+    { "name": "Service", "description": "Health and this document." }
+  ],
+  "security": [{ "apiKey": [] }],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": ["Service"],
+        "summary": "Health check",
+        "description": "Answers as long as the process serves requests. It does not touch the store.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The server is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["ok"],
+                  "properties": { "ok": { "const": true } }
+                },
+                "example": { "ok": true }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/openapi.json": {
+      "get": {
+        "operationId": "getOpenApi",
+        "tags": ["Service"],
+        "summary": "This document",
+        "description": "The OpenAPI 3.1 description of this server's API. Public and cacheable: send the\n`ETag` back as `If-None-Match` to get `304 Not Modified` while it is unchanged.\n",
+        "security": [],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "The `ETag` of a copy you already have.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The OpenAPI document.",
+            "headers": {
+              "ETag": {
+                "description": "Changes whenever the document changes.",
+                "schema": { "type": "string" }
+              },
+              "Cache-Control": { "schema": { "type": "string", "example": "public, max-age=300" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["openapi", "info", "paths"],
+                  "properties": {
+                    "openapi": { "type": "string" },
+                    "info": { "type": "object" },
+                    "paths": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "304": { "description": "Unchanged since the `ETag` in `If-None-Match`." }
+        }
+      }
+    },
+    "/v1/envelopes": {
+      "post": {
+        "operationId": "createEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Create an envelope",
+        "description": "Creates a draft with its documents, recipients and fields, and sends it at once when\n`send` is `true`. Send the PDFs either as base64 in JSON, or as a multipart upload with\nthe envelope JSON in a form field named `envelope` and the files as `documents`.\n\nThe example carries a real one-page PDF, so it works as it is in Test Request.\n\nEach PDF is checked: at most 20 MB by default, at most 20 per envelope, and it must\nopen as a PDF. Field boxes are in PDF points from the top-left corner of the page and\nmust fit on it.\n",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateEnvelope" },
+              "examples": {
+                "sendNow": {
+                  "summary": "Send an offer letter to two signers",
+                  "value": {
+                    "title": "Offer letter",
+                    "message": "Please sign by Friday.",
+                    "send": true,
+                    "routing": "sequential",
+                    "documents": [
+                      {
+                        "key": "offer",
+                        "name": "offer.pdf",
+                        "content": "JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCA5OQo+PgpzdHJlYW0KeJwr5HIK4TJQAMGidC59j9ScstSSzOREXXMDSwsTCwNzC0sFIwOFkDQuIxOFEB8uQ7BSQwVzIwVzM6B4LpeNiZsZCJiaGxkZmDkDaRNzExDPTiEkiytEi8s1hCuQCwDoMxbjCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM2Nwo+PgpzdHJlYW0KeJzVUl1LwzAUfc+vuI/64PLR9EvGYFtbBRHHJiiKD1kbRmUk0qYy/703bTfZg/gs4ZDce889yW0PBwYCpIQA4gQkhIGAECIuYTol9PHrQwNdqZ1uCb2rqxZescpgDW+ELm1nHHAym5Ef7lI5tbc7MjQB9+QjY9XYqit1A9MiLwrGYsZYJBERYyLDfYlIEQJjrIkEz4hYjsBcHDAWzLFWDIjiocfXe2449ue4IzfynGzgymSIT/f6u/JBQ/z1nnRG6L2tMuU0XGTXgomIc57iEoK9XOLnaLRy9v8O17+/tubXCc/+c2GNI3TTbV0f+iQndKFa7StAb/X+U7u6VITmprRVbXZAn2ozN219TJwresN42zTau6r3DV3r1nZNiUbyvF7ZH07iVzFLE5w8TlL07mg1+vywfddlT/VhfnA3G+enGhI+d6+rWi3sAf3McIVpOBEJJJJPUAm9PTfGOu/23ufG4Zt8FI3eR4lvH/rHKAplbmRzdHJlYW0KZW5kb2JqCgo4IDAgb2JqCjw8Ci9TaXplIDkKL1Jvb3QgMiAwIFIKL0luZm8gMyAwIFIKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL1hSZWYKL0xlbmd0aCA0MAovVyBbIDEgMiAyIF0KL0luZGV4IFsgMCA5IF0KPj4Kc3RyZWFtCnicFcSxEQAgDAOxt8MdLaOzD8MlWIWAbrMhKTlVWuKAeD9fGGEqA5YKZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjY1NgolJUVPRg=="
+                      }
+                    ],
+                    "recipients": [
+                      {
+                        "key": "asha",
+                        "name": "Asha Rao",
+                        "email": "asha@example.com",
+                        "auth": "email_otp"
+                      },
+                      { "key": "ravi", "name": "Ravi Kumar", "email": "ravi@example.com" },
+                      {
+                        "key": "hr",
+                        "name": "HR Team",
+                        "email": "hr@example.com",
+                        "role": "viewer"
+                      }
+                    ],
+                    "fields": [
+                      {
+                        "recipient": "asha",
+                        "document": "offer",
+                        "type": "signature",
+                        "page": 0,
+                        "x": 72,
+                        "y": 640,
+                        "width": 180,
+                        "height": 48
+                      },
+                      {
+                        "recipient": "ravi",
+                        "type": "signature",
+                        "page": 0,
+                        "x": 320,
+                        "y": 640,
+                        "width": 180,
+                        "height": 48
+                      }
+                    ],
+                    "metadata": { "employeeId": "E-1042" }
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/CreateEnvelopeUpload" },
+              "encoding": {
+                "envelope": { "contentType": "application/json" },
+                "documents": { "contentType": "application/pdf" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The envelope, as a draft or already sent.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Envelope" },
+                "examples": { "sent": { "$ref": "#/components/examples/SentEnvelope" } }
+              }
+            },
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "422": { "$ref": "#/components/responses/Unprocessable" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "get": {
+        "operationId": "getEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Get an envelope",
+        "description": "The envelope with its documents, recipients, fields and the values entered so far.",
+        "responses": {
+          "200": {
+            "description": "The envelope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Envelope" },
+                "examples": { "sent": { "$ref": "#/components/examples/SentEnvelope" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "operationId": "updateEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Change a draft",
+        "description": "Changes a draft envelope. Only the properties you send change. `recipients` and\n`fields`, when sent, replace the whole list: pass a recipient's `id` to keep it (its\nsigning order and details are updated), leave it out to remove it. Fields name their\nrecipient by `key` or `id` and their document by `id` or position (`\"0\"`).\nDocuments cannot be changed; create a new envelope instead. Send `\"message\": null`\nto remove the message.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateEnvelope" },
+              "examples": {
+                "retitle": {
+                  "summary": "Rename and push the deadline",
+                  "value": { "title": "Offer letter (revised)", "expiresInDays": 14 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed draft.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Envelope" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/send": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "post": {
+        "operationId": "sendEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Send a draft",
+        "description": "Sends the draft. In sequential routing the recipients with the lowest `order` get their\nsigning links; in parallel routing everyone does. Viewers get a copy once it is complete.\nThe envelope needs at least one signer or approver, and every signer needs a signature\nfield.\n",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": {
+          "200": {
+            "description": "The sent envelope.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Envelope" } }
+            },
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "410": { "$ref": "#/components/responses/Gone" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/void": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "post": {
+        "operationId": "voidEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Withdraw an envelope",
+        "description": "Withdraws a sent envelope that is not yet final. Signing links stop working and\nrecipients already invited are told it was withdrawn.\n",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["reason"],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Shown to recipients and kept in the audit log."
+                  }
+                }
+              },
+              "example": { "reason": "The offer was sent to the wrong address." }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The voided envelope.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Envelope" } }
+            },
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/events": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "get": {
+        "operationId": "listEnvelopeEvents",
+        "tags": ["Audit and files"],
+        "summary": "Audit log",
+        "description": "Every action on the envelope, oldest first, and whether the hash chain is intact: each\nevent's `hash` is `sha256(prevHash + canonical(event))` and the last one must equal the\nenvelope's `auditHead`.\n",
+        "responses": {
+          "200": {
+            "description": "The events and the chain check.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["events", "chainValid"],
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AuditEvent" }
+                    },
+                    "chainValid": { "type": "boolean" }
+                  }
+                },
+                "example": {
+                  "chainValid": true,
+                  "events": [
+                    {
+                      "seq": 1,
+                      "envelopeId": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
+                      "action": "envelope.created",
+                      "at": "2026-03-02T09:00:00.000Z",
+                      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "hash": "3b5f0c4d6e1a2b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/documents/{docId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/EnvelopeId" },
+        { "$ref": "#/components/parameters/DocumentId" }
+      ],
+      "get": {
+        "operationId": "downloadDocument",
+        "tags": ["Audit and files"],
+        "summary": "Download a PDF",
+        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`.\n",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "description": "`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).",
+            "schema": { "type": "string", "enum": ["original", "sealed"] }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Pdf" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/documents/{docId}/verification": {
+      "parameters": [
+        { "$ref": "#/components/parameters/EnvelopeId" },
+        { "$ref": "#/components/parameters/DocumentId" }
+      ],
+      "get": {
+        "operationId": "verifyDocument",
+        "tags": ["Audit and files"],
+        "summary": "Verify the sealed PDF",
+        "description": "Runs the seal check on the stored sealed file against the operator certificate and any\nolder certificates the server trusts.\n",
+        "responses": {
+          "200": {
+            "description": "The result of the check.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Verification" },
+                "example": {
+                  "documentId": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+                  "valid": true,
+                  "reason": null,
+                  "signer": { "commonName": "Codevibe Sign Seal" },
+                  "signedAt": "2026-03-02T09:14:31.000Z",
+                  "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+                  "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/certificate": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "get": {
+        "operationId": "getCertificate",
+        "tags": ["Audit and files"],
+        "summary": "Signing certificate",
+        "description": "What the certificate page of the sealed PDF shows, as JSON: the hash of each document\nbefore and after sealing, each recipient with the authentication they used and every\naction they took, and the head of the audit chain.\n",
+        "responses": {
+          "200": {
+            "description": "The certificate.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Certificate" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/sign/{token}": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "get": {
+        "operationId": "getSigningSession",
+        "tags": ["Signing"],
+        "summary": "Open a signing session",
+        "description": "The envelope basics, the recipient, their own fields and values, and what they still\nneed to do. For recipients who sign with a one-time code, `otpRequired` is `true` and\n`authenticated` says whether a valid session came with the request. `canAct` is\n`false` while it is someone else's turn.\n",
+        "security": [
+          {},
+          { "signerSession": [] },
+          { "signerSessionCookie": [] },
+          { "linkCookie": [] }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signer's view.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SignerView" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/sign/{token}/documents/{docId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/SigningToken" },
+        { "$ref": "#/components/parameters/DocumentId" }
+      ],
+      "get": {
+        "operationId": "getSigningDocument",
+        "tags": ["Signing"],
+        "summary": "Download the original PDF",
+        "description": "The document to sign. Recipients who sign with a one-time code must verify it first.",
+        "security": [
+          {},
+          { "signerSession": [] },
+          { "signerSessionCookie": [] },
+          { "linkCookie": [] }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Pdf" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/sign/{token}/otp": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "post": {
+        "operationId": "sendOtp",
+        "tags": ["Signing"],
+        "summary": "Send a one-time code",
+        "description": "Sends a new six-digit code by email or SMS, valid for 10 minutes, and replaces the\nprevious one. At most 5 codes per 15 minutes and 10 per recipient over the envelope's\nlife; after that the answer is `OTP_LOCKED` with `details.reason: \"too_many_codes\"`\nand the sender has to send the envelope again.\n",
+        "security": [{}, { "linkCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": {
+          "200": {
+            "description": "The code is on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["sentTo", "expiresAt"],
+                  "properties": {
+                    "sentTo": {
+                      "type": ["string", "null"],
+                      "description": "The masked address or number the code went to.",
+                      "examples": ["a***@example.com"]
+                    },
+                    "expiresAt": { "type": "string", "format": "date-time" }
+                  }
+                },
+                "example": { "sentTo": "a***@example.com", "expiresAt": "2026-03-02T09:10:00.000Z" }
+              }
+            },
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "423": { "$ref": "#/components/responses/Locked" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/sign/{token}/otp/verify": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "post": {
+        "operationId": "verifyOtp",
+        "tags": ["Signing"],
+        "summary": "Verify the one-time code",
+        "description": "Checks the code. On success the server sets a 30-minute `cvsign_session` cookie\n(HttpOnly, SameSite=Strict, path `/v1/sign`) and also returns the session, which you\ncan send as `X-Sign-Session` instead. Five wrong guesses lock the code (`OTP_LOCKED`);\nask for a new one.\n",
+        "security": [{}, { "linkCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["code"],
+                "properties": { "code": { "type": "string", "pattern": "^\\s*\\d{6}\\s*$" } }
+              },
+              "example": { "code": "482913" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The code is correct.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "`cvsign_session=<session>; Path=/v1/sign; HttpOnly; SameSite=Strict; Max-Age=1800`",
+                "schema": { "type": "string" }
+              },
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["sessionToken", "expiresAt"],
+                  "properties": {
+                    "sessionToken": {
+                      "type": "string",
+                      "description": "Send it as `X-Sign-Session` on later requests."
+                    },
+                    "expiresAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "423": { "$ref": "#/components/responses/Locked" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/sign/{token}/view": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "post": {
+        "operationId": "markViewed",
+        "tags": ["Signing"],
+        "summary": "Record that the document was opened",
+        "description": "Marks the recipient as having viewed the document. Call it when the page shows the\ndocument, not when the link is opened, so mail scanners that follow links change\nnothing.\n",
+        "security": [
+          {},
+          { "signerSession": [] },
+          { "signerSessionCookie": [] },
+          { "linkCookie": [] }
+        ],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/SignerStatus" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/sign/{token}/submit": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "post": {
+        "operationId": "submitSignature",
+        "tags": ["Signing"],
+        "summary": "Sign or approve",
+        "description": "Submits the recipient's field values and their consent to sign electronically. Signers\nmust fill every required field; approvers send an empty `values` list. When the last\nrequired recipient acts, the envelope completes and the sealed PDF is produced.\n",
+        "security": [
+          {},
+          { "signerSession": [] },
+          { "signerSessionCookie": [] },
+          { "linkCookie": [] }
+        ],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["consent", "values"],
+                "properties": {
+                  "consent": {
+                    "const": true,
+                    "description": "The signer agrees to sign electronically."
+                  },
+                  "values": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": { "$ref": "#/components/schemas/FieldValue" }
+                  }
+                }
+              },
+              "example": {
+                "consent": true,
+                "values": [
+                  {
+                    "fieldId": "e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94",
+                    "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SignerStatus" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "410": { "$ref": "#/components/responses/Gone" },
+          "422": { "$ref": "#/components/responses/Unprocessable" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/sign/{token}/decline": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "post": {
+        "operationId": "declineSignature",
+        "tags": ["Signing"],
+        "summary": "Decline",
+        "description": "Declines to sign. The envelope becomes `declined` and everyone already invited is told.",
+        "security": [
+          {},
+          { "signerSession": [] },
+          { "signerSessionCookie": [] },
+          { "linkCookie": [] }
+        ],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["reason"],
+                "properties": { "reason": { "type": "string", "minLength": 1 } }
+              },
+              "example": { "reason": "The joining date is wrong." }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SignerStatus" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/sign/{token}": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "The signing token from the email.",
+          "schema": { "type": "string" }
+        }
+      ],
+      "get": {
+        "operationId": "openSigningLink",
+        "tags": ["Signing"],
+        "summary": "Open a signing link",
+        "description": "Where signing links point. Stores the token in an HttpOnly, SameSite=Strict\n`cvsign_link` cookie (path `/v1/sign`, at most 24 hours) and redirects to the signing\npage, whose URL carries no token. The page then calls `/v1/sign/link/...` from the same\norigin. An unknown or used token clears the cookie and redirects all the same. This\nroute only reads: opening a link does not mark the document as viewed.\n",
+        "security": [],
+        "responses": {
+          "303": {
+            "description": "Redirect to the signing page.",
+            "headers": {
+              "Location": {
+                "description": "The signing page, without the token.",
+                "schema": { "type": "string", "format": "uri" }
+              },
+              "Set-Cookie": {
+                "description": "`cvsign_link=<token>; Path=/v1/sign; HttpOnly; SameSite=Strict`",
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "envelopeEvent": {
+      "post": {
+        "operationId": "envelopeEvent",
+        "summary": "Envelope event",
+        "description": "Sent to each configured webhook URL for the audit actions it subscribes to (`*` for\nall), one delivery per action. The body is fixed when the event happens, so a retry\ndelivers the same bytes with the same `id`. Failed deliveries (no 2xx within 10 s) are\nretried with backoff, from 30 seconds up to 12 hours, nine attempts in all.\n\nVerify each delivery before trusting it: the `x-codevibe-signature` header is\n`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\">` with the target's secret.\nReject it when the HMAC does not match or `t` is more than five minutes old.\n`verifyWebhook(secret, header, rawBody)` from the server or client package does this.\n",
+        "parameters": [
+          {
+            "name": "x-codevibe-signature",
+            "in": "header",
+            "required": true,
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\">`.",
+            "schema": {
+              "type": "string",
+              "pattern": "^t=\\d+,v1=[0-9a-f]{64}$",
+              "examples": [
+                "t=1772442000,v1=5f1c0e3a9d2b4c6e8f0a1b3c5d7e9f1a2b4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e"
+              ]
+            }
+          },
+          {
+            "name": "x-codevibe-delivery",
+            "in": "header",
+            "required": true,
+            "description": "The delivery id, the same as `id` in the body. Use it to drop duplicates.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "user-agent",
+            "in": "header",
+            "required": true,
+            "schema": { "const": "codevibe-sign-webhooks" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WebhookEvent" },
+              "example": {
+                "id": "5a7e3c1d-8b2f-4d6a-9e0c-1f4b7a2d3e58",
+                "type": "envelope.completed",
+                "createdAt": "2026-03-02T09:14:31.000Z",
+                "data": {
+                  "envelope": {
+                    "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
+                    "title": "Offer letter",
+                    "status": "completed",
+                    "metadata": { "employeeId": "E-1042" },
+                    "completedAt": "2026-03-02T09:14:31.000Z",
+                    "recipients": [
+                      {
+                        "id": "c4a1d9e2-7f3b-4c8d-a6e5-0b9f2d1c7e83",
+                        "name": "Asha Rao",
+                        "email": "asha@example.com",
+                        "role": "signer",
+                        "status": "signed",
+                        "actedAt": "2026-03-02T09:12:05.000Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Answer quickly; any other status, or no answer in 10 s, is retried."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A sender API key from the server's `apiKeys` option, as `Authorization: Bearer <key>`.\nKeys are at least 16 characters.\n"
+      },
+      "signerSession": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Sign-Session",
+        "description": "The `sessionToken` from `POST /v1/sign/{token}/otp/verify`, for recipients who sign\nwith a one-time code. Valid for 30 minutes and only with the token it was issued for.\n"
+      },
+      "signerSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "cvsign_session",
+        "description": "The same session as an HttpOnly cookie, set by `otp/verify` for browsers."
+      },
+      "linkCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "cvsign_link",
+        "description": "Holds the signing token after `GET /sign/{token}`. Used when the path has `link` in\nplace of the token. Requests other than GET must come from the same site.\n"
+      }
+    },
+    "parameters": {
+      "EnvelopeId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The envelope id.",
+        "schema": { "type": "string" },
+        "example": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37"
+      },
+      "DocumentId": {
+        "name": "docId",
+        "in": "path",
+        "required": true,
+        "description": "The document id, from `documents[].id`.",
+        "schema": { "type": "string" },
+        "example": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048"
+      },
+      "SigningToken": {
+        "name": "token",
+        "in": "path",
+        "required": true,
+        "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`.\n",
+        "schema": { "type": "string", "pattern": "^([A-Za-z0-9_-]{43}|link)$" }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.\n",
+        "schema": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "example": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+      }
+    },
+    "headers": {
+      "IdempotentReplayed": {
+        "description": "`true` when this is the stored response to an earlier request with the same `Idempotency-Key`.",
+        "schema": { "type": "string", "enum": ["true"] }
+      },
+      "RetryAfter": {
+        "description": "Seconds to wait before trying again.",
+        "schema": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "responses": {
+      "Pdf": {
+        "description": "The PDF file.",
+        "headers": {
+          "Content-Disposition": {
+            "description": "`attachment; filename=\"<name>-original.pdf\"` or `...-sealed.pdf`.",
+            "schema": { "type": "string" }
+          }
+        },
+        "content": {
+          "application/pdf": {
+            "schema": { "type": "string", "contentMediaType": "application/pdf" }
+          }
+        }
+      },
+      "SignerStatus": {
+        "description": "Where the envelope and this recipient stand now.",
+        "headers": { "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" } },
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["envelopeStatus", "recipientStatus"],
+              "properties": {
+                "envelopeStatus": { "$ref": "#/components/schemas/EnvelopeStatus" },
+                "recipientStatus": { "$ref": "#/components/schemas/RecipientStatus" }
+              }
+            },
+            "example": { "envelopeStatus": "in_progress", "recipientStatus": "signed" }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "`VALIDATION`: the request is malformed. `details.issues` lists each problem.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": {
+                "code": "VALIDATION",
+                "message": "recipients[0].email is not a valid email address",
+                "details": {
+                  "issues": [
+                    {
+                      "path": "recipients[0].email",
+                      "message": "recipients[0].email is not a valid email address"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "`UNAUTHORIZED`: the API key is missing or not valid.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": {
+                "code": "UNAUTHORIZED",
+                "message": "Send an API key as Authorization: Bearer <key>"
+              }
+            }
+          }
+        }
+      },
+      "SignerUnauthorized": {
+        "description": "`TOKEN_INVALID`: the link is unknown, used, expired or withdrawn.\n`OTP_INVALID`: the code is wrong (`details.attemptsLeft`), or the session is missing\n(`details.otpRequired`). `OTP_EXPIRED`: the code timed out or none was sent.\n",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": {
+                "code": "TOKEN_INVALID",
+                "message": "This signing link is no longer valid"
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "`FIELD_NOT_YOURS`: a value names a field that belongs to another recipient.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "`ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND` or `NOT_FOUND`.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": { "code": "ENVELOPE_NOT_FOUND", "message": "Envelope not found" }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "`INVALID_STATE`: not allowed in the envelope's status (`details.status`).\n`NOT_YOUR_TURN`: sequential routing, an earlier recipient has not acted.\n`CONFLICT`: another request changed the envelope, or one with the same\n`Idempotency-Key` is still running; try again.\n",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": {
+                "code": "INVALID_STATE",
+                "message": "Only draft envelopes can be changed",
+                "details": { "status": "sent" }
+              }
+            }
+          }
+        }
+      },
+      "Gone": {
+        "description": "`ENVELOPE_EXPIRED`: the envelope is past its expiry.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "TooLarge": {
+        "description": "`DOCUMENT_TOO_LARGE`: a PDF or the whole request is over the limit (`details.maxBytes`).",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unprocessable": {
+        "description": "`DOCUMENT_INVALID`: a file is not a readable PDF.\n`REQUIRED_FIELDS_MISSING`: required fields were left empty.\n`INVALID_FIELD_VALUE`: a value does not suit its field (PNG, date, length).\n",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Locked": {
+        "description": "`OTP_LOCKED`: too many wrong guesses, or too many codes for this envelope (`details.reason`).",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RateLimited": {
+        "description": "`RATE_LIMITED`: too many requests. Wait `Retry-After` seconds.",
+        "headers": { "Retry-After": { "$ref": "#/components/headers/RetryAfter" } },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "error": {
+                "code": "RATE_LIMITED",
+                "message": "Too many requests, try again later",
+                "details": { "retryAfterSeconds": 42 }
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "`INTERNAL` or `SEAL_FAILED`. Safe to retry with the same `Idempotency-Key`.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "examples": {
+      "SentEnvelope": {
+        "summary": "A sent envelope",
+        "value": {
+          "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
+          "title": "Offer letter",
+          "message": "Please sign by Friday.",
+          "status": "sent",
+          "routing": "sequential",
+          "documents": [
+            {
+              "id": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+              "name": "offer.pdf",
+              "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d",
+              "pageCount": 1,
+              "fileKey": "envelopes/7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37/documents/0/original.pdf",
+              "pageSizes": [{ "width": 595.28, "height": 841.89 }]
+            }
+          ],
+          "recipients": [
+            {
+              "id": "c4a1d9e2-7f3b-4c8d-a6e5-0b9f2d1c7e83",
+              "name": "Asha Rao",
+              "email": "asha@example.com",
+              "role": "signer",
+              "order": 1,
+              "auth": "email_otp",
+              "status": "notified",
+              "notifiedAt": "2026-03-02T09:00:00.000Z"
+            }
+          ],
+          "fields": [
+            {
+              "id": "e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94",
+              "documentId": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+              "recipientId": "c4a1d9e2-7f3b-4c8d-a6e5-0b9f2d1c7e83",
+              "type": "signature",
+              "page": 0,
+              "rect": { "x": 72, "y": 640, "width": 180, "height": 48 },
+              "required": true
+            }
+          ],
+          "values": [],
+          "reminders": { "firstAfterDays": 2, "everyDays": 2, "max": 3 },
+          "expiresAt": "2026-04-01T09:00:00.000Z",
+          "createdAt": "2026-03-02T09:00:00.000Z",
+          "sentAt": "2026-03-02T09:00:00.000Z",
+          "metadata": { "employeeId": "E-1042" },
+          "auditHead": "3b5f0c4d6e1a2b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c"
+        }
+      }
+    },
+    "schemas": {
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "VALIDATION",
+          "UNAUTHORIZED",
+          "TOKEN_INVALID",
+          "OTP_INVALID",
+          "OTP_EXPIRED",
+          "FIELD_NOT_YOURS",
+          "ENVELOPE_NOT_FOUND",
+          "RECIPIENT_NOT_FOUND",
+          "NOT_FOUND",
+          "INVALID_STATE",
+          "NOT_YOUR_TURN",
+          "CONFLICT",
+          "ENVELOPE_EXPIRED",
+          "DOCUMENT_TOO_LARGE",
+          "REQUIRED_FIELDS_MISSING",
+          "INVALID_FIELD_VALUE",
+          "DOCUMENT_INVALID",
+          "OTP_LOCKED",
+          "RATE_LIMITED",
+          "SEAL_FAILED",
+          "INTERNAL",
+          "PROVIDER_ERROR",
+          "WEBHOOK_INVALID"
+        ],
+        "x-status": {
+          "VALIDATION": 400,
+          "UNAUTHORIZED": 401,
+          "TOKEN_INVALID": 401,
+          "OTP_INVALID": 401,
+          "OTP_EXPIRED": 401,
+          "FIELD_NOT_YOURS": 403,
+          "ENVELOPE_NOT_FOUND": 404,
+          "RECIPIENT_NOT_FOUND": 404,
+          "NOT_FOUND": 404,
+          "INVALID_STATE": 409,
+          "NOT_YOUR_TURN": 409,
+          "CONFLICT": 409,
+          "ENVELOPE_EXPIRED": 410,
+          "DOCUMENT_TOO_LARGE": 413,
+          "REQUIRED_FIELDS_MISSING": 422,
+          "INVALID_FIELD_VALUE": 422,
+          "DOCUMENT_INVALID": 422,
+          "OTP_LOCKED": 423,
+          "RATE_LIMITED": 429,
+          "SEAL_FAILED": 500,
+          "INTERNAL": 500,
+          "PROVIDER_ERROR": 502,
+          "WEBHOOK_INVALID": 502
+        },
+        "description": "A stable error code. `x-status` maps each code to the HTTP status it always comes with."
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "$ref": "#/components/schemas/ErrorCode" },
+              "message": {
+                "type": "string",
+                "description": "A sentence for people. Do not parse it; use `code` and `details`."
+              },
+              "details": {
+                "type": "object",
+                "description": "More about the error, depending on the code: `issues` (`VALIDATION`),\n`retryAfterSeconds` (`RATE_LIMITED`), `attemptsLeft` (`OTP_*`), `status`\n(`INVALID_STATE`), `maxBytes` and `document` (document errors).\n",
+                "properties": {
+                  "issues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["path", "message"],
+                      "properties": {
+                        "path": { "type": "string", "examples": ["recipients[1].email"] },
+                        "message": { "type": "string" }
+                      }
+                    }
+                  },
+                  "retryAfterSeconds": { "type": "integer", "minimum": 1 },
+                  "attemptsLeft": { "type": "integer", "minimum": 0 }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Id": { "type": "string", "minLength": 1 },
+      "Timestamp": { "type": "string", "format": "date-time" },
+      "Sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+      "EnvelopeStatus": {
+        "type": "string",
+        "enum": ["draft", "sent", "in_progress", "completed", "declined", "expired", "voided"],
+        "description": "`completed`, `declined`, `expired` and `voided` are final."
+      },
+      "RecipientStatus": {
+        "type": "string",
+        "enum": ["pending", "notified", "viewed", "signed", "approved", "declined"]
+      },
+      "RecipientRole": {
+        "type": "string",
+        "enum": ["signer", "approver", "viewer"],
+        "description": "Signers fill fields, approvers approve without fields, viewers get a copy."
+      },
+      "AuthMethod": {
+        "type": "string",
+        "enum": ["email_link", "email_otp", "sms_otp", "aadhaar"],
+        "description": "How the recipient proves who they are. `email_link` needs only the link."
+      },
+      "Routing": {
+        "type": "string",
+        "enum": ["sequential", "parallel"],
+        "description": "`sequential` goes by `order`, lowest first (equal orders sign together); `parallel` invites everyone at once."
+      },
+      "FieldType": {
+        "type": "string",
+        "enum": ["signature", "initials", "date_signed", "name", "text", "checkbox"]
+      },
+      "AuditAction": {
+        "type": "string",
+        "enum": [
+          "envelope.created",
+          "envelope.updated",
+          "envelope.sent",
+          "envelope.completed",
+          "envelope.declined",
+          "envelope.expired",
+          "envelope.voided",
+          "recipient.notified",
+          "recipient.reminded",
+          "recipient.viewed",
+          "recipient.authenticated",
+          "recipient.signed",
+          "recipient.approved",
+          "recipient.declined",
+          "document.sealed"
+        ]
+      },
+      "Rect": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["x", "y", "width", "height"],
+        "description": "A box in PDF points, measured from the top-left corner of the page.",
+        "properties": {
+          "x": { "type": "number", "minimum": 0 },
+          "y": { "type": "number", "minimum": 0 },
+          "width": { "type": "number", "minimum": 1 },
+          "height": { "type": "number", "minimum": 1 }
+        }
+      },
+      "Reminders": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["firstAfterDays", "everyDays", "max"],
+        "properties": {
+          "firstAfterDays": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 365,
+            "description": "Days after the invitation for the first reminder; 0 turns reminders off."
+          },
+          "everyDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "description": "Most reminders per recipient."
+          }
+        }
+      },
+      "Metadata": {
+        "type": "object",
+        "maxProperties": 50,
+        "description": "Your own data, for example an employee id. Echoed in webhooks.",
+        "propertyNames": { "maxLength": 100 },
+        "additionalProperties": { "type": "string", "maxLength": 500 }
+      },
+      "Document": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "sha256", "pageCount", "fileKey"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "sha256": {
+            "$ref": "#/components/schemas/Sha256",
+            "description": "SHA-256 of the original file."
+          },
+          "pageCount": { "type": "integer", "minimum": 1 },
+          "fileKey": {
+            "type": "string",
+            "description": "Where the server's file store keeps the original."
+          },
+          "pageSizes": {
+            "type": "array",
+            "description": "Size of each page in PDF points, in page order.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["width", "height"],
+              "properties": { "width": { "type": "number" }, "height": { "type": "number" } }
+            }
+          }
+        }
+      },
+      "Recipient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "role", "order", "auth", "status"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "phone": { "type": "string", "pattern": "^\\+[1-9]\\d{6,14}$" },
+          "role": { "$ref": "#/components/schemas/RecipientRole" },
+          "order": { "type": "integer", "minimum": 1 },
+          "auth": { "$ref": "#/components/schemas/AuthMethod" },
+          "status": { "$ref": "#/components/schemas/RecipientStatus" },
+          "declineReason": { "type": "string" },
+          "actedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "notifiedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "viewedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "remindersSent": { "type": "integer", "minimum": 0 },
+          "lastRemindedAt": { "$ref": "#/components/schemas/Timestamp" }
+        }
+      },
+      "Field": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "documentId", "recipientId", "type", "page", "rect", "required"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "documentId": { "$ref": "#/components/schemas/Id" },
+          "recipientId": { "$ref": "#/components/schemas/Id" },
+          "type": { "$ref": "#/components/schemas/FieldType" },
+          "page": { "type": "integer", "minimum": 0, "description": "Zero-based page index." },
+          "rect": { "$ref": "#/components/schemas/Rect" },
+          "required": { "type": "boolean" },
+          "label": { "type": "string" },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Filled in by the sender; the recipient cannot change it."
+          }
+        }
+      },
+      "FieldValue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fieldId", "value"],
+        "properties": {
+          "fieldId": { "$ref": "#/components/schemas/Id" },
+          "value": {
+            "type": "string",
+            "description": "Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or\n`false`. Date: an ISO date.\n"
+          }
+        }
+      },
+      "Envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "status",
+          "routing",
+          "documents",
+          "recipients",
+          "fields",
+          "values",
+          "reminders",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "title": { "type": "string" },
+          "message": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
+          "routing": { "$ref": "#/components/schemas/Routing" },
+          "documents": { "type": "array", "items": { "$ref": "#/components/schemas/Document" } },
+          "recipients": { "type": "array", "items": { "$ref": "#/components/schemas/Recipient" } },
+          "fields": { "type": "array", "items": { "$ref": "#/components/schemas/Field" } },
+          "values": { "type": "array", "items": { "$ref": "#/components/schemas/FieldValue" } },
+          "reminders": { "$ref": "#/components/schemas/Reminders" },
+          "expiresAt": { "$ref": "#/components/schemas/Timestamp" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "sentAt": { "$ref": "#/components/schemas/Timestamp" },
+          "completedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "metadata": { "$ref": "#/components/schemas/Metadata" },
+          "auditHead": {
+            "$ref": "#/components/schemas/Sha256",
+            "description": "Hash of the last audit event."
+          }
+        }
+      },
+      "AuditEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "envelopeId", "action", "at", "prevHash", "hash"],
+        "properties": {
+          "seq": { "type": "integer", "minimum": 1 },
+          "envelopeId": { "$ref": "#/components/schemas/Id" },
+          "action": { "$ref": "#/components/schemas/AuditAction" },
+          "at": { "$ref": "#/components/schemas/Timestamp" },
+          "recipientId": { "$ref": "#/components/schemas/Id" },
+          "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "ip": { "type": "string" }, "userAgent": { "type": "string" } }
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": { "type": ["string", "number", "boolean"] }
+          },
+          "prevHash": { "$ref": "#/components/schemas/Sha256" },
+          "hash": { "$ref": "#/components/schemas/Sha256" }
+        }
+      },
+      "Verification": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "valid",
+          "reason",
+          "signer",
+          "signedAt",
+          "certificateSha256",
+          "sha256"
+        ],
+        "properties": {
+          "documentId": { "$ref": "#/components/schemas/Id" },
+          "valid": {
+            "type": "boolean",
+            "description": "One trusted seal, cryptographically valid, covering every byte."
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": [
+              "not_sealed",
+              "signature_invalid",
+              "not_whole_document",
+              "multiple_signatures",
+              "untrusted_signer",
+              null
+            ],
+            "description": "Why the check failed; `null` when it passed."
+          },
+          "signer": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "properties": {
+              "commonName": { "type": "string" },
+              "organization": { "type": "string" }
+            }
+          },
+          "signedAt": { "type": ["string", "null"], "format": "date-time" },
+          "certificateSha256": {
+            "description": "SHA-256 of the sealing certificate.",
+            "oneOf": [{ "$ref": "#/components/schemas/Sha256" }, { "type": "null" }]
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Sha256",
+            "description": "SHA-256 of the sealed file as stored."
+          }
+        }
+      },
+      "Certificate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "envelopeId",
+          "title",
+          "status",
+          "completedAt",
+          "auditHead",
+          "chainValid",
+          "documents",
+          "recipients"
+        ],
+        "properties": {
+          "envelopeId": { "$ref": "#/components/schemas/Id" },
+          "title": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" },
+          "auditHead": { "oneOf": [{ "$ref": "#/components/schemas/Sha256" }, { "type": "null" }] },
+          "chainValid": { "type": "boolean" },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "name", "sha256", "sealedSha256"],
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "sha256": { "$ref": "#/components/schemas/Sha256" },
+                "sealedSha256": {
+                  "oneOf": [{ "$ref": "#/components/schemas/Sha256" }, { "type": "null" }]
+                }
+              }
+            }
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "name", "email", "phone", "role", "auth", "status", "actions"],
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "email": { "type": ["string", "null"] },
+                "phone": { "type": ["string", "null"] },
+                "role": { "$ref": "#/components/schemas/RecipientRole" },
+                "auth": { "$ref": "#/components/schemas/AuthMethod" },
+                "status": { "$ref": "#/components/schemas/RecipientStatus" },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["action", "at", "ip", "userAgent"],
+                    "properties": {
+                      "action": { "$ref": "#/components/schemas/AuditAction" },
+                      "at": { "$ref": "#/components/schemas/Timestamp" },
+                      "ip": { "type": ["string", "null"] },
+                      "userAgent": { "type": ["string", "null"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SignerView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "envelope",
+          "recipient",
+          "documents",
+          "fields",
+          "values",
+          "otpRequired",
+          "authenticated",
+          "canAct"
+        ],
+        "properties": {
+          "envelope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "message", "status", "expiresAt"],
+            "properties": {
+              "id": { "$ref": "#/components/schemas/Id" },
+              "title": { "type": "string" },
+              "message": { "type": ["string", "null"] },
+              "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
+              "expiresAt": { "type": ["string", "null"], "format": "date-time" }
+            }
+          },
+          "recipient": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "email", "role", "status", "auth"],
+            "properties": {
+              "id": { "$ref": "#/components/schemas/Id" },
+              "name": { "type": "string" },
+              "email": { "type": ["string", "null"] },
+              "role": { "$ref": "#/components/schemas/RecipientRole" },
+              "status": { "$ref": "#/components/schemas/RecipientStatus" },
+              "auth": { "$ref": "#/components/schemas/AuthMethod" }
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "name", "pageCount"],
+              "properties": {
+                "id": { "$ref": "#/components/schemas/Id" },
+                "name": { "type": "string" },
+                "pageCount": { "type": "integer" }
+              }
+            }
+          },
+          "fields": {
+            "type": "array",
+            "description": "This recipient's fields only.",
+            "items": { "$ref": "#/components/schemas/Field" }
+          },
+          "values": {
+            "type": "array",
+            "description": "Values already entered in this recipient's fields.",
+            "items": { "$ref": "#/components/schemas/FieldValue" }
+          },
+          "otpRequired": {
+            "type": "boolean",
+            "description": "The recipient signs with a one-time code."
+          },
+          "authenticated": {
+            "type": "boolean",
+            "description": "A valid session came with this request."
+          },
+          "canAct": { "type": "boolean", "description": "It is this recipient's turn." }
+        }
+      },
+      "NewDocument": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "content"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "How fields refer to this document in the same request. Default its position, `\"0\"`."
+          },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "content": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "contentMediaType": "application/pdf",
+            "description": "The PDF file as base64."
+          }
+        }
+      },
+      "NewRecipient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "description": "`email` is required for viewers and for `email_link` and `email_otp`; `phone` for\n`sms_otp`.\n",
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "How fields refer to this recipient in the same request. Default its position, `\"0\"`."
+          },
+          "id": {
+            "type": "string",
+            "description": "On `PATCH`, the id of an existing recipient to keep."
+          },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "email": { "type": "string", "format": "email", "maxLength": 254 },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{6,14}$",
+            "description": "International format, like `+919812345678`."
+          },
+          "role": { "$ref": "#/components/schemas/RecipientRole", "default": "signer" },
+          "auth": { "$ref": "#/components/schemas/AuthMethod", "default": "email_link" },
+          "order": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Signing order in sequential routing. Default the position in the list, from 1."
+          }
+        }
+      },
+      "NewField": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["recipient", "page"],
+        "description": "A box on a page for one recipient. Give its position either as `x`, `y`, `width` and\n`height` or as `rect`.\n",
+        "properties": {
+          "recipient": {
+            "type": ["string", "integer"],
+            "description": "The recipient's `key` (or `id` on `PATCH`)."
+          },
+          "document": {
+            "type": ["string", "integer"],
+            "description": "The document's `key` or `id`. Optional when the envelope has one document."
+          },
+          "type": { "$ref": "#/components/schemas/FieldType", "default": "signature" },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Zero-based page index."
+          },
+          "x": { "type": "number", "minimum": 0 },
+          "y": { "type": "number", "minimum": 0 },
+          "width": { "type": "number", "minimum": 1 },
+          "height": { "type": "number", "minimum": 1 },
+          "rect": { "$ref": "#/components/schemas/Rect" },
+          "required": { "type": "boolean", "default": true },
+          "label": { "type": "string", "maxLength": 200 }
+        },
+        "anyOf": [{ "required": ["rect"] }, { "required": ["x", "y", "width", "height"] }]
+      },
+      "EnvelopeSettings": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "Shown to recipients in the invitation and on the signing page."
+          },
+          "routing": { "$ref": "#/components/schemas/Routing", "default": "sequential" },
+          "reminders": { "$ref": "#/components/schemas/Reminders" },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the envelope expires; must be in the future."
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "default": 30,
+            "description": "Used when `expiresAt` is not set."
+          },
+          "metadata": { "$ref": "#/components/schemas/Metadata" }
+        }
+      },
+      "CreateEnvelope": {
+        "allOf": [{ "$ref": "#/components/schemas/EnvelopeSettings" }],
+        "type": "object",
+        "required": ["title", "documents", "recipients"],
+        "unevaluatedProperties": false,
+        "properties": {
+          "send": {
+            "type": "boolean",
+            "default": false,
+            "description": "Send at once instead of keeping a draft."
+          },
+          "documents": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "$ref": "#/components/schemas/NewDocument" }
+          },
+          "recipients": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": { "$ref": "#/components/schemas/NewRecipient" }
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 500,
+            "items": { "$ref": "#/components/schemas/NewField" }
+          }
+        }
+      },
+      "CreateEnvelopeUpload": {
+        "type": "object",
+        "required": ["envelope", "documents"],
+        "properties": {
+          "envelope": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "description": "The same JSON as the JSON body, with `documents` holding only `{ key, name }` for\neach file in upload order, or left out.\n",
+            "examples": [
+              "{\"title\":\"Offer letter\",\"send\":true,\"recipients\":[{\"key\":\"asha\",\"name\":\"Asha Rao\",\"email\":\"asha@example.com\"}],\"fields\":[{\"recipient\":\"asha\",\"page\":0,\"x\":72,\"y\":640,\"width\":180,\"height\":48}]}"
+            ]
+          },
+          "documents": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "type": "string", "format": "binary", "contentMediaType": "application/pdf" }
+          }
+        }
+      },
+      "UpdateEnvelope": {
+        "allOf": [{ "$ref": "#/components/schemas/EnvelopeSettings" }],
+        "type": "object",
+        "unevaluatedProperties": false,
+        "properties": {
+          "message": { "type": ["string", "null"], "maxLength": 5000 },
+          "recipients": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "description": "Replaces the recipients. Include `id` to keep an existing one.",
+            "items": { "$ref": "#/components/schemas/NewRecipient" }
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 500,
+            "description": "Replaces all fields.",
+            "items": { "$ref": "#/components/schemas/NewField" }
+          }
+        }
+      },
+      "WebhookEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "createdAt", "data"],
+        "properties": {
+          "id": { "type": "string", "description": "The delivery id; the same on every retry." },
+          "type": { "$ref": "#/components/schemas/AuditAction" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["envelope"],
+            "properties": {
+              "envelope": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "title", "status", "metadata", "completedAt", "recipients"],
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/Id" },
+                  "title": { "type": "string" },
+                  "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
+                  "metadata": { "$ref": "#/components/schemas/Metadata" },
+                  "completedAt": { "type": ["string", "null"], "format": "date-time" },
+                  "recipients": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["id", "name", "email", "role", "status", "actedAt"],
+                      "properties": {
+                        "id": { "$ref": "#/components/schemas/Id" },
+                        "name": { "type": "string" },
+                        "email": { "type": ["string", "null"] },
+                        "role": { "$ref": "#/components/schemas/RecipientRole" },
+                        "status": { "$ref": "#/components/schemas/RecipientStatus" },
+                        "actedAt": { "type": ["string", "null"], "format": "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
