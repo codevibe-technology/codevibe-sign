@@ -1,5 +1,5 @@
 import { SignError } from '@codevibe/sign-core';
-import { request, type FetchLike, type HttpOptions } from '../http';
+import { readLimited, request, type FetchLike, type HttpOptions } from '../http';
 import type {
   EsignEvent,
   EsignProvider,
@@ -274,14 +274,8 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
       async (res) => {
         const type = res.headers.get('content-type') ?? '';
         if (type.includes('json')) throw envelopeError(await readEnvelope(res));
-        const length = Number(res.headers.get('content-length'));
-        if (Number.isFinite(length) && length > maxSignedBytes) {
-          throw new SignError('DOCUMENT_TOO_LARGE', 'Signed document from Leegality is too large', {
-            limit: maxSignedBytes,
-          });
-        }
-        const bytes = new Uint8Array(await res.arrayBuffer());
-        if (bytes.byteLength > maxSignedBytes) {
+        const bytes = await readLimited(res, maxSignedBytes);
+        if (!bytes) {
           throw new SignError('DOCUMENT_TOO_LARGE', 'Signed document from Leegality is too large', {
             limit: maxSignedBytes,
           });

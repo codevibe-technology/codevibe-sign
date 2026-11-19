@@ -2,6 +2,7 @@ import { SignError } from '@codevibe/sign-core';
 import { describe, expect, it, vi } from 'vitest';
 import type { EsignRequest } from '../provider';
 import { createLeegalityProvider, type LeegalityOptions } from './provider';
+import { MAX_JSON_RESPONSE_BYTES } from './api';
 import { computeMac } from './webhook';
 
 const SALT = 'test-private-salt';
@@ -202,6 +203,15 @@ describe('createRequest', () => {
     );
     const error = await caught(provider.createRequest(signRequest()));
     expect(error.details).toMatchObject({ reason: 'missing_sign_url', providerRef: 'DOC123' });
+  });
+
+  it('refuses a JSON response that is too large to be real', async () => {
+    const { provider } = setup(() =>
+      json({ ...created, padding: 'x'.repeat(MAX_JSON_RESPONSE_BYTES) }),
+    );
+    const error = await caught(provider.createRequest(signRequest()));
+    expect(error.code).toBe('PROVIDER_ERROR');
+    expect(error.details).toMatchObject({ reason: 'malformed_response' });
   });
 
   it('maps network failures as retryable', async () => {
@@ -430,6 +440,46 @@ describe('fetchSignedDocument', () => {
     expect((await caught(big.provider.fetchSignedDocument('DOC123'))).code).toBe(
       'DOCUMENT_TOO_LARGE',
     );
+  });
+
+  it('stops reading a download that runs past the limit without a length header', async () => {
+    let pulled = 0;
+    let cancelled = false;
+    const endless = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(pulled === 1 ? signedPdf : new Uint8Array(1024));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        { headers: { 'content-type': 'application/pdf' } },
+      );
+    const { provider } = setup(routes(endless), { maxSignedDocumentBytes: 10 * 1024 });
+    const error = await caught(provider.fetchSignedDocument('DOC123'));
+    expect(error.code).toBe('DOCUMENT_TOO_LARGE');
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThan(20);
+  });
+
+  it('refuses a download whose declared length is over the limit without reading it', async () => {
+    let pulled = 0;
+    const declared = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(signedPdf);
+          },
+        }),
+        { headers: { 'content-type': 'application/pdf', 'content-length': '999999999' } },
+      );
+    const { provider } = setup(routes(declared), { maxSignedDocumentBytes: 1024 });
+    expect((await caught(provider.fetchSignedDocument('DOC123'))).code).toBe('DOCUMENT_TOO_LARGE');
+    expect(pulled).toBeLessThanOrEqual(1);
   });
 
   it('times out a download that stalls mid-body', async () => {
