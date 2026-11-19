@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import forge from 'node-forge';
 import { OID } from './cms';
+import { signatureFields } from './signatures';
 
 const { asn1, pki } = forge;
 type Asn1 = forge.asn1.Asn1;
@@ -29,8 +30,6 @@ const DIGESTS: Record<string, { node: string; forge: () => forge.md.MessageDiges
   '2.16.840.1.101.3.4.2.2': { node: 'sha384', forge: () => forge.md.sha384.create() },
   '2.16.840.1.101.3.4.2.3': { node: 'sha512', forge: () => forge.md.sha512.create() },
 };
-
-const BYTE_RANGE = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g;
 
 function children(node: Asn1 | undefined): Asn1[] {
   return node && Array.isArray(node.value) ? (node.value as Asn1[]) : [];
@@ -182,35 +181,49 @@ function signingTimeOf(attributes: Asn1[]): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+interface SignatureCheck {
+  valid: boolean;
+  signer?: SealSigner;
+  signedAt?: string;
+  signerCertificateDer?: string;
+  certificates: forge.pki.Certificate[];
+}
+
 /** Checks the CMS signature against the signed bytes. Any parse problem means "not valid". */
-function checkSignature(
-  signedContent: Buffer,
-  cmsBinary: string,
-): { valid: boolean; signer?: SealSigner; signedAt?: string } {
+function checkSignature(signedContent: Buffer, cmsBinary: string): SignatureCheck {
   let parsed: ParsedSignature | null;
   try {
     parsed = parseCms(cmsBinary);
   } catch {
-    return { valid: false };
+    return { valid: false, certificates: [] };
   }
   if (!parsed) {
-    return { valid: false };
+    return { valid: false, certificates: [] };
   }
   const digest = DIGESTS[parsed.digestOid];
   const signerCert = findSignerCertificate(parsed);
   const cert = signerCert?.cert ?? undefined;
+  const certificates = parsed.certificates
+    .map((entry) => entry.cert)
+    .filter((entry): entry is forge.pki.Certificate => entry !== null);
   const signer = cert
     ? { commonName: field(cert, 'CN'), organization: field(cert, 'O') }
     : undefined;
   const signedAt = signingTimeOf(parsed.signedAttributes);
+  const invalid: SignatureCheck = {
+    valid: false,
+    certificates,
+    ...(signer ? { signer } : {}),
+    ...(signedAt ? { signedAt } : {}),
+  };
   if (!digest || !signerCert || !cert) {
-    return { valid: false, signer, signedAt };
+    return invalid;
   }
 
   const messageDigest = attributeValue(parsed.signedAttributes, OID.messageDigest);
   const contentDigest = createHash(digest.node).update(signedContent).digest('binary');
   if (!messageDigest || messageDigest.value !== contentDigest) {
-    return { valid: false, signer, signedAt };
+    return invalid;
   }
 
   const essCertificate = attributeValue(parsed.signedAttributes, OID.signingCertificateV2);
@@ -227,7 +240,7 @@ function checkSignature(
           .digest('binary')
       : undefined;
     if (!hashNode || hashNode.value !== expected) {
-      return { valid: false, signer, signedAt };
+      return invalid;
     }
   }
 
@@ -245,38 +258,50 @@ function checkSignature(
   } catch {
     verified = false;
   }
-  return { valid: verified, signer, signedAt };
+  return { ...invalid, valid: verified, signerCertificateDer: der(signerCert.node) };
+}
+
+/** What `examineSeal` learns about the first signature, beyond the public result. */
+export interface SealExamination {
+  result: SealVerification;
+  /** DER (binary string) of the certificate that made the signature, when it was found. */
+  signerCertificateDer?: string;
+  /** Every certificate embedded in the signature, signer included. */
+  certificates: forge.pki.Certificate[];
 }
 
 /**
- * Verifies the first signature in the file: the byte range is well formed, the
- * /Contents hold exactly the CMS structure, its message digest matches the covered
- * bytes and the RSA signature checks out against the embedded signer certificate.
- * Whether that certificate is trusted is left to the caller.
+ * Verifies the first signed signature field of the document's form: the byte range is
+ * well formed and is the one the field declares, the /Contents hold exactly the CMS
+ * structure, its message digest matches the covered bytes and the RSA signature checks out
+ * against the embedded signer certificate. Whether that certificate is trusted is left to
+ * the caller; `verify()` adds that check.
  */
 export async function verifySeal(bytes: Uint8Array): Promise<SealVerification> {
+  return (await examineSeal(bytes)).result;
+}
+
+export async function examineSeal(bytes: Uint8Array): Promise<SealExamination> {
   const pdf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const text = pdf.toString('latin1');
-  const matches = [...text.matchAll(BYTE_RANGE)];
-  const first = matches[0];
-  const notSealed = { sealed: false, valid: false, coversWholeDocument: false, signatureCount: 0 };
+  const fields = await signatureFields(bytes);
+  const first = fields[0];
   if (!first) {
-    return notSealed;
+    return {
+      result: { sealed: false, valid: false, coversWholeDocument: false, signatureCount: 0 },
+      certificates: [],
+    };
   }
 
-  const [start, firstLength, secondStart, secondLength] = first.slice(1, 5).map(Number) as [
-    number,
-    number,
-    number,
-    number,
-  ];
-  const signatureCount = matches.length;
+  const [start, firstLength, secondStart, secondLength] = first.byteRange;
+  const signatureCount = fields.length;
   const coversWholeDocument = secondStart + secondLength === pdf.length;
+  const dictionaryTime = first.signingDate ? parsePdfDate(first.signingDate) : undefined;
   const result: SealVerification = {
     sealed: true,
     valid: false,
     coversWholeDocument,
     signatureCount,
+    ...(dictionaryTime ? { signedAt: dictionaryTime } : {}),
   };
 
   const gapStart = start + firstLength;
@@ -284,31 +309,23 @@ export async function verifySeal(bytes: Uint8Array): Promise<SealVerification> {
     start === 0 &&
     gapStart < secondStart &&
     secondStart + secondLength <= pdf.length &&
-    text[gapStart] === '<' &&
-    text[secondStart - 1] === '>';
+    pdf[gapStart] === 0x3c &&
+    pdf[secondStart - 1] === 0x3e;
   if (!wellFormed) {
-    return result;
+    return { result, certificates: [] };
   }
 
-  const dictStart = text.lastIndexOf('obj', gapStart);
-  const dictEnd = text.indexOf('endobj', secondStart);
-  const dictionary = text.slice(
-    Math.max(0, dictStart),
-    dictEnd === -1 ? secondStart + 4096 : dictEnd,
-  );
-  const dateMatch = /\/M\s*\((D:[^)]*)\)/.exec(dictionary);
-  const dictionaryTime = dateMatch?.[1] ? parsePdfDate(dateMatch[1]) : undefined;
-
   // The /Contents must be exactly the DER signature in lowercase hex, padded with zeros,
-  // so that no byte of the file can change without the check failing.
-  const hex = text.slice(gapStart + 1, secondStart - 1);
-  if (!/^[0-9a-f]*$/.test(hex) || hex.length % 2 !== 0) {
-    return { ...result, signedAt: dictionaryTime };
+  // so that no byte of the file can change without the check failing. It must also be the
+  // value the signature field declares, so the byte range cannot point at another one.
+  const hex = pdf.toString('latin1', gapStart + 1, secondStart - 1);
+  if (!/^[0-9a-f]*$/.test(hex) || hex.length % 2 !== 0 || hex !== first.contentsHex) {
+    return { result, certificates: [] };
   }
   const contents = Buffer.from(hex, 'hex');
   const length = derLength(contents);
   if (length === null || contents.subarray(length).some((byte) => byte !== 0)) {
-    return { ...result, signedAt: dictionaryTime };
+    return { result, certificates: [] };
   }
 
   const signedContent = Buffer.concat([
@@ -316,14 +333,18 @@ export async function verifySeal(bytes: Uint8Array): Promise<SealVerification> {
     pdf.subarray(secondStart, secondStart + secondLength),
   ]);
   const check = checkSignature(signedContent, contents.subarray(0, length).toString('binary'));
+  const signedAt = check.signedAt ?? dictionaryTime;
   return {
-    ...result,
-    valid: check.valid,
-    signer: check.signer,
-    signedAt: check.signedAt ?? dictionaryTime,
+    result: {
+      ...result,
+      valid: check.valid,
+      ...(check.signer ? { signer: check.signer } : {}),
+      ...(signedAt ? { signedAt } : {}),
+    },
+    ...(check.signerCertificateDer ? { signerCertificateDer: check.signerCertificateDer } : {}),
+    certificates: check.certificates,
   };
 }
-
 /** Total length of the DER element at the start of the buffer, or null if it is not one. */
 function derLength(buffer: Buffer): number | null {
   if (buffer.length < 2 || buffer[0] !== 0x30) {

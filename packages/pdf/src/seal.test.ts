@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFHexString } from 'pdf-lib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe/sign-core';
 import { appendCertificate } from './certificate';
@@ -142,6 +142,37 @@ describe('seal and verifySeal', () => {
       coversWholeDocument: false,
       signatureCount: 0,
     });
+  });
+
+  it('ignores /ByteRange text that no signature field references', async () => {
+    const doc = await PDFDocument.load(await makePdf([{ size: A4 }]));
+    doc.context.register(
+      doc.context.obj({ Type: 'Sig', ByteRange: [0, 10, 20, 30], Contents: PDFHexString.of('00') }),
+    );
+    const decoy = await doc.save({ useObjectStreams: false });
+    expect(Buffer.from(decoy).toString('latin1')).toContain('/ByteRange');
+    expect(await verifySeal(decoy)).toMatchObject({ sealed: false, signatureCount: 0 });
+  });
+
+  it('verifies the signature the form declares, not an earlier decoy', async () => {
+    const doc = await PDFDocument.load(await makePdf([{ size: A4 }]));
+    doc.context.register(
+      doc.context.obj({ Type: 'Sig', ByteRange: [0, 10, 20, 30], Contents: PDFHexString.of('00') }),
+    );
+    const output = await seal(await doc.save({ useObjectStreams: false }), {
+      p12: identity.p12,
+      passphrase: identity.passphrase,
+    });
+    const text = Buffer.from(output).toString('latin1');
+    expect(text.indexOf('/ByteRange [0 10 20 30]')).toBeLessThan(text.lastIndexOf('/ByteRange'));
+    expect(await verifySeal(output)).toMatchObject({ valid: true, coversWholeDocument: true });
+  });
+
+  it('counts every signed signature field', async () => {
+    const twice = await seal(sealed, { p12: identity.p12, passphrase: identity.passphrase });
+    const result = await verifySeal(twice);
+    expect(result.signatureCount).toBe(2);
+    expect(result.valid).toBe(false);
   });
 
   it('seals with a key whose certificate is not first in the file', async () => {
