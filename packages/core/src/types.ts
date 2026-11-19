@@ -176,6 +176,8 @@ export type SignErrorCode =
   | 'DOCUMENT_TOO_LARGE'
   | 'DOCUMENT_INVALID'
   | 'SEAL_FAILED'
+  | 'PROVIDER_ERROR'
+  | 'WEBHOOK_INVALID'
   | 'VALIDATION';
 
 export class SignError extends Error {
