@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   singleWorkspace: false,
   workspaceCount: 0,
   calls: [] as string[],
+  signingArgs: [] as unknown[],
 }));
 
 const WORKSPACE = { id: 'ws_1', slug: 'acme', name: 'Acme' };
@@ -38,6 +39,11 @@ vi.mock('../workspaces', () => ({
 }));
 vi.mock('../brand', () => ({
   updateBrand: record('updateBrand'),
+  updateEmailSettings: record('updateEmailSettings'),
+  updateSigningSettings: async (...args: unknown[]) => {
+    state.calls.push('updateSigningSettings');
+    state.signingArgs = args;
+  },
   setLogo: record('setLogo'),
   removeLogo: record('removeLogo'),
 }));
@@ -63,7 +69,13 @@ vi.mock('../preferences', () => ({
 }));
 
 const { createApiKeyAction, revokeApiKeyAction } = await import('./api-keys');
-const { removeLogoAction, updateBrandAction, uploadLogoAction } = await import('./brand');
+const {
+  removeLogoAction,
+  updateBrandAction,
+  updateEmailSettingsAction,
+  updateSigningSettingsAction,
+  uploadLogoAction,
+} = await import('./brand');
 const { updatePreferencesAction } = await import('./personal');
 const {
   acceptInvitationAction,
@@ -91,6 +103,22 @@ const workspaceActions: [string, Role, (input: unknown) => Promise<unknown>, () 
     () => ({ brandColor: '#123456', font: 'inter', senderName: 'Acme HR' }),
   ],
   ['uploadLogo', 'admin', uploadLogoAction, logo],
+  [
+    'updateEmailSettings',
+    'admin',
+    updateEmailSettingsAction,
+    () => ({
+      senderName: 'Acme HR',
+      replyTo: 'hr@acme.test',
+      overrides: { invite: { subject: 'Sign {{document_title}}', intro: '' } },
+    }),
+  ],
+  [
+    'updateSigningSettings',
+    'admin',
+    updateSigningSettingsAction,
+    () => ({ showBadge: false, certificateFooter: 'Acme Pvt Ltd', signingDomain: '' }),
+  ],
   ['removeLogo', 'admin', removeLogoAction, () => ({})],
   ['inviteMember', 'admin', inviteMemberAction, () => ({ email: 'a@b.co', role: 'member' })],
   ['revokeInvitation', 'admin', revokeInvitationAction, () => ({ invitationId: 'inv_1' })],
@@ -170,6 +198,27 @@ describe('input checks', () => {
       field: 'logo',
     });
     expect(state.calls).toEqual([]);
+  });
+
+  it('refuses a mail kind that does not exist and a badge that is not a yes or no', async () => {
+    expect(
+      await updateEmailSettingsAction(
+        withWorkspace({ senderName: '', replyTo: '', overrides: { welcome: { subject: 'x' } } }),
+      ),
+    ).toMatchObject({ ok: false, code: 'VALIDATION' });
+    expect(
+      await updateSigningSettingsAction(
+        withWorkspace({ showBadge: 'yes', certificateFooter: '', signingDomain: '' }),
+      ),
+    ).toMatchObject({ ok: false, code: 'VALIDATION', field: 'showBadge' });
+    expect(state.calls).toEqual([]);
+  });
+
+  it("checks the signing domain against the app's own host", async () => {
+    await updateSigningSettingsAction(
+      withWorkspace({ showBadge: true, certificateFooter: '', signingDomain: 'sign.acme.test' }),
+    );
+    expect(state.signingArgs.at(-1)).toBe('sign.example.com');
   });
 
   it('hides unexpected failures behind a plain message', async () => {
