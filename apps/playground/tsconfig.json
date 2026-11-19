@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "noEmit": true,
+    "paths": {
+      "@codevibe/sign-core": ["../../packages/core/src/index.ts"],
+      "@codevibe/sign-react": ["../../packages/react/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
