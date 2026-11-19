@@ -41,5 +41,7 @@
   "dependencies": {
     "@codevibe/sign-core": "workspace:*"
   },
-  "peerDependencies": {}
+  "devDependencies": {
+    "@types/node": "22.10.1"
+  }
 }

@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/coverage
+.worktrees
+.git
+.github
+.changeset
+**/*.log
+**/.env
+**/.env.*
+**/*.p12
+**/*.pfx
