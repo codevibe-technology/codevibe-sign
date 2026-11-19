@@ -6,7 +6,16 @@ const nodeGlobals = Object.fromEntries(
 );
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '.worktrees/**', '**/.vitepress/cache/**', '**/.vitepress/dist/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '.worktrees/**',
+      '**/.vitepress/cache/**',
+      '**/.vitepress/dist/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { files: ['scripts/**/*.mjs'], languageOptions: { globals: nodeGlobals } },
