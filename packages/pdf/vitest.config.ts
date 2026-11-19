@@ -1,7 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { limitsWorkerVitePlugin } from './scripts/limits-worker';
 
 export default defineConfig({
+  plugins: [limitsWorkerVitePlugin()],
   resolve: {
     alias: {
       '@codevibe_technology/sign-core': fileURLToPath(

@@ -1,7 +1,9 @@
+import { builtinModules } from 'node:module';
 import { deflateSync } from 'node:zlib';
 import { PDFDocument, PDFRawStream } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe_technology/sign-core';
+import workerSource from 'virtual:limits-worker';
 import { inspectPdf } from './inspect';
 import { checkParseLimits, DEFAULT_PARSE_LIMITS } from './limits';
 import { A4, makePdf } from './testing/fixtures';
@@ -93,6 +95,16 @@ describe('checkParseLimits', () => {
     const error = await rejection(checkParseLimits(pdf, { timeoutMs: 1 }));
     expect(error.details).toMatchObject({ reason: 'timeout', timeoutMs: 1 });
     expect(Date.now() - started).toBeLessThan(5_000);
+  });
+});
+
+describe('limits worker source', () => {
+  it('needs nothing from disk but Node built-ins, so bundling the package cannot break it', () => {
+    const required = [...workerSource.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]);
+    expect(required).toContain('node:worker_threads');
+    for (const id of required) {
+      expect(builtinModules).toContain(id?.replace(/^node:/, ''));
+    }
   });
 });
 
