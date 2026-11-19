@@ -3,6 +3,8 @@ import type { Field, FieldType, PageSize, Recipient, Rect, ReminderPolicy } from
 import { SignError } from './types';
 
 export const MAX_IMAGE_BYTES = 512 * 1024;
+/** Largest width or height, in pixels, of a signature or initials image. */
+export const MAX_IMAGE_DIMENSION = 2048;
 export const MAX_TEXT_LENGTH = 1000;
 export const MAX_NAME_LENGTH = 200;
 export const MAX_REASON_LENGTH = 1000;
@@ -163,6 +165,16 @@ export function normalizePng(value: string): { base64: string } | { problem: str
   const header = [...PNG_SIGNATURE, 0, 0, 0, 13, ...IHDR];
   if (bytes.length < 33 || header.some((byte, i) => bytes[i] !== byte)) {
     return { problem: 'Image is not a PNG' };
+  }
+  // A few hundred bytes of PNG can declare a huge canvas that decodes to gigabytes, so the
+  // declared size is capped here, before anything downstream decodes the image.
+  const ihdr = new DataView(bytes.buffer, bytes.byteOffset + 16, 8);
+  const width = ihdr.getUint32(0);
+  const height = ihdr.getUint32(4);
+  if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+    return {
+      problem: `Image is larger than ${MAX_IMAGE_DIMENSION} x ${MAX_IMAGE_DIMENSION} pixels`,
+    };
   }
   return { base64 };
 }

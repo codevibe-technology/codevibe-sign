@@ -86,6 +86,7 @@ export {
   isValidEmail,
   isValidPhone,
   MAX_IMAGE_BYTES,
+  MAX_IMAGE_DIMENSION,
   MAX_NAME_LENGTH,
   MAX_REASON_LENGTH,
   MAX_TEXT_LENGTH,
