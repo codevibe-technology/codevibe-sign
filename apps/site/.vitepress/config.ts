@@ -15,6 +15,7 @@ export default defineConfig({
   lang: 'en',
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
+  srcExclude: ['README.md'],
   cleanUrls: false,
   lastUpdated: false,
   appearance: true,
