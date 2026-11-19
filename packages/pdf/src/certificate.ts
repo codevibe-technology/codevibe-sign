@@ -66,6 +66,7 @@ const AUTH_LABELS: Record<AuthMethod, string> = {
 
 const ACTION_LABELS: Record<AuditAction, string> = {
   'envelope.created': 'Envelope created',
+  'envelope.updated': 'Draft edited',
   'envelope.sent': 'Envelope sent',
   'envelope.completed': 'Envelope completed',
   'envelope.declined': 'Envelope declined',
@@ -83,6 +84,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
 
 const SENDER_ACTIONS: ReadonlySet<AuditAction> = new Set([
   'envelope.created',
+  'envelope.updated',
   'envelope.sent',
   'envelope.voided',
 ]);
