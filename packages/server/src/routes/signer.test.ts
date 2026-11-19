@@ -342,6 +342,52 @@ describe('OTP', () => {
     expect(right.status).toBe(423);
   });
 
+  it('counts parallel wrong guesses one by one', async () => {
+    const { h, token } = await otpEnvelope();
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const code = h.otp.sent.at(-1)!.code;
+    const wrong = code === '123456' ? '654321' : '123456';
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code: wrong } }),
+      ),
+    );
+    const errors = results.map((r) => r.json.error.code);
+    expect(errors.filter((c) => c === 'OTP_INVALID')).toHaveLength(4);
+    expect(errors.filter((c) => c === 'OTP_LOCKED')).toHaveLength(4);
+    const right = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code } });
+    expect(right.json.error.code).toBe('OTP_LOCKED');
+  });
+
+  it('invalidates the previous code when a new one is sent', async () => {
+    const { h, token } = await otpEnvelope();
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const first = h.otp.sent.at(-1)!.code;
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const second = h.otp.sent.at(-1)!.code;
+    if (first !== second) {
+      const old = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code: first } });
+      expect(old.json.error.code).toBe('OTP_INVALID');
+    }
+    const ok = await h.call('POST', `/v1/sign/${token}/otp/verify`, { body: { code: second } });
+    expect(ok.status).toBe(200);
+  });
+
+  it('sends at most ten codes per recipient over the life of an envelope', async () => {
+    const { h, token } = await otpEnvelope();
+    for (let i = 0; i < 10; i++) {
+      expect((await h.call('POST', `/v1/sign/${token}/otp`)).status).toBe(200);
+      h.advance(16 * 60_000);
+    }
+    const capped = await h.call('POST', `/v1/sign/${token}/otp`);
+    expect(capped.status).toBe(423);
+    expect(capped.json.error).toMatchObject({
+      code: 'OTP_LOCKED',
+      details: { reason: 'too_many_codes', max: 10 },
+    });
+    expect(h.otp.sent).toHaveLength(10);
+  });
+
   it('expires codes after ten minutes', async () => {
     const { h, token } = await otpEnvelope();
     await h.call('POST', `/v1/sign/${token}/otp`);

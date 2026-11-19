@@ -52,6 +52,8 @@ export interface Limits {
   ipRequestsPerMinute?: number;
   /** OTP codes sent to one recipient per 15 minutes. Default 5. */
   otpSendsPer15Minutes?: number;
+  /** OTP codes one recipient can ever be sent for one envelope. Default 10. */
+  otpCodesPerRecipient?: number;
   /** Total size of sealed files attached to the completion email. Default 10 MB. */
   maxAttachmentBytes?: number;
 }

@@ -57,6 +57,7 @@ const DEFAULT_LIMITS: Required<Limits> = {
   signerRequestsPerMinute: 60,
   ipRequestsPerMinute: 120,
   otpSendsPer15Minutes: 5,
+  otpCodesPerRecipient: 10,
   maxAttachmentBytes: 10 * 1024 * 1024,
 };
 

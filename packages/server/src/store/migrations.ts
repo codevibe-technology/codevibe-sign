@@ -69,4 +69,12 @@ create table sign_jobs (
 create index sign_jobs_due_idx on sign_jobs (run_at) where state = 'pending';
 `,
   },
+  {
+    name: '0002_otp_issuance',
+    sql: `
+alter table sign_otp_challenges
+  add column issued integer not null default 1,
+  add column version integer not null default 1;
+`,
+  },
 ];

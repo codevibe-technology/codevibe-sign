@@ -38,6 +38,7 @@ import { signerView } from '../views';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const OTP_METHODS = new Set(['email_otp', 'sms_otp']);
+const OTP_SAVE_ATTEMPTS = 10;
 
 interface SignerContext {
   tokenHash: string;
@@ -105,6 +106,22 @@ export function signerRoutes(rt: Runtime) {
     return signer;
   }
 
+  /**
+   * Checks the code and saves the new attempt count in one compare-and-set, re-reading on a
+   * race, so parallel wrong guesses each count against the limit.
+   */
+  async function checkOtp(envelopeId: string, recipientId: string, code: string): Promise<void> {
+    for (let attempt = 0; attempt < OTP_SAVE_ATTEMPTS; attempt++) {
+      const challenge = await rt.store.getOtp(envelopeId, recipientId);
+      if (!challenge) throw new SignError('OTP_EXPIRED', 'Ask for a code first.');
+      const check = verifyOtp(challenge.state, code, rt.clock);
+      if (!(await rt.store.updateOtp(challenge, check.state))) continue;
+      if (!check.ok) throw check.error;
+      return;
+    }
+    throw new HttpError('CONFLICT', 'Too many checks at once, try again');
+  }
+
   const deps = { clock: rt.clock };
   const context = (c: Context): AuditContext => {
     const ua = userAgent(c);
@@ -145,11 +162,17 @@ export function signerRoutes(rt: Runtime) {
     await enforce(rt.limiter, `otp-send-ip:${clientIp(c, rt)}`, sends * 4, FIFTEEN_MINUTES, now);
 
     const issued = createOtp(rt.random, rt.clock);
-    await rt.store.putOtp({
-      envelopeId: envelope.id,
-      recipientId: recipient.id,
-      state: issued.state,
-    });
+    const stored = await rt.store.issueOtp(
+      { envelopeId: envelope.id, recipientId: recipient.id, state: issued.state },
+      rt.limits.otpCodesPerRecipient,
+    );
+    if (!stored) {
+      throw new SignError(
+        'OTP_LOCKED',
+        'No more codes can be sent for this document. Ask the sender to send it again.',
+        { reason: 'too_many_codes', max: rt.limits.otpCodesPerRecipient },
+      );
+    }
     const code = issued.code;
     try {
       await rt.otp.send(recipient, code);
@@ -180,11 +203,7 @@ export function signerRoutes(rt: Runtime) {
     const body = parseJsonObject(await readJson(c));
     const code = typeof body.code === 'string' ? body.code.trim() : '';
 
-    const challenge = await rt.store.getOtp(envelope.id, recipient.id);
-    if (!challenge) throw new SignError('OTP_EXPIRED', 'Ask for a code first.');
-    const check = verifyOtp(challenge.state, code, rt.clock);
-    await rt.store.putOtp({ ...challenge, state: check.state });
-    if (!check.ok) throw check.error;
+    await checkOtp(envelope.id, recipient.id, code);
     await mutate(rt, envelope.id, (current) =>
       markAuthenticated(current, { recipientId: recipient.id, context: context(c) }, deps),
     );

@@ -111,24 +111,66 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       expect(await store.findToken('nope')).toBeNull();
     });
 
-    it('keeps one OTP challenge per recipient', async () => {
+    const otpState = (attempts = 0) => ({
+      codeHash: `x${attempts}`,
+      salt: 'y',
+      issuedAt: T0.toISOString(),
+      expiresAt: new Date(T0.getTime() + 600_000).toISOString(),
+      attempts,
+    });
+
+    it('keeps one OTP challenge per recipient and counts every code issued', async () => {
       const envelope = draft();
       await store.commit(envelope, [], 0, []);
-      const recipientId = envelope.recipients[0]!.id;
-      const state = {
-        codeHash: 'x',
-        salt: 'y',
-        issuedAt: T0.toISOString(),
-        expiresAt: new Date(T0.getTime() + 600_000).toISOString(),
-        attempts: 0,
-      };
-      await store.putOtp({ envelopeId: envelope.id, recipientId, state });
-      await store.putOtp({
-        envelopeId: envelope.id,
-        recipientId,
-        state: { ...state, attempts: 2 },
+      const ids = { envelopeId: envelope.id, recipientId: envelope.recipients[0]!.id };
+      const first = await store.issueOtp({ ...ids, state: otpState() }, 2);
+      expect(first).toMatchObject({ issued: 1, state: { codeHash: 'x0' } });
+      const second = await store.issueOtp({ ...ids, state: otpState(3) }, 2);
+      expect(second).toMatchObject({ issued: 2 });
+      expect(await store.getOtp(ids.envelopeId, ids.recipientId)).toMatchObject({
+        issued: 2,
+        state: { codeHash: 'x3' },
       });
-      expect((await store.getOtp(envelope.id, recipientId))?.state.attempts).toBe(2);
+      expect(await store.issueOtp({ ...ids, state: otpState(9) }, 2)).toBeNull();
+      expect((await store.getOtp(ids.envelopeId, ids.recipientId))?.state.codeHash).toBe('x3');
+    });
+
+    it('saves an OTP check only against the version it read', async () => {
+      const envelope = draft();
+      await store.commit(envelope, [], 0, []);
+      const ids = { envelopeId: envelope.id, recipientId: envelope.recipients[0]!.id };
+      await store.issueOtp({ ...ids, state: otpState() }, 10);
+      const read = (await store.getOtp(ids.envelopeId, ids.recipientId))!;
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => store.updateOtp(read, otpState(1))),
+      );
+      expect(results.filter(Boolean)).toHaveLength(1);
+      const after = (await store.getOtp(ids.envelopeId, ids.recipientId))!;
+      expect(after.version).toBe(read.version + 1);
+      expect(await store.updateOtp(after, otpState(2))).toBe(true);
+    });
+
+    it('caps OTP issuance under concurrency', async () => {
+      const envelope = draft();
+      await store.commit(envelope, [], 0, []);
+      const ids = { envelopeId: envelope.id, recipientId: envelope.recipients[0]!.id };
+      const issued = await Promise.all(
+        Array.from({ length: 8 }, (_, i) => store.issueOtp({ ...ids, state: otpState(i) }, 3)),
+      );
+      expect(issued.filter((c) => c !== null)).toHaveLength(3);
+    });
+
+    it('keeps the OTP count until the envelope is final', async () => {
+      const active = send(draft(), { clock }).envelope;
+      await store.commit(active, [], 0, []);
+      const ids = { envelopeId: active.id, recipientId: active.recipients[0]!.id };
+      await store.issueOtp({ ...ids, state: otpState() }, 10);
+      const later = new Date(T0.getTime() + 86_400_000);
+      await store.purge(later, later);
+      expect((await store.getOtp(ids.envelopeId, ids.recipientId))?.issued).toBe(1);
+      await store.commit({ ...active, status: 'voided' }, [], 1, []);
+      await store.purge(later, later);
+      expect(await store.getOtp(ids.envelopeId, ids.recipientId)).toBeNull();
     });
 
     it('claims, replays and rejects idempotency keys', async () => {
@@ -217,7 +259,7 @@ describe.skipIf(!url)('postgresStore', () => {
     await admin.unsafe(`create schema ${schema}`);
     sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
     const runs = await Promise.all([migrate(sql), migrate(sql), migrate(sql)]);
-    expect(runs.flat()).toEqual(['0001_init']);
+    expect(runs.flat()).toEqual(['0001_init', '0002_otp_issuance']);
     expect(await migrate(sql)).toEqual([]);
   });
 

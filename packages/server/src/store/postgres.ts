@@ -158,18 +158,39 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
       }
     },
 
-    async putOtp({ envelopeId, recipientId, state }) {
-      await sql`insert into sign_otp_challenges (envelope_id, recipient_id, state, expires_at)
-        values (${envelopeId}, ${recipientId}, ${sql.json(asJson(state))}, ${new Date(state.expiresAt)})
+    async issueOtp({ envelopeId, recipientId, state }, maxIssued) {
+      if (maxIssued < 1) return null;
+      const rows = await sql<{ issued: number; version: number }[]>`
+        insert into sign_otp_challenges
+          (envelope_id, recipient_id, state, expires_at, issued, version)
+        values (${envelopeId}, ${recipientId}, ${sql.json(asJson(state))},
+          ${new Date(state.expiresAt)}, 1, 1)
         on conflict (envelope_id, recipient_id) do update set
-          state = excluded.state, expires_at = excluded.expires_at`;
+          state = excluded.state, expires_at = excluded.expires_at,
+          issued = sign_otp_challenges.issued + 1, version = sign_otp_challenges.version + 1
+        where sign_otp_challenges.issued < ${maxIssued}
+        returning issued, version`;
+      const row = rows[0];
+      return row
+        ? { envelopeId, recipientId, state, issued: row.issued, version: row.version }
+        : null;
     },
     async getOtp(envelopeId, recipientId) {
-      const rows = await sql<{ state: OtpState }[]>`
-        select state from sign_otp_challenges
+      const rows = await sql<{ state: OtpState; issued: number; version: number }[]>`
+        select state, issued, version from sign_otp_challenges
         where envelope_id = ${envelopeId} and recipient_id = ${recipientId}`;
       const row = rows[0];
-      return row ? { envelopeId, recipientId, state: row.state } : null;
+      return row
+        ? { envelopeId, recipientId, state: row.state, issued: row.issued, version: row.version }
+        : null;
+    },
+    async updateOtp(challenge, state) {
+      const rows = await sql`
+        update sign_otp_challenges set state = ${sql.json(asJson(state))}, version = version + 1
+        where envelope_id = ${challenge.envelopeId} and recipient_id = ${challenge.recipientId}
+          and version = ${challenge.version}
+        returning version`;
+      return rows.length > 0;
     },
 
     async claimIdempotency(scope, key, fingerprint, now): Promise<IdempotencyClaim> {
@@ -243,7 +264,9 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
 
     async purge(now, idempotencyBefore) {
       await sql`delete from sign_tokens where expires_at <= ${now}`;
-      await sql`delete from sign_otp_challenges where expires_at <= ${now}`;
+      await sql`delete from sign_otp_challenges c using sign_envelopes e
+        where c.envelope_id = e.id
+          and e.status in ('completed', 'declined', 'expired', 'voided')`;
       await sql`delete from sign_idempotency where created_at < ${idempotencyBefore}`;
       await sql`delete from sign_jobs where state = 'done'`;
     },

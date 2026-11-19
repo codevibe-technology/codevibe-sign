@@ -20,6 +20,10 @@ export interface OtpChallenge {
   recipientId: Id;
   /** From `createOtp` / `verifyOtp` in core: salted hash, expiry and attempts. */
   state: OtpState;
+  /** Codes issued to this recipient for this envelope so far, the current one included. */
+  issued: number;
+  /** Grows on every write; `updateOtp` saves only if it has not moved. */
+  version: number;
 }
 
 export type IdempotencyClaim =
@@ -62,9 +66,22 @@ export interface ServerStore extends EnvelopeStore {
   findToken(hash: string): Promise<SigningToken | null>;
   revokeTokens(envelopeId: Id, recipientId: Id | undefined, at: Date): Promise<void>;
 
-  /** Creates or replaces the recipient's current challenge. */
-  putOtp(challenge: OtpChallenge): Promise<void>;
+  /**
+   * Replaces the recipient's challenge with a newly issued code, so the previous code stops
+   * working, and counts it. Returns null without changing anything when `maxIssued` codes have
+   * already been issued for this recipient and envelope. Atomic.
+   */
+  issueOtp(
+    challenge: Pick<OtpChallenge, 'envelopeId' | 'recipientId' | 'state'>,
+    maxIssued: number,
+  ): Promise<OtpChallenge | null>;
   getOtp(envelopeId: Id, recipientId: Id): Promise<OtpChallenge | null>;
+  /**
+   * Saves `state` for the challenge only if its version is still `challenge.version`, and
+   * reports whether it did. Two checks racing on the same code can then never both count as
+   * the first attempt.
+   */
+  updateOtp(challenge: OtpChallenge, state: OtpState): Promise<boolean>;
 
   claimIdempotency(
     scope: string,
@@ -82,6 +99,10 @@ export interface ServerStore extends EnvelopeStore {
   /** Schedules a retry at `retryAt`, or gives up when it is null. */
   failJob(id: Id, error: string, retryAt: Date | null): Promise<void>;
 
-  /** Removes expired tokens, OTP challenges and idempotency records older than `before`. */
+  /**
+   * Removes expired tokens, idempotency records older than `idempotencyBefore` and finished
+   * jobs. OTP challenges stay until their envelope is final, because they carry the count of
+   * codes issued.
+   */
   purge(now: Date, idempotencyBefore: Date): Promise<void>;
 }
