@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not report security problems here. Email security@codevibe.in instead (see SECURITY.md).
+        Remove personal data and real documents from anything you paste.
+  - type: input
+    id: package
+    attributes:
+      label: Package and version
+      placeholder: '@codevibe/sign-server 0.3.1'
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: A minimal repository or code snippet helps most.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Node 22.11, Ubuntu 24.04, PostgreSQL 16
