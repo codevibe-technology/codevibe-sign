@@ -3,8 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '../db';
+import { recordSender } from '../envelopes';
 import { env } from '../env';
 import { AppError } from '../errors';
+import { createSampleEnvelope, dismissStartHere } from '../sample-envelope';
+import { signRequest } from '../sign/client';
 import { countWorkspaces, createWorkspace, renameWorkspace } from '../workspaces';
 import { userAction, workspaceAction } from './action';
 
@@ -19,8 +22,26 @@ export const createWorkspaceAction = userAction(z.object({ name }), async (user,
     );
   }
   const workspace = await createWorkspace(sql, { name: input.name, userId: user.id });
+  if (workspace.plan === 'free') {
+    // The workspace stands without the sample; a failure here only costs the "Start here" card.
+    await createSampleEnvelope(
+      { sql, request: signRequest, recordSender: (r) => recordSender(sql, r) },
+      { workspaceId: workspace.id, user },
+    ).catch((err: unknown) =>
+      console.error('sample envelope failed', err instanceof Error ? err.message : err),
+    );
+  }
   return { slug: workspace.slug };
 });
+
+export const dismissStartHereAction = workspaceAction(
+  'envelopes.read',
+  z.object({}),
+  async (ctx) => {
+    await dismissStartHere(db(), ctx.workspace.id);
+    revalidatePath(`/w/${ctx.workspace.slug}`);
+  },
+);
 
 export const renameWorkspaceAction = workspaceAction(
   'workspace.manage',

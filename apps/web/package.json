@@ -14,6 +14,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p .",
     "dev:seal": "tsx scripts/dev-seal.ts",
+    "sample:pdf": "tsx scripts/sample-pdf.ts",
     "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {

@@ -15,6 +15,7 @@ import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
 import { planSettings } from '../plans';
+import { isSampleEnvelope } from '../sample-envelope';
 import { createWorkspaceMail } from './mail';
 import { createPlanGate } from './plan-gate';
 import { createAuthenticate } from './principal';
@@ -101,10 +102,12 @@ export function signServer(): SignServer {
 }
 
 function gate(): Gate {
+  const sql = db();
   holder.__cvsSignGate ??= createPlanGate({
-    sql: db(),
+    sql,
     settings: () => planSettings(),
     authenticate: authenticate(),
+    isSampleEnvelope: (workspaceId, envelopeId) => isSampleEnvelope(sql, workspaceId, envelopeId),
     basePath: SIGN_BASE_PATH,
     maxBodyBytes: MAX_REQUEST_BYTES,
   });

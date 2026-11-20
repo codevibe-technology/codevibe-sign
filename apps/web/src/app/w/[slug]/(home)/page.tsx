@@ -13,6 +13,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RemindButton } from '@/components/envelopes/remind-button';
+import { StartHereCard } from '@/components/home/start-here-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -23,6 +24,7 @@ import { can } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
 import { envelopeCounts, recentActivity, waitingOn } from '@/server/envelopes';
+import { startHere } from '@/server/sample-envelope';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -57,12 +59,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
   const { slug } = await params;
   const { user, workspace, role } = await requireWorkspace(slug);
   const sql = db();
-  const [counts, mine, activity] = await Promise.all([
+  const canSend = can(role, 'envelopes.write');
+  const [counts, mine, activity, sample] = await Promise.all([
     envelopeCounts(sql, workspace.id),
     waitingOn(sql, workspace.id, user.email),
     recentActivity(sql, workspace.id),
+    canSend ? startHere(sql, workspace.id) : null,
   ]);
-  const canSend = can(role, 'envelopes.write');
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const sendButton = canSend ? (
     <Button asChild>
@@ -80,6 +83,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         description={`Here is what is happening in ${workspace.name}.`}
         action={sendButton}
       />
+
+      {sample ? (
+        <StartHereCard
+          workspaceId={workspace.id}
+          href={`/w/${slug}/envelopes/new?draft=${encodeURIComponent(sample)}`}
+        />
+      ) : null}
 
       <section
         aria-label="Envelopes by status"

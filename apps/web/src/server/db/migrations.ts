@@ -256,4 +256,15 @@ create table app_plan_changes (
 create index app_plan_changes_workspace_idx on app_plan_changes (workspace_id, created_at desc);
 `,
   },
+  {
+    name: '0007_first_run',
+    sql: `
+create table app_first_run (
+  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  envelope_id text not null,
+  dismissed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+`,
+  },
 ];
