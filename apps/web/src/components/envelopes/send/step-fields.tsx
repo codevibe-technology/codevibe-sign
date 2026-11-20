@@ -84,7 +84,7 @@ export function StepFields({
             </p>
           ))}
       </Card>
-      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card md:h-[calc(100dvh-9rem)] md:min-h-[520px]">
         {pdf ? (
           <FieldPlacer
             documents={viewerDocuments}
