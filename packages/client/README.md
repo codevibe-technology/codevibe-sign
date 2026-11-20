@@ -104,6 +104,10 @@ they are retried on network errors, timeouts, 429 and 5xx, with exponential back
 | `createSignClient({ baseUrl, apiKey, fetch?, timeoutMs?, retries? })`    | `SignClient`                   |
 | `envelopes.create(input, options?)`                                      | `Envelope`                     |
 | `envelopes.get(id)`, `update(id, patch)`, `send(id)`, `void(id, reason)` | `Envelope`                     |
+| `envelopes.shareLink(id, recipientId)`                                   | `{ recipientId, url }`         |
+| `envelopes.correctRecipient(id, recipientId, { name?, email?, phone? })` | `Envelope`                     |
+| `envelopes.recall(id, note?)`                                            | `{ draft, recalled }`          |
+| `envelopes.revise(id)`                                                   | `{ draft, declined }`          |
 | `envelopes.events(id)`                                                   | `{ events, chainValid }`       |
 | `envelopes.downloadDocument(id, documentId, { version? })`               | `Uint8Array`                   |
 | `envelopes.certificate(id)`                                              | `Certificate`                  |

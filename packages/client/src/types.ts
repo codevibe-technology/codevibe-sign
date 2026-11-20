@@ -88,6 +88,8 @@ export interface FieldSpec extends Rect {
 interface EnvelopeSettings {
   title: string;
   message?: string;
+  /** For a revised envelope: what changed, shown to recipients. */
+  changeNote?: string;
   routing?: RoutingMode;
   reminders?: ReminderPolicy;
   expiresAt?: IsoDateTime | Date;
@@ -111,6 +113,14 @@ export interface UpdateEnvelopeInput extends Partial<Omit<EnvelopeSettings, 'mes
   recipients?: RecipientSpec[];
   /** Replaces every field. */
   fields?: FieldSpec[];
+}
+
+export interface RecipientCorrection {
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** Send a new invitation even when only the name changed. */
+  resend?: boolean;
 }
 
 export interface EnvelopeEvents {
@@ -149,6 +159,8 @@ export interface SigningSession {
     id: Id;
     title: string;
     message: string | null;
+    /** For a revised envelope: what changed, to show above the document. */
+    changeNote: string | null;
     status: EnvelopeStatus;
     expiresAt: IsoDateTime | null;
   };

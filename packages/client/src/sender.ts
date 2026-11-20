@@ -6,6 +6,7 @@ import type {
   DocumentVersion,
   Envelope,
   EnvelopeEvents,
+  RecipientCorrection,
   UpdateEnvelopeInput,
 } from './types';
 
@@ -23,6 +24,30 @@ export interface SignClient {
     update(id: string, patch: UpdateEnvelopeInput, options?: RequestOptions): Promise<Envelope>;
     send(id: string, options?: RequestOptions): Promise<Envelope>;
     void(id: string, reason: string, options?: RequestOptions): Promise<Envelope>;
+    /**
+     * A fresh signing link for a recipient whose turn it is, to pass on yourself; no email is
+     * sent and their earlier links stop working. Treat the URL like a password.
+     */
+    shareLink(
+      id: string,
+      recipientId: string,
+      options?: RequestOptions,
+    ): Promise<{ recipientId: string; url: string }>;
+    /** Corrects the name, email or phone of a recipient who has not acted yet. */
+    correctRecipient(
+      id: string,
+      recipientId: string,
+      correction: RecipientCorrection,
+      options?: RequestOptions,
+    ): Promise<Envelope>;
+    /** Voids a sent envelope and returns a draft copy to edit and send again. */
+    recall(
+      id: string,
+      note?: string,
+      options?: RequestOptions,
+    ): Promise<{ draft: Envelope; recalled: Envelope }>;
+    /** Copies a declined envelope to a new draft; the declined one stays as it is. */
+    revise(id: string, options?: RequestOptions): Promise<{ draft: Envelope; declined: Envelope }>;
     /** The audit log and whether its hash chain is intact. */
     events(id: string, options?: RequestOptions): Promise<EnvelopeEvents>;
     /**
@@ -81,6 +106,36 @@ export function createSignClient(options: SignClientOptions): SignClient {
           method: 'POST',
           path: path`/v1/envelopes/${id}/void`,
           json: { reason },
+          headers,
+          options: requestOptions,
+        }),
+      shareLink: (id, recipientId, requestOptions) =>
+        http.json({
+          method: 'POST',
+          path: path`/v1/envelopes/${id}/recipients/${recipientId}/link`,
+          headers,
+          options: requestOptions,
+        }),
+      correctRecipient: (id, recipientId, correction, requestOptions) =>
+        http.json({
+          method: 'PATCH',
+          path: path`/v1/envelopes/${id}/recipients/${recipientId}`,
+          json: correction,
+          headers,
+          options: requestOptions,
+        }),
+      recall: (id, note, requestOptions) =>
+        http.json({
+          method: 'POST',
+          path: path`/v1/envelopes/${id}/recall`,
+          json: note ? { note } : {},
+          headers,
+          options: requestOptions,
+        }),
+      revise: (id, requestOptions) =>
+        http.json({
+          method: 'POST',
+          path: path`/v1/envelopes/${id}/revise`,
           headers,
           options: requestOptions,
         }),

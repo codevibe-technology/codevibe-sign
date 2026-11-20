@@ -261,3 +261,38 @@ describe('idempotency', () => {
     expect(await client.envelopes.get(created.id)).toMatchObject({ id: created.id });
   });
 });
+
+describe('fixing an envelope after sending', () => {
+  it('shares a link, corrects a recipient, recalls and revises', async () => {
+    const { env, client } = setup();
+    const sent = await client.envelopes.create({ ...offer(), send: true });
+    const asha = sent.recipients[0]!.id;
+    const shared = await client.envelopes.shareLink(sent.id, asha);
+    expect(shared.url).toMatch(/\/sign\/[\w-]{43}$/);
+    const retried = await client.envelopes.shareLink(sent.id, asha, { idempotencyKey: 'same' });
+    expect(retried.url).not.toBe(shared.url);
+
+    const corrected = await client.envelopes.correctRecipient(sent.id, asha, { name: 'Asha R.' });
+    expect(corrected.recipients[0]!.name).toBe('Asha R.');
+
+    const { draft, recalled } = await client.envelopes.recall(sent.id, 'Wrong date');
+    expect(recalled.status).toBe('voided');
+    expect(draft.status).toBe('draft');
+
+    const other = await client.envelopes.create({
+      ...offer({
+        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+      }),
+      send: true,
+    });
+    await createSignerClient({
+      baseUrl: BASE_URL,
+      token: env.tokenFor('asha@example.com'),
+      fetch: env.fetch,
+    }).decline('Not me');
+    const revised = await client.envelopes.revise(other.id);
+    expect(revised.declined.status).toBe('declined');
+    expect(revised.draft.status).toBe('draft');
+    await expect(client.envelopes.revise(draft.id)).rejects.toBeInstanceOf(SignApiError);
+  });
+});
