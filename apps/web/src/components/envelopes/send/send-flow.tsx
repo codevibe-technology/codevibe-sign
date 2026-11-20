@@ -376,7 +376,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
         />
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:sticky sm:mt-4 sm:rounded-xl sm:border sm:px-4">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <Button
             type="button"

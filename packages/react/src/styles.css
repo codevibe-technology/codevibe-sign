@@ -434,6 +434,7 @@
 .cvs-scroller {
   flex: 1 1 auto;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 16px;
   -webkit-overflow-scrolling: touch;
 }
@@ -719,14 +720,42 @@
 }
 
 .cvs-placer-panel {
-  flex: 0 0 240px;
+  flex: 0 0 272px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px;
+  min-width: 0;
+  padding: 14px 12px 14px 14px;
   border-right: 1px solid var(--cvs-border);
   background: var(--cvs-surface);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.cvs-placer-panel,
+.cvs-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cvs-text-muted) 45%, transparent) transparent;
+}
+
+.cvs-placer-panel::-webkit-scrollbar,
+.cvs-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.cvs-placer-panel::-webkit-scrollbar-thumb,
+.cvs-scroller::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cvs-text-muted) 45%, transparent) padding-box;
+}
+
+.cvs-placer-panel::-webkit-scrollbar-track,
+.cvs-scroller::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .cvs-panel-title {
@@ -770,7 +799,7 @@
 
 .cvs-palette {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
