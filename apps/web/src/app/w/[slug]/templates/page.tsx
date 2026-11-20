@@ -1,25 +1,85 @@
-import { LayoutTemplate } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { Metadata } from 'next';
-import { EmptyState } from '@/components/ui/empty-state';
-import { PageHeader } from '@/components/ui/page-header';
+import Link from 'next/link';
+import { BulkSendsCard } from '@/components/templates/bulk-sends-card';
+import { TemplatesList } from '@/components/templates/templates-list';
+import { Button } from '@/components/ui/button';
+import { bulkSendView } from '@/lib/bulk-send';
+import { cn } from '@/lib/cn';
+import { can } from '@/lib/roles';
+import { templateSummary } from '@/lib/templates';
 import { requireWorkspace } from '@/server/auth/guards';
+import { listBulkSends } from '@/server/bulk-sends';
+import { db } from '@/server/db';
+import { countTemplates, listTemplates } from '@/server/templates';
+import { PageHeader } from '@/components/ui/page-header';
 
 export const metadata: Metadata = { title: 'Templates' };
 
-export default async function TemplatesPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function TemplatesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ view?: string }>;
+}) {
   const { slug } = await params;
-  await requireWorkspace(slug);
+  const archived = (await searchParams).view === 'archived';
+  const { workspace, role } = await requireWorkspace(slug);
+  const sql = db();
+  const [templates, counts, bulks] = await Promise.all([
+    listTemplates(sql, workspace.id, { archived }),
+    countTemplates(sql, workspace.id),
+    listBulkSends(sql, workspace.id, { limit: 5 }),
+  ]);
+  const canWrite = can(role, 'envelopes.write');
+  const tab = (active: boolean) =>
+    cn(
+      'inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold',
+      active ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink',
+    );
   return (
     <>
       <PageHeader
         title="Templates"
-        description="Reusable documents with their signers and fields already placed."
+        description="Reusable documents with their roles and fields already placed."
+        action={
+          canWrite ? (
+            <Button asChild>
+              <Link href={`/w/${slug}/templates/new`}>
+                <Plus aria-hidden className="h-4 w-4" />
+                New template
+              </Link>
+            </Button>
+          ) : null
+        }
       />
-      <EmptyState
-        icon={LayoutTemplate}
-        title="No templates yet"
-        description="Save an offer letter, NDA or policy once, then send it to one person or a whole list in a few clicks."
-      />
+      <nav aria-label="Template lists" className="mb-4 flex gap-1">
+        <Link
+          href={`/w/${slug}/templates`}
+          className={tab(!archived)}
+          aria-current={archived ? undefined : 'page'}
+        >
+          Active <span className="text-muted">{counts.active}</span>
+        </Link>
+        <Link
+          href={`/w/${slug}/templates?view=archived`}
+          className={tab(archived)}
+          aria-current={archived ? 'page' : undefined}
+        >
+          Archived <span className="text-muted">{counts.archived}</span>
+        </Link>
+      </nav>
+      <div className="space-y-6">
+        <TemplatesList
+          slug={slug}
+          workspaceId={workspace.id}
+          templates={templates.map(templateSummary)}
+          archived={archived}
+          canWrite={canWrite}
+        />
+        {bulks.length > 0 ? <BulkSendsCard slug={slug} bulks={bulks.map(bulkSendView)} /> : null}
+      </div>
     </>
   );
 }
