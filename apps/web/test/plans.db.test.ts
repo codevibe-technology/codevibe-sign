@@ -16,6 +16,7 @@ import {
   usageReport,
   workspacePlan,
 } from '@/server/plans';
+import { dismissStartHere, isSampleEnvelope, startHere } from '@/server/sample-envelope';
 import { createPlanGate } from '@/server/sign/plan-gate';
 import {
   createTemplate,
@@ -626,6 +627,22 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const report = await usageReport(sql, ws.id, selfHosted);
       expect(report.plan).toBe('unlimited');
       expect(report.lines.every((l) => l.max === null)).toBe(true);
+    });
+  });
+
+  describe('first run', () => {
+    it('remembers the sample and hides the card once dismissed', async () => {
+      const ws = await freeWorkspace();
+      expect(await startHere(sql, ws.id)).toBeNull();
+      await sql`insert into app_first_run (workspace_id, envelope_id) values (${ws.id}, 'env_s')`;
+      expect(await startHere(sql, ws.id)).toBe('env_s');
+      expect(await isSampleEnvelope(sql, ws.id, 'env_s')).toBe(true);
+      expect(await isSampleEnvelope(sql, ws.id, 'env_other')).toBe(false);
+      const other = await freeWorkspace('Other');
+      expect(await isSampleEnvelope(sql, other.id, 'env_s')).toBe(false);
+      await dismissStartHere(sql, ws.id);
+      expect(await startHere(sql, ws.id)).toBeNull();
+      expect(await isSampleEnvelope(sql, ws.id, 'env_s')).toBe(true);
     });
   });
 });
