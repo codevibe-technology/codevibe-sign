@@ -1,5 +1,5 @@
 import { HttpError } from '@codevibe_technology/sign-server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Role } from '@/lib/roles';
 import { createAuthenticate, inProcess } from './principal';
 
@@ -96,5 +96,14 @@ describe('createAuthenticate', () => {
     expect(await refusal(member(voiding('env_other')))).toBe('FORBIDDEN');
     expect(await setup('admin')(voiding('env_other'))).toMatchObject({ id: 'user:u1' });
     expect(await setup('viewer')(voiding('env_mine'))).toMatchObject({ readOnly: true });
+  });
+});
+
+describe('inProcess', () => {
+  it('is one map however many times the module is loaded', async () => {
+    const first = (await import('./principal')).inProcess;
+    vi.resetModules();
+    const second = (await import('./principal')).inProcess;
+    expect(second).toBe(first);
   });
 });

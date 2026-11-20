@@ -15,8 +15,14 @@ export interface PrincipalDeps {
   isSender?: (userId: string, workspaceId: string, envelopeId: string) => Promise<boolean>;
 }
 
-/** Principals for calls made in this process; see `signRequest`. */
-export const inProcess = new WeakMap<Request, Principal>();
+const holder = globalThis as unknown as { __cvsInProcess?: WeakMap<Request, Principal> };
+
+/**
+ * Principals for calls made in this process; see `signRequest`. Kept on `globalThis` because
+ * the server may load this module in more than one bundle (instrumentation, route handlers,
+ * server actions) while the sign server itself is built once; they must share one map.
+ */
+export const inProcess = (holder.__cvsInProcess ??= new WeakMap<Request, Principal>());
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
 const VOID_PATH = /\/v1\/envelopes\/([^/]+)\/void\/?$/;
