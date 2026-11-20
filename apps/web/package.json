@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "db:migrate": "tsx scripts/migrate.ts",
+    "plan:set": "tsx scripts/plan-set.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p .",
     "dev:seal": "tsx scripts/dev-seal.ts",
