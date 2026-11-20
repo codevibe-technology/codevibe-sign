@@ -21,6 +21,8 @@ corner of every page, or a signature on the last page of each document.
 
 ## Text tags
 
+::: v-pre
+
 Write tags in your document before you export it to PDF, and the send flow offers **Place
 fields from tags (found N)**:
 
@@ -38,6 +40,8 @@ approver, `2` for the second. A field starts at the tag's left edge, centred on 
 in the type's usual size; tags for a number nobody has are reported and skipped. Spaces
 inside the braces are allowed and case does not matter. The tag text stays in the PDF, so
 set it in white or a tiny font if it should not show.
+
+:::
 
 Tags are read from the PDF's text layer. A scanned PDF has none, so place its fields by
 hand.
