@@ -201,7 +201,7 @@ export function BulkProgress({
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm"
               >
                 <span className="w-14 shrink-0 text-muted">Row {row.line}</span>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1 break-words sm:truncate">
                   {rowPeopleLine(row.people, roles) || 'Unnamed'}
                 </span>
                 <BulkRowPill status={row.status} />

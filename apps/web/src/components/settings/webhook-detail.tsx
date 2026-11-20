@@ -265,16 +265,17 @@ export function WebhookDetail({
                 >
                   <DeliveryPill status={d.status} />
                   <code className="min-w-0 flex-1 truncate font-medium text-ink">{d.event}</code>
-                  <span className="text-muted">
+                  <span className="w-full text-muted sm:w-auto">
                     {d.responseStatus !== null
                       ? `HTTP ${d.responseStatus}`
                       : d.status === 'delivered'
                         ? ''
                         : 'No answer'}
                     {d.attempts > 1 ? ` · ${d.attempts} attempts` : ''}
-                  </span>
-                  <span className="w-full text-muted sm:w-auto">
-                    {relativeTime(d.lastAttemptAt)}
+                    <span className="sm:ml-3">
+                      {d.responseStatus !== null || d.attempts > 1 ? ' · ' : ''}
+                      {relativeTime(d.lastAttemptAt)}
+                    </span>
                   </span>
                 </button>
               </li>
