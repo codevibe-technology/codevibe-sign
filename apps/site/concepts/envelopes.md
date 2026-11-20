@@ -22,6 +22,7 @@ Envelope ──< Document ──< Field >── Recipient
 | `routing`    | `sequential` (the default) or `parallel`. See [Routing](./routing).             |
 | `reminders`  | `{ firstAfterDays, everyDays, max }`, by default 3, 3 and 3.                    |
 | `expiresAt`  | Optional. Past this time the envelope expires.                                  |
+| `changeNote` | Optional. For a revised envelope, what changed; shown to recipients.            |
 | `metadata`   | Your own string data, for example an employee id. Codevibe Sign never reads it. |
 | `auditHead`  | The hash at the head of the audit chain. See [Audit chain](./audit-chain).      |
 

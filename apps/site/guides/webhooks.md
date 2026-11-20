@@ -7,9 +7,10 @@ description: Receive signed webhook events from the server when envelopes change
 
 The server tells your backend when something happens to an envelope by sending a webhook. Each
 one corresponds to an audit action: `envelope.created`, `envelope.sent`, `envelope.completed`,
-`envelope.declined`, `envelope.expired`, `envelope.voided`, `recipient.notified`,
-`recipient.reminded`, `recipient.viewed`, `recipient.authenticated`, `recipient.signed`,
-`recipient.approved`, `recipient.declined` and `document.sealed`.
+`envelope.declined`, `envelope.expired`, `envelope.voided`, `envelope.recalled`,
+`envelope.revised`, `recipient.notified`, `recipient.reminded`, `recipient.viewed`,
+`recipient.authenticated`, `recipient.signed`, `recipient.approved`, `recipient.declined`,
+`recipient.link_shared`, `recipient.corrected` and `document.sealed`.
 
 ## Targets
 

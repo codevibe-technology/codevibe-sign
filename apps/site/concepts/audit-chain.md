@@ -6,7 +6,8 @@ description: Every action is appended to a log chained with SHA-256, so removing
 # Audit chain
 
 Every action on an envelope is an audit event: created, sent, notified, reminded, viewed,
-authenticated, signed, approved, declined, expired, voided, completed and sealed. Events are
+authenticated, signed, approved, declined, expired, voided, recalled, revised, completed and
+sealed, and a recipient corrected or given a link by hand. Events are
 append-only and each one is chained to the one before it.
 
 ## How the chain is built
