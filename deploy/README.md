@@ -22,7 +22,7 @@ Data lives in two named volumes: `codevibe-sign_sign-db` (the database) and
   watches. Note the network's name (`docker network ls`) and the resolver's name from the
   Traefik configuration.
 - An SMTP account that may send from the address in `MAIL_FROM`, with SPF and DKIM set up
-  for its domain.
+  for its domain, or a Microsoft 365 mailbox (see "Microsoft 365 (Graph)" in step 3).
 
 ## 2. DNS
 
@@ -60,6 +60,52 @@ Set `SIGN_HOST`, `TRAEFIK_NETWORK`, `TRAEFIK_ENTRYPOINT`, `TRAEFIK_CERTRESOLVER`
 `MAIL_TRANSPORT` and `MAIL_FROM`. For the Codevibe cloud keep `PLAN_MODE=hosted`; for your
 own company's install use `PLAN_MODE=self-hosted` (and `SINGLE_WORKSPACE=true` if only one
 workspace should ever exist).
+
+### Microsoft 365 (Graph)
+
+Microsoft is switching off password (basic auth) SMTP, app passwords included. To send from a
+Microsoft 365 mailbox, let the app sign in on its own through Microsoft Graph instead. A
+password change on the mailbox then has no effect on sending.
+
+1. In the Entra admin center, open **App registrations > New registration**. Name it (for
+   example `Codevibe Sign mail`), keep "Accounts in this organizational directory only", no
+   redirect URI.
+2. **API permissions > Add a permission > Microsoft Graph > Application permissions**, pick
+   `Mail.Send`, then **Grant admin consent**.
+3. **Certificates & secrets > New client secret**. Copy the value now; it is shown once. Note
+   when it expires and put a reminder in the calendar.
+4. From **Overview**, copy the Application (client) ID and the Directory (tenant) ID.
+
+Then in `.env`:
+
+```sh
+MAIL_TRANSPORT=graph
+MAIL_FROM=Your Company <no-reply@example.com>   # the mailbox to send as
+MS_TENANT_ID=<Directory (tenant) ID>
+MS_CLIENT_ID=<Application (client) ID>
+MS_CLIENT_SECRET=<client secret value>
+```
+
+The mailbox in `MAIL_FROM` must exist in the tenant (a licensed or shared mailbox). Sent mail is
+not kept in its Sent Items. Completed copies over 2 MB go out as download links, because Graph
+takes about 4 MB per message once attachments are encoded.
+
+`Mail.Send` granted in Entra lets the app send as any mailbox in the tenant. To allow only the
+one mailbox, use RBAC for Applications in Exchange Online instead, and then remove the
+`Mail.Send` grant from the app registration (the Entra grant applies on top of the scope):
+
+```powershell
+Connect-ExchangeOnline
+# ObjectId: Enterprise applications > your app > Object ID (not the app registration's)
+New-ServicePrincipal -AppId <client id> -ObjectId <enterprise app object id> -DisplayName "Codevibe Sign mail"
+New-ManagementScope -Name "Codevibe Sign mailbox" -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'no-reply@example.com'"
+New-ManagementRoleAssignment -App <client id> -Role "Application Mail.Send" -CustomResourceScope "Codevibe Sign mailbox"
+Test-ServicePrincipalAuthorization -Identity <client id> -Resource no-reply@example.com
+```
+
+When a send fails, Settings > Email log and the app logs say what to fix: a wrong or expired
+client secret, a wrong client or tenant ID, a missing permission or consent, or a mailbox that
+does not exist. Busy responses from Microsoft are retried like any other failed send.
 
 ## 4. Seal certificate
 
@@ -215,4 +261,4 @@ previous release, build it, and restore the backup taken before the upgrade.
 | `SEAL_P12_PATH is not set` or a seal error  | `secrets/seal.p12` exists, belongs to 1001, and `SEAL_PASSPHRASE` matches it.                 |
 | Browser shows Traefik's default certificate | DNS (step 2), `TRAEFIK_CERTRESOLVER`, and the Traefik logs for the ACME error.                |
 | `404 page not found` from Traefik           | `TRAEFIK_NETWORK` is the network Traefik watches, and `web` is healthy (`docker compose ps`). |
-| No sign-in emails                           | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP error.                               |
+| No sign-in emails                           | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP or Microsoft Graph error.            |
