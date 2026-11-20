@@ -50,12 +50,37 @@ export interface MailMessage {
   text: string;
   html?: string;
   attachments?: { filename: string; content: Uint8Array; contentType: string }[];
+  /** What the message is about, for a mailer that keeps a send log. Never sent. */
+  meta?: MailMeta;
+}
+
+/**
+ * Context for a send log. Holds identifiers and a kind only, so a log built from it never
+ * keeps a body, a link or a code.
+ */
+export interface MailMeta {
+  /** For example `invite`, `reminder`, `completed_copy`, `cancelled` or `otp`. */
+  kind: string;
+  workspaceId?: string;
+  envelopeId?: string;
+  recipientId?: string;
+}
+
+/** What a mailer learned from the provider; `messageId` is the `Message-ID` it used. */
+export interface MailReceipt {
+  messageId?: string;
 }
 
 export interface Mailer {
-  send(message: MailMessage): Promise<void>;
+  send(message: MailMessage): Promise<MailReceipt | void>;
+}
+
+/** Which envelope a one-time code is for, so the sender can label the message. */
+export interface OtpContext {
+  envelopeId: string;
+  workspaceId?: string;
 }
 
 export interface OtpSender {
-  send(recipient: Recipient, code: string): Promise<void>;
+  send(recipient: Recipient, code: string, context?: OtpContext): Promise<void>;
 }
