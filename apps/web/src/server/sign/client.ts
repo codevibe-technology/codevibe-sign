@@ -2,7 +2,7 @@ import 'server-only';
 import type { Principal } from '@codevibe_technology/sign-server';
 import { env } from '../env';
 import { inProcess } from './principal';
-import { SIGN_BASE_PATH, signServer } from './server';
+import { SIGN_BASE_PATH, handleSignRequest } from './server';
 
 /**
  * Calls the sign API from server code as `principal`, without a network hop. The principal is
@@ -17,7 +17,7 @@ export async function signRequest(
 ): Promise<Response> {
   const request = new Request(`${env().APP_URL}${SIGN_BASE_PATH}${path}`, await withLength(init));
   inProcess.set(request, principal);
-  return signServer().app.fetch(request);
+  return handleSignRequest(request);
 }
 
 /**

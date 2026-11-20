@@ -14,7 +14,9 @@ import { senderOf } from '../envelopes';
 import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
+import { planSettings } from '../plans';
 import { createWorkspaceMail } from './mail';
+import { createPlanGate } from './plan-gate';
 import { createAuthenticate } from './principal';
 import { recordDelivery } from '../webhooks';
 import { webhookSecurity, webhookTargets } from './webhooks';
@@ -26,6 +28,23 @@ export const SIGN_BASE_PATH = '/api';
  * (`mailOtpSender`), so the signing page tells SMS recipients to ask for an email instead.
  */
 export const SMS_CODES = false;
+
+/** Largest request body the sign server accepts; its default. */
+const MAX_REQUEST_BYTES = 50 * 1024 * 1024;
+
+function authenticate() {
+  const config = env();
+  const sql = db();
+  return createAuthenticate({
+    appUrl: config.APP_URL,
+    resolveApiKey: (key) => resolveApiKey(sql, key),
+    sessionUser: async (headers) => (await auth().api.getSession({ headers }))?.user ?? null,
+    roleOf: async (userId, workspaceId) =>
+      (await findMembership(sql, userId, { id: workspaceId }))?.role ?? null,
+    isSender: async (userId, workspaceId, envelopeId) =>
+      (await senderOf(sql, workspaceId, envelopeId))?.userId === userId,
+  });
+}
 
 function build(): SignServer {
   const config = env();
@@ -48,15 +67,8 @@ function build(): SignServer {
       allowWeakKey: config.SEAL_ALLOW_WEAK_KEY,
     },
     apiKeys: [],
-    authenticate: createAuthenticate({
-      appUrl: config.APP_URL,
-      resolveApiKey: (key) => resolveApiKey(sql, key),
-      sessionUser: async (headers) => (await auth().api.getSession({ headers }))?.user ?? null,
-      roleOf: async (userId, workspaceId) =>
-        (await findMembership(sql, userId, { id: workspaceId }))?.role ?? null,
-      isSender: async (userId, workspaceId, envelopeId) =>
-        (await senderOf(sql, workspaceId, envelopeId))?.userId === userId,
-    }),
+    authenticate: authenticate(),
+    limits: { maxRequestBytes: MAX_REQUEST_BYTES },
     webhookTargets,
     webhookSecurity: webhookSecurity(),
     onWebhookDelivery: (report) => recordDelivery(sql, report),
@@ -78,7 +90,9 @@ function build(): SignServer {
   });
 }
 
-const holder = globalThis as unknown as { __cvsSign?: SignServer };
+type Gate = ReturnType<typeof createPlanGate>;
+
+const holder = globalThis as unknown as { __cvsSign?: SignServer; __cvsSignGate?: Gate };
 
 /** The sign server mounted at `/api`, created on first use. */
 export function signServer(): SignServer {
@@ -86,5 +100,22 @@ export function signServer(): SignServer {
   return holder.__cvsSign;
 }
 
-/** Hands a request to the sign server unchanged; for route handlers. */
-export const handleSignRequest = (request: Request) => signServer().app.fetch(request);
+function gate(): Gate {
+  holder.__cvsSignGate ??= createPlanGate({
+    sql: db(),
+    settings: () => planSettings(),
+    authenticate: authenticate(),
+    basePath: SIGN_BASE_PATH,
+    maxBodyBytes: MAX_REQUEST_BYTES,
+  });
+  return holder.__cvsSignGate;
+}
+
+/**
+ * Hands a request to the sign server; every call, from a browser, an API key or the app
+ * itself, goes this way. On the hosted cloud it passes the workspace's plan limits first.
+ */
+export const handleSignRequest = async (request: Request): Promise<Response> => {
+  if (planSettings().mode === 'self-hosted') return signServer().app.fetch(request);
+  return gate()(request, async (r) => signServer().app.fetch(r));
+};

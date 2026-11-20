@@ -67,6 +67,9 @@ export async function apiError(res: Response): Promise<AppError> {
       'The signing service could not finish that. Try again in a moment.',
     );
   }
+  if (body.error?.code === 'PLAN_LIMIT') {
+    return new AppError('PLAN_LIMIT', body.error.message ?? 'The plan limit was reached.');
+  }
   const issue = body.error?.details?.issues?.[0];
   const message =
     res.status === 404
