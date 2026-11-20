@@ -19,7 +19,7 @@ const initials = (name: string) =>
 
 export function WorkspaceAvatar({ name }: { name: string }) {
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-white">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/15 bg-nav-raised font-display text-xs font-bold text-white">
       {initials(name)}
     </span>
   );
@@ -37,27 +37,34 @@ export function WorkspaceSwitcher({
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        className="flex w-full items-center gap-2.5 rounded-lg border border-white/10 bg-nav-raised/50 px-2.5 py-2 text-left text-sm hover:bg-nav-raised"
+        className="flex w-[72px] flex-col items-center gap-1 rounded-md px-1 py-1.5 text-center hover:bg-nav-raised"
         aria-label={`Workspace: ${current.name}. Switch workspace`}
+        title={current.name}
       >
-        <WorkspaceAvatar name={current.name} />
-        <span className="min-w-0 flex-1 truncate font-semibold text-white">{current.name}</span>
-        <ChevronsUpDown aria-hidden className="h-4 w-4 text-nav-muted" />
+        <span className="relative">
+          <WorkspaceAvatar name={current.name} />
+          <ChevronsUpDown
+            aria-hidden
+            className="absolute -right-2 -bottom-1 h-3.5 w-3.5 rounded-sm bg-nav p-px text-nav-muted"
+          />
+        </span>
+        <span className="w-full truncate text-[10.5px] leading-tight font-medium text-nav-muted">
+          {current.name}
+        </span>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
+          side="right"
           align="start"
-          sideOffset={6}
-          className="z-50 w-64 rounded-xl border border-line bg-surface p-1.5 text-ink shadow-card"
+          sideOffset={10}
+          className="z-50 w-64 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
         >
-          <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted uppercase">
-            Workspaces
-          </DropdownMenu.Label>
+          <DropdownMenu.Label className="eyebrow px-2 py-1.5">Workspaces</DropdownMenu.Label>
           {workspaces.map((workspace) => (
             <DropdownMenu.Item key={workspace.id} asChild>
               <Link
                 href={`/w/${workspace.slug}`}
-                className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2"
+                className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2"
               >
                 <WorkspaceAvatar name={workspace.name} />
                 <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
@@ -73,7 +80,7 @@ export function WorkspaceSwitcher({
               <DropdownMenu.Item asChild>
                 <Link
                   href="/onboarding"
-                  className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium text-primary outline-none data-[highlighted]:bg-surface-2"
+                  className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm font-medium text-primary outline-none data-[highlighted]:bg-surface-2"
                 >
                   <Plus aria-hidden className="h-4 w-4" /> New workspace
                 </Link>

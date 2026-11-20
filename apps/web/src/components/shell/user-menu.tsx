@@ -25,7 +25,7 @@ export function UserMenu({
 }) {
   const router = useRouter();
   const item =
-    'flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
+    'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
 
   async function setTheme(theme: Theme) {
     applyTheme(theme);
@@ -42,16 +42,17 @@ export function UserMenu({
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary hover:ring-2 hover:ring-primary/30"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-accent font-display text-sm font-bold text-accent-ink ring-2 ring-white/10 hover:ring-accent/50"
         aria-label="Account menu"
       >
         {(user.name || user.email).slice(0, 1).toUpperCase()}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
+          side="right"
           align="end"
-          sideOffset={8}
-          className="z-50 w-64 rounded-xl border border-line bg-surface p-1.5 text-ink shadow-card"
+          sideOffset={12}
+          className="z-50 w-64 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
         >
           <div className="px-2 py-2">
             <p className="truncate text-sm font-semibold">{user.name || 'Your account'}</p>
@@ -63,9 +64,7 @@ export function UserMenu({
               <UserRound aria-hidden className="h-4 w-4" /> Personal settings
             </Link>
           </DropdownMenu.Item>
-          <DropdownMenu.Label className="px-2 pt-2 pb-1 text-xs font-semibold text-muted uppercase">
-            Theme
-          </DropdownMenu.Label>
+          <DropdownMenu.Label className="eyebrow px-2 pt-2 pb-1">Theme</DropdownMenu.Label>
           {THEME_ITEMS.map(({ value, label, icon: Icon }) => (
             <DropdownMenu.Item key={value} className={item} onSelect={() => void setTheme(value)}>
               <Icon aria-hidden className="h-4 w-4" /> {label}
