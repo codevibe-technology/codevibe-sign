@@ -11,6 +11,7 @@ export function settingsTabs(slug: string, role: Role) {
           { label: 'Brand', href: `${base}/brand` },
           { label: 'Team', href: `${base}/team` },
           { label: 'API keys', href: `${base}/api-keys` },
+          { label: 'Webhooks', href: `${base}/webhooks` },
         ]
       : []),
     { label: 'Personal', href: `${base}/personal` },
