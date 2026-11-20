@@ -73,6 +73,31 @@ describe('appendCertificate', () => {
     expect(text).toContain('Acme Pvt Ltd CIN U72900KA2020PTC000000 ?');
   });
 
+  it('names who shared a link or corrected someone, and marks a corrected copy', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const output = await appendCertificate(pdf, {
+      envelope: envelope({ recipients: [signer] }),
+      document: document(),
+      events: [
+        event(1, 'envelope.created', { data: { recalledFrom: 'env_old', by: 'Meera Iyer' } }),
+        event(2, 'envelope.sent'),
+        event(3, 'recipient.corrected', {
+          recipientId: 'r1',
+          data: { by: 'Meera Iyer', oldEmail: 'old@example.com', newEmail: 'new@example.com' },
+        }),
+        event(4, 'recipient.link_shared', { recipientId: 'r1', data: { by: 'Dev Admin' } }),
+        event(5, 'recipient.signed', { recipientId: 'r1' }),
+      ],
+    });
+    const text = (await certificateText(output, 1)).join('\n');
+    expect(text).toContain('Corrected copy created');
+    expect(text).toContain('Recipient corrected');
+    expect(text).toContain('Link shared manually');
+    expect(text).toContain('Dev Admin');
+    expect(text).toContain('Meera Iyer');
+    expect(text).not.toContain('old@example.com');
+  });
+
   it('appends A4 pages after the document', async () => {
     const pdf = await makePdf([{ size: A4 }, { size: [612, 792] }]);
     const output = await appendCertificate(pdf, {

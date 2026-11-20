@@ -77,6 +77,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'envelope.declined': 'Envelope declined',
   'envelope.expired': 'Envelope expired',
   'envelope.voided': 'Envelope voided',
+  'envelope.recalled': 'Recalled to correct',
+  'envelope.revised': 'Revised after decline',
   'recipient.notified': 'Invitation sent',
   'recipient.reminded': 'Reminder sent',
   'recipient.viewed': 'Document viewed',
@@ -84,6 +86,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'recipient.signed': 'Signed',
   'recipient.approved': 'Approved',
   'recipient.declined': 'Declined',
+  'recipient.link_shared': 'Link shared manually',
+  'recipient.corrected': 'Recipient corrected',
   'document.sealed': 'Document sealed',
 };
 
@@ -92,7 +96,22 @@ const SENDER_ACTIONS: ReadonlySet<AuditAction> = new Set([
   'envelope.updated',
   'envelope.sent',
   'envelope.voided',
+  'envelope.recalled',
+  'envelope.revised',
+  'recipient.link_shared',
+  'recipient.corrected',
 ]);
+
+/** The label for an event; a copy says what it replaced. */
+function actionLabel(event: AuditEvent): string {
+  if (event.action === 'envelope.created' && event.data?.recalledFrom) {
+    return 'Corrected copy created';
+  }
+  if (event.action === 'envelope.created' && event.data?.revisedFrom) {
+    return 'Revision created';
+  }
+  return ACTION_LABELS[event.action] ?? event.action;
+}
 
 interface RecipientActivity {
   viewedAt?: string;
@@ -371,7 +390,11 @@ function contact(recipient: Recipient): { label: string; value: string } | null 
 }
 
 function actor(event: AuditEvent, names: Map<string, string>): string {
-  if (event.recipientId) {
+  const by = event.data?.by;
+  if (typeof by === 'string' && by && SENDER_ACTIONS.has(event.action)) {
+    return by;
+  }
+  if (event.recipientId && !SENDER_ACTIONS.has(event.action)) {
     return names.get(event.recipientId) ?? event.recipientId;
   }
   return SENDER_ACTIONS.has(event.action) ? 'Sender' : 'System';
@@ -504,7 +527,7 @@ export async function appendCertificate(
     events.map((event) => [
       String(event.seq),
       formatMoment(event.at, timeZone, '\n'),
-      ACTION_LABELS[event.action] ?? event.action,
+      actionLabel(event),
       human(actor(event, names), 'recipient name'),
     ]),
   );
