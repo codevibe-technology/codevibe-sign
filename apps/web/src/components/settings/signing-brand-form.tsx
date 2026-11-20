@@ -17,16 +17,24 @@ export interface SigningBrandValues {
   signingDomainVerified: boolean;
 }
 
+/** Why the plan keeps a setting fixed, shown next to it. */
+export interface SigningPlanLocks {
+  badge?: string;
+  domain?: string;
+}
+
 /** The badge on the signing page, the certificate footer and the signing-page domain. */
 export function SigningBrandForm({
   workspaceId,
   appHost,
   values,
+  locks = {},
 }: {
   workspaceId: string;
   /** Where the custom domain's CNAME points. */
   appHost: string;
   values: SigningBrandValues;
+  locks?: SigningPlanLocks;
 }) {
   const [showBadge, setShowBadge] = useState(values.showBadge);
   const [footer, setFooter] = useState(values.certificateFooter);
@@ -72,8 +80,10 @@ export function SigningBrandForm({
               role="switch"
               aria-checked={showBadge}
               checked={showBadge}
+              disabled={Boolean(locks.badge)}
+              aria-describedby={locks.badge ? 'badge-lock' : undefined}
               onChange={(e) => setShowBadge(e.target.checked)}
-              className="mt-1 h-5 w-5 shrink-0 accent-primary"
+              className="mt-1 h-5 w-5 shrink-0 accent-primary disabled:opacity-60"
             />
             <div>
               <label htmlFor="show-badge" className="text-sm font-semibold">
@@ -83,6 +93,11 @@ export function SigningBrandForm({
                 A small badge on the signing page and at the foot of emails. It tells signers who
                 keeps the record.
               </p>
+              {locks.badge ? (
+                <p id="badge-lock" className="mt-1 text-sm font-medium text-ink">
+                  {locks.badge}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -105,12 +120,16 @@ export function SigningBrandForm({
           <div className="space-y-3">
             <Field
               label="Signing page domain"
-              hint="Optional. Your own address for signing links, like sign.example.com."
+              hint={
+                locks.domain ??
+                'Optional. Your own address for signing links, like sign.example.com.'
+              }
               error={save.errors.signingDomain}
             >
               {(props) => (
                 <Input
                   {...props}
+                  disabled={Boolean(locks.domain) && !domain}
                   inputMode="url"
                   autoCapitalize="none"
                   spellCheck={false}

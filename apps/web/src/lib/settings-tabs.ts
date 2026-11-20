@@ -1,7 +1,7 @@
 import { can, type Role } from './roles';
 
-/** The settings sections a role can open, in order. */
-export function settingsTabs(slug: string, role: Role) {
+/** The settings sections a role can open, in order. `plans` adds Plan and usage (hosted cloud). */
+export function settingsTabs(slug: string, role: Role, options: { plans?: boolean } = {}) {
   const base = `/w/${slug}/settings`;
   const admin = can(role, 'workspace.manage');
   return [
@@ -14,6 +14,7 @@ export function settingsTabs(slug: string, role: Role) {
           { label: 'Webhooks', href: `${base}/webhooks` },
         ]
       : []),
+    ...(options.plans ? [{ label: 'Plan and usage', href: `${base}/plan` }] : []),
     { label: 'Personal', href: `${base}/personal` },
   ];
 }
