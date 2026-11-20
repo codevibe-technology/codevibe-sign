@@ -95,6 +95,7 @@ function linkMail(ctx: LinkMailContext, reminder: boolean): RenderedMail {
       ? `This is a reminder that "${envelope.title}" is waiting for you to ${action}.`
       : `You have been asked to ${action} "${envelope.title}".`,
     ...(envelope.message ? [envelope.message] : []),
+    ...(envelope.changeNote ? [`What changed: ${envelope.changeNote}`] : []),
     ...(envelope.expiresAt ? [`The request expires on ${envelope.expiresAt.slice(0, 10)}.`] : []),
     'This link is personal. Do not forward this email.',
   ];

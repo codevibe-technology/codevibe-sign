@@ -270,6 +270,29 @@ describe('a full run against the server', () => {
     expect(voided.json.status).toBe('voided');
     expect(second.json.status).toBe('sent');
 
+    const fourth = await call('POST', '/v1/envelopes', {
+      body: { ...body, send: true, recipients: body.recipients.slice(1, 2), fields: [] },
+    });
+    const ravi = fourth.json.recipients[0].id as string;
+    const shared = await call('POST', `/v1/envelopes/${fourth.json.id}/recipients/${ravi}/link`);
+    expect(shared.status).toBe(201);
+    const corrected = await call('PATCH', `/v1/envelopes/${fourth.json.id}/recipients/${ravi}`, {
+      body: { name: 'Ravi K.' },
+    });
+    expect(corrected.json.recipients[0].name).toBe('Ravi K.');
+    const recalled = await call('POST', `/v1/envelopes/${fourth.json.id}/recall`, {
+      body: { note: 'Wrong file' },
+    });
+    expect(recalled.status).toBe(201);
+    const replaced = await call(
+      'PUT',
+      `/v1/envelopes/${recalled.json.draft.id}/documents/${recalled.json.draft.documents[0].id}`,
+      { body: { name: 'v2.pdf', content: Buffer.from(pdf).toString('base64') } },
+    );
+    expect(replaced.status).toBe(200);
+    const revised = await call('POST', `/v1/envelopes/${second.json.id}/revise`);
+    expect(revised.status).toBe(201);
+
     const form = new FormData();
     form.set(
       'envelope',

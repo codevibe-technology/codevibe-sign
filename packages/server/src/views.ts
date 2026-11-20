@@ -21,6 +21,7 @@ export function signerView(
       id: envelope.id,
       title: envelope.title,
       message: envelope.message ?? null,
+      changeNote: envelope.changeNote ?? null,
       status: envelope.status,
       expiresAt: envelope.expiresAt ?? null,
     },

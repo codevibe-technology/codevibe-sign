@@ -101,6 +101,11 @@ All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
 | `POST /v1/envelopes/:id/send`                         | Send it; the first signers get their links.                                                             |
 | `POST /v1/envelopes/:id/void`                         | Withdraw it (`{ "reason": "..." }`).                                                                    |
 | `POST /v1/envelopes/:id/remind`                       | Mail a fresh link to whoever's turn it is (`{ "recipientId" }` for one); at most every 15 minutes.      |
+| `POST /v1/envelopes/:id/recipients/:rid/link`         | A fresh signing link to pass on yourself; no email, earlier links stop, 5 per hour.                     |
+| `PATCH /v1/envelopes/:id/recipients/:rid`             | Correct the name, email or phone of someone who has not acted; a new address is invited.                |
+| `POST /v1/envelopes/:id/recall`                       | Void a sent envelope and get a draft copy to edit (`{ "note" }`); returns `{ draft, recalled }`.        |
+| `POST /v1/envelopes/:id/revise`                       | Copy a declined envelope to a draft to send again; returns `{ draft, declined }`.                       |
+| `PUT /v1/envelopes/:id/documents/:docId`              | Replace a draft's PDF; returns `{ envelope, movedFields }`.                                             |
 | `GET /v1/envelopes/:id/events`                        | The audit log and whether its hash chain is intact.                                                     |
 | `GET /v1/envelopes/:id/documents/:docId`              | The sealed PDF once complete, else the original (`?version=`).                                          |
 | `GET /v1/envelopes/:id/documents/:docId/verification` | `verify()` on the stored sealed file: `{ valid, reason, signer, signedAt, certificateSha256, sha256 }`. |

@@ -433,6 +433,163 @@
         }
       }
     },
+    "/v1/envelopes/{id}/recipients/{recipientId}/link": {
+      "parameters": [
+        { "$ref": "#/components/parameters/EnvelopeId" },
+        { "$ref": "#/components/parameters/RecipientId" }
+      ],
+      "post": {
+        "operationId": "shareSigningLink",
+        "tags": ["Envelopes"],
+        "summary": "Get a signing link to pass on yourself",
+        "description": "A fresh signing link for a recipient whose turn it is, for when emails do not reach\nthem. No email is sent. Their earlier links stop working, so only the newest one\ndoes. A one-time code still applies when the recipient signs with one. The audit\ntrail records `recipient.link_shared` with who took the link, never the link itself.\nAt most 5 links per recipient per hour. The link is in this response only: it is\nnever stored in clear, and the request may not carry an `Idempotency-Key`.\n",
+        "responses": {
+          "201": {
+            "description": "The link. Treat it like a password.",
+            "headers": {
+              "Cache-Control": { "schema": { "type": "string", "example": "no-store" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["recipientId", "url"],
+                  "properties": {
+                    "recipientId": { "$ref": "#/components/schemas/Id" },
+                    "url": { "type": "string", "format": "uri" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "410": { "$ref": "#/components/responses/Gone" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/recipients/{recipientId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/EnvelopeId" },
+        { "$ref": "#/components/parameters/RecipientId" }
+      ],
+      "patch": {
+        "operationId": "correctRecipient",
+        "tags": ["Envelopes"],
+        "summary": "Correct a recipient who has not acted",
+        "description": "Changes the name, email or phone of a recipient on a sent envelope who has not signed,\napproved or declined. Role, order and fields stay. Their earlier links stop working.\nWhen it is their turn and the email or phone changed, the new address is invited at\nonce; a name change sends nothing unless `resend` is true. Recorded as\n`recipient.corrected` with the old and new values. Someone who has acted cannot be\nchanged (`INVALID_STATE` with `details.reason: acted`); recall the envelope instead.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": { "type": "string", "maxLength": 200 },
+                  "email": { "type": "string", "format": "email" },
+                  "phone": {
+                    "type": "string",
+                    "description": "International format, for example +919876543210."
+                  },
+                  "resend": {
+                    "type": "boolean",
+                    "description": "Send a new invitation even when only the name changed."
+                  }
+                }
+              },
+              "example": { "email": "asha.rao@example.com" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The envelope after the correction.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Envelope" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "410": { "$ref": "#/components/responses/Gone" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/recall": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "post": {
+        "operationId": "recallEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Recall a sent envelope to edit it",
+        "description": "Voids a sent or in-progress envelope with the reason \"Recalled to correct\" (and your\nnote), exactly like `void`: links stop and everyone already invited is told. Then\ncreates a new draft with the same documents (the original files), recipients, fields,\ntitle, message and reminders, and an expiry of the same length from now. Signatures\nalready given are not carried over; everyone signs again. The old envelope records\n`envelope.recalled` with `replacementId`; the draft's `envelope.created` has\n`recalledFrom`.\n",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": { "note": { "type": "string", "maxLength": 900 } }
+              },
+              "example": { "note": "The joining date was wrong." }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new draft and the recalled envelope.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeCopy" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/envelopes/{id}/revise": {
+      "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
+      "post": {
+        "operationId": "reviseEnvelope",
+        "tags": ["Envelopes"],
+        "summary": "Revise a declined envelope",
+        "description": "Copies a declined envelope to a new draft, like `recall`, so you can address the\ndecline and send again. The declined envelope stays declined and unchanged; it\nrecords `envelope.revised` with `replacementId`, and the draft's `envelope.created`\nhas `revisedFrom`. Set `changeNote` on the draft to tell recipients what changed.\n",
+        "responses": {
+          "201": {
+            "description": "The new draft and the declined envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["draft", "declined"],
+                  "properties": {
+                    "draft": { "$ref": "#/components/schemas/Envelope" },
+                    "declined": { "$ref": "#/components/schemas/Envelope" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
     "/v1/envelopes/{id}/events": {
       "parameters": [{ "$ref": "#/components/parameters/EnvelopeId" }],
       "get": {
@@ -483,6 +640,66 @@
         { "$ref": "#/components/parameters/EnvelopeId" },
         { "$ref": "#/components/parameters/DocumentId" }
       ],
+      "put": {
+        "operationId": "replaceDocument",
+        "tags": ["Envelopes"],
+        "summary": "Replace a draft's document",
+        "description": "Uploads a new version of one document of a draft, as multipart (`document`, optional\n`name`) or JSON (`name`, `content` in base64). Fields stay where they are when their\npage still exists and they fit on it; the others are moved onto the nearest page and\nlisted in `movedFields`, so you can check them before sending.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["content"],
+                "properties": {
+                  "name": { "type": "string", "maxLength": 200 },
+                  "content": { "type": "string", "contentEncoding": "base64" }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["document"],
+                "properties": {
+                  "document": { "type": "string", "format": "binary" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft with the new file, and the fields that were moved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["envelope", "movedFields"],
+                  "properties": {
+                    "envelope": { "$ref": "#/components/schemas/Envelope" },
+                    "movedFields": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Id" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "422": { "$ref": "#/components/responses/Unprocessable" }
+        }
+      },
       "get": {
         "operationId": "downloadDocument",
         "tags": ["Audit and files"],
@@ -1108,6 +1325,14 @@
         "schema": { "type": "string" },
         "example": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37"
       },
+      "RecipientId": {
+        "name": "recipientId",
+        "in": "path",
+        "required": true,
+        "description": "The recipient id, from `recipients[].id`.",
+        "schema": { "type": "string" },
+        "example": "4c2a9e1b-7d3f-4b6a-8e5c-1f0d2b3a4c5e"
+      },
       "DocumentId": {
         "name": "docId",
         "in": "path",
@@ -1490,6 +1715,10 @@
           "recipient.signed",
           "recipient.approved",
           "recipient.declined",
+          "recipient.link_shared",
+          "recipient.corrected",
+          "envelope.recalled",
+          "envelope.revised",
           "document.sealed"
         ]
       },
@@ -1688,6 +1917,15 @@
           }
         }
       },
+      "EnvelopeCopy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["draft", "recalled"],
+        "properties": {
+          "draft": { "$ref": "#/components/schemas/Envelope" },
+          "recalled": { "$ref": "#/components/schemas/Envelope" }
+        }
+      },
       "Envelope": {
         "type": "object",
         "additionalProperties": false,
@@ -1707,6 +1945,10 @@
           "id": { "$ref": "#/components/schemas/Id" },
           "title": { "type": "string" },
           "message": { "type": "string" },
+          "changeNote": {
+            "type": "string",
+            "description": "What changed since a declined version; shown to recipients."
+          },
           "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
           "routing": { "$ref": "#/components/schemas/Routing" },
           "documents": { "type": "array", "items": { "$ref": "#/components/schemas/Document" } },
@@ -1951,11 +2193,15 @@
           "envelope": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "title", "message", "status", "expiresAt"],
+            "required": ["id", "title", "message", "changeNote", "status", "expiresAt"],
             "properties": {
               "id": { "$ref": "#/components/schemas/Id" },
               "title": { "type": "string" },
               "message": { "type": ["string", "null"] },
+              "changeNote": {
+                "type": ["string", "null"],
+                "description": "What changed since a declined version, shown above the document."
+              },
               "status": { "$ref": "#/components/schemas/EnvelopeStatus" },
               "expiresAt": { "type": ["string", "null"], "format": "date-time" }
             }
@@ -2098,6 +2344,11 @@
             "minLength": 1,
             "maxLength": 5000,
             "description": "Shown to recipients in the invitation and on the signing page."
+          },
+          "changeNote": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "For a revised envelope: what changed, shown to recipients as \"What changed: …\" in\nthe invitation and on the signing page. Send null or an empty string to clear it.\n"
           },
           "routing": { "$ref": "#/components/schemas/Routing", "default": "sequential" },
           "reminders": { "$ref": "#/components/schemas/Reminders" },

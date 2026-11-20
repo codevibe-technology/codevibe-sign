@@ -117,24 +117,28 @@ function requestFor(spec, path, method, operation, pathItem) {
   return request;
 }
 
-function uploadVariant(spec, path, operation, pathItem) {
+function uploadVariant(spec, path, method, operation, pathItem) {
   const media = resolve(spec, operation.requestBody)?.content?.['multipart/form-data'];
   if (!media) return undefined;
   const schema = resolve(spec, media.schema);
-  const request = requestFor(spec, path, 'post', operation, pathItem);
+  const request = requestFor(spec, path, method, operation, pathItem);
   request.header = request.header.filter((h) => h.key !== 'Content-Type');
-  request.body = {
-    mode: 'formdata',
-    formdata: [
-      {
-        key: 'envelope',
-        value: schema.properties.envelope.examples[0],
-        type: 'text',
-        contentType: 'application/json',
-      },
-      { key: 'documents', type: 'file', src: [] },
-    ],
-  };
+  const formdata = schema.properties.envelope
+    ? [
+        {
+          key: 'envelope',
+          value: schema.properties.envelope.examples[0],
+          type: 'text',
+          contentType: 'application/json',
+        },
+        { key: 'documents', type: 'file', src: [] },
+      ]
+    : Object.entries(schema.properties).map(([key, property]) =>
+        property.format === 'binary'
+          ? { key, type: 'file', src: [] }
+          : { key, value: '', type: 'text' },
+      );
+  request.body = { mode: 'formdata', formdata };
   return { name: `${operation.summary} (multipart upload)`, request };
 }
 
@@ -153,7 +157,7 @@ function toPostman(spec) {
       if (capture)
         item.event = [{ listen: 'test', script: { type: 'text/javascript', exec: capture } }];
       folder.item.push(item);
-      const upload = uploadVariant(spec, path, operation, pathItem);
+      const upload = uploadVariant(spec, path, method, operation, pathItem);
       if (upload) folder.item.push(upload);
     }
   }

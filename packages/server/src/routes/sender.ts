@@ -32,7 +32,9 @@ import type { Runtime } from '../runtime/context';
 import type { EnvelopeListQuery } from '../store/types';
 import { create, mutate } from '../runtime/mutate';
 import { sealedFileKey } from '../runtime/seal';
-import { DEFAULT_WORKSPACE, principalScope, type Principal } from '../tenancy';
+import { revisionRoutes } from './revisions';
+import { checkPdf, loadScoped, originalFileKey } from './shared';
+import { principalScope, type Principal } from '../tenancy';
 import { certificateView, envelopeSummary } from '../views';
 
 type SenderEnv = { Variables: { principal: Principal } };
@@ -46,9 +48,6 @@ const STATUSES: readonly EnvelopeStatus[] = [
   'expired',
   'voided',
 ];
-
-const originalFileKey = (envelopeId: Id, index: number) =>
-  `envelopes/${envelopeId}/documents/${index}/original.pdf`;
 
 export function senderRoutes(rt: Runtime) {
   const app = new Hono<SenderEnv>();
@@ -107,6 +106,7 @@ export function senderRoutes(rt: Runtime) {
         ...(settings.routing ? { routing: settings.routing } : {}),
         ...(settings.reminders ? { reminders: settings.reminders } : {}),
         ...(settings.message ? { message: settings.message } : {}),
+        ...(settings.changeNote ? { changeNote: settings.changeNote } : {}),
         ...(settings.expiresAt ? { expiresAt: settings.expiresAt } : {}),
         ...(settings.metadata ? { metadata: settings.metadata } : {}),
       },
@@ -270,6 +270,7 @@ export function senderRoutes(rt: Runtime) {
     return c.json(certificateView(envelope, events, chain.valid));
   });
 
+  revisionRoutes(app, rt);
   return app;
 }
 
@@ -291,6 +292,9 @@ function applyDraftChange(rt: Runtime, current: Envelope, body: Record<string, u
     {
       ...(settings.title !== undefined ? { title: settings.title } : {}),
       ...(typeof settings.message === 'string' ? { message: settings.message } : {}),
+      ...(typeof settings.changeNote === 'string' && settings.changeNote.trim()
+        ? { changeNote: settings.changeNote.trim() }
+        : {}),
       ...(settings.routing ? { routing: settings.routing } : {}),
       ...(settings.reminders ? { reminders: settings.reminders } : {}),
       ...(settings.expiresAt ? { expiresAt: settings.expiresAt } : {}),
@@ -301,6 +305,10 @@ function applyDraftChange(rt: Runtime, current: Envelope, body: Record<string, u
   if (settings.message === null) {
     next = { ...next };
     delete next.message;
+  }
+  if (settings.changeNote === null || settings.changeNote?.trim() === '') {
+    next = { ...next };
+    delete next.changeNote;
   }
   const documentKeys = new Map<string, Id>();
   current.documents.forEach((d, i) => {
@@ -319,18 +327,6 @@ function applyDraftChange(rt: Runtime, current: Envelope, body: Record<string, u
     body.fields !== undefined ? parseFields(body) : undefined,
     rt.ids,
   );
-}
-
-/**
- * The stored envelope, if it belongs to the caller's workspace. One in another workspace is
- * reported exactly like one that does not exist, so ids cannot be probed across workspaces.
- */
-async function loadScoped(rt: Runtime, id: Id, scope: { workspaceId: string }) {
-  const stored = await rt.store.load(id);
-  if (!stored || (stored.workspaceId ?? DEFAULT_WORKSPACE) !== scope.workspaceId) {
-    throw new SignError('ENVELOPE_NOT_FOUND', 'Envelope not found');
-  }
-  return stored;
 }
 
 async function getEnvelope(rt: Runtime, id: Id, scope: { workspaceId: string }) {
@@ -396,28 +392,4 @@ async function readCreateBody(c: Context, rt: Runtime) {
     }),
   );
   return { body, documents };
-}
-
-async function checkPdf(rt: Runtime, upload: UploadedDocument) {
-  if (upload.bytes.byteLength > rt.limits.maxPdfBytes) {
-    throw new SignError(
-      'DOCUMENT_TOO_LARGE',
-      `${upload.name} is larger than ${rt.limits.maxPdfBytes} bytes`,
-      { document: upload.key, maxBytes: rt.limits.maxPdfBytes },
-    );
-  }
-  if (Buffer.from(upload.bytes.subarray(0, 5)).toString('latin1') !== '%PDF-') {
-    throw new SignError('DOCUMENT_INVALID', `${upload.name} is not a PDF file`, {
-      document: upload.key,
-    });
-  }
-  try {
-    return await rt.pdf.inspectPdf(upload.bytes, { maxBytes: rt.limits.maxPdfBytes });
-  } catch (err) {
-    if (err instanceof SignError) throw err;
-    // A parser crash on a hostile or broken file is the file's fault, not the server's.
-    throw new SignError('DOCUMENT_INVALID', `${upload.name} could not be read as a PDF`, {
-      document: upload.key,
-    });
-  }
 }

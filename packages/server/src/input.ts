@@ -246,6 +246,7 @@ export function parseFields(body: Obj): FieldSpec[] {
 export interface EnvelopeSettings {
   title?: string;
   message?: string | null;
+  changeNote?: string | null;
   routing?: RoutingMode;
   reminders?: ReminderPolicy;
   expiresAt?: string;
@@ -257,6 +258,10 @@ export function parseSettings(body: Obj, now: Date, isCreate: boolean): Envelope
   if (isCreate || body.title !== undefined) out.title = str(body, 'title', '', { max: 200 });
   if (body.message === null) out.message = null;
   else if (body.message !== undefined) out.message = str(body, 'message', '', { max: 5000 });
+  if (body.changeNote === null) out.changeNote = null;
+  else if (body.changeNote !== undefined) {
+    out.changeNote = str(body, 'changeNote', '', { max: 2000 });
+  }
   if (body.routing !== undefined || isCreate) {
     out.routing = oneOf(body, 'routing', '', ROUTING, 'sequential');
   }

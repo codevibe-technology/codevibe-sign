@@ -243,6 +243,140 @@
               "options": { "raw": { "language": "json" } }
             }
           }
+        },
+        {
+          "name": "Get a signing link to pass on yourself",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/recipients/:recipientId/link",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "recipients", ":recipientId", "link"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "recipientId",
+                  "value": "{{recipientId}}",
+                  "description": "The recipient id, from `recipients[].id`."
+                }
+              ]
+            },
+            "description": "Get a signing link to pass on yourself\n\nA fresh signing link for a recipient whose turn it is, for when emails do not reach\nthem. No email is sent. Their earlier links stop working, so only the newest one\ndoes. A one-time code still applies when the recipient signs with one. The audit\ntrail records `recipient.link_shared` with who took the link, never the link itself.\nAt most 5 links per recipient per hour. The link is in this response only: it is\nnever stored in clear, and the request may not carry an `Idempotency-Key`."
+          }
+        },
+        {
+          "name": "Correct a recipient who has not acted",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/recipients/:recipientId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "recipients", ":recipientId"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "recipientId",
+                  "value": "{{recipientId}}",
+                  "description": "The recipient id, from `recipients[].id`."
+                }
+              ]
+            },
+            "description": "Correct a recipient who has not acted\n\nChanges the name, email or phone of a recipient on a sent envelope who has not signed,\napproved or declined. Role, order and fields stay. Their earlier links stop working.\nWhen it is their turn and the email or phone changed, the new address is invited at\nonce; a name change sends nothing unless `resend` is true. Recorded as\n`recipient.corrected` with the old and new values. Someone who has acted cannot be\nchanged (`INVALID_STATE` with `details.reason: acted`); recall the envelope instead.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"asha.rao@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Recall a sent envelope to edit it",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/recall",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "recall"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Recall a sent envelope to edit it\n\nVoids a sent or in-progress envelope with the reason \"Recalled to correct\" (and your\nnote), exactly like `void`: links stop and everyone already invited is told. Then\ncreates a new draft with the same documents (the original files), recipients, fields,\ntitle, message and reminders, and an expiry of the same length from now. Signatures\nalready given are not carried over; everyone signs again. The old envelope records\n`envelope.recalled` with `replacementId`; the draft's `envelope.created` has\n`recalledFrom`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"The joining date was wrong.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Revise a declined envelope",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/revise",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "revise"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Revise a declined envelope\n\nCopies a declined envelope to a new draft, like `recall`, so you can address the\ndecline and send again. The declined envelope stays declined and unchanged; it\nrecords `envelope.revised` with `replacementId`, and the draft's `envelope.created`\nhas `revisedFrom`. Set `changeNote` on the draft to tell recipients what changed."
+          }
+        },
+        {
+          "name": "Replace a draft's document",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/documents/:docId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "documents", ":docId"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Replace a draft's document\n\nUploads a new version of one document of a draft, as multipart (`document`, optional\n`name`) or JSON (`name`, `content` in base64). Fields stay where they are when their\npage still exists and they fit on it; the others are moved onto the nearest page and\nlisted in `movedFields`, so you can check them before sending.",
+            "body": { "mode": "formdata", "formdata": [] }
+          }
+        },
+        {
+          "name": "Replace a draft's document (multipart upload)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/documents/:docId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "documents", ":docId"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Replace a draft's document\n\nUploads a new version of one document of a draft, as multipart (`document`, optional\n`name`) or JSON (`name`, `content` in base64). Fields stay where they are when their\npage still exists and they fit on it; the others are moved onto the nearest page and\nlisted in `movedFields`, so you can check them before sending.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "document", "type": "file", "src": [] },
+                { "key": "name", "value": "", "type": "text" }
+              ]
+            }
+          }
         }
       ]
     },

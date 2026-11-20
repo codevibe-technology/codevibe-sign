@@ -11,6 +11,11 @@ export interface Principal {
   workspaceId: string;
   /** Only `GET` routes are allowed, for example for a viewer. */
   readOnly?: boolean;
+  /**
+   * How the audit trail names the caller when they share a link, correct a recipient or
+   * recall an envelope, for example the signed-in user's name. Defaults to `id`.
+   */
+  actorName?: string;
 }
 
 /** Idempotency and rate-limit keys for a principal; unchanged for the default workspace. */

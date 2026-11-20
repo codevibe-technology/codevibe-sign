@@ -54,7 +54,7 @@ export async function mutate(rt: Runtime, id: Id, apply: Apply, scope?: Scope): 
       throw err;
     }
     await announce(rt, owner, committed.envelope.id, committed.events);
-    await afterCommit(rt, stored.envelope, committed.envelope, jobs);
+    await afterCommit(rt, stored.envelope, committed.envelope, committed.events, jobs);
     return { envelope: committed.envelope, changed: true };
   }
 }
@@ -87,18 +87,33 @@ async function announce(rt: Runtime, workspaceId: string, envelopeId: Id, events
   }
 }
 
-/** Signing links stop working once their recipient has acted or the envelope is final. */
-async function afterCommit(rt: Runtime, before: Envelope, after: Envelope, jobs: Job[]) {
+/** Actions after which a recipient's earlier links must stop working. */
+const REISSUE = new Set<string>(['recipient.corrected', 'recipient.link_shared']);
+
+/**
+ * Signing links stop working once their recipient has acted or the envelope is final, and
+ * when a recipient was corrected or given a new link by hand. This runs before the jobs, so a
+ * new invitation's link is issued after the old ones are revoked.
+ */
+async function afterCommit(
+  rt: Runtime,
+  before: Envelope,
+  after: Envelope,
+  events: AuditEvent[],
+  jobs: Job[],
+) {
   const now = rt.clock.now();
   if (isFinal(after) && !isFinal(before)) {
     await rt.store.revokeTokens(after.id, undefined, now);
   } else {
+    const revoke = new Set(
+      events.flatMap((e) => (REISSUE.has(e.action) && e.recipientId ? [e.recipientId] : [])),
+    );
     for (const recipient of after.recipients) {
       const previous = before.recipients.find((r) => r.id === recipient.id);
-      if (hasActed(recipient) && !(previous && hasActed(previous))) {
-        await rt.store.revokeTokens(after.id, recipient.id, now);
-      }
+      if (hasActed(recipient) && !(previous && hasActed(previous))) revoke.add(recipient.id);
     }
+    for (const recipientId of revoke) await rt.store.revokeTokens(after.id, recipientId, now);
   }
   await dispatchJobs(rt, jobs);
 }
