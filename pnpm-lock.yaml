@@ -344,8 +344,8 @@ importers:
         specifier: 1.1.1
         version: 1.1.1
       '@signpdf/placeholder-pdf-lib':
-        specifier: 3.4.0
-        version: 3.4.0(pdf-lib@1.17.1)
+        specifier: 4.0.0
+        version: 4.0.0(pdf-lib@1.17.1)
       '@signpdf/signpdf':
         specifier: 3.4.0
         version: 3.4.0
@@ -2903,9 +2903,9 @@ packages:
   '@shikijs/vscode-textmate@10.1.0':
     resolution: {integrity: sha512-cVBuhDQjBZaNMTwBquYfPydrUP+E3hE6oYGasx8h6ZrODIM7/r+gxLDXdd66oszbrggZHEntdE6j+5gYIVyMWQ==}
 
-  '@signpdf/placeholder-pdf-lib@3.4.0':
-    resolution: {integrity: sha512-rn3vvDwjxWTK/3LtcNX7ecKyocBjDUxVnU6CDagNsmD7qAeVz0pp/QrnAx3U0cHp2GuHsRi49oEUdw0hjJFpOg==}
-    engines: {node: '>=12', yarn: '>=1.22.18'}
+  '@signpdf/placeholder-pdf-lib@4.0.0':
+    resolution: {integrity: sha512-5EGTe4RVulLaxDi1ta2v42+M3rhy55LmgpSZUWTTspUpXAfhsjyhE+dUINXz6wYKtjDoY+Qz2yR9kD2xOPSTCw==}
+    engines: {node: '>=22', yarn: '>=1.22.18'}
     peerDependencies:
       pdf-lib: ^1.17.1
 
@@ -2916,6 +2916,10 @@ packages:
   '@signpdf/utils@3.4.0':
     resolution: {integrity: sha512-8Ayesb0qwk9FrrlotPPaGvNKkIwMeTz4WB43kVu20zA/wcPn2s7J0ZSPqsx+ltVYDglL1wYHQFobgrKDccp3kw==}
     engines: {node: '>=12', yarn: '>=1.22.18'}
+
+  '@signpdf/utils@4.0.0':
+    resolution: {integrity: sha512-4uiNqyHTVnXGYK+zhwLKrsykX3d4f0mlbzykyI0BGiNVIZssHo61KmwWzUEbAcE//TpheUd2xD7yA8mjxIpaZg==}
+    engines: {node: '>=22', yarn: '>=1.22.18'}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -3927,6 +3931,7 @@ packages:
   eslint@9.15.0:
     resolution: {integrity: sha512-7CrWySmIibCgT1Os28lUU6upBshZ+GxybLOrmRzi08kS8MBuO8QA7pXEgYgY5W8vK3e74xv0lpjo9DbaGU9Rkw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -8372,9 +8377,9 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.1.0': {}
 
-  '@signpdf/placeholder-pdf-lib@3.4.0(pdf-lib@1.17.1)':
+  '@signpdf/placeholder-pdf-lib@4.0.0(pdf-lib@1.17.1)':
     dependencies:
-      '@signpdf/utils': 3.4.0
+      '@signpdf/utils': 4.0.0
       pdf-lib: 1.17.1
 
   '@signpdf/signpdf@3.4.0':
@@ -8382,6 +8387,8 @@ snapshots:
       '@signpdf/utils': 3.4.0
 
   '@signpdf/utils@3.4.0': {}
+
+  '@signpdf/utils@4.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
 
