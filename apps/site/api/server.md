@@ -210,7 +210,7 @@ minute: it also sends due reminders and expires envelopes.
   also exported as `migrations` for your own tooling. A custom `ServerStore` must make
   `issueOtp` and `updateOtp` atomic and refuse a second audit event with the same `seq`.
 - Files: `localFileStore(dir)`, `memoryFileStore()`.
-- Mail: `smtpMailer({ transport, from })`, `consoleMailer()`.
+- Mail: `smtpMailer({ transport, from, messageIdDomain })`, `consoleMailer()`.
 - OTP: `mailOtpSender(mailer)`, `consoleOtpSender()`. Bring your own `OtpSender` for SMS.
 - Rate limits: `memoryRateLimiter()`. Pass a shared `RateLimiter` when running more than
   one process, and set `sessionSecret` so sessions work across them.

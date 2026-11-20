@@ -244,7 +244,7 @@ export function signerRoutes(rt: Runtime) {
   });
 
   app.post('/:token/otp', async (c) => {
-    const { envelope, recipient, otpRequired } = await resolve(c);
+    const { envelope, recipient, workspaceId, otpRequired } = await resolve(c);
     if (!otpRequired) throw validation('This signing link does not use a one-time code');
     const now = rt.clock.now();
     const sends = rt.limits.otpSendsPer15Minutes;
@@ -271,7 +271,7 @@ export function signerRoutes(rt: Runtime) {
     }
     const code = issued.code;
     try {
-      await rt.otp.send(recipient, code);
+      await rt.otp.send(recipient, code, { envelopeId: envelope.id, workspaceId });
     } catch (err) {
       // An adapter's error may quote the message it tried to send, code included.
       rt.logger.error('one-time code could not be sent', {

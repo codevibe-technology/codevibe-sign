@@ -4,7 +4,14 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { defaultTemplates } from '../templates';
 import { localFileStore } from './files';
-import { consoleMailer, fromHeader, mailOtpSender, nodemailerMessage } from './mail';
+import {
+  consoleMailer,
+  fromHeader,
+  mailOtpSender,
+  messageId,
+  nodemailerMessage,
+  smtpMailer,
+} from './mail';
 
 describe('localFileStore', () => {
   let dir: string | undefined;
@@ -79,11 +86,50 @@ describe('mail', () => {
         status: 'notified',
       },
       '123456',
+      { envelopeId: 'env_1', workspaceId: 'ws_1' },
     );
     expect(mailer.sent[0]).toMatchObject({
       to: 'a@example.com',
       subject: 'Your signing code is 123456',
+      meta: { kind: 'otp', envelopeId: 'env_1', workspaceId: 'ws_1', recipientId: 'r' },
     });
+  });
+
+  it('never puts the log meta into the sent message', () => {
+    const message = nodemailerMessage(
+      { to: 'a@x.test', subject: 'S', text: 'T', meta: { kind: 'invite' } },
+      'sign@x.test',
+      '<id@sign.x.test>',
+    );
+    expect(message).not.toHaveProperty('meta');
+    expect(message.messageId).toBe('<id@sign.x.test>');
+  });
+
+  it('makes Message-IDs on the given host and refuses a malformed one', () => {
+    expect(messageId('Sign.Example.com')).toMatch(/^<[0-9a-f-]{36}@sign\.example\.com>$/);
+    expect(() => messageId('bad host>')).toThrow(/Message-ID domain/);
+  });
+
+  it('sends with a Message-ID on the configured host and returns it', async () => {
+    const mailer = smtpMailer({
+      transport: { jsonTransport: true } as never,
+      from: 'Sign <sign@mail.example.com>',
+      messageIdDomain: 'sign.example.com',
+    });
+    const receipt = await mailer.send({
+      to: 'a@x.test',
+      subject: 'S',
+      text: 'T',
+      html: '<p>T</p>',
+    });
+    expect(receipt?.messageId).toMatch(/@sign\.example\.com>$/);
+    const fallback = smtpMailer({
+      transport: { jsonTransport: true } as never,
+      from: 'sign@mail.example.com',
+    });
+    expect((await fallback.send({ to: 'a@x.test', subject: 'S', text: 'T' }))?.messageId).toMatch(
+      /@mail\.example\.com>$/,
+    );
   });
 
   it('escapes names and titles in HTML', () => {

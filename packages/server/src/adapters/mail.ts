@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { MailMessage, Mailer, OtpSender, Recipient } from '@codevibe_technology/sign-core';
 import nodemailer from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -7,7 +8,23 @@ export interface SmtpMailerOptions {
   transport: SMTPTransport.Options | string;
   /** Sender address, for example `Codevibe Sign <sign@example.com>`. */
   from: string;
+  /**
+   * Host name for the `Message-ID` header, for example the app's own host. By default the
+   * domain of the sender address.
+   */
+  messageIdDomain?: string;
 }
+
+const HOST_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/;
+
+/** A fresh `Message-ID` value, `<uuid@domain>`. */
+export function messageId(domain: string): string {
+  if (!HOST_NAME.test(domain)) throw new Error(`Invalid Message-ID domain: ${domain}`);
+  return `<${randomUUID()}@${domain.toLowerCase()}>`;
+}
+
+const addressDomain = (from: string) =>
+  (/<([^<>]+)>\s*$/.exec(from)?.[1] ?? from).trim().split('@').pop() ?? 'localhost';
 
 /**
  * The `From` header for a message: the configured address, with the message's `fromName` as
@@ -21,9 +38,10 @@ export function fromHeader(from: string, fromName: string | undefined): string {
   return `"${name}" <${address}>`;
 }
 
-/** The nodemailer message for a `MailMessage`, sent from `from`. */
-export function nodemailerMessage(message: MailMessage, from: string) {
+/** The nodemailer message for a `MailMessage`, sent from `from`. `meta` is never sent. */
+export function nodemailerMessage(message: MailMessage, from: string, id?: string) {
   return {
+    ...(id ? { messageId: id } : {}),
     from: fromHeader(from, message.fromName),
     to: message.to,
     ...(message.replyTo ? { replyTo: message.replyTo } : {}),
@@ -44,9 +62,15 @@ export function nodemailerMessage(message: MailMessage, from: string) {
 
 export function smtpMailer(options: SmtpMailerOptions): Mailer & { close(): void } {
   const transport = nodemailer.createTransport(options.transport);
+  const domain = options.messageIdDomain ?? addressDomain(options.from);
+  messageId(domain);
   return {
     async send(message) {
-      await transport.sendMail(nodemailerMessage(message, options.from));
+      const id = messageId(domain);
+      const info = (await transport.sendMail(nodemailerMessage(message, options.from, id))) as {
+        messageId?: string;
+      };
+      return { messageId: info.messageId ?? id };
     },
     close: () => transport.close(),
   };
@@ -88,10 +112,16 @@ export function consoleOtpSender(
 /** Sends one-time codes by email. Recipients set to `sms_otp` need an SMS sender instead. */
 export function mailOtpSender(mailer: Mailer): OtpSender {
   return {
-    async send(recipient, code) {
+    async send(recipient, code, context) {
       if (!recipient.email) throw new Error(`Recipient ${recipient.id} has no email address`);
       await mailer.send({
         to: recipient.email,
+        meta: {
+          kind: 'otp',
+          recipientId: recipient.id,
+          ...(context?.envelopeId ? { envelopeId: context.envelopeId } : {}),
+          ...(context?.workspaceId ? { workspaceId: context.workspaceId } : {}),
+        },
         subject: `Your signing code is ${code}`,
         text:
           `Your one-time code is ${code}.\n\nIt expires in 10 minutes. ` +
