@@ -1,14 +1,13 @@
 import 'server-only';
 import type postgres from 'postgres';
-import type { BulkRowPlan } from '@/lib/bulk-send';
+import type { BulkRowPlan, BulkRowStatus, BulkStatus } from '@/lib/bulk-send';
 import type { People } from '@/lib/templates';
 import { randomId } from './crypto';
 import { AppError } from './errors';
 
 type Sql = postgres.Sql;
 
-export type BulkStatus = 'sending' | 'done' | 'cancelled';
-export type BulkRowStatus = 'pending' | 'sent' | 'failed';
+export type { BulkRowStatus, BulkStatus };
 
 export interface BulkSendRecord {
   id: string;

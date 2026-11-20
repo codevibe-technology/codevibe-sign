@@ -205,3 +205,71 @@ export function previewBulkCsv(
 /** Problems with the fixed people, keyed `people.<roleId>.<attribute>`. */
 export const fixedPeopleProblems = (fixedRoles: TemplateRoleDef[], fixed: People) =>
   sendProblems({ roles: fixedRoles }, fixed);
+
+export type BulkStatus = 'sending' | 'done' | 'cancelled';
+export type BulkRowStatus = 'pending' | 'sent' | 'failed';
+
+export interface BulkSendView {
+  id: string;
+  templateId: string;
+  templateName: string;
+  createdByName: string | null;
+  status: BulkStatus;
+  total: number;
+  sent: number;
+  failed: number;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface BulkRowView {
+  line: number;
+  people: People;
+  status: BulkRowStatus;
+  envelopeId: string | null;
+  error: string | null;
+}
+
+export function bulkSendView(record: {
+  id: string;
+  templateId: string;
+  templateName: string;
+  createdByName: string | null;
+  status: BulkStatus;
+  total: number;
+  sent: number;
+  failed: number;
+  createdAt: Date;
+  finishedAt: Date | null;
+}): BulkSendView {
+  return {
+    id: record.id,
+    templateId: record.templateId,
+    templateName: record.templateName,
+    createdByName: record.createdByName,
+    status: record.status,
+    total: record.total,
+    sent: record.sent,
+    failed: record.failed,
+    createdAt: record.createdAt.toISOString(),
+    finishedAt: record.finishedAt?.toISOString() ?? null,
+  };
+}
+
+/** Rows handled so far, as a whole percentage. */
+export const bulkProgress = (bulk: Pick<BulkSendView, 'total' | 'sent' | 'failed'>) =>
+  bulk.total === 0 ? 100 : Math.floor(((bulk.sent + bulk.failed) / bulk.total) * 100);
+
+export function bulkStatusLabel(bulk: Pick<BulkSendView, 'status' | 'total' | 'sent' | 'failed'>) {
+  if (bulk.status === 'cancelled') return `Stopped after ${bulk.sent} sent`;
+  if (bulk.status === 'sending') return `Sending: ${bulk.sent + bulk.failed} of ${bulk.total} done`;
+  return bulk.failed > 0 ? `${bulk.sent} sent, ${bulk.failed} failed` : `All ${bulk.sent} sent`;
+}
+
+/** Who a row went to: the first role's person, plus how many others. */
+export function rowPeopleLine(people: People, roles: { id: string }[]): string {
+  const named = roles.map((r) => people[r.id]).filter((p): p is Person => Boolean(p?.name));
+  if (named.length === 0) return '';
+  const first = `${named[0]!.name} <${named[0]!.email}>`;
+  return named.length > 1 ? `${first} + ${named.length - 1}` : first;
+}
