@@ -1,15 +1,33 @@
 ---
 title: Self-host with Docker
-description: Build and run the standalone Codevibe Sign service with Docker, configured entirely from environment variables.
+description: Run the Codevibe Sign web app with Docker Compose, or the standalone HTTP API as one container configured from environment variables.
 ---
 
 # Self-host with Docker
+
+## The whole web app
+
+The web app (workspaces, sending, templates, bulk send, webhooks, the signing page and these
+docs) runs with Docker Compose next to PostgreSQL, behind Traefik:
+
+```sh
+git clone https://github.com/codevibe-technology/codevibe-sign.git
+cd codevibe-sign/deploy
+cp .env.example .env    # host name, Traefik, database, secrets, SMTP; PLAN_MODE=self-hosted
+docker compose up -d --build
+```
+
+Before the first start, create the seal certificate as described in the
+[deployment runbook](https://github.com/codevibe-technology/codevibe-sign/blob/main/deploy/README.md),
+which also covers DNS, backups, a restore drill and upgrades.
+
+## The HTTP API on its own
 
 `apps/server` builds a Docker image of the standalone service. It reads all of its
 configuration from environment variables, migrates the PostgreSQL database on start and stores
 files in a volume.
 
-## Build and run
+### Build and run
 
 From the repository root:
 
@@ -21,7 +39,7 @@ docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data co
 The image runs as the unprivileged `node` user, stores files under `/data` and checks
 `GET /health` every 30 seconds. Put it behind a reverse proxy that terminates TLS.
 
-## Environment
+### Environment
 
 | Variable                 | Required | Default           | Notes                                                                                                   |
 | ------------------------ | -------- | ----------------- | ------------------------------------------------------------------------------------------------------- |
@@ -59,7 +77,7 @@ SMTP_FROM=Sign <sign@example.com>
 
 To turn a `.p12` file into the base64 value: `base64 -i seal.p12 | tr -d '\n'`.
 
-## Operating it
+### Operating it
 
 - Back up the PostgreSQL database and the files volume together. The audit log lives in the
   database and refers to files by key.
