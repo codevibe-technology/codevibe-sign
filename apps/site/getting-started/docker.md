@@ -21,6 +21,19 @@ Before the first start, create the seal certificate as described in the
 [deployment runbook](https://github.com/codevibe-technology/codevibe-sign/blob/main/deploy/README.md),
 which also covers DNS, backups, a restore drill and upgrades.
 
+Email goes out through your SMTP account (`MAIL_TRANSPORT` set to an SMTP URL) or, for a
+Microsoft 365 mailbox, through Microsoft Graph with an app registration instead of a password:
+
+| Variable           | Required     | Notes                                                                         |
+| ------------------ | ------------ | ----------------------------------------------------------------------------- |
+| `MAIL_TRANSPORT`   | yes          | An SMTP URL such as `smtps://user:password@smtp.example.com:465`, or `graph`. |
+| `MAIL_FROM`        | yes          | The sender, for example `Your Company <no-reply@example.com>`.                |
+| `MS_TENANT_ID`     | with `graph` | The Directory (tenant) ID of the app registration.                            |
+| `MS_CLIENT_ID`     | with `graph` | The Application (client) ID.                                                  |
+| `MS_CLIENT_SECRET` | with `graph` | A client secret of the app. It needs the `Mail.Send` application permission.  |
+
+The runbook's "Microsoft 365 (Graph)" section walks through the app registration.
+
 ## The HTTP API on its own
 
 `apps/server` builds a Docker image of the standalone service. It reads all of its
