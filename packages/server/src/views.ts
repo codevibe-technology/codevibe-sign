@@ -157,6 +157,7 @@ export function envelopeSummary(envelope: Envelope) {
       role: r.role,
       status: r.status,
       actedAt: r.actedAt ?? null,
+      declineReason: r.declineReason ?? null,
     })),
   };
 }

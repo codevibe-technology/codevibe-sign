@@ -2059,7 +2059,7 @@ components:
           items:
             type: object
             additionalProperties: false
-            required: [id, name, email, role, status, actedAt]
+            required: [id, name, email, role, status, actedAt, declineReason]
             properties:
               id:
                 $ref: '#/components/schemas/Id'
@@ -2075,6 +2075,9 @@ components:
                 oneOf:
                   - $ref: '#/components/schemas/Timestamp'
                   - type: 'null'
+              declineReason:
+                type: [string, 'null']
+                description: What the recipient wrote when they declined.
     EnvelopeList:
       type: object
       additionalProperties: false
