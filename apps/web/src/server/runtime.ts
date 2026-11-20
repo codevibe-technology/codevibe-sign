@@ -1,9 +1,10 @@
 import 'server-only';
 import type { FileStore, Mailer } from '@codevibe_technology/sign-core';
-import { consoleMailer, localFileStore, smtpMailer } from '@codevibe_technology/sign-server';
+import { localFileStore } from '@codevibe_technology/sign-server';
 import { db } from './db';
 import { env } from './env';
 import { loggingMailer, recordMail } from './mail-log';
+import { createMailTransport } from './mail-transport';
 
 export interface AppRuntime {
   files: FileStore;
@@ -19,14 +20,7 @@ const holder = globalThis as unknown as { __cvsRuntime?: AppRuntime };
 export function appRuntime(): AppRuntime {
   if (!holder.__cvsRuntime) {
     const config = env();
-    const transport =
-      config.MAIL_TRANSPORT === 'console'
-        ? consoleMailer()
-        : smtpMailer({
-            transport: config.MAIL_TRANSPORT,
-            from: config.MAIL_FROM,
-            messageIdDomain: new URL(config.APP_URL).hostname,
-          });
+    const transport = createMailTransport(config);
     holder.__cvsRuntime = {
       files: localFileStore(config.FILES_DIR),
       mailer: loggingMailer(transport, (entry) => recordMail(db(), entry)),

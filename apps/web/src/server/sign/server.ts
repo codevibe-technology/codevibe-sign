@@ -15,6 +15,7 @@ import { senderOf } from '../envelopes';
 import { env, type Env } from '../env';
 import { mailSenderOnDecline } from '../decline-mail';
 import { publishChange } from '../live/live';
+import { completedCopyAttachmentLimit } from '../mail-transport';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
 import { planSettings } from '../plans';
@@ -89,7 +90,10 @@ function build(): SignServer {
     },
     apiKeys: [],
     authenticate: authenticate(),
-    limits: { maxRequestBytes: MAX_REQUEST_BYTES, maxAttachmentBytes: MAX_ATTACHMENT_BYTES },
+    limits: {
+      maxRequestBytes: MAX_REQUEST_BYTES,
+      maxAttachmentBytes: completedCopyAttachmentLimit(config, MAX_ATTACHMENT_BYTES),
+    },
     webhookTargets,
     webhookSecurity: webhookSecurity(),
     onWebhookDelivery: (report) => recordDelivery(sql, report),
