@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
   createSignServer,
@@ -11,7 +12,7 @@ import { getBrand } from '../brand';
 import { auth } from '../auth/auth';
 import { db } from '../db';
 import { senderOf } from '../envelopes';
-import { env } from '../env';
+import { env, type Env } from '../env';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
 import { planSettings } from '../plans';
@@ -32,6 +33,16 @@ export const SMS_CODES = false;
 
 /** Largest request body the sign server accepts; its default. */
 const MAX_REQUEST_BYTES = 50 * 1024 * 1024;
+/** Larger sealed copies go out as a download link; many mailboxes refuse big attachments. */
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Signs signer sessions, receipts and emailed download links. Without SIGN_SESSION_SECRET it
+ * is derived from AUTH_SECRET, so links keep working across restarts and processes.
+ */
+const sessionSecret = (config: Env) =>
+  config.SIGN_SESSION_SECRET ??
+  createHmac('sha256', config.AUTH_SECRET).update('codevibe-sign/session').digest('hex');
 
 function authenticate() {
   const config = env();
@@ -69,7 +80,7 @@ function build(): SignServer {
     },
     apiKeys: [],
     authenticate: authenticate(),
-    limits: { maxRequestBytes: MAX_REQUEST_BYTES },
+    limits: { maxRequestBytes: MAX_REQUEST_BYTES, maxAttachmentBytes: MAX_ATTACHMENT_BYTES },
     webhookTargets,
     webhookSecurity: webhookSecurity(),
     onWebhookDelivery: (report) => recordDelivery(sql, report),
@@ -87,7 +98,7 @@ function build(): SignServer {
     signingPageUrl: `${config.APP_URL}/sign`,
     trustProxy: config.TRUST_PROXY,
     effects: 'background',
-    ...(config.SIGN_SESSION_SECRET ? { sessionSecret: config.SIGN_SESSION_SECRET } : {}),
+    sessionSecret: sessionSecret(config),
   });
 }
 

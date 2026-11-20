@@ -50,9 +50,20 @@ describe('createWorkspaceMail', () => {
     expect(mail).not.toHaveProperty('replyTo');
     const templates = mail!.templates!;
     expect(templates.reminder!({ envelope, recipient, link: 'x' }).subject).toMatch(/^Reminder/);
-    expect(templates.completed!({ envelope, recipient, attached: false }).text).toContain(
-      'Ask Acme People for a copy',
+    expect(
+      templates.completed!({ envelope, recipient, attached: false, downloads: [] }).text,
+    ).toContain('Ask Acme People for a copy');
+    const linked = templates.completed!({
+      envelope,
+      recipient,
+      attached: false,
+      downloads: [{ name: 'offer.pdf', url: 'https://sign.example.com/api/v1/sign/copy/d1?c=x' }],
+    });
+    expect(linked.text).toContain(
+      'Download the signed copy: https://sign.example.com/api/v1/sign/copy/d1?c=x',
     );
+    expect(linked.html).toContain('href="https://sign.example.com/api/v1/sign/copy/d1?c=x"');
+    expect(linked.text).toContain('works for 30 days');
     expect(templates.cancelled!({ envelope, recipient }).text).toContain('was withdrawn');
   });
 

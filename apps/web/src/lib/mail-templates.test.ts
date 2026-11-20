@@ -116,4 +116,30 @@ describe('renderMail', () => {
       expect(mail.subject.length).toBeGreaterThan(5);
     }
   });
+
+  it('gives every kind a plain-text part', () => {
+    for (const kind of MAIL_KINDS) {
+      const mail = renderMail(kind, sampleInput(kind), brand);
+      expect(mail.text.trim().length).toBeGreaterThan(40);
+      expect(mail.text).not.toMatch(/<[a-z]/i);
+    }
+  });
+
+  it('lists a download link per document when the copy is not attached', () => {
+    const downloads = [
+      { name: 'offer.pdf', url: 'https://sign.example.com/api/v1/sign/copy/d1?c=x' },
+      { name: 'nda.pdf', url: 'https://sign.example.com/api/v1/sign/copy/d2?c=x' },
+    ];
+    const mail = renderMail(
+      'completed',
+      { ...sampleInput('completed'), attached: false, downloads },
+      brand,
+    );
+    expect(mail.text).toContain('offer.pdf: https://sign.example.com/api/v1/sign/copy/d1?c=x');
+    expect(mail.text).toContain('nda.pdf: https://sign.example.com/api/v1/sign/copy/d2?c=x');
+    expect(mail.html).toContain('href="https://sign.example.com/api/v1/sign/copy/d2?c=x"');
+    expect(mail.text).not.toContain('Ask Acme HR');
+    const attached = renderMail('completed', { ...sampleInput('completed'), downloads }, brand);
+    expect(attached.text).not.toContain('/copy/');
+  });
 });
