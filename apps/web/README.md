@@ -48,6 +48,9 @@ it. Download the sample CSV from the bulk page to start.
 **Settings → Webhooks** sends signed events to your own systems as envelopes are sent,
 signed, completed or declined. Pick the events, copy the secret (shown once), send a test
 event, and follow every delivery with its payload; failed ones can be sent again.
+To try webhooks without a server of your own, add `${APP_URL}/api/webhooks/test` as the
+endpoint: it accepts every delivery and stores nothing, so the delivery log shows each one
+as delivered.
 
 ## Signing a document
 
