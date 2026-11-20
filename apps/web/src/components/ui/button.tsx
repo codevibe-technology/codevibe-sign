@@ -3,8 +3,9 @@ import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
 const variants = {
-  primary: 'bg-primary text-primary-ink hover:bg-primary-hover shadow-sm',
-  secondary: 'bg-surface text-ink border border-line-strong hover:bg-surface-2',
+  primary: 'bg-primary text-primary-ink hover:bg-primary-hover',
+  secondary:
+    'bg-surface text-ink border border-line-strong hover:border-primary hover:text-primary',
   ghost: 'text-ink hover:bg-surface-2',
   danger: 'bg-danger text-white hover:opacity-90',
 } as const;
@@ -37,7 +38,7 @@ export function Button({
   return (
     <Component
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-lg font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex shrink-0 items-center justify-center rounded-md font-semibold tracking-[-0.005em] whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60',
         variants[variant],
         sizes[size],
         className,

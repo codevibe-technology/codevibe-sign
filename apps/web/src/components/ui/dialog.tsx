@@ -20,7 +20,7 @@ export function DialogContent({
   return (
     <Primitive.Portal>
       <Primitive.Overlay className="fixed inset-0 z-40 bg-[#0D1B2A]/50" />
-      <Primitive.Content className="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-line bg-surface p-6 shadow-card focus:outline-none">
+      <Primitive.Content className="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-line border-t-[3px] border-t-accent bg-surface p-6 shadow-[0_24px_64px_rgb(13_27_42/0.28)] focus:outline-none">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <Primitive.Title className="font-display text-lg font-semibold">

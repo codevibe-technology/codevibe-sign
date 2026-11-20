@@ -21,11 +21,11 @@ function Pill({ tone, label }: { tone: Tone; label: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap',
+        'inline-flex items-center gap-1.5 rounded-[3px] px-2 py-[3px] font-mono text-[10.5px] font-medium tracking-[0.06em] whitespace-nowrap uppercase',
         tones[tone],
       )}
     >
-      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
+      <span aria-hidden className="h-1.5 w-1.5 bg-current" />
       {label}
     </span>
   );

@@ -2,7 +2,7 @@ import { useId, type ComponentProps, type ReactNode, type SelectHTMLAttributes }
 import { cn } from '@/lib/cn';
 
 const control =
-  'block w-full rounded-lg border bg-surface px-3 text-ink placeholder:text-muted/70 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 disabled:opacity-60';
+  'block w-full rounded-md border bg-surface px-3 text-[15px] text-ink placeholder:text-muted/70 transition-colors hover:border-muted/60 focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/20 disabled:opacity-60';
 
 export function Input({ className, ...props }: ComponentProps<'input'>) {
   return (
@@ -64,7 +64,7 @@ export function Field({ label, hint, error, children }: FieldProps) {
   const note = error ?? hint;
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-semibold text-ink">
+      <label htmlFor={id} className="block text-[13px] font-semibold text-ink">
         {label}
       </label>
       {children({
@@ -75,7 +75,7 @@ export function Field({ label, hint, error, children }: FieldProps) {
       {note ? (
         <p
           id={noteId}
-          className={cn('text-sm', error ? 'text-danger' : 'text-muted')}
+          className={cn('text-[13px]', error ? 'text-danger' : 'text-muted')}
           role={error ? 'alert' : undefined}
         >
           {note}

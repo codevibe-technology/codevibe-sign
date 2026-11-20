@@ -3,7 +3,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 function HeaderSkeleton() {
   return (
-    <div className="mb-6 space-y-2">
+    <div className="mb-7 space-y-2.5 border-b border-line pb-5">
+      <Skeleton className="h-3 w-24" />
       <Skeleton className="h-8 w-56" />
       <Skeleton className="h-4 w-80 max-w-full" />
     </div>
@@ -16,12 +17,10 @@ export function DashboardSkeleton() {
       <HeaderSkeleton />
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         {Array.from({ length: 5 }, (_, i) => (
-          <Card key={i} className="flex items-center gap-3 p-5">
-            <Skeleton className="h-10 w-10 rounded-lg" />
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-8" />
-              <Skeleton className="h-3 w-20" />
-            </div>
+          <Card key={i} className="space-y-3 p-5">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-8 w-10" />
+            <Skeleton className="h-3 w-12" />
           </Card>
         ))}
       </div>
@@ -47,7 +46,7 @@ export function TableSkeleton({ rows = 6 }: { rows?: number }) {
             <Skeleton className="h-4 w-2/3 max-w-sm" />
             <Skeleton className="h-3 w-1/3 max-w-48" />
           </div>
-          <Skeleton className="hidden h-5 w-24 rounded-full sm:block" />
+          <Skeleton className="hidden h-5 w-24 sm:block" />
           <Skeleton className="hidden h-4 w-16 md:block" />
         </div>
       ))}
