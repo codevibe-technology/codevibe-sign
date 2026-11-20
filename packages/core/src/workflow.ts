@@ -712,3 +712,38 @@ export function recall(
   notifyCancelled(t);
   return t.result();
 }
+
+export interface RevisionInput {
+  replacementId: Id;
+  replacementTitle?: string;
+  by?: string;
+  context?: AuditContext;
+}
+
+/**
+ * Records on a declined envelope that it was copied to a new draft to be revised and sent
+ * again. The envelope itself stays declined and unchanged.
+ */
+export function recordRevision(
+  envelope: Envelope,
+  input: RevisionInput,
+  deps: WorkflowDeps,
+): TransitionResult {
+  if (envelope.status !== 'declined') {
+    throw new SignError(
+      'INVALID_STATE',
+      `Only a declined envelope can be revised; this one is ${envelope.status}`,
+      { status: envelope.status },
+    );
+  }
+  const t = new Transition(envelope, deps.clock.now().toISOString());
+  t.event('envelope.revised', {
+    context: input.context,
+    data: {
+      replacementId: input.replacementId,
+      ...(input.replacementTitle ? { replacementTitle: input.replacementTitle } : {}),
+      ...(input.by ? { by: input.by } : {}),
+    },
+  });
+  return t.result();
+}

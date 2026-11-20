@@ -36,6 +36,7 @@ export const DEFAULT_REMINDERS: ReminderPolicy = { firstAfterDays: 3, everyDays:
 export interface CreateEnvelopeInput {
   title: string;
   message?: string;
+  changeNote?: string;
   /** Defaults to `sequential`. */
   routing?: RoutingMode;
   /** Defaults to `DEFAULT_REMINDERS`. */
@@ -45,7 +46,10 @@ export interface CreateEnvelopeInput {
 }
 
 export type EnvelopePatch = Partial<
-  Pick<Envelope, 'title' | 'message' | 'routing' | 'reminders' | 'expiresAt' | 'metadata'>
+  Pick<
+    Envelope,
+    'title' | 'message' | 'changeNote' | 'routing' | 'reminders' | 'expiresAt' | 'metadata'
+  >
 >;
 
 export interface DocumentInput {
@@ -211,6 +215,7 @@ export function createEnvelope(
     reminders: { ...reminders },
     createdAt: now.toISOString(),
     ...(input.message !== undefined && { message: input.message }),
+    ...(input.changeNote !== undefined && { changeNote: input.changeNote }),
     ...(input.expiresAt !== undefined && { expiresAt: input.expiresAt }),
     ...(input.metadata !== undefined && { metadata: { ...input.metadata } }),
   };
@@ -278,6 +283,78 @@ export function addDocument(
     ...(input.pageSizes && { pageSizes: input.pageSizes.map((s) => ({ ...s })) }),
   };
   return { envelope: { ...envelope, documents: [...envelope.documents, document] }, document };
+}
+
+export interface DocumentReplacement {
+  name?: string;
+  sha256: string;
+  pageCount: number;
+  fileKey: string;
+  pageSizes?: PageSize[];
+}
+
+/**
+ * Swaps a draft's document for a new version. Fields stay where they were when their page
+ * still exists and they fit on it; the others are moved onto the nearest page inside its
+ * edges and returned in `moved`, so the sender can check them.
+ */
+export function replaceDocument(
+  envelope: Envelope,
+  documentId: Id,
+  input: DocumentReplacement,
+): { envelope: Envelope; moved: Id[] } {
+  assertDraft(envelope);
+  const current = envelope.documents.find((d) => d.id === documentId);
+  if (!current) {
+    throw new SignError('VALIDATION', 'Document not found in this envelope', {
+      issues: [{ path: 'documentId', message: 'Document not found in this envelope' }],
+    });
+  }
+  const document: Document = {
+    id: current.id,
+    name: input.name?.trim() || current.name,
+    sha256: input.sha256,
+    pageCount: input.pageCount,
+    fileKey: input.fileKey,
+    ...(input.pageSizes && { pageSizes: input.pageSizes.map((s) => ({ ...s })) }),
+  };
+  const issues: ValidationIssue[] = [];
+  if (!/^[0-9a-f]{64}$/.test(document.sha256)) {
+    issues.push({
+      path: 'document.sha256',
+      message: 'SHA-256 must be 64 lowercase hex characters',
+    });
+  }
+  if (!Number.isInteger(document.pageCount) || document.pageCount < 1) {
+    issues.push({ path: 'document.pageCount', message: 'A document needs at least one page' });
+  } else if (document.pageSizes) {
+    issues.push(...pageSizeIssues(document.pageSizes, document.pageCount, 'document.pageSizes'));
+  }
+  throwIf(issues);
+
+  const next = {
+    ...envelope,
+    documents: envelope.documents.map((d) => (d.id === documentId ? document : d)),
+  };
+  const moved: Id[] = [];
+  const fields = next.fields.map((field) => {
+    if (field.documentId !== documentId) return field;
+    if (fieldIssues(next, field, 'field').length === 0) return field;
+    moved.push(field.id);
+    const page = Math.min(Math.max(field.page, 0), document.pageCount - 1);
+    const size = document.pageSizes?.[page];
+    if (!size) return { ...field, page };
+    const width = Math.min(field.rect.width, size.width);
+    const height = Math.min(field.rect.height, size.height);
+    const rect = {
+      width,
+      height,
+      x: Math.min(Math.max(field.rect.x, 0), size.width - width),
+      y: Math.min(Math.max(field.rect.y, 0), size.height - height),
+    };
+    return { ...field, page, rect };
+  });
+  return { envelope: { ...next, fields }, moved };
 }
 
 /** Removes a document and every field placed on it. */

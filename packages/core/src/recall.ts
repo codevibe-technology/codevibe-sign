@@ -5,8 +5,10 @@ import type { Envelope, Id, TransitionResult } from './types';
 export interface RecallCopyOptions {
   /** Where the copy of document `index` is stored; the caller copies the original file there. */
   fileKey: (envelopeId: Id, index: number) => string;
-  /** Who recalled it, for the audit trail. */
+  /** Who made the copy, for the audit trail. */
   by?: string;
+  /** `recalled` (default) for a recalled envelope, `revised` for one revised after a decline. */
+  origin?: 'recalled' | 'revised';
 }
 
 /**
@@ -100,8 +102,9 @@ export function recallCopy(
         ...event!,
         data: {
           ...event!.data,
-          recalledFrom: envelope.id,
-          recalledFromTitle: envelope.title,
+          ...(options.origin === 'revised'
+            ? { revisedFrom: envelope.id, revisedFromTitle: envelope.title }
+            : { recalledFrom: envelope.id, recalledFromTitle: envelope.title }),
           ...(options.by ? { by: options.by } : {}),
         },
       },

@@ -115,6 +115,11 @@ export interface Envelope {
   id: Id;
   title: string;
   message?: string;
+  /**
+   * For an envelope sent again after a decline: what changed since, shown to recipients in the
+   * invitation and on the signing page.
+   */
+  changeNote?: string;
   status: EnvelopeStatus;
   routing: RoutingMode;
   documents: Document[];
@@ -143,6 +148,8 @@ export type AuditAction =
   | 'envelope.voided'
   /** Voided to be corrected; `data.replacementId` is the draft copy that replaces it. */
   | 'envelope.recalled'
+  /** A declined envelope was copied to a new draft, `data.replacementId`, to send again. */
+  | 'envelope.revised'
   | 'recipient.notified'
   | 'recipient.reminded'
   | 'recipient.viewed'

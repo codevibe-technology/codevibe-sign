@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { recallCopy } from './recall';
 import { at, clockAt, counterIds, errorCode, ready, T0, valuesFor } from './test/fixtures';
+import { replaceDocument } from './builder';
 import {
   correctRecipient,
+  decline,
   recall,
   RECALL_REASON,
+  recordRevision,
   send,
   shareLink,
   submit,
@@ -229,5 +232,105 @@ describe('recallCopy', () => {
         }),
       }),
     ]);
+  });
+});
+
+describe('recordRevision', () => {
+  it('links a declined envelope to its revised draft and leaves it declined', () => {
+    const { envelope, ids } = sent();
+    const declined = decline(
+      envelope,
+      { recipientId: ids[0]!, reason: 'Salary is wrong' },
+      d(),
+    ).envelope;
+    const result = recordRevision(
+      declined,
+      { replacementId: 'env_new', replacementTitle: 'Offer letter', by: 'Meera' },
+      d(),
+    );
+    expect(result.envelope).toEqual(declined);
+    expect(result.events.map((e) => [e.action, e.data])).toEqual([
+      [
+        'envelope.revised',
+        { replacementId: 'env_new', replacementTitle: 'Offer letter', by: 'Meera' },
+      ],
+    ]);
+    expect(result.effects.filter((e) => e.kind === 'notify')).toEqual([]);
+  });
+
+  it('is only for declined envelopes', () => {
+    const { envelope } = sent();
+    expect(errorCode(() => recordRevision(envelope, { replacementId: 'x' }, d()))).toBe(
+      'INVALID_STATE',
+    );
+    const voided = voidEnvelope(envelope, { reason: 'x' }, d()).envelope;
+    expect(errorCode(() => recordRevision(voided, { replacementId: 'x' }, d()))).toBe(
+      'INVALID_STATE',
+    );
+  });
+
+  it('marks the copy as revised from the declined envelope', () => {
+    const { envelope } = sent();
+    const copy = recallCopy(
+      envelope,
+      { clock: clockAt(T0), ids: counterIds('c') },
+      {
+        fileKey: () => 'k',
+        origin: 'revised',
+      },
+    );
+    expect(copy.events[0]!.data).toMatchObject({ revisedFrom: envelope.id });
+    expect(copy.events[0]!.data).not.toHaveProperty('recalledFrom');
+  });
+});
+
+describe('replaceDocument', () => {
+  const page = { width: 612, height: 792 };
+
+  it('keeps fields in place when the new file has the same pages', () => {
+    const { envelope, documentId } = ready();
+    const result = replaceDocument(envelope, documentId, {
+      sha256: 'b'.repeat(64),
+      pageCount: 2,
+      fileKey: 'files/offer-v2.pdf',
+      pageSizes: [page, page],
+    });
+    expect(result.moved).toEqual([]);
+    expect(result.envelope.fields).toEqual(envelope.fields);
+    expect(result.envelope.documents[0]).toMatchObject({
+      id: documentId,
+      name: 'offer.pdf',
+      sha256: 'b'.repeat(64),
+      fileKey: 'files/offer-v2.pdf',
+    });
+  });
+
+  it('moves fields from pages that are gone, or that no longer fit, and says which', () => {
+    const { envelope, documentId } = ready();
+    const result = replaceDocument(envelope, documentId, {
+      name: 'offer-v2.pdf',
+      sha256: 'b'.repeat(64),
+      pageCount: 1,
+      fileKey: 'k2',
+      pageSizes: [{ width: 200, height: 300 }],
+    });
+    const onPage1 = envelope.fields.filter((f) => f.page === 1).map((f) => f.id);
+    expect(result.moved).toEqual(expect.arrayContaining(onPage1));
+    for (const field of result.envelope.fields) {
+      expect(field.page).toBe(0);
+      expect(field.rect.x + field.rect.width).toBeLessThanOrEqual(200);
+      expect(field.rect.y + field.rect.height).toBeLessThanOrEqual(300);
+    }
+  });
+
+  it('works on drafts only and checks the new file', () => {
+    const { envelope, documentId } = sent();
+    const input = { sha256: 'b'.repeat(64), pageCount: 1, fileKey: 'k' };
+    expect(errorCode(() => replaceDocument(envelope, documentId, input))).toBe('INVALID_STATE');
+    const r = ready();
+    expect(errorCode(() => replaceDocument(r.envelope, 'nope', input))).toBe('VALIDATION');
+    expect(
+      errorCode(() => replaceDocument(r.envelope, r.documentId, { ...input, sha256: 'x' })),
+    ).toBe('VALIDATION');
   });
 });
