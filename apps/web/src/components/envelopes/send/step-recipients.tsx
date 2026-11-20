@@ -149,7 +149,7 @@ export function StepRecipients({
                 >
                   <GripVertical aria-hidden className="h-4 w-4" />
                 </span>
-                <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-surface-2 px-1.5 text-xs font-bold text-ink">
+                <span className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-surface-2 px-1.5 font-mono text-[11px] font-semibold text-ink">
                   {sequential ? i + 1 : '•'}
                 </span>
                 <RecipientDot index={color} />

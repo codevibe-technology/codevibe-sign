@@ -2,13 +2,11 @@
 
 import type { Field, Recipient } from '@codevibe_technology/sign-core';
 import { FieldPlacer, type ViewerDocument } from '@codevibe_technology/sign-react';
-import { CheckCircle2, CircleAlert } from 'lucide-react';
+import { CircleAlert } from 'lucide-react';
 import { useMemo } from 'react';
 import { usePdfjs } from '@/components/pdf/use-pdfjs';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DraftDocument, DraftRecipient, Problems } from '@/lib/send-flow';
-import { RecipientDot, colorIndex } from './step-recipients';
 
 const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
   id: r.id,
@@ -42,49 +40,26 @@ export function StepFields({
     [documents, documentUrl],
   );
   const people = useMemo(() => recipients.map(asRecipient), [recipients]);
-  const actors = recipients.filter((r) => r.role !== 'viewer');
+
+  const alerts = Object.entries(problems).filter(([key]) => key.startsWith('fields.'));
 
   return (
-    <div className="space-y-4">
-      <Card className="p-4">
-        <p className="text-sm text-muted">
-          Pick a person, then drag a field onto the page (or press Enter on it). Every signer needs
-          at least one signature. Approvers need no fields.
-        </p>
-        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2" aria-label="Fields per recipient">
-          {actors.map((r) => {
-            const count = fields.filter((f) => f.recipientId === r.id).length;
-            const problem = problems[`fields.${r.id}`];
-            return (
-              <li key={r.id} className="flex items-center gap-2 text-sm">
-                <RecipientDot index={colorIndex(recipients, r.id)} />
-                <span className="font-semibold">{r.name || 'Unnamed'}</span>
-                <span className="text-muted">
-                  {count} {count === 1 ? 'field' : 'fields'}
-                </span>
-                {r.role === 'signer' ? (
-                  problem ? (
-                    <CircleAlert
-                      aria-label="Needs a signature field"
-                      className="h-4 w-4 text-warning"
-                    />
-                  ) : (
-                    <CheckCircle2 aria-label="Ready" className="h-4 w-4 text-success" />
-                  )
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-        {Object.entries(problems)
-          .filter(([key]) => key.startsWith('fields.'))
-          .map(([key, message]) => (
-            <p key={key} role="alert" className="mt-2 text-sm text-danger">
+    <div className="space-y-3">
+      {alerts.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          {alerts.map(([key, message]) => (
+            <p
+              key={key}
+              role="alert"
+              className="flex items-center gap-2 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger"
+            >
+              <CircleAlert aria-hidden className="h-4 w-4 shrink-0" />
               {message}
             </p>
           ))}
-      </Card>
-      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card md:h-[calc(100dvh-13rem)] md:min-h-[480px]">
+        </div>
+      ) : null}
+      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card md:h-[calc(100dvh-18rem)] md:min-h-[520px]">
         {pdf ? (
           <FieldPlacer
             documents={viewerDocuments}

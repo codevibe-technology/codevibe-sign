@@ -163,7 +163,7 @@ export function StepDocuments({
           <ul className="divide-y divide-line" aria-label="Documents">
             {documents.map((d) => (
               <li key={d.id} className="flex items-center gap-3 px-4 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
                   <FileText aria-hidden className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">

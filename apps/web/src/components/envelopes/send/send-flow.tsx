@@ -297,9 +297,13 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
 
   return (
     <div className="pb-24 sm:pb-0">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">
+          <p className="eyebrow mb-1.5 flex items-center gap-2">
+            <span aria-hidden className="h-[2px] w-5 bg-accent" />
+            New envelope
+          </p>
+          <h1 className="text-[24px] leading-tight font-bold text-ink md:text-[26px]">
             {state.envelopeId ? 'Draft' : 'Send a document'}
             {state.envelopeId && state.settings.title ? (
               <span className="font-normal text-muted">: {state.settings.title}</span>
@@ -319,7 +323,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
       {revision ? (
         <aside
           aria-label="Why it was declined"
-          className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-ink"
+          className="mb-5 rounded-lg border border-danger/30 border-l-[3px] border-l-danger bg-danger-soft px-4 py-3 text-sm text-ink"
         >
           <p className="font-semibold">
             Declined by {revision.declinedBy} ({revision.role}): “{revision.title}”
@@ -376,8 +380,8 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
         />
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:sticky sm:mt-4 sm:rounded-xl sm:border sm:px-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:sticky sm:bottom-3 sm:mt-4 sm:rounded-lg sm:border sm:px-4 sm:shadow-card">
+        <div className="flex items-center justify-between gap-3">
           <Button
             type="button"
             variant="secondary"
