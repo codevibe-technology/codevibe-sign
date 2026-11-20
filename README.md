@@ -1,10 +1,46 @@
 # Codevibe Sign
 
-Codevibe Sign is an open-source toolkit for electronic signatures. Upload a PDF, place fields,
-send it to people to sign in the order you choose, then get back one sealed file with a
-certificate page and a hash-chained audit trail that anyone can verify offline. It is a set of
-small TypeScript packages you embed in your own product, or a standalone service you run with
-Docker. Your documents stay on your servers.
+Send documents for signature in minutes and get back a sealed PDF anyone can check. Codevibe
+Sign is open-source e-signing: upload a PDF, add who signs, place the fields and send. Signers
+sign in their browser, with no account. The finished PDF carries a PAdES seal, a signing
+certificate and a hash-chained audit trail that can be verified offline. Use it on the free
+cloud, run the same app on your own server with Docker, or build signing into your own product
+with the TypeScript libraries.
+
+**[Website](https://sign.codevibe.in)** · **[Docs](https://sign.codevibe.in/docs)** ·
+**[Self-hosting runbook](deploy/README.md)** · **[npm](https://www.npmjs.com/package/codevibe-sign)**
+
+## Get started
+
+**Cloud.** Create a free workspace at [sign.codevibe.in](https://sign.codevibe.in). A sample
+agreement is waiting in it, so you can send yourself a document and sign it in a minute.
+
+**Self-host the app with Docker.** The web app, its HTTP API and these docs, with PostgreSQL,
+behind your Traefik. No limits, and your documents never leave your server.
+
+```sh
+git clone https://github.com/codevibe-technology/codevibe-sign.git
+cd codevibe-sign/deploy
+cp .env.example .env              # host name, Traefik, database, secrets, SMTP; PLAN_MODE=self-hosted
+# create secrets/seal.p12 as described in deploy/README.md
+docker compose up -d --build
+```
+
+[deploy/README.md](deploy/README.md) walks through DNS, the seal certificate, the first start,
+backups, a restore drill and upgrades.
+
+**Use the libraries.** Add signing to your own Node or React app:
+
+```sh
+npm i codevibe-sign              # or try the server first: npx codevibe-sign start --memory
+```
+
+See [Using the libraries](#using-the-libraries) below.
+
+**Licence in short.** The libraries are Apache-2.0: use them in any product, open or closed.
+The server and the web app are AGPL-3.0: run and change them freely, and share your changes if
+you offer a modified version to others over a network. The Codevibe names and logos are not
+covered by either licence. Details in [LICENSING.md](LICENSING.md).
 
 > Status: pre-release. The packages are under active development and the APIs below may change
 > before 0.1.
@@ -20,6 +56,7 @@ Docker. Your documents stay on your servers.
   signature applied with your certificate, so any later edit shows up in Adobe Reader and in
   `verify()`.
 - An append-only audit log chained with SHA-256.
+- Templates and bulk send from a CSV, in the web app.
 - Signed outbound webhooks with retries.
 - Optional Aadhaar eSign through your own account with a licensed provider.
 - React components for signing and field placement, unstyled and themed with CSS variables.
@@ -39,21 +76,22 @@ Docker. Your documents stay on your servers.
 
 ## Packages
 
-| Package                                                 | What it does                                                                            |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [`codevibe-sign`](packages/codevibe-sign)               | The one to install: all of the below behind subpath imports, plus the CLI.              |
-| [`@codevibe_technology/sign-core`](packages/core)       | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O. |
-| [`@codevibe_technology/sign-pdf`](packages/pdf)         | Draws fields, appends the certificate page, seals and verifies PDFs.                    |
-| [`@codevibe_technology/sign-server`](packages/server)   | HTTP API and runtime with adapters for storage, files, mail and OTP.                    |
-| [`@codevibe_technology/sign-client`](packages/client)   | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.    |
-| [`@codevibe_technology/sign-react`](packages/react)     | Signature pad, signing view and field placement components.                             |
-| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.                 |
-| [`apps/server`](apps/server)                            | Docker image of the standalone service.                                                 |
-| [`examples/`](examples)                                 | Runnable examples: embedding the server, handling webhooks, a React signing page.       |
+| Package                                                 | What it does                                                                                     |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [`codevibe-sign`](packages/codevibe-sign)               | The one to install: all of the below behind subpath imports, plus the CLI.                       |
+| [`@codevibe_technology/sign-core`](packages/core)       | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O.          |
+| [`@codevibe_technology/sign-pdf`](packages/pdf)         | Draws fields, appends the certificate page, seals and verifies PDFs.                             |
+| [`@codevibe_technology/sign-server`](packages/server)   | HTTP API and runtime with adapters for storage, files, mail and OTP.                             |
+| [`@codevibe_technology/sign-client`](packages/client)   | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.             |
+| [`@codevibe_technology/sign-react`](packages/react)     | Signature pad, signing view and field placement components.                                      |
+| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.                          |
+| [`apps/web`](apps/web)                                  | The web app: workspaces, sending, templates, bulk send, webhooks, signing page, docs at `/docs`. |
+| [`apps/server`](apps/server)                            | Docker image of the standalone service.                                                          |
+| [`examples/`](examples)                                 | Runnable examples: embedding the server, handling webhooks, a React signing page.                |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
-## Quick start
+## Using the libraries
 
 ### Try it in a minute
 
@@ -161,6 +199,8 @@ match your product.
 
 ## Self-hosting
 
+The whole web app (workspaces, the send flow, templates, webhooks, the signing page and the
+docs) runs from [deploy/](deploy/README.md) with Docker Compose. For only the HTTP API,
 `apps/server` builds a Docker image that runs the standalone service from environment
 variables: a PostgreSQL `DATABASE_URL`, a directory for files, SMTP settings, your sealing
 certificate as a PKCS#12 file and the API keys your backend uses. See
@@ -203,8 +243,7 @@ document.
 
 ## Roadmap
 
-- Templates: reusable documents with fields and roles already placed.
-- Bulk send: one template to many recipients from a CSV.
+- Aadhaar eSign on the cloud, through a licensed eSign provider.
 - More eSign providers behind the same `EsignProvider` interface.
 - Translations of the signing experience and emails (i18n).
 
