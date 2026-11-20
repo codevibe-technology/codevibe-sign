@@ -33,6 +33,8 @@ export interface DraftDocument {
   pages: PageSize[];
   /** The file's bytes when picked in this session; reopened drafts load from the server. */
   bytes?: Uint8Array;
+  /** Where the server keeps the checked file until a template using it is saved. */
+  stagedKey?: string;
 }
 
 export interface DraftRecipient {

@@ -4,24 +4,26 @@ import { Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { STEPS, type StepKey } from '@/lib/send-flow';
 
-/** The four steps; reached ones can be revisited. */
-export function Stepper({
+/** The flow's steps (the send flow's four by default); reached ones can be revisited. */
+export function Stepper<K extends string = StepKey>({
+  steps = STEPS as unknown as readonly { key: K; label: string }[],
   current,
   reached,
   onSelect,
 }: {
-  current: StepKey;
+  steps?: readonly { key: K; label: string }[];
+  current: K;
   reached: number;
-  onSelect: (step: StepKey) => void;
+  onSelect: (step: K) => void;
 }) {
-  const index = STEPS.findIndex((s) => s.key === current);
+  const index = steps.findIndex((s) => s.key === current);
   return (
     <nav aria-label="Steps" className="mb-6">
       <p className="mb-2 text-sm font-medium text-muted sm:hidden">
-        Step {index + 1} of {STEPS.length} · <span className="text-ink">{STEPS[index]!.label}</span>
+        Step {index + 1} of {steps.length} · <span className="text-ink">{steps[index]!.label}</span>
       </p>
       <ol className="flex items-center gap-2">
-        {STEPS.map((step, i) => {
+        {steps.map((step, i) => {
           const done = i < index;
           const active = i === index;
           const reachable = i <= reached;
@@ -56,7 +58,7 @@ export function Stepper({
                   {step.label}
                 </span>
               </button>
-              {i < STEPS.length - 1 ? (
+              {i < steps.length - 1 ? (
                 <span
                   aria-hidden
                   className={cn('h-0.5 flex-1 rounded-full', done ? 'bg-accent' : 'bg-line')}
