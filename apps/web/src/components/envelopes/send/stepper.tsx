@@ -34,6 +34,7 @@ export function Stepper<K extends string = StepKey>({
                 disabled={!reachable || active}
                 onClick={() => onSelect(step.key)}
                 aria-current={active ? 'step' : undefined}
+                aria-label={step.label}
                 className={cn(
                   'flex min-w-0 items-center gap-2 rounded-lg text-left disabled:cursor-default',
                   reachable && !active && 'hover:opacity-80',
