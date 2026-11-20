@@ -71,23 +71,33 @@ export function EnvelopesTable({
   const [voiding, setVoiding] = useState<{ id: string; title: string }[] | null>(null);
   const request = useRef(0);
   const first = useRef(true);
+  const shown = useRef(initial);
+  const loaded = useRef(rows.length);
+  useEffect(() => {
+    loaded.current = rows.length;
+  }, [rows.length]);
 
   const load = useCallback(
-    async (opts: { cursor?: string | null; append?: boolean } = {}) => {
+    async (opts: { cursor?: string | null; append?: boolean; refresh?: boolean } = {}) => {
       const ticket = ++request.current;
-      const params = new URLSearchParams({ limit: '25' });
+      // A refresh reloads as many rows as are on screen, so loaded pages stay loaded.
+      const limit = opts.refresh ? Math.min(100, Math.max(25, loaded.current)) : 25;
+      const params = new URLSearchParams({ limit: String(limit) });
       if (status) params.set('status', statusesFor(status).join(','));
       if (query.trim()) params.set('q', query.trim());
       if (opts.cursor) params.set('cursor', opts.cursor);
       if (opts.append) setLoadingMore(true);
-      else setLoading(true);
+      else if (!opts.refresh) setLoading(true);
       try {
         const page = await apiFetch<EnvelopePage>(workspaceId, `/v1/envelopes?${params}`);
         if (ticket !== request.current) return;
         setRows((prev) => (opts.append ? [...prev, ...page.envelopes] : page.envelopes));
         setCursor(page.nextCursor);
         setError(null);
-        if (!opts.append) setSelected(new Set());
+        if (opts.refresh) {
+          const ids = new Set(page.envelopes.map((e) => e.id));
+          setSelected((prev) => new Set([...prev].filter((id) => ids.has(id))));
+        } else if (!opts.append) setSelected(new Set());
       } catch (err) {
         if (ticket !== request.current) return;
         setError(err instanceof ApiError ? err.message : 'The list could not be loaded.');
@@ -115,6 +125,14 @@ export function EnvelopesTable({
     const timer = setTimeout(() => void load(), 250);
     return () => clearTimeout(timer);
   }, [status, query, load]);
+
+  // The page passes fresh `initial` data after a refresh (a live update or an action); the
+  // table reloads with its own filters and keeps what is selected.
+  useEffect(() => {
+    if (shown.current === initial) return;
+    shown.current = initial;
+    void load({ refresh: true });
+  }, [initial, load]);
 
   const sorted = useMemo(() => sortEnvelopes(rows, sort), [rows, sort]);
   const voidable = (e: EnvelopeSummary) => canWrite && !isFinalStatus(e.status);

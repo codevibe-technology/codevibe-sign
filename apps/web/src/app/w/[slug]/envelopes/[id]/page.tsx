@@ -10,8 +10,8 @@ import {
   RecipientsCard,
   Timeline,
 } from '@/components/envelopes/envelope-detail';
-import { LiveRefresh } from '@/components/envelopes/live-refresh';
 import { StatusPill } from '@/components/envelopes/status-pill';
+import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
 import { formatDateTime, isFinalStatus, isOpen, relativeTime } from '@/lib/envelopes';
 import { can, canVoidEnvelope } from '@/lib/roles';
@@ -56,7 +56,6 @@ export default async function EnvelopePage({
 
   return (
     <>
-      <LiveRefresh active={open} />
       <Link
         href={`/w/${slug}/envelopes`}
         className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
@@ -69,6 +68,7 @@ export default async function EnvelopePage({
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold break-words text-ink">{envelope.title}</h1>
             <StatusPill status={envelope.status} />
+            <LiveUpdates workspaceId={workspace.id} envelopeId={envelope.id} />
           </div>
           <p className="mt-1 text-sm text-muted">
             {sender?.name

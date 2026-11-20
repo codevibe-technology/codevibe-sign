@@ -2,6 +2,7 @@ import { Send } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EnvelopesTable } from '@/components/envelopes/envelopes-table';
+import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { isStatusFilter, statusesFor } from '@/lib/envelopes';
@@ -33,6 +34,7 @@ export default async function EnvelopesPage({
       <PageHeader
         title="Envelopes"
         description="Every document sent for signature from this workspace."
+        badge={<LiveUpdates workspaceId={workspace.id} />}
         action={
           canWrite ? (
             <Button asChild>

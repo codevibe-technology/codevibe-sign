@@ -13,6 +13,7 @@ import { auth } from '../auth/auth';
 import { db } from '../db';
 import { senderOf } from '../envelopes';
 import { env, type Env } from '../env';
+import { publishChange } from '../live/live';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
 import { planSettings } from '../plans';
@@ -84,6 +85,7 @@ function build(): SignServer {
     webhookTargets,
     webhookSecurity: webhookSecurity(),
     onWebhookDelivery: (report) => recordDelivery(sql, report),
+    onEnvelopeChange: (change) => publishChange(sql, change),
     workspaceMail: createWorkspaceMail({
       appUrl: config.APP_URL,
       brand: (workspaceId) => getBrand(sql, workspaceId),

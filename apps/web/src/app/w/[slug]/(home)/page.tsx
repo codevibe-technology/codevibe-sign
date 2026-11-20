@@ -14,6 +14,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { RemindButton } from '@/components/envelopes/remind-button';
 import { StartHereCard } from '@/components/home/start-here-card';
+import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -81,6 +82,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
       <PageHeader
         title={`Hello${user.name ? `, ${user.name.split(' ')[0]}` : ''}`}
         description={`Here is what is happening in ${workspace.name}.`}
+        badge={<LiveUpdates workspaceId={workspace.id} />}
         action={sendButton}
       />
 
