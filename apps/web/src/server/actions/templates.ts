@@ -15,6 +15,7 @@ import { db } from '../db';
 import { recordSender } from '../envelopes';
 import { AppError } from '../errors';
 import { inspectUpload } from '../pdf';
+import { assertSendsLeft, assertWithin, usageOf, workspacePlan } from '../plans';
 import { appRuntime } from '../runtime';
 import { signRequest } from '../sign/client';
 import { roleField, sendFromTemplate } from '../template-send';
@@ -43,6 +44,7 @@ export const stageTemplateDocumentAction = workspaceAction(
   'envelopes.write',
   z.object({ file: z.instanceof(File, { error: 'Choose a PDF file' }) }),
   async (ctx, input) => {
+    assertWithin(await workspacePlan(db(), ctx.workspace.id), 'fileBytes', input.file.size, 'file');
     const bytes = new Uint8Array(await input.file.arrayBuffer());
     const info = await inspectUpload(input.file.name, bytes);
     const stagedKey = await stageDocument(appRuntime().files, ctx.workspace.id, bytes);
@@ -199,6 +201,12 @@ export const startBulkSendAction = workspaceAction(
         `${bad} ${bad === 1 ? 'row has' : 'rows have'} problems. Fix them, or choose to skip them.`,
         'csv',
       );
+    }
+    const plan = await workspacePlan(sql, ctx.workspace.id);
+    assertWithin(plan, 'bulkRows', preview.ready.length, 'csv');
+    if (plan.limits.envelopesPerMonth !== null) {
+      const sent = await usageOf(sql, ctx.workspace.id, 'envelopes_sent');
+      assertSendsLeft(plan, sent, preview.ready.length);
     }
     const bulkId = await createBulkSend(sql, {
       workspaceId: ctx.workspace.id,

@@ -7,6 +7,7 @@ import { db } from '../db';
 import { findSealedDocument, sentBy } from '../envelopes';
 import { AppError } from '../errors';
 import { inspectUpload, verifyUpload } from '../pdf';
+import { assertWithin, workspacePlan } from '../plans';
 import { signApi, userPrincipal } from '../sign/api';
 import { workspaceAction } from './action';
 
@@ -17,8 +18,10 @@ const pdfFile = z.instanceof(File, { error: 'Choose a PDF file' });
 export const inspectDocumentAction = workspaceAction(
   'envelopes.write',
   z.object({ file: pdfFile }),
-  async (_ctx, input) =>
-    inspectUpload(input.file.name, new Uint8Array(await input.file.arrayBuffer())),
+  async (ctx, input) => {
+    assertWithin(await workspacePlan(db(), ctx.workspace.id), 'fileBytes', input.file.size, 'file');
+    return inspectUpload(input.file.name, new Uint8Array(await input.file.arrayBuffer()));
+  },
 );
 
 /**

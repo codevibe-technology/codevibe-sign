@@ -12,6 +12,7 @@ import {
 } from '@/lib/webhooks';
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
+import { assertRoom, lockedPlan } from './plans';
 
 type Sql = postgres.Sql;
 
@@ -92,21 +93,26 @@ export async function createWebhook(
   rules: WebhookRules = {},
 ): Promise<{ id: string; secret: string }> {
   const values = clean(input, rules);
-  const [count] = await sql<{ n: number }[]>`
-    select count(*)::int as n from app_webhooks where workspace_id = ${input.workspaceId}`;
-  if ((count?.n ?? 0) >= MAX_WEBHOOKS) {
-    throw new AppError(
-      'CONFLICT',
-      `A workspace can have up to ${MAX_WEBHOOKS} endpoints. Remove one first.`,
-    );
-  }
   const id = randomId('wh');
   const secret = newSecret();
-  await unique(
-    () => sql`insert into app_webhooks (id, workspace_id, url, description, events, secret, created_by)
-      values (${id}, ${input.workspaceId}, ${values.url}, ${values.description}, ${values.events},
-        ${secret}, ${input.createdBy})`,
-  );
+  await sql.begin(async (tx) => {
+    const plan = await lockedPlan(tx, input.workspaceId);
+    const [count] = await tx<{ n: number }[]>`
+      select count(*)::int as n from app_webhooks where workspace_id = ${input.workspaceId}`;
+    const used = count?.n ?? 0;
+    assertRoom(plan, 'webhooks', used);
+    if (used >= MAX_WEBHOOKS) {
+      throw new AppError(
+        'CONFLICT',
+        `A workspace can have up to ${MAX_WEBHOOKS} endpoints. Remove one first.`,
+      );
+    }
+    await unique(
+      () => tx`insert into app_webhooks (id, workspace_id, url, description, events, secret, created_by)
+        values (${id}, ${input.workspaceId}, ${values.url}, ${values.description}, ${values.events},
+          ${secret}, ${input.createdBy})`,
+    );
+  });
   return { id, secret };
 }
 

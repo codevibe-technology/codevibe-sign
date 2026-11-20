@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { canManageRole, type Role } from '@/lib/roles';
 import { randomId, randomSecret, sha256Hex } from './crypto';
 import { AppError } from './errors';
+import { assertRoom, countSeats, lockedPlan } from './plans';
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -63,6 +64,7 @@ export async function createInvitation(
     createdAt: now,
   };
   await sql.begin(async (tx) => {
+    const plan = await lockedPlan(tx, input.workspaceId);
     const [member] = await tx`
       select 1 from app_members m join auth_users u on u.id = m.user_id
       where m.workspace_id = ${input.workspaceId} and lower(u.email) = ${email}`;
@@ -70,6 +72,10 @@ export async function createInvitation(
     await tx`update app_invitations set revoked_at = ${now}
       where workspace_id = ${input.workspaceId} and lower(email) = ${email}
         and accepted_at is null and revoked_at is null`;
+    if (plan) {
+      const seats = await countSeats(tx, input.workspaceId, now);
+      assertRoom(plan, 'members', seats.members + seats.invited, 1, 'email');
+    }
     await tx`insert into app_invitations
         (id, workspace_id, email, role, token_hash, invited_by, expires_at, created_at)
       values (${invitation.id}, ${input.workspaceId}, ${email}, ${input.role},
@@ -155,6 +161,13 @@ export async function acceptInvitation(
       returning id`;
     if (used.length === 0) {
       throw new AppError('NOT_FOUND', 'This invitation is no longer valid. Ask for a new one');
+    }
+    const plan = await lockedPlan(tx, invitation.workspaceId);
+    if (plan) {
+      const [count] = await tx<{ members: number; joined: boolean }[]>`
+        select count(*)::int as members, bool_or(user_id = ${user.id}) as joined
+        from app_members where workspace_id = ${invitation.workspaceId}`;
+      if (!count?.joined) assertRoom(plan, 'members', count?.members ?? 0);
     }
     await tx`insert into app_members (workspace_id, user_id, role)
       values (${invitation.workspaceId}, ${user.id}, ${invitation.role})

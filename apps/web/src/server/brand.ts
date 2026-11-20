@@ -10,6 +10,7 @@ import {
   type MailOverrides,
 } from '@/lib/mail-templates';
 import { AppError } from './errors';
+import { assertBadgeOptional, assertCustomDomain, workspacePlan } from './plans';
 
 export interface Brand {
   workspaceId: string;
@@ -50,6 +51,7 @@ export async function getBrand(sql: postgres.Sql, workspaceId: string): Promise<
   const [row] = await sql<
     Row[]
   >`select * from app_brand_settings where workspace_id = ${workspaceId}`;
+  const plan = await workspacePlan(sql, workspaceId).catch(() => null);
   return {
     workspaceId,
     logoUrl:
@@ -64,7 +66,7 @@ export async function getBrand(sql: postgres.Sql, workspaceId: string): Promise<
     signingDomain: row?.signing_domain ?? null,
     signingDomainVerified: Boolean(row?.signing_domain_verified_at),
     certificateFooter: row?.certificate_footer ?? null,
-    showBadge: row?.show_badge ?? true,
+    showBadge: plan?.limits.badgeRequired ? true : (row?.show_badge ?? true),
   };
 }
 
@@ -243,6 +245,9 @@ export async function updateSigningSettings(
     );
   }
   const domain = normalizeDomain(input.signingDomain);
+  const plan = await workspacePlan(sql, workspaceId);
+  if (!input.showBadge) assertBadgeOptional(plan);
+  if (domain) assertCustomDomain(plan);
   if (domain && domain === appHost.toLowerCase()) {
     throw new AppError(
       'VALIDATION',

@@ -16,6 +16,7 @@ import {
 } from '@/lib/templates';
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
+import { assertRoom, assertWithin, lockedPlan, reserveUsage, workspacePlan } from './plans';
 
 type Sql = postgres.Sql;
 
@@ -214,6 +215,60 @@ const SELECT = (sql: Sql) => sql`
     t.updated_at as "updatedAt", t.archived_at as "archivedAt"
   from app_templates t left join auth_users u on u.id = t.created_by`;
 
+async function activeTemplates(sql: Sql | postgres.TransactionSql, workspaceId: string) {
+  const [row] = await sql<{ n: number }[]>`select count(*)::int as n from app_templates
+    where workspace_id = ${workspaceId} and archived_at is null`;
+  return row?.n ?? 0;
+}
+
+/** Refuses early, before any file is copied, when the plan has no room for another template. */
+async function precheckRoom(sql: Sql, workspaceId: string) {
+  const plan = await workspacePlan(sql, workspaceId);
+  if (plan.limits.activeTemplates !== null) {
+    assertRoom(plan, 'activeTemplates', await activeTemplates(sql, workspaceId));
+  }
+}
+
+/**
+ * Inserts a template under the plan: the count of active templates, the size of its PDFs and
+ * the workspace's stored bytes are checked with the workspace locked, so they hold under
+ * concurrent saves. The template's files are removed again when it is refused.
+ */
+async function insertTemplate(
+  sql: Sql,
+  files: FileStore,
+  row: {
+    id: string;
+    workspaceId: string;
+    name: string;
+    description: string | null;
+    definition: TemplateDefinition;
+    createdBy: string;
+  },
+) {
+  const bytes = row.definition.documents.reduce((sum, d) => sum + d.size, 0);
+  try {
+    await sql.begin(async (tx) => {
+      const plan = await lockedPlan(tx, row.workspaceId);
+      if (plan) {
+        assertRoom(plan, 'activeTemplates', await activeTemplates(tx, row.workspaceId));
+        assertWithin(plan, 'envelopeBytes', bytes, 'documents');
+        await reserveUsage(tx, { id: row.workspaceId, ...plan }, 'storage_bytes', bytes);
+      }
+      await tx`insert into app_templates (id, workspace_id, name, description, definition, created_by)
+        values (${row.id}, ${row.workspaceId}, ${row.name}, ${row.description},
+          ${tx.json(row.definition as unknown as postgres.JSONValue)}, ${row.createdBy})`;
+    });
+  } catch (err) {
+    await Promise.allSettled(
+      row.definition.documents.map((d) =>
+        files.delete(templateFileKey(row.workspaceId, row.id, d.id)),
+      ),
+    );
+    throw err;
+  }
+}
+
 export async function createTemplate(
   sql: Sql,
   files: FileStore,
@@ -237,11 +292,17 @@ export async function createTemplate(
     pages: d.pages,
   }));
   checkDefinition(input.definition, pagesOnly);
+  await precheckRoom(sql, input.workspaceId);
   const documents = await claimStaged(files, input.workspaceId, id, input.documents, input.inspect);
   const checked = checkDefinition(input.definition, documents);
-  await sql`insert into app_templates (id, workspace_id, name, description, definition, created_by)
-    values (${id}, ${input.workspaceId}, ${checked.name}, ${checked.description},
-      ${sql.json(checked.definition as unknown as postgres.JSONValue)}, ${input.createdBy})`;
+  await insertTemplate(sql, files, {
+    id,
+    workspaceId: input.workspaceId,
+    name: checked.name,
+    description: checked.description,
+    definition: checked.definition,
+    createdBy: input.createdBy,
+  });
   return (await getTemplate(sql, input.workspaceId, id))!;
 }
 
@@ -308,18 +369,34 @@ export async function setTemplateArchived(
   id: string,
   archived: boolean,
 ) {
-  const rows = await sql`update app_templates
-    set archived_at = ${archived ? sql`now()` : null}, updated_at = now()
-    where id = ${id} and workspace_id = ${workspaceId}
-      and ${archived ? sql`archived_at is null` : sql`archived_at is not null`}
-    returning id`;
-  if (rows.length === 0) {
+  const changed = archived
+    ? await flipArchived(sql, workspaceId, id, archived)
+    : await sql.begin(async (tx) => {
+        const plan = await lockedPlan(tx, workspaceId);
+        if (plan) assertRoom(plan, 'activeTemplates', await activeTemplates(tx, workspaceId));
+        return flipArchived(tx, workspaceId, id, archived);
+      });
+  if (!changed) {
     await requireTemplate(sql, workspaceId, id);
     throw new AppError(
       'CONFLICT',
       archived ? 'That template is already archived.' : 'That template is not archived.',
     );
   }
+}
+
+async function flipArchived(
+  sql: Sql | postgres.TransactionSql,
+  workspaceId: string,
+  id: string,
+  archived: boolean,
+): Promise<boolean> {
+  const rows = await sql`update app_templates
+    set archived_at = ${archived ? sql`now()` : null}, updated_at = now()
+    where id = ${id} and workspace_id = ${workspaceId}
+      and ${archived ? sql`archived_at is null` : sql`archived_at is not null`}
+    returning id`;
+  return rows.length > 0;
 }
 
 /** A copy named "<name> (copy)", with its own copies of the PDFs. */
@@ -329,6 +406,7 @@ export async function duplicateTemplate(
   input: { workspaceId: string; id: string; createdBy: string },
 ): Promise<TemplateRecord> {
   const source = await requireTemplate(sql, input.workspaceId, input.id);
+  await precheckRoom(sql, input.workspaceId);
   const id = randomId('tpl');
   for (const doc of source.definition.documents) {
     const bytes = await files.get(templateFileKey(input.workspaceId, source.id, doc.id));
@@ -340,9 +418,14 @@ export async function duplicateTemplate(
     await files.put(templateFileKey(input.workspaceId, id, doc.id), bytes, 'application/pdf');
   }
   const name = `${source.name} (copy)`.slice(0, TEMPLATE_NAME_MAX);
-  await sql`insert into app_templates (id, workspace_id, name, description, definition, created_by)
-    values (${id}, ${input.workspaceId}, ${name}, ${source.description},
-      ${sql.json(source.definition as unknown as postgres.JSONValue)}, ${input.createdBy})`;
+  await insertTemplate(sql, files, {
+    id,
+    workspaceId: input.workspaceId,
+    name,
+    description: source.description,
+    definition: source.definition,
+    createdBy: input.createdBy,
+  });
   return (await getTemplate(sql, input.workspaceId, id))!;
 }
 
