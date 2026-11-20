@@ -28,7 +28,7 @@ const row = (patch: Partial<EnvelopeSummary>): EnvelopeSummary => ({
   id: 'env_1',
   title: 'Offer letter',
   status: 'sent',
-  createdAt: new Date().toISOString(),
+  createdAt: '2026-11-19T10:00:00.000Z',
   sentAt: null,
   completedAt: null,
   expiresAt: null,
@@ -57,8 +57,18 @@ const row = (patch: Partial<EnvelopeSummary>): EnvelopeSummary => ({
 const PAGE: EnvelopePage = {
   envelopes: [
     row({}),
-    row({ id: 'env_2', title: 'Appraisal', status: 'completed' }),
-    row({ id: 'env_3', title: 'Contract draft', status: 'draft' }),
+    row({
+      id: 'env_2',
+      title: 'Appraisal',
+      status: 'completed',
+      createdAt: '2026-11-18T10:00:00.000Z',
+    }),
+    row({
+      id: 'env_3',
+      title: 'Contract draft',
+      status: 'draft',
+      createdAt: '2026-11-17T10:00:00.000Z',
+    }),
   ],
   nextCursor: 'c1',
 };
