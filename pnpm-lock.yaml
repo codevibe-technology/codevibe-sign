@@ -114,7 +114,7 @@ importers:
         version: 0.29.8
       kysely-postgres-js:
         specifier: 5.0.1
-        version: 5.0.1(kysely@0.29.8)(postgres@3.4.9)
+        version: 5.0.1(kysely@0.29.8)(postgres@4.1.0)
       lucide-react:
         specifier: 1.69.0
         version: 1.69.0(@types/react@19.3.0)(react@19.3.1)
@@ -125,8 +125,8 @@ importers:
         specifier: 4.10.38
         version: 4.10.38
       postgres:
-        specifier: 3.4.9
-        version: 3.4.9
+        specifier: 4.1.0
+        version: 4.1.0
       radix-ui:
         specifier: 1.8.1
         version: 1.8.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -427,8 +427,8 @@ importers:
         specifier: 10.3.1
         version: 10.3.1
       postgres:
-        specifier: 3.4.9
-        version: 3.4.9
+        specifier: 4.1.0
+        version: 4.1.0
     devDependencies:
       '@types/node':
         specifier: 22.19.1
@@ -3927,6 +3927,7 @@ packages:
   eslint@9.15.0:
     resolution: {integrity: sha512-7CrWySmIibCgT1Os28lUU6upBshZ+GxybLOrmRzi08kS8MBuO8QA7pXEgYgY5W8vK3e74xv0lpjo9DbaGU9Rkw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -4890,9 +4891,9 @@ packages:
     resolution: {integrity: sha512-RVHEU9/Pp1Fnjr/MpAJsZoADukCKhfIi15OunEYiGktIkYLkPVvC1sioWolGDS7XByMTx9m/IGbro0Js13zhnQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postgres@3.4.9:
-    resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
-    engines: {node: '>=12'}
+  postgres@4.1.0:
+    resolution: {integrity: sha512-s+0WH67YAyLdBQUb6XczbziBhY+C9uiQsg9S8R5RHdZhk6sdyK6202E+T2tXpiInSEEjDLRSJ3OpYBe3PN6MsQ==}
+    engines: {node: '>=18'}
 
   preact@10.29.8:
     resolution: {integrity: sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==}
@@ -9944,11 +9945,11 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  kysely-postgres-js@5.0.1(kysely@0.29.8)(postgres@3.4.9):
+  kysely-postgres-js@5.0.1(kysely@0.29.8)(postgres@4.1.0):
     dependencies:
       kysely: 0.29.8
     optionalDependencies:
-      postgres: 3.4.9
+      postgres: 4.1.0
 
   kysely@0.29.8: {}
 
@@ -10582,7 +10583,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.4
 
-  postgres@3.4.9: {}
+  postgres@4.1.0: {}
 
   preact@10.29.8: {}
 
