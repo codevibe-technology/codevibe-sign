@@ -1,8 +1,10 @@
 import 'server-only';
 import type postgres from 'postgres';
+import { limitsFor, type Plan, type PlanSettings } from '@/lib/plans';
 import type { Role } from '@/lib/roles';
 import { randomId } from './crypto';
 import { AppError } from './errors';
+import { assertRoom, planSettings } from './plans';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
@@ -45,14 +47,28 @@ export function cleanWorkspaceName(name: string): string {
   return clean;
 }
 
-/** Creates a workspace with `userId` as its owner and default brand settings, atomically. */
+/**
+ * Creates a workspace with `userId` as its owner and default brand settings, atomically. In
+ * hosted mode it starts on the Free plan, and a person may own only so many Free workspaces;
+ * the user's row is locked while they are counted, so two tabs cannot both create one.
+ */
 export async function createWorkspace(
   sql: postgres.Sql,
-  input: { name: string; userId: string },
-): Promise<Workspace> {
+  input: { name: string; userId: string; plan?: Plan },
+  settings: PlanSettings = planSettings(),
+): Promise<Workspace & { plan: Plan }> {
   const name = cleanWorkspaceName(input.name);
   const base = slugify(name);
+  const plan = input.plan ?? (settings.mode === 'hosted' ? 'free' : 'unlimited');
   return sql.begin(async (tx) => {
+    const max = limitsFor(plan, settings).ownedWorkspaces;
+    if (max !== null) {
+      await tx`select 1 from auth_users where id = ${input.userId} for update`;
+      const [owned] = await tx<{ n: number }[]>`
+        select count(*)::int as n from app_members m join app_workspaces w on w.id = m.workspace_id
+        where m.user_id = ${input.userId} and m.role = 'owner' and w.plan = ${plan}`;
+      assertRoom({ plan, limits: limitsFor(plan, settings) }, 'ownedWorkspaces', owned?.n ?? 0);
+    }
     const id = randomId('ws');
     let slug = base;
     for (let attempt = 0; ; attempt++) {
@@ -60,12 +76,12 @@ export async function createWorkspace(
       if (!taken) break;
       slug = `${base}-${id.slice(-4 - attempt)}`.slice(0, 48);
     }
-    await tx`insert into app_workspaces (id, slug, name, created_by)
-      values (${id}, ${slug}, ${name}, ${input.userId})`;
+    await tx`insert into app_workspaces (id, slug, name, created_by, plan)
+      values (${id}, ${slug}, ${name}, ${input.userId}, ${plan})`;
     await tx`insert into app_members (workspace_id, user_id, role)
       values (${id}, ${input.userId}, 'owner')`;
     await tx`insert into app_brand_settings (workspace_id) values (${id})`;
-    return { id, slug, name };
+    return { id, slug, name, plan };
   });
 }
 

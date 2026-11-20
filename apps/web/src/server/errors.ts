@@ -1,4 +1,10 @@
-export type AppErrorCode = 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION' | 'CONFLICT';
+export type AppErrorCode =
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'VALIDATION'
+  | 'CONFLICT'
+  | 'PLAN_LIMIT';
 
 /**
  * A failure the person can act on. `field` names the form field to fix, so the form can put the

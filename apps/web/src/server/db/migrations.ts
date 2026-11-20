@@ -230,4 +230,30 @@ create index app_webhook_deliveries_webhook_idx
 create index app_webhook_deliveries_age_idx on app_webhook_deliveries (last_attempt_at);
 `,
   },
+  {
+    name: '0006_plans',
+    sql: `
+alter table app_workspaces add column plan text not null default 'unlimited'
+  check (plan in ('free', 'cloud', 'unlimited'));
+
+create table app_usage (
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  metric text not null,
+  period text not null,
+  used bigint not null default 0 check (used >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, metric, period)
+);
+
+create table app_plan_changes (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  from_plan text not null,
+  to_plan text not null,
+  changed_by text not null,
+  created_at timestamptz not null default now()
+);
+create index app_plan_changes_workspace_idx on app_plan_changes (workspace_id, created_at desc);
+`,
+  },
 ];
