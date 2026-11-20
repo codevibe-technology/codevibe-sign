@@ -81,11 +81,6 @@ export function revisionRoutes(app: Hono<SenderEnv>, rt: Runtime) {
   const scopeOf = (c: Context<SenderEnv>) => ({ workspaceId: c.get('principal').workspaceId });
 
   app.post('/:id/recipients/:recipientId/link', async (c) => {
-    if (c.req.header('idempotency-key') !== undefined) {
-      throw validation(
-        'A shared link is never replayed; send this request without an Idempotency-Key',
-      );
-    }
     const recipientId = c.req.param('recipientId');
     const by = actorOf(c);
     const { envelope } = await mutate(

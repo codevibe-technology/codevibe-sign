@@ -20,7 +20,7 @@ example on WhatsApp. No email goes out. Their earlier links stop working, so onl
 one does, and a one-time code still applies if they sign with one. The link is in the
 response only: the server keeps its hash, never the link, and the event
 `recipient.link_shared` names who took it. At most 5 links per recipient per hour; the
-request may not carry an `Idempotency-Key`, so the link is never replayed.
+link is never replayed for an `Idempotency-Key`: a retry gives a new one.
 
 ## A name or address is wrong
 

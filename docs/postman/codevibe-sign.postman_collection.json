@@ -262,7 +262,7 @@
                 }
               ]
             },
-            "description": "Get a signing link to pass on yourself\n\nA fresh signing link for a recipient whose turn it is, for when emails do not reach\nthem. No email is sent. Their earlier links stop working, so only the newest one\ndoes. A one-time code still applies when the recipient signs with one. The audit\ntrail records `recipient.link_shared` with who took the link, never the link itself.\nAt most 5 links per recipient per hour. The link is in this response only: it is\nnever stored in clear, and the request may not carry an `Idempotency-Key`."
+            "description": "Get a signing link to pass on yourself\n\nA fresh signing link for a recipient whose turn it is, for when emails do not reach\nthem. No email is sent. Their earlier links stop working, so only the newest one\ndoes. A one-time code still applies when the recipient signs with one. The audit\ntrail records `recipient.link_shared` with who took the link, never the link itself.\nAt most 5 links per recipient per hour. The link is in this response only and is never\nstored in clear, so an `Idempotency-Key` is ignored: a retry gives a new link."
           }
         },
         {

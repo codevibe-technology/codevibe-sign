@@ -137,15 +137,15 @@ describe('POST /v1/envelopes/:id/recipients/:recipientId/link', () => {
     expect((await link(ravi(envelope))).json.error.code).toBe('INVALID_STATE');
   });
 
-  it('is not available to another workspace, to read-only callers, or with an Idempotency-Key', async () => {
+  it('is not available to another workspace and is never replayed from an Idempotency-Key', async () => {
     const { h, send, asha } = setup();
     const envelope = await send();
     const path = `/v1/envelopes/${envelope.id}/recipients/${asha(envelope)}/link`;
     expect((await h.call('POST', path, { headers: other })).status).toBe(404);
-    const replayable = await h.call('POST', path, {
-      headers: { ...acme, 'idempotency-key': 'k1' },
-    });
-    expect(replayable.status).toBe(400);
+    const first = await h.call('POST', path, { headers: { ...acme, 'idempotency-key': 'k1' } });
+    const retry = await h.call('POST', path, { headers: { ...acme, 'idempotency-key': 'k1' } });
+    expect(retry.res.headers.get('idempotent-replayed')).toBeNull();
+    expect(retry.json.url).not.toBe(first.json.url);
   });
 });
 

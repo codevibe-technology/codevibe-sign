@@ -72,6 +72,8 @@ export function senderRoutes(rt: Runtime) {
       rt.store,
       (c) => principalScope(c.get('principal')),
       () => rt.clock.now(),
+      // The answer holds a signing link, which is never stored; a retry gets a new one.
+      (c) => /\/recipients\/[^/]+\/link\/?$/.test(c.req.path),
     ),
   );
   const scopeOf = (c: Context<SenderEnv>) => ({ workspaceId: c.get('principal').workspaceId });

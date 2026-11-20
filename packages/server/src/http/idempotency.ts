@@ -15,10 +15,12 @@ export function idempotency(
   store: ServerStore,
   scope: (c: Parameters<MiddlewareHandler>[0]) => string,
   now: () => Date,
+  /** Requests whose response must never be stored, such as one carrying a signing link. */
+  skip: (c: Parameters<MiddlewareHandler>[0]) => boolean = () => false,
 ): MiddlewareHandler {
   return async (c, next) => {
     const key = c.req.header('idempotency-key');
-    if (c.req.method !== 'POST' || key === undefined) return next();
+    if (c.req.method !== 'POST' || key === undefined || skip(c)) return next();
     if (key.length === 0 || key.length > 255) {
       throw new HttpError('VALIDATION', 'Idempotency-Key must be 1 to 255 characters');
     }
