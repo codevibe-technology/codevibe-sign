@@ -40,7 +40,9 @@ let cached: Env | undefined;
  */
 export function env(): Env {
   if (cached) return cached;
-  const parsed = schema.safeParse(process.env);
+  // A blank line in an env file (`GOOGLE_CLIENT_ID=`) means "not set", not an empty value.
+  const set = Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== ''));
+  const parsed = schema.safeParse(set);
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
     throw new Error(`Invalid configuration:\n  ${problems.join('\n  ')}`);
