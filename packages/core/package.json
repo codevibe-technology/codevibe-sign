@@ -50,6 +50,6 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
-    "fast-check": "4.10.1"
+    "fast-check": "4.10.2"
   }
 }
