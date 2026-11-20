@@ -54,7 +54,7 @@
   "dependencies": {
     "@codevibe_technology/sign-core": "workspace:*",
     "@codevibe_technology/sign-pdf": "workspace:*",
-    "@hono/node-server": "2.1.5",
+    "@hono/node-server": "2.1.6",
     "hono": "4.13.14",
     "nodemailer": "10.3.1",
     "postgres": "3.4.9"

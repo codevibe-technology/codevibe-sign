@@ -418,8 +418,8 @@ importers:
         specifier: workspace:*
         version: link:../pdf
       '@hono/node-server':
-        specifier: 2.1.5
-        version: 2.1.5(hono@4.13.14)
+        specifier: 2.1.6
+        version: 2.1.6(hono@4.13.14)
       hono:
         specifier: 4.13.14
         version: 4.13.14
@@ -1543,8 +1543,8 @@ packages:
     peerDependencies:
       vue: ^3.2.0
 
-  '@hono/node-server@2.1.5':
-    resolution: {integrity: sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==}
+  '@hono/node-server@2.1.6':
+    resolution: {integrity: sha512-p/KH9MnfNcsm3sR6x4lNgm5j+QN4Et8srKredl9DZfXiyZ1UQ3aQ2YVpFLbqktYN5JI+DB+VZFKM2PqE5hLKjQ==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4 || ^5.0.0-0
@@ -3927,6 +3927,7 @@ packages:
   eslint@9.15.0:
     resolution: {integrity: sha512-7CrWySmIibCgT1Os28lUU6upBshZ+GxybLOrmRzi08kS8MBuO8QA7pXEgYgY5W8vK3e74xv0lpjo9DbaGU9Rkw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -6739,7 +6740,7 @@ snapshots:
       '@tanstack/vue-virtual': 3.13.52(vue@3.5.45(typescript@5.6.3))
       vue: 3.5.45(typescript@5.6.3)
 
-  '@hono/node-server@2.1.5(hono@4.13.14)':
+  '@hono/node-server@2.1.6(hono@4.13.14)':
     dependencies:
       hono: 4.13.14
 
