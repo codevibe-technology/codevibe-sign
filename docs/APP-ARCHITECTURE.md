@@ -346,6 +346,53 @@ secret** replaces it at once. Endpoints can be edited, turned off and removed.
   receiver on your own machine.
 - Secrets are stored as they are, because each delivery is signed with them.
 
+## Live updates
+
+Open envelope, list and dashboard pages update when something happens, without polling.
+
+- The sign server calls `onEnvelopeChange({ workspaceId, envelopeId, actions })` after every
+  saved change. The app sends it as `NOTIFY cvs_envelope_changes` with ids and action names
+  only (`src/server/live/events.ts`), so every web process hears it.
+- Each process keeps one `LISTEN` connection (`liveHub()`, `src/server/live/live.ts`) and
+  fans changes out in memory by workspace. After the connection comes back it tells every
+  subscriber to `resync`, since notifications sent meanwhile are lost.
+- `GET /api/live/workspaces/[workspaceId]/stream` is a Server-Sent Events stream for
+  signed-in members of that workspace (404 for anyone else). It sends a comment every 25
+  seconds, checks the membership again each time, and unsubscribes on disconnect. Headers
+  `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no` keep proxies and
+  compression from buffering it.
+- `LiveUpdates` (`src/components/live`) subscribes, refreshes the page 300 ms after a
+  change it shows (when the tab is visible), and shows Live or Reconnecting. EventSource
+  reconnects by itself; after a refused connection it tries again with growing delays up to
+  30 seconds. The envelopes table reloads its rows, with its own filters, when the page
+  hands it fresh data.
+
+## Email log
+
+Every email goes through `loggingMailer` (`src/server/mail-log.ts`), which writes one
+`app_mail_log` row per send, sent or failed: workspace, envelope and recipient ids, kind,
+recipient address, subject (one-time code emails without the code), the `Message-ID`, the
+SMTP error on one line with links removed, and the attachment count and size. Bodies and
+links are never stored. The background tick deletes rows after 90 days.
+
+- **Settings → Email log** (admins) lists the latest 200, optionally for one envelope.
+- A completed envelope shows per recipient "Copy emailed 14:42" or the failure.
+- Completed copies over 5 MB, or whose files cannot be read or are refused by the provider,
+  go out with a personal download link per document (30 days) instead of attachments.
+- `Message-ID` uses the host of `APP_URL`.
+- When an envelope sent from the app is declined, its sender gets an email with who
+  declined, their role and the reason.
+
+## Fixing an envelope after sending
+
+The envelope page offers, as roles allow: **Get a link to share** (admins and owners, for
+the recipient whose turn it is; shown once, earlier links stop working, 5 per hour),
+**Correct** (senders, for anyone who has not acted), **Recall and edit** (whoever may void
+it) and **Revise and resend** on a declined envelope. Recall and revise open a draft copy in
+the send flow; a revised draft shows why it was declined, can carry a note on what changed
+and can have its PDF replaced. Each step is an audit event that links the envelopes both
+ways.
+
 ## Plans and limits
 
 `app_workspaces.plan` is `free`, `cloud` or `unlimited`. `PLAN_MODE=self-hosted` treats every
