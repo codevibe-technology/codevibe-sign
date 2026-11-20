@@ -107,6 +107,27 @@ function table(props: Partial<Parameters<typeof EnvelopesTable>[0]> = {}) {
 }
 
 describe('EnvelopesTable', () => {
+  it('reloads its rows with the same filters when the page hands it fresh data', async () => {
+    const view = table({ initialStatus: 'waiting' });
+    expect(requests).toHaveLength(0);
+    pages.push({
+      envelopes: [row({ id: 'env_1', title: 'Offer letter', status: 'completed' })],
+      nextCursor: null,
+    });
+    view.rerender(
+      <EnvelopesTable
+        slug="acme"
+        workspaceId="ws_1"
+        initial={{ ...PAGE }}
+        initialStatus="waiting"
+        initialQuery=""
+        canWrite
+      />,
+    );
+    await waitFor(() => expect(screen.getAllByRole('row').slice(1)).toHaveLength(1));
+    expect(requests[0]).toBe('/api/v1/envelopes?limit=25&status=sent%2Cin_progress|ws_1');
+  });
+
   it('shows each envelope with its status, people and progress', () => {
     table();
     const rows = screen.getAllByRole('row').slice(1);
@@ -371,6 +392,39 @@ describe('envelope detail', () => {
     expect(within(items[0]!).queryByRole('button')).toBeNull();
     expect(items[1]).toHaveTextContent('Invited');
     expect(within(items[1]!).getByRole('button', { name: 'Resend link' })).toBeTruthy();
+  });
+
+  it('says when the completed copy was emailed, or why it failed', () => {
+    const at = new Date().toISOString();
+    render(
+      <RecipientsCard
+        workspaceId="ws_1"
+        envelope={{ ...envelope, status: 'completed' }}
+        currentIds={[]}
+        canRemind
+        copyMail={{
+          r1: { status: 'sent', at, error: null },
+          r2: { status: 'failed', at, error: '550 mailbox unavailable' },
+        }}
+      />,
+    );
+    expect(screen.getByTestId('copy-mail-r1')).toHaveTextContent(/^Copy emailed \d\d:\d\d$/);
+    expect(screen.getByTestId('copy-mail-r2')).toHaveTextContent(
+      'Email failed: 550 mailbox unavailable',
+    );
+  });
+
+  it('says nothing about copies before the envelope is complete', () => {
+    render(
+      <RecipientsCard
+        workspaceId="ws_1"
+        envelope={envelope}
+        currentIds={['r2']}
+        canRemind
+        copyMail={{ r1: { status: 'sent', at: new Date().toISOString(), error: null } }}
+      />,
+    );
+    expect(screen.queryByTestId('copy-mail-r1')).toBeNull();
   });
 
   it('hides resending from people who cannot send', () => {

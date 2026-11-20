@@ -18,6 +18,7 @@ import { can, canVoidEnvelope } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
 import { senderOf } from '@/server/envelopes';
+import { completedCopyMail } from '@/server/mail-log';
 import { AppError } from '@/server/errors';
 import { signApi, userPrincipal, type SealCheck } from '@/server/sign/api';
 
@@ -35,11 +36,20 @@ export default async function EnvelopePage({
     if (err instanceof AppError && err.code === 'NOT_FOUND') notFound();
     throw err;
   });
-  const [{ events, chainValid }, certificate, sender] = await Promise.all([
+  const [{ events, chainValid }, certificate, sender, copies] = await Promise.all([
     api.events(id),
     api.certificate(id),
     senderOf(db(), workspace.id, id),
+    envelope.status === 'completed'
+      ? completedCopyMail(db(), workspace.id, id)
+      : ({} as Awaited<ReturnType<typeof completedCopyMail>>),
   ]);
+  const copyMail = Object.fromEntries(
+    Object.entries(copies).map(([recipientId, m]) => [
+      recipientId,
+      { status: m.status, at: m.createdAt.toISOString(), error: m.error },
+    ]),
+  );
   const checks: Record<string, SealCheck | null> = {};
   if (envelope.status === 'completed') {
     await Promise.all(
@@ -113,7 +123,18 @@ export default async function EnvelopePage({
             envelope={envelope}
             currentIds={open ? currentIds : []}
             canRemind={canWrite}
+            copyMail={copyMail}
           />
+          {can(role, 'workspace.manage') ? (
+            <p className="-mt-3 text-right text-sm">
+              <Link
+                href={`/w/${slug}/settings/email-log?envelope=${encodeURIComponent(envelope.id)}`}
+                className="font-medium text-primary hover:underline"
+              >
+                Emails for this envelope
+              </Link>
+            </p>
+          ) : null}
           <DocumentsCard slug={slug} envelope={envelope} checks={checks} />
           <CertificateCard
             certificate={certificate}

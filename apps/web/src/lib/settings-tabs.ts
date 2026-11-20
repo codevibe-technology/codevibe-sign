@@ -12,6 +12,7 @@ export function settingsTabs(slug: string, role: Role, options: { plans?: boolea
           { label: 'Team', href: `${base}/team` },
           { label: 'API keys', href: `${base}/api-keys` },
           { label: 'Webhooks', href: `${base}/webhooks` },
+          { label: 'Email log', href: `${base}/email-log` },
         ]
       : []),
     ...(options.plans ? [{ label: 'Plan and usage', href: `${base}/plan` }] : []),

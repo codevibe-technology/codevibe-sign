@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { copyMailLine, type CopyMailStatus } from '@/lib/mail-log';
 import {
   AUTH_LABELS,
   ROLE_OPTIONS,
@@ -134,11 +135,14 @@ export function RecipientsCard({
   envelope,
   currentIds,
   canRemind,
+  copyMail = {},
 }: {
   workspaceId: string;
   envelope: Envelope;
   currentIds: string[];
   canRemind: boolean;
+  /** The completed-copy email to each recipient, by recipient id, from the mail log. */
+  copyMail?: Record<string, CopyMailStatus>;
 }) {
   const sequential = envelope.routing === 'sequential';
   return (
@@ -154,6 +158,7 @@ export function RecipientsCard({
       <ol className="divide-y divide-line">
         {envelope.recipients.map((r, i) => {
           const current = currentIds.includes(r.id);
+          const copy = envelope.status === 'completed' ? copyMail[r.id] : undefined;
           return (
             <li key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <span
@@ -178,6 +183,17 @@ export function RecipientsCard({
                 </p>
                 {r.declineReason ? (
                   <p className="mt-1 text-sm text-danger">Reason: {r.declineReason}</p>
+                ) : null}
+                {copy ? (
+                  <p
+                    className={cn(
+                      'mt-1 text-xs break-words',
+                      copy.status === 'sent' ? 'text-muted' : 'text-danger',
+                    )}
+                    data-testid={`copy-mail-${r.id}`}
+                  >
+                    {copyMailLine(copy)}
+                  </p>
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
