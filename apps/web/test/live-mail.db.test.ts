@@ -12,6 +12,7 @@ import {
   recordMail,
   type MailLogEntry,
 } from '@/server/mail-log';
+import { mailSenderOnDecline } from '@/server/decline-mail';
 import { migrateAll } from '@/server/migrate';
 
 const url = process.env.DATABASE_URL;
@@ -149,5 +150,53 @@ describe.skipIf(!url)('live updates and the mail log against PostgreSQL', () => 
     const subjects = (await listMailLog(sql, ws.b)).map((r) => r.subject);
     expect(subjects).toContain('recent');
     expect(subjects).not.toContain('old');
+  });
+
+  it('emails the member who sent a declined envelope, with the reason', async () => {
+    const userId = randomUUID();
+    await sql`insert into auth_users (id, name, email) values (${userId}, 'Meera', ${`meera-${userId.slice(0, 6)}@example.com`})`;
+    await sql`insert into app_envelope_senders (envelope_id, workspace_id, user_id) values ('env_d', ${ws.a}, ${userId})`;
+    const sent: { to: string; subject: string; text: string; meta?: unknown }[] = [];
+    const deps = {
+      sql,
+      appUrl: 'https://sign.example.com',
+      mailer: { send: async (m: (typeof sent)[number]) => void sent.push(m) },
+      load: async () =>
+        ({
+          id: 'env_d',
+          title: 'Offer letter',
+          recipients: [
+            {
+              id: 'r1',
+              name: 'Satyam',
+              role: 'approver',
+              status: 'declined',
+              declineReason: 'Clause 4',
+            },
+          ],
+        }) as never,
+    };
+    await mailSenderOnDecline(deps, {
+      workspaceId: ws.a,
+      envelopeId: 'env_d',
+      actions: ['recipient.signed'],
+    });
+    expect(sent).toEqual([]);
+    await mailSenderOnDecline(deps, {
+      workspaceId: ws.a,
+      envelopeId: 'env_d',
+      actions: ['recipient.declined', 'envelope.declined'],
+    });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.subject).toBe('Declined: Offer letter');
+    expect(sent[0]!.text).toContain('Their reason: Clause 4');
+    expect(sent[0]!.text).toContain(`https://sign.example.com/w/${ws.a}/envelopes/env_d`);
+    expect(sent[0]!.meta).toMatchObject({ kind: 'decline_notice', envelopeId: 'env_d' });
+    await mailSenderOnDecline(deps, {
+      workspaceId: ws.b,
+      envelopeId: 'env_d',
+      actions: ['envelope.declined'],
+    });
+    expect(sent).toHaveLength(1);
   });
 });

@@ -13,6 +13,7 @@ import { auth } from '../auth/auth';
 import { db } from '../db';
 import { senderOf } from '../envelopes';
 import { env, type Env } from '../env';
+import { mailSenderOnDecline } from '../decline-mail';
 import { publishChange } from '../live/live';
 import { appRuntime } from '../runtime';
 import { findMembership } from '../workspaces';
@@ -69,8 +70,15 @@ function build(): SignServer {
   }
   const sql = db();
   const { files, mailer } = appRuntime();
+  const store = postgresStore(sql);
+  const declineMail = {
+    sql,
+    mailer,
+    appUrl: config.APP_URL,
+    load: async (id: string) => (await store.load(id))?.envelope ?? null,
+  };
   return createSignServer({
-    store: postgresStore(sql),
+    store,
     files,
     mailer,
     otp: mailOtpSender(mailer),
@@ -85,7 +93,13 @@ function build(): SignServer {
     webhookTargets,
     webhookSecurity: webhookSecurity(),
     onWebhookDelivery: (report) => recordDelivery(sql, report),
-    onEnvelopeChange: (change) => publishChange(sql, change),
+    onEnvelopeChange: async (change) => {
+      // The email goes out after the response; a failure is logged, not shown to the signer.
+      void mailSenderOnDecline(declineMail, change).catch((err: unknown) =>
+        console.error('[decline mail] failed', err instanceof Error ? err.message : err),
+      );
+      await publishChange(sql, change);
+    },
     workspaceMail: createWorkspaceMail({
       appUrl: config.APP_URL,
       brand: (workspaceId) => getBrand(sql, workspaceId),

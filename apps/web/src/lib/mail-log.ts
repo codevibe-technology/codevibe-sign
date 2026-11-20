@@ -12,6 +12,7 @@ const KIND_LABELS: Record<string, string> = {
   otp: 'Signing code',
   sign_in: 'Sign-in link',
   team_invite: 'Team invitation',
+  decline_notice: 'Declined notice',
 };
 
 export const mailKindLabel = (kind: string) => KIND_LABELS[kind] ?? 'Other';
