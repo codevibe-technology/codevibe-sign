@@ -2,6 +2,7 @@ import { db } from './db';
 import { env } from './env';
 import { migrateAll } from './migrate';
 import { resumeBulkSends } from './bulk-worker';
+import { pruneMailLog } from './mail-log';
 import { signServer } from './sign/server';
 import { pruneDeliveries } from './webhooks';
 
@@ -18,6 +19,7 @@ export async function startBackground() {
     signServer().tick().catch(report('tick'));
     resumeBulkSends().catch(report('bulk'));
     pruneDeliveries(db()).catch(report('webhook log'));
+    pruneMailLog(db()).catch(report('mail log'));
   }, config.SIGN_TICK_SECONDS * 1000);
   timer.unref();
 }

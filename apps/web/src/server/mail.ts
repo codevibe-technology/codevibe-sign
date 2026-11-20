@@ -26,12 +26,24 @@ export async function sendMagicLink(mailer: Mailer, to: string, url: string) {
     ],
     { label: 'Sign in', url },
   );
-  await mailer.send({ to, subject: 'Your sign-in link for Codevibe Sign', ...body });
+  await mailer.send({
+    to,
+    subject: 'Your sign-in link for Codevibe Sign',
+    ...body,
+    meta: { kind: 'sign_in' },
+  });
 }
 
 export async function sendInvitation(
   mailer: Mailer,
-  input: { to: string; url: string; workspaceName: string; inviterName: string; role: Role },
+  input: {
+    to: string;
+    url: string;
+    workspaceId: string;
+    workspaceName: string;
+    inviterName: string;
+    role: Role;
+  },
 ) {
   const body = layout(
     `Join ${input.workspaceName} on Codevibe Sign`,
@@ -45,5 +57,6 @@ export async function sendInvitation(
     to: input.to,
     subject: `${input.inviterName} invited you to ${input.workspaceName}`,
     ...body,
+    meta: { kind: 'team_invite', workspaceId: input.workspaceId },
   });
 }

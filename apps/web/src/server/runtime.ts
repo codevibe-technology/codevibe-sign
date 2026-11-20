@@ -3,6 +3,7 @@ import type { FileStore, Mailer } from '@codevibe_technology/sign-core';
 import { consoleMailer, localFileStore, smtpMailer } from '@codevibe_technology/sign-server';
 import { db } from './db';
 import { env } from './env';
+import { loggingMailer, recordMail } from './mail-log';
 
 export interface AppRuntime {
   files: FileStore;
@@ -11,16 +12,24 @@ export interface AppRuntime {
 
 const holder = globalThis as unknown as { __cvsRuntime?: AppRuntime };
 
-/** File store and mailer shared by the app and the sign server, created on first use. */
+/**
+ * File store and mailer shared by the app and the sign server, created on first use. Every
+ * email goes through the mailer, so every send, sent or failed, lands in the mail log.
+ */
 export function appRuntime(): AppRuntime {
   if (!holder.__cvsRuntime) {
     const config = env();
+    const transport =
+      config.MAIL_TRANSPORT === 'console'
+        ? consoleMailer()
+        : smtpMailer({
+            transport: config.MAIL_TRANSPORT,
+            from: config.MAIL_FROM,
+            messageIdDomain: new URL(config.APP_URL).hostname,
+          });
     holder.__cvsRuntime = {
       files: localFileStore(config.FILES_DIR),
-      mailer:
-        config.MAIL_TRANSPORT === 'console'
-          ? consoleMailer()
-          : smtpMailer({ transport: config.MAIL_TRANSPORT, from: config.MAIL_FROM }),
+      mailer: loggingMailer(transport, (entry) => recordMail(db(), entry)),
     };
   }
   return holder.__cvsRuntime;

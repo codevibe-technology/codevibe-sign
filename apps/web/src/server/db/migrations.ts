@@ -267,4 +267,28 @@ create table app_first_run (
 );
 `,
   },
+  {
+    name: '0008_mail_log',
+    sql: `
+create table app_mail_log (
+  id text primary key,
+  workspace_id text references app_workspaces (id) on delete cascade,
+  envelope_id text,
+  recipient_id text,
+  kind text not null,
+  recipient_email text not null,
+  subject text not null,
+  provider_message_id text,
+  status text not null check (status in ('sent', 'failed')),
+  error text,
+  attachment_count integer not null default 0,
+  attachment_bytes bigint not null default 0,
+  created_at timestamptz not null default now()
+);
+create index app_mail_log_workspace_idx on app_mail_log (workspace_id, created_at desc);
+create index app_mail_log_envelope_idx on app_mail_log (envelope_id, created_at desc)
+  where envelope_id is not null;
+create index app_mail_log_created_idx on app_mail_log (created_at);
+`,
+  },
 ];

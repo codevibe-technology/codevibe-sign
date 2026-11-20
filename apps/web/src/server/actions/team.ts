@@ -29,6 +29,7 @@ export const inviteMemberAction = workspaceAction(
     await sendInvitation(appRuntime().mailer, {
       to: invitation.email,
       url: `${env().APP_URL}/invite/${token}`,
+      workspaceId: ctx.workspace.id,
       workspaceName: ctx.workspace.name,
       inviterName: ctx.user.name || ctx.user.email,
       role: invitation.role,
