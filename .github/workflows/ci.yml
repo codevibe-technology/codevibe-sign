@@ -35,12 +35,15 @@ jobs:
       - run: pnpm check:snippets
       - run: pnpm test
       - run: pnpm e2e
+      - run: pnpm --filter web build:docs
+      - run: pnpm --filter web build
 
   postgres:
     name: PostgreSQL store
     runs-on: ubuntu-latest
-    # Runs the store, startSignServer and end-to-end tests against a real database. It does
-    # not block merges; a failure here still needs a look.
+    # Runs the sign server's store and end-to-end tests and the web app's database suites
+    # (workspaces, plans and usage limits) against a real database. It does not block merges;
+    # a failure here still needs a look.
     continue-on-error: true
     services:
       postgres:
@@ -66,3 +69,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm --filter @codevibe_technology/sign-server test
+      - run: pnpm --filter web test
