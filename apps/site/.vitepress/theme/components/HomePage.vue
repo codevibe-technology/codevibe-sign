@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withBase } from 'vitepress';
 import HeroFlow from './HeroFlow.vue';
 import { CODEVIBE_URL, GITHUB_URL, HRVIBE_URL } from '../../site';
 
@@ -105,7 +106,7 @@ const faqs = [
             the service with Docker.
           </p>
           <div class="actions">
-            <a class="btn btn-primary" href="/getting-started/">Get started</a>
+            <a class="btn btn-primary" :href="withBase('/getting-started')">Get started</a>
             <a class="btn btn-ghost" :href="GITHUB_URL" target="_blank" rel="noopener">
               View on GitHub
             </a>
@@ -158,7 +159,7 @@ const faqs = [
             <span class="badge">Pre-release</span>
             Not on npm yet; build it from the repository. The API may change before 0.1.
           </p>
-          <a class="text-link" href="/getting-started/node">Read the Node guide</a>
+          <a class="text-link" :href="withBase('/getting-started/node')">Read the Node guide</a>
         </div>
         <div class="code-box">
           <slot name="code" />
@@ -212,7 +213,7 @@ const faqs = [
         <p class="fineprint">
           Some documents cannot be signed electronically at all, such as wills, powers of attorney
           and property sale deeds. This is not legal advice.
-          <a href="/legal">Read the legal notes</a>.
+          <a :href="withBase('/legal')">Read the legal notes</a>.
         </p>
       </div>
     </section>
@@ -236,8 +237,8 @@ const faqs = [
           Start with the concepts, or go straight to sending your first envelope.
         </p>
         <div class="actions center">
-          <a class="btn btn-primary" href="/getting-started/">Get started</a>
-          <a class="btn btn-ghost" href="/concepts/envelopes">Learn the concepts</a>
+          <a class="btn btn-primary" :href="withBase('/getting-started')">Get started</a>
+          <a class="btn btn-ghost" :href="withBase('/concepts/envelopes')">Learn the concepts</a>
         </div>
       </div>
     </section>

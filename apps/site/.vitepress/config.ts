@@ -1,14 +1,21 @@
 import { readFileSync } from 'node:fs';
-import { copyFile, writeFile } from 'node:fs/promises';
+import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { CODEVIBE_URL, GITHUB_URL, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from './site';
 
+/**
+ * The docs are served by the web app under /docs. Folder index pages are written out as
+ * `getting-started.html` and so on, so every page has one address with no trailing slash.
+ */
+const BASE = '/docs/';
+const DOCS_URL = `${SITE_URL}${BASE}`;
+
 function pageUrl(relativePath: string): string {
   const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html');
-  return new URL(path, `${SITE_URL}/`).href;
+  return new URL(path, DOCS_URL).href;
 }
 
 /** Files from the repository served at the site root: the API description and its collection. */
@@ -41,25 +48,31 @@ const fonts =
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap';
 
 export default defineConfig({
+  base: BASE,
   lang: 'en',
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
   srcExclude: ['README.md'],
+  rewrites: {
+    'getting-started/index.md': 'getting-started.md',
+    'http-api/index.md': 'http-api.md',
+    'api/index.md': 'api.md',
+  },
   cleanUrls: false,
   lastUpdated: false,
   appearance: true,
 
-  sitemap: { hostname: SITE_URL },
+  sitemap: { hostname: DOCS_URL },
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}favicon.svg` }],
     ['meta', { name: 'theme-color', content: '#0D1B2A' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     ['link', { rel: 'stylesheet', href: fonts }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: SITE_NAME }],
-    ['meta', { property: 'og:image', content: new URL(OG_IMAGE, SITE_URL).href }],
+    ['meta', { property: 'og:image', content: new URL(OG_IMAGE.slice(1), DOCS_URL).href }],
     ['meta', { property: 'og:image:width', content: '1200' }],
     ['meta', { property: 'og:image:height', content: '630' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
@@ -79,8 +92,6 @@ export default defineConfig({
   },
 
   async buildEnd({ outDir }) {
-    const robots = `User-agent: *\nAllow: /\n\nSitemap: ${new URL('/sitemap.xml', SITE_URL).href}\n`;
-    await writeFile(join(outDir, 'robots.txt'), robots);
     for (const [name, file] of Object.entries(downloads)) await copyFile(file, join(outDir, name));
   },
 
@@ -100,11 +111,11 @@ export default defineConfig({
     siteTitle: SITE_NAME,
 
     nav: [
-      { text: 'Get started', link: '/getting-started/', activeMatch: '^/getting-started/' },
+      { text: 'Get started', link: '/getting-started', activeMatch: '^/getting-started(/|$)' },
       { text: 'Concepts', link: '/concepts/envelopes', activeMatch: '^/concepts/' },
       { text: 'Guides', link: '/guides/first-envelope', activeMatch: '^/guides/' },
-      { text: 'HTTP API', link: '/http-api/', activeMatch: '^/http-api/' },
-      { text: 'Packages', link: '/api/', activeMatch: '^/api/' },
+      { text: 'HTTP API', link: '/http-api', activeMatch: '^/http-api(/|$)' },
+      { text: 'Packages', link: '/api', activeMatch: '^/api(/|$)' },
       {
         text: 'More',
         items: [
@@ -121,7 +132,7 @@ export default defineConfig({
       {
         text: 'Getting started',
         items: [
-          { text: 'Install', link: '/getting-started/' },
+          { text: 'Install', link: '/getting-started' },
           { text: 'Self-host with Docker', link: '/getting-started/docker' },
           { text: 'Embed in Node', link: '/getting-started/node' },
         ],
@@ -151,7 +162,7 @@ export default defineConfig({
       {
         text: 'HTTP API',
         items: [
-          { text: 'Overview', link: '/http-api/' },
+          { text: 'Overview', link: '/http-api' },
           { text: 'Interactive reference', link: '/http-api/reference' },
           { text: 'Run a local sandbox', link: '/http-api/sandbox' },
         ],
@@ -159,7 +170,7 @@ export default defineConfig({
       {
         text: 'API reference',
         items: [
-          { text: 'Overview', link: '/api/' },
+          { text: 'Overview', link: '/api' },
           { text: 'sign-core', link: '/api/core' },
           { text: 'sign-pdf', link: '/api/pdf' },
           { text: 'sign-server', link: '/api/server' },

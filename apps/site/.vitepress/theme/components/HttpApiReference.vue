@@ -90,7 +90,7 @@ onUnmounted(() => {
 });
 
 const links = [
-  { text: 'How the API works', href: withBase('/http-api/') },
+  { text: 'How the API works', href: withBase('/http-api') },
   { text: 'Run a local sandbox', href: withBase('/http-api/sandbox') },
 ];
 </script>

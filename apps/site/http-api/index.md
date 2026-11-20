@@ -9,9 +9,9 @@ The server speaks plain JSON over HTTP. Your backend sends documents with an API
 recipient's browser signs with the token from their link. The whole API is described in an
 OpenAPI 3.1 document, so you can read it, try it and generate clients from it.
 
-- [**Interactive reference**](./reference): every route with its schemas and examples, and a
+- [**Interactive reference**](/http-api/reference): every route with its schemas and examples, and a
   **Test Request** button that calls your own server.
-- [**Run a local sandbox**](./sandbox): a server on your machine with in-memory storage and an
+- [**Run a local sandbox**](/http-api/sandbox): a server on your machine with in-memory storage and an
   API key, ready for the reference to call.
 - [**`openapi.json`**](/openapi.json): the OpenAPI document. Every server also serves its own
   copy at `GET /v1/openapi.json`.
@@ -88,7 +88,7 @@ shows how to verify them.
 The server sends no CORS headers, so a page on another origin cannot call it. That is the
 safe default for an API that takes secret keys. For the interactive reference, either:
 
-- run the [local sandbox](./sandbox), which wraps the server with CORS for the docs origins; or
+- run the [local sandbox](/http-api/sandbox), which wraps the server with CORS for the docs origins; or
 - serve the docs and the API from one origin. The docs' dev server proxies `/v1`, `/sign` and
   `/health` to a server when you start it with `SIGN_SERVER`:
 

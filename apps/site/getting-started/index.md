@@ -47,9 +47,9 @@ APIs may still change before 0.1.
 
 | You want to                                                     | Use                                                 |
 | --------------------------------------------------------------- | --------------------------------------------------- |
-| Run signing as its own service and call it over HTTP            | [Self-host with Docker](./docker)                   |
+| Run signing as its own service and call it over HTTP            | [Self-host with Docker](/getting-started/docker)                   |
 | Run the same service without Docker                             | `npx codevibe-sign start`, with the same variables  |
-| Start the server inside your existing Node app                  | [Embed in Node](./node)                             |
+| Start the server inside your existing Node app                  | [Embed in Node](/getting-started/node)                             |
 | Use the signing rules only, with your own storage and transport | [`@codevibe_technology/sign-core`](/api/core)       |
 | Show the signing screen inside your React app                   | [`@codevibe_technology/sign-react`](/api/react)     |
 | Add Aadhaar eSign for statutory signatures in India             | [`@codevibe_technology/sign-aadhaar`](/api/aadhaar) |

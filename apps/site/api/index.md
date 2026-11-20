@@ -10,14 +10,14 @@ parts you need.
 
 | Package                                          | What it does                                                                        | Status       |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------ |
-| [`@codevibe_technology/sign-core`](./core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
-| [`@codevibe_technology/sign-pdf`](./pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
-| [`@codevibe_technology/sign-server`](./server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
-| [`@codevibe_technology/sign-react`](./react)     | Signature pad, signing view and field placement components.                         | Ready to try |
-| [`@codevibe_technology/sign-aadhaar`](./aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.             | Ready to try |
+| [`@codevibe_technology/sign-core`](/api/core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
+| [`@codevibe_technology/sign-pdf`](/api/pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
+| [`@codevibe_technology/sign-server`](/api/server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
+| [`@codevibe_technology/sign-react`](/api/react)     | Signature pad, signing view and field placement components.                         | Ready to try |
+| [`@codevibe_technology/sign-aadhaar`](/api/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.             | Ready to try |
 
 For the HTTP API itself, with every route, schema and error code, see the
-[HTTP API reference](/http-api/), which you can try against your own server.
+[HTTP API reference](/http-api), which you can try against your own server.
 
 All packages are pre-release (`0.0.0`) and their APIs may change before 0.1.
 
@@ -26,7 +26,7 @@ All packages are pre-release (`0.0.0`) and their APIs may change before 0.1.
 - TypeScript, strict, ESM first, with CommonJS builds and type declarations. Node 20 or later.
 - Each package's public API is exported only from its entry point.
 - Errors are `SignError` instances with a stable `code`, never bare strings. See the
-  [error codes](./core#error-codes).
+  [error codes](/api/core#error-codes).
 
 ## Dependencies
 
