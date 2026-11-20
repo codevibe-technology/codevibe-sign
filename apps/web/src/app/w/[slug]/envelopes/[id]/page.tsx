@@ -10,6 +10,7 @@ import {
   RecipientsCard,
   Timeline,
 } from '@/components/envelopes/envelope-detail';
+import { LiveRefresh } from '@/components/envelopes/live-refresh';
 import { StatusPill } from '@/components/envelopes/status-pill';
 import { Button } from '@/components/ui/button';
 import { formatDateTime, isFinalStatus, isOpen, relativeTime } from '@/lib/envelopes';
@@ -55,6 +56,7 @@ export default async function EnvelopePage({
 
   return (
     <>
+      <LiveRefresh active={open} />
       <Link
         href={`/w/${slug}/envelopes`}
         className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
