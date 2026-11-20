@@ -21,7 +21,7 @@ import type {
   TransitionResult,
 } from './types';
 import { SignError } from './types';
-import { checkFieldValue, isFilled, MAX_REASON_LENGTH } from './validation';
+import { checkFieldValue, isFilled, MAX_REASON_LENGTH, recipientIssues } from './validation';
 
 export interface WorkflowDeps {
   clock: Clock;
@@ -536,5 +536,179 @@ export function recordSeal(
     context: input.context,
     data: { documentId: input.documentId, sha256: input.sha256 },
   });
+  return t.result();
+}
+
+export interface ShareLinkInput {
+  recipientId: Id;
+  /** Who took the link, for the audit trail; for example the sender's name. */
+  by?: string;
+  context?: AuditContext;
+}
+
+/**
+ * The sender takes a fresh signing link for a recipient whose turn it is, to pass on
+ * themselves (for example when emails do not arrive). Records the fact; no email goes out.
+ * The caller revokes the recipient's earlier links and issues the new one.
+ */
+export function shareLink(
+  envelope: Envelope,
+  input: ShareLinkInput,
+  deps: WorkflowDeps,
+): TransitionResult {
+  const now = deps.clock.now();
+  assertOpen(envelope, now);
+  const recipient = findRecipient(envelope, input.recipientId);
+  assertTurn(envelope, recipient);
+  const t = new Transition(envelope, now.toISOString());
+  t.event('recipient.link_shared', {
+    recipientId: recipient.id,
+    context: input.context,
+    ...(input.by ? { data: { by: input.by } } : {}),
+  });
+  return t.result();
+}
+
+export interface RecipientCorrection {
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** Invite again even when only the name changed. */
+  resend?: boolean;
+  by?: string;
+  context?: AuditContext;
+}
+
+const cleanText = (value: string | undefined) => value?.trim() || undefined;
+
+/**
+ * Corrects the name, email or phone of a recipient who has not acted yet, on a sent envelope.
+ * Role, order and fields stay. When it is their turn and the address changed (or `resend`),
+ * they are invited again at the new address; the caller revokes their earlier links. Someone
+ * who has acted cannot be changed: recall the envelope instead.
+ */
+export function correctRecipient(
+  envelope: Envelope,
+  recipientId: Id,
+  input: RecipientCorrection,
+  deps: WorkflowDeps,
+): TransitionResult {
+  const now = deps.clock.now();
+  assertOpen(envelope, now);
+  const recipient = findRecipient(envelope, recipientId);
+  if (hasActed(recipient)) {
+    throw new SignError(
+      'INVALID_STATE',
+      `${recipient.name} has already ${recipient.status}. Recall the envelope to change them.`,
+      { recipientId, status: recipient.status, reason: 'acted' },
+    );
+  }
+  const next: Recipient = { ...recipient };
+  if (input.name !== undefined) next.name = input.name.trim();
+  if (input.email !== undefined) {
+    const email = cleanText(input.email)?.toLowerCase();
+    if (email) next.email = email;
+    else delete next.email;
+  }
+  if (input.phone !== undefined) {
+    const phone = cleanText(input.phone)?.replace(/[\s-]/g, '');
+    if (phone) next.phone = phone;
+    else delete next.phone;
+  }
+  const issues = recipientIssues(next, `recipients.${recipientId}`);
+  if (issues.length > 0) {
+    throw new SignError('VALIDATION', issues[0]!.message, { issues });
+  }
+
+  const nameChanged = next.name !== recipient.name;
+  const emailChanged = next.email !== recipient.email;
+  const phoneChanged = next.phone !== recipient.phone;
+  const contactChanged = emailChanged || phoneChanged;
+  if (!nameChanged && !contactChanged && !input.resend) {
+    throw new SignError('VALIDATION', 'Nothing to change', {
+      issues: [{ path: `recipients.${recipientId}`, message: 'Nothing to change' }],
+    });
+  }
+
+  const current = currentRecipients(envelope).some((r) => r.id === recipientId);
+  const invite = current && isActor(recipient) && (contactChanged || input.resend === true);
+  const t = new Transition(envelope, now.toISOString());
+  let updated: Recipient = next;
+  if (contactChanged) {
+    // A new address starts over: not viewed, no reminders yet.
+    updated = { ...next, status: current ? 'notified' : 'pending', remindersSent: 0 };
+    delete updated.viewedAt;
+    delete updated.lastRemindedAt;
+    delete updated.notifiedAt;
+    if (current) updated.notifiedAt = t.at;
+  } else if (invite) {
+    updated = { ...next, lastRemindedAt: t.at };
+  }
+  t.envelope = {
+    ...t.envelope,
+    recipients: t.envelope.recipients.map((r) => (r.id === recipientId ? updated : r)),
+  };
+  const data: Record<string, string | boolean> = { invited: invite };
+  if (input.by) data.by = input.by;
+  if (nameChanged) Object.assign(data, { oldName: recipient.name, newName: next.name });
+  if (emailChanged) {
+    Object.assign(data, { oldEmail: recipient.email ?? '', newEmail: next.email ?? '' });
+  }
+  if (phoneChanged) {
+    Object.assign(data, { oldPhone: recipient.phone ?? '', newPhone: next.phone ?? '' });
+  }
+  t.event('recipient.corrected', { recipientId, context: input.context, data });
+  if (invite) t.notify(recipientId, 'invite');
+  return t.result();
+}
+
+/** The void reason of a recalled envelope; a note from the sender follows it. */
+export const RECALL_REASON = 'Recalled to correct';
+
+export interface RecallInput {
+  /** The draft copy that replaces the envelope. */
+  replacementId: Id;
+  replacementTitle?: string;
+  note?: string;
+  by?: string;
+  context?: AuditContext;
+}
+
+/**
+ * Voids a sent envelope so it can be corrected and sent again as `replacementId`: the links
+ * stop, everyone already invited is told it was cancelled, and the envelope is final.
+ */
+export function recall(
+  envelope: Envelope,
+  input: RecallInput,
+  deps: WorkflowDeps,
+): TransitionResult {
+  if (!isActive(envelope)) {
+    throw new SignError(
+      'INVALID_STATE',
+      `Only a sent envelope can be recalled; this one is ${envelope.status}`,
+      {
+        status: envelope.status,
+      },
+    );
+  }
+  const note = input.note?.trim() ?? '';
+  const reason = note ? `${RECALL_REASON}: ${note}` : RECALL_REASON;
+  if (reason.length > MAX_REASON_LENGTH) {
+    const message = `Note is longer than ${MAX_REASON_LENGTH - RECALL_REASON.length - 2} characters`;
+    throw new SignError('VALIDATION', message, { issues: [{ path: 'note', message }] });
+  }
+  const now = deps.clock.now();
+  const t = new Transition({ ...envelope, status: 'voided' }, now.toISOString());
+  t.event('envelope.voided', { context: input.context, data: { reason } });
+  t.event('envelope.recalled', {
+    context: input.context,
+    data: {
+      replacementId: input.replacementId,
+      ...(input.replacementTitle ? { replacementTitle: input.replacementTitle } : {}),
+      ...(input.by ? { by: input.by } : {}),
+    },
+  });
+  notifyCancelled(t);
   return t.result();
 }

@@ -141,6 +141,8 @@ export type AuditAction =
   | 'envelope.declined'
   | 'envelope.expired'
   | 'envelope.voided'
+  /** Voided to be corrected; `data.replacementId` is the draft copy that replaces it. */
+  | 'envelope.recalled'
   | 'recipient.notified'
   | 'recipient.reminded'
   | 'recipient.viewed'
@@ -148,6 +150,10 @@ export type AuditAction =
   | 'recipient.signed'
   | 'recipient.approved'
   | 'recipient.declined'
+  /** The sender took a fresh signing link to pass on themselves; no email was sent. */
+  | 'recipient.link_shared'
+  /** The sender corrected the name or contact of a recipient who had not acted yet. */
+  | 'recipient.corrected'
   | 'document.sealed';
 
 export interface AuditContext {

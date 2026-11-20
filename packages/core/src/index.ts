@@ -43,22 +43,30 @@ export {
 export type { DraftChange, DraftEditDeps, DraftEditOptions } from './edits';
 
 export {
+  correctRecipient,
   decline,
   markAuthenticated,
   markViewed,
   MIN_REMINDER_INTERVAL_MS,
+  recall,
+  RECALL_REASON,
   recordSeal,
   remind,
   send,
+  shareLink,
   submit,
   tick,
   voidEnvelope,
 } from './workflow';
+export { recallCopy, type RecallCopyOptions } from './recall';
 export type {
   AuthenticatedInput,
   DeclineInput,
+  RecallInput,
   RecipientAction,
+  RecipientCorrection,
   RemindInput,
+  ShareLinkInput,
   SealInput,
   SubmitInput,
   VoidInput,
