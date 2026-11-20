@@ -8,8 +8,8 @@ description: Reference pages for each Codevibe Sign package - core, pdf, server,
 Codevibe Sign is split into small packages with one job each. Use the whole service, or only the
 parts you need.
 
-| Package                                          | What it does                                                                        | Status       |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------ |
+| Package                                             | What it does                                                                        | Status       |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
 | [`@codevibe_technology/sign-core`](/api/core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
 | [`@codevibe_technology/sign-pdf`](/api/pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
 | [`@codevibe_technology/sign-server`](/api/server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
