@@ -54,6 +54,8 @@ export interface FieldPlacerLabels extends ViewerLabels {
   signatureLastPage: string;
   placeFromTags: (count: number) => string;
   tagsPlaced: (placed: number, unmatched: number) => string;
+  fieldCount: (count: number) => string;
+  selectHint: string;
 }
 
 export const defaultFieldPlacerLabels: FieldPlacerLabels = {
@@ -61,7 +63,7 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   fieldTypes: defaultFieldTypeLabels,
   palette: 'Fields',
   paletteHint: 'Drag a field onto a page, or press Enter to add it to the page in view.',
-  recipient: 'Placing fields for',
+  recipient: 'Signers',
   noRecipients: 'Add a recipient to start placing fields.',
   field: (type, recipient, page) => `${type} for ${recipient}, page ${page}`,
   keyboardHint:
@@ -99,6 +101,10 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
     unmatched === 0
       ? `Placed ${placed} ${placed === 1 ? 'field' : 'fields'} from tags.`
       : `Placed ${placed}; ${unmatched} ${unmatched === 1 ? 'tag names' : 'tags name'} a recipient number nobody has.`,
+  fieldCount: (count) =>
+    count === 0 ? 'No fields' : `${count} ${count === 1 ? 'field' : 'fields'}`,
+  selectHint:
+    'Pick a signer, then drag a field onto the page. Click a placed field to change it here.',
 };
 
 const FIELD_TYPES: FieldType[] = [
@@ -436,12 +442,7 @@ export function FieldPlacer({
 
   return (
     <div className={['cvs-root', 'cvs-placer', className].filter(Boolean).join(' ')}>
-      <aside className="cvs-placer-panel" aria-label={labels.palette}>
-        {signers.length === 0 ? (
-          <p className="cvs-hint">{labels.noRecipients}</p>
-        ) : (
-          <RecipientPicker placement={placement} recipients={signers} label={labels.recipient} />
-        )}
+      <aside className="cvs-placer-panel cvs-placer-tools" aria-label={labels.palette}>
         <h3 className="cvs-panel-title" id={`${id}-palette`}>
           {labels.palette}
         </h3>
@@ -465,7 +466,8 @@ export function FieldPlacer({
                 paletteDragWasMove.current = false;
               }}
             >
-              {labels.fieldTypes[type]}
+              <FieldTypeIcon type={type} />
+              <span className="cvs-palette-label">{labels.fieldTypes[type]}</span>
             </button>
           ))}
         </div>
@@ -477,7 +479,7 @@ export function FieldPlacer({
         <div className="cvs-presets" role="group" aria-label={labels.presets}>
           <button
             type="button"
-            className="cvs-button"
+            className="cvs-button cvs-button--quiet"
             disabled={signers.length === 0}
             onClick={() => placement.addInitialsEveryPage()}
           >
@@ -485,7 +487,7 @@ export function FieldPlacer({
           </button>
           <button
             type="button"
-            className="cvs-button"
+            className="cvs-button cvs-button--quiet"
             disabled={signers.length === 0}
             onClick={() => placement.addSignatureLastPage()}
           >
@@ -507,8 +509,43 @@ export function FieldPlacer({
             {notice.text}
           </p>
         )}
+      </aside>
 
-        {selected && (
+      <div className="cvs-viewer">
+        <div className="cvs-viewer-bar">
+          <ZoomControls zoom={zoom} onZoom={setZoom} labels={labels} />
+        </div>
+        <div
+          ref={scroller}
+          className="cvs-scroller"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) placement.select(null);
+          }}
+        >
+          <DocumentPages
+            documents={documents}
+            states={states}
+            containerWidth={width}
+            zoom={zoom}
+            labels={labels}
+            renderOverlay={renderOverlay}
+          />
+        </div>
+      </div>
+
+      <aside className="cvs-placer-panel cvs-placer-side" aria-label={labels.recipient}>
+        {signers.length === 0 ? (
+          <p className="cvs-hint">{labels.noRecipients}</p>
+        ) : (
+          <RecipientPicker
+            placement={placement}
+            recipients={signers}
+            label={labels.recipient}
+            countLabel={labels.fieldCount}
+          />
+        )}
+
+        {selected ? (
           <div className="cvs-inspector" role="group" aria-label={labels.selectedField}>
             <h3 className="cvs-panel-title">{labels.selectedField}</h3>
             <label className="cvs-label" htmlFor={`${id}-assign`}>
@@ -537,18 +574,23 @@ export function FieldPlacer({
             <label className="cvs-label" htmlFor={`${id}-repeat`}>
               {labels.repeatOn}
             </label>
-            <select
-              id={`${id}-repeat`}
-              className="cvs-input"
-              value={repeatChoice}
-              onChange={(e) => setRepeatChoice(e.target.value as RepeatChoice)}
-            >
-              {(Object.keys(labels.repeatChoices) as RepeatChoice[]).map((choice) => (
-                <option key={choice} value={choice}>
-                  {labels.repeatChoices[choice]}
-                </option>
-              ))}
-            </select>
+            <div className="cvs-row">
+              <select
+                id={`${id}-repeat`}
+                className="cvs-input"
+                value={repeatChoice}
+                onChange={(e) => setRepeatChoice(e.target.value as RepeatChoice)}
+              >
+                {(Object.keys(labels.repeatChoices) as RepeatChoice[]).map((choice) => (
+                  <option key={choice} value={choice}>
+                    {labels.repeatChoices[choice]}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="cvs-button" onClick={() => repeatSelected(selected)}>
+                {labels.applyRepeat}
+              </button>
+            </div>
             {repeatChoice === 'custom' && (
               <input
                 className="cvs-input"
@@ -558,70 +600,49 @@ export function FieldPlacer({
                 onChange={(e) => setRepeatPages(e.target.value)}
               />
             )}
-            <button type="button" className="cvs-button" onClick={() => repeatSelected(selected)}>
-              {labels.applyRepeat}
-            </button>
-            {placement.groupOf(selected.id).length > 1 ? (
-              <>
+            <div className="cvs-inspector-actions">
+              {placement.groupOf(selected.id).length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    className="cvs-button"
+                    onClick={() => placement.applyToGroup(selected.id)}
+                  >
+                    {labels.applyToGroup(placement.groupOf(selected.id).length)}
+                  </button>
+                  <button
+                    type="button"
+                    className="cvs-button cvs-button--danger-quiet"
+                    onClick={() => placement.removeField(selected.id)}
+                  >
+                    {labels.deleteThis}
+                  </button>
+                  <button
+                    type="button"
+                    className="cvs-button cvs-button--danger-quiet"
+                    onClick={() => placement.removeGroup(selected.id)}
+                  >
+                    {labels.deleteGroup(placement.groupOf(selected.id).length)}
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
-                  className="cvs-button"
-                  onClick={() => placement.applyToGroup(selected.id)}
-                >
-                  {labels.applyToGroup(placement.groupOf(selected.id).length)}
-                </button>
-                <button
-                  type="button"
-                  className="cvs-button cvs-button--danger"
+                  className="cvs-button cvs-button--danger-quiet"
                   onClick={() => placement.removeField(selected.id)}
                 >
-                  {labels.deleteThis}
+                  {labels.deleteField}
                 </button>
-                <button
-                  type="button"
-                  className="cvs-button cvs-button--danger"
-                  onClick={() => placement.removeGroup(selected.id)}
-                >
-                  {labels.deleteGroup(placement.groupOf(selected.id).length)}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="cvs-button cvs-button--danger"
-                onClick={() => placement.removeField(selected.id)}
-              >
-                {labels.deleteField}
-              </button>
-            )}
+              )}
+            </div>
           </div>
+        ) : (
+          signers.length > 0 && <p className="cvs-hint cvs-side-empty">{labels.selectHint}</p>
         )}
-        <p className="cvs-hint" id={`${id}-keys`}>
+        <p className="cvs-hint cvs-keys" id={`${id}-keys`}>
           {labels.keyboardHint}
         </p>
       </aside>
-
-      <div className="cvs-viewer">
-        <div className="cvs-viewer-bar">
-          <ZoomControls zoom={zoom} onZoom={setZoom} labels={labels} />
-        </div>
-        <div
-          ref={scroller}
-          className="cvs-scroller"
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) placement.select(null);
-          }}
-        >
-          <DocumentPages
-            documents={documents}
-            states={states}
-            containerWidth={width}
-            zoom={zoom}
-            labels={labels}
-            renderOverlay={renderOverlay}
-          />
-        </div>
-      </div>
 
       {paletteDrag?.moved && (
         <div
@@ -637,14 +658,43 @@ export function FieldPlacer({
   );
 }
 
+const ICON_PATHS: Record<FieldType, string> = {
+  signature:
+    'M3 17c3-5 5.2-7.5 6.6-7.5 2.1 0 .3 6.6 2.4 6.6 1.6 0 3-3 4.6-3 1.2 0 1.2 1.9 2.6 1.9M3 21h18',
+  initials: 'M5 18V6l5 12V6M14 6h5M16.5 6v12M14 18h5',
+  date_signed: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3',
+  name: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.4-4 4.4-6 8-6s6.6 2 8 6',
+  text: 'M5 6V4h14v2M12 4v16M9 20h6',
+  checkbox: 'M4 4h16v16H4zM8 12l3 3 5-6',
+};
+
+function FieldTypeIcon({ type }: { type: FieldType }) {
+  return (
+    <svg
+      className="cvs-palette-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={ICON_PATHS[type]} />
+    </svg>
+  );
+}
+
 function RecipientPicker({
   placement,
   recipients,
   label,
+  countLabel,
 }: {
   placement: FieldPlacementState;
   recipients: Recipient[];
   label: string;
+  countLabel: (count: number) => string;
 }) {
   const id = useId();
   return (
@@ -652,18 +702,34 @@ function RecipientPicker({
       <h3 className="cvs-panel-title" id={id}>
         {label}
       </h3>
-      {recipients.map((r, index) => (
-        <label key={r.id} className="cvs-recipient" data-cvs-color={index % 6}>
-          <input
-            type="radio"
-            name={id}
-            checked={placement.recipientId === r.id}
-            onChange={() => placement.setRecipientId(r.id)}
-          />
-          <span className="cvs-recipient-dot" aria-hidden="true" />
-          {r.name}
-        </label>
-      ))}
+      {recipients.map((r, index) => {
+        const count = placement.fields.filter((f) => f.recipientId === r.id).length;
+        return (
+          <div
+            key={r.id}
+            className="cvs-recipient"
+            data-cvs-color={index % 6}
+            data-active={placement.recipientId === r.id || undefined}
+          >
+            <label className="cvs-recipient-main">
+              <input
+                type="radio"
+                name={id}
+                checked={placement.recipientId === r.id}
+                onChange={() => placement.setRecipientId(r.id)}
+              />
+              <span className="cvs-recipient-dot" aria-hidden="true" />
+              <span className="cvs-recipient-name">{r.name}</span>
+            </label>
+            <span
+              className="cvs-recipient-count"
+              data-empty={(count === 0 && r.role === 'signer') || undefined}
+            >
+              {countLabel(count)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
