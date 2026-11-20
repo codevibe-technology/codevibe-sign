@@ -54,7 +54,13 @@ export function Sidebar({ current, workspaces, canCreate, onNavigate }: SidebarP
           })}
         </ul>
       </nav>
-      <p className="px-5 py-4 text-xs text-nav-muted">Open source · AGPL-3.0</p>
+      <p className="flex items-center gap-2 px-5 py-4 text-xs text-nav-muted">
+        <a href="/docs" className="font-semibold text-nav-ink hover:underline">
+          Docs
+        </a>
+        <span aria-hidden>·</span>
+        Open source · AGPL-3.0
+      </p>
     </div>
   );
 }

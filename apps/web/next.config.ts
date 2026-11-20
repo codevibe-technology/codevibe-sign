@@ -8,6 +8,8 @@ const securityHeaders = [
 ];
 
 const config: NextConfig = {
+  // The Docker image runs the self-contained server; `next start` keeps working without it.
+  ...(process.env.NEXT_OUTPUT === 'standalone' ? { output: 'standalone' as const } : {}),
   poweredByHeader: false,
   reactStrictMode: true,
   // Node-only packages are loaded at runtime, not bundled. Turbopack applies this only to

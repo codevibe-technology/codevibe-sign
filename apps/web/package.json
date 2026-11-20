@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:docs": "pnpm --filter site build && tsx scripts/copy-docs.ts",
     "start": "next start",
     "db:migrate": "tsx scripts/migrate.ts",
     "plan:set": "tsx scripts/plan-set.ts",
