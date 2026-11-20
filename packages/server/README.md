@@ -324,6 +324,22 @@ await sign.redeliverWebhook({
 workspace's targets; `redeliverWebhook` posts an earlier body again under the same id. Both
 deliver once, now, and are never queued for retry.
 
+## Envelope changes and sent mail
+
+`onEnvelopeChange({ workspaceId, envelopeId, actions })` is called once each change is
+saved, with the audit actions it recorded (`envelope.sent`, `recipient.viewed`,
+`recipient.signed`, `envelope.completed`, `document.sealed`, `recipient.reminded`,
+`envelope.expired` and the rest). Use it to tell open pages to refresh. A hook that throws
+is logged and does not undo the change.
+
+Every email the server sends carries `meta` (kind, workspace, envelope and recipient ids) so
+a mailer can keep a send log without storing bodies, links or codes. `meta` is never sent.
+
+When the sealed files of a completed envelope are over `limits.maxAttachmentBytes`, cannot be
+read, or the provider refuses the message with them attached, the completed copy goes out
+with a personal download link per document instead (`GET /v1/sign/copy/:docId?c=...`, valid
+for 30 days, signed with `sessionSecret`).
+
 ## Background work
 
 Invitations, reminders, completion copies, webhooks and sealing are jobs in the store.

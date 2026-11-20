@@ -55,10 +55,16 @@ export function createWorkspaceMail(deps: WorkspaceMailDeps) {
           look,
           overrides.reminder,
         ),
-      completed: ({ envelope, recipient, attached }) =>
+      completed: ({ envelope, recipient, attached, downloads }) =>
         renderMail(
           'completed',
-          { recipientName: recipient.name, title: envelope.title, role: recipient.role, attached },
+          {
+            recipientName: recipient.name,
+            title: envelope.title,
+            role: recipient.role,
+            attached,
+            downloads,
+          },
           look,
           overrides.completed,
         ),

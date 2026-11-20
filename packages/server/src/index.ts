@@ -50,6 +50,7 @@ export type {
   MailContext,
   LinkMailContext,
   CompletedMailContext,
+  CopyDownload,
   WorkspaceMail,
 } from './templates';
 export { memoryStore } from './store/memory';

@@ -668,6 +668,37 @@ paths:
           $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /v1/sign/copy/{docId}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+      - name: c
+        in: query
+        required: true
+        description: The signed value from the download link in the completed-copy email.
+        schema:
+          type: string
+          maxLength: 1024
+    get:
+      operationId: getEmailedCopy
+      tags: [Signing]
+      summary: Download a signed copy from its email link
+      description: |
+        The link in a completed-copy email whose sealed files were not attached, because they
+        were too large or could not be read. It names one recipient of one completed
+        envelope and works for 30 days. Nothing else is needed to call it.
+      security:
+        - {}
+      responses:
+        '200':
+          $ref: '#/components/responses/Pdf'
+        '401':
+          $ref: '#/components/responses/SignerUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/sign/{token}:
     parameters:
       - $ref: '#/components/parameters/SigningToken'

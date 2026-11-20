@@ -106,6 +106,8 @@ export interface MailInput {
   link?: string;
   /** Completed: the sealed files are attached. */
   attached?: boolean;
+  /** Completed without attachments: a personal download link per sealed document. */
+  downloads?: { name: string; url: string }[];
   /** Cancelled: what happened to the envelope. */
   envelopeStatus?: string;
 }
@@ -148,26 +150,40 @@ export function renderMail(
   if (linkMail && values.expires_on) {
     paragraphs.push(`The request expires on ${values.expires_on}.`);
   }
+  const downloads = kind === 'completed' && !input.attached ? (input.downloads ?? []) : [];
   if (kind === 'completed') {
     paragraphs.push(
       input.attached
         ? 'The signed copy is attached. Keep it for your records.'
-        : `The signed copy was too large to attach. Ask ${brand.company} for a copy.`,
+        : downloads.length
+          ? 'The signed copy could not be attached. Download it below and keep it for your records.'
+          : `The signed copy could not be attached. Ask ${brand.company} for a copy.`,
     );
   }
   if (kind === 'cancelled') paragraphs.push('Your signing link no longer works.');
+  const single = downloads.length === 1 ? downloads[0] : undefined;
   const button =
-    linkMail && input.link ? { label: `Review and ${action}`, href: input.link } : null;
-  const after = linkMail ? ['This link is personal. Do not forward this email.'] : [];
+    linkMail && input.link
+      ? { label: `Review and ${action}`, href: input.link }
+      : single
+        ? { label: 'Download the signed copy', href: single.url }
+        : null;
+  const links = single ? [] : downloads;
+  const after = linkMail
+    ? ['This link is personal. Do not forward this email.']
+    : downloads.length
+      ? ['The download link is personal and works for 30 days. Do not forward this email.']
+      : [];
 
   const footer = `Sent by ${brand.company}${brand.showBadge ? ' · Secured by Codevibe Sign' : ''}`;
   const text = [
     ...paragraphs,
     ...(button ? [`${button.label}: ${button.href}`] : []),
+    ...links.map((l) => `${l.name}: ${l.url}`),
     ...after,
     footer,
   ].join('\n\n');
-  return { subject, text, html: layout(brand, paragraphs, button, after, footer) };
+  return { subject, text, html: layout(brand, paragraphs, button, after, footer, links) };
 }
 
 function layout(
@@ -176,6 +192,7 @@ function layout(
   button: { label: string; href: string } | null,
   after: string[],
   footer: string,
+  links: { name: string; url: string }[] = [],
 ): string {
   const color = isHexColor(brand.brandColor) ? brand.brandColor : DEFAULT_BRAND_COLOR;
   const ink = textOn(color);
@@ -194,6 +211,7 @@ function layout(
 <tr><td style="padding:16px 28px;background:${color};color:${ink}">${header}</td></tr>
 <tr><td style="padding:24px 28px;font-size:15px;line-height:1.6">
 ${paragraphs.map(para).join('\n')}
+${links.map((l) => `<p style="margin:0 0 8px"><a href="${escapeHtml(l.url)}" style="color:${color};font-weight:600">${escapeHtml(l.name)}</a></p>`).join('')}
 ${action}
 ${after.map((line) => `<p style="margin:16px 0 0;font-size:13px;color:#5B6B80">${escapeHtml(line)}</p>`).join('')}
 </td></tr>

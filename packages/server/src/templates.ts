@@ -13,11 +13,19 @@ export interface LinkMailContext {
   link: string;
 }
 
+/** A link to download one sealed document. Personal to the recipient, like a signing link. */
+export interface CopyDownload {
+  name: string;
+  url: string;
+}
+
 export interface CompletedMailContext {
   envelope: Envelope;
   recipient: Recipient;
-  /** False when the sealed files were too large to attach. */
+  /** False when the sealed files are not attached: too large, unreadable or refused. */
   attached: boolean;
+  /** When not attached, a download link for each sealed document. Empty otherwise. */
+  downloads: CopyDownload[];
 }
 
 export interface MailContext {
@@ -51,8 +59,17 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function layout(paragraphs: string[], action?: { label: string; href: string }): string {
-  const body = paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('\n');
+function layout(
+  paragraphs: string[],
+  action?: { label: string; href: string },
+  links: CopyDownload[] = [],
+): string {
+  const list = links.length
+    ? `<ul>${links
+        .map((l) => `<li><a href="${escapeHtml(l.url)}">${escapeHtml(l.name)}</a></li>`)
+        .join('')}</ul>`
+    : '';
+  const body = paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('\n') + list;
   const button = action
     ? `<p><a href="${escapeHtml(action.href)}" style="display:inline-block;padding:10px 18px;` +
       `background:#1f6feb;color:#ffffff;text-decoration:none;border-radius:6px">` +
@@ -91,18 +108,21 @@ function linkMail(ctx: LinkMailContext, reminder: boolean): RenderedMail {
 export const defaultTemplates: MailTemplates = {
   invite: (ctx) => linkMail(ctx, false),
   reminder: (ctx) => linkMail(ctx, true),
-  completed({ envelope, recipient, attached }) {
+  completed({ envelope, recipient, attached, downloads }) {
     const lines = [
       `Hello ${recipient.name},`,
       `Everyone has finished with "${envelope.title}".`,
       attached
         ? 'The sealed copy is attached. Keep it for your records.'
-        : 'The sealed copy was too large to attach. Ask the sender for a copy.',
+        : downloads.length
+          ? 'The sealed copy could not be attached. Download it here and keep it for your records. The link is personal and works for 30 days.'
+          : 'The sealed copy could not be attached. Ask the sender for a copy.',
     ];
+    const text = [...lines, ...downloads.map((d) => `${d.name}: ${d.url}`)].join('\n\n');
     return {
       subject: `Completed: "${envelope.title}"`,
-      text: lines.join('\n\n'),
-      html: layout(lines),
+      text,
+      html: layout(lines, undefined, attached ? [] : downloads),
     };
   },
   cancelled({ envelope, recipient }) {

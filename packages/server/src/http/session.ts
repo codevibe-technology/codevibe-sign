@@ -99,3 +99,55 @@ export function verifyReceipt(
     return null;
   }
 }
+
+/** How long the download link in a completed-copy email works. */
+export const COPY_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+interface CopyClaims {
+  k: 'copy';
+  e: string;
+  r: string;
+  exp: number;
+}
+
+/**
+ * A signed value that lets one recipient download the sealed copy of one envelope, for the
+ * completed-copy email when the files are not attached. Nothing is stored.
+ */
+export function issueCopyClaim(
+  secret: string,
+  envelopeId: string,
+  recipientId: string,
+  now: Date,
+): string {
+  const claims: CopyClaims = {
+    k: 'copy',
+    e: envelopeId,
+    r: recipientId,
+    exp: now.getTime() + COPY_LINK_TTL_MS,
+  };
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `${payload}.${hmacSha256Hex(secret, payload)}`;
+}
+
+/** The envelope and recipient a copy claim names, or null when it is forged, malformed or old. */
+export function verifyCopyClaim(
+  secret: string,
+  value: string | undefined,
+  now: Date,
+): { envelopeId: string; recipientId: string } | null {
+  if (!value || value.length > 1024) return null;
+  const [payload, signature, extra] = value.split('.');
+  if (!payload || !signature || extra !== undefined) return null;
+  if (!constantTimeEqual(signature, hmacSha256Hex(secret, payload))) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as CopyClaims;
+    if (claims.k !== 'copy' || typeof claims.e !== 'string' || typeof claims.r !== 'string') {
+      return null;
+    }
+    if (typeof claims.exp !== 'number' || claims.exp <= now.getTime()) return null;
+    return { envelopeId: claims.e, recipientId: claims.r };
+  } catch {
+    return null;
+  }
+}

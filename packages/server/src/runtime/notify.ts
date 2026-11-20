@@ -7,8 +7,9 @@ import {
   type Id,
   type Recipient,
 } from '@codevibe_technology/sign-core';
+import { issueCopyClaim } from '../http/session';
 import { DEFAULT_WORKSPACE } from '../tenancy';
-import type { MailTemplates } from '../templates';
+import type { CopyDownload, MailTemplates } from '../templates';
 import type { Runtime } from './context';
 import { sealedFileKey } from './seal';
 
@@ -59,43 +60,79 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
 
   const linkMail = payload.reason === 'invite' || payload.reason === 'reminder';
   if (linkMail && (isFinal(envelope) || hasActed(recipient))) return;
-  const { templates, sender } = await mailFor(rt, stored.workspaceId ?? DEFAULT_WORKSPACE);
+  const workspaceId = stored.workspaceId ?? DEFAULT_WORKSPACE;
+  const { templates, sender } = await mailFor(rt, workspaceId);
+  const base = {
+    to: recipient.email,
+    ...sender,
+    meta: {
+      kind: payload.reason,
+      workspaceId,
+      envelopeId: envelope.id,
+      recipientId: recipient.id,
+    },
+  };
 
   if (payload.reason === 'completed_copy') {
     const attachments = await sealedAttachments(rt, envelope);
-    const mail = templates.completed({ envelope, recipient, attached: attachments !== null });
+    if (attachments) {
+      try {
+        const mail = templates.completed({ envelope, recipient, attached: true, downloads: [] });
+        await rt.mailer.send({ ...base, ...mail, attachments });
+        return;
+      } catch (err) {
+        rt.logger.warn('completed copy with attachments was not sent, sending links instead', {
+          envelope: envelope.id,
+          recipient: recipient.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    const downloads = copyDownloads(rt, envelope, recipient);
     await rt.mailer.send({
-      to: recipient.email,
-      ...sender,
-      ...mail,
-      ...(attachments ? { attachments } : {}),
+      ...base,
+      ...templates.completed({ envelope, recipient, attached: false, downloads }),
     });
     return;
   }
 
   if (payload.reason === 'cancelled') {
-    await rt.mailer.send({
-      to: recipient.email,
-      ...sender,
-      ...templates.cancelled({ envelope, recipient }),
-    });
+    await rt.mailer.send({ ...base, ...templates.cancelled({ envelope, recipient }) });
     return;
   }
 
   const link = await issueToken(rt, envelope, recipient);
   const template = payload.reason === 'invite' ? templates.invite : templates.reminder;
-  await rt.mailer.send({
-    to: recipient.email,
-    ...sender,
-    ...template({ envelope, recipient, link }),
-  });
+  await rt.mailer.send({ ...base, ...template({ envelope, recipient, link }) });
 }
 
+/** One personal download link per document, for a completed copy sent without attachments. */
+function copyDownloads(rt: Runtime, envelope: Envelope, recipient: Recipient): CopyDownload[] {
+  const claim = issueCopyClaim(rt.sessionSecret, envelope.id, recipient.id, rt.clock.now());
+  return envelope.documents.map((document) => ({
+    name: document.name,
+    url: `${rt.publicUrl}${rt.basePath}/v1/sign/copy/${encodeURIComponent(document.id)}?c=${claim}`,
+  }));
+}
+
+/**
+ * The sealed files to attach, or null to send links instead: when one is missing or cannot be
+ * read, or together they are over `maxAttachmentBytes`.
+ */
 async function sealedAttachments(rt: Runtime, envelope: Envelope) {
   const attachments = [];
   let total = 0;
   for (const document of envelope.documents) {
-    const content = await rt.files.get(sealedFileKey(envelope.id, document.id));
+    const content = await rt.files
+      .get(sealedFileKey(envelope.id, document.id))
+      .catch((err: unknown) => {
+        rt.logger.warn('sealed file could not be read for the completed copy', {
+          envelope: envelope.id,
+          document: document.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      });
     if (!content) return null;
     total += content.byteLength;
     if (total > rt.limits.maxAttachmentBytes) return null;

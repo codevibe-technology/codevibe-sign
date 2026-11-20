@@ -374,6 +374,35 @@
           }
         },
         {
+          "name": "Download a signed copy from its email link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/copy/:docId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", "copy", ":docId"],
+              "query": [
+                {
+                  "key": "c",
+                  "value": "",
+                  "description": "The signed value from the download link in the completed-copy email.",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
+              ]
+            },
+            "description": "Download a signed copy from its email link\n\nThe link in a completed-copy email whose sealed files were not attached, because they\nwere too large or could not be read. It names one recipient of one completed\nenvelope and works for 30 days. Nothing else is needed to call it.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
           "name": "Open a signing session",
           "request": {
             "method": "GET",

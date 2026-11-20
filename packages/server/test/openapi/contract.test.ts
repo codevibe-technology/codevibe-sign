@@ -285,8 +285,9 @@ describe('a full run against the server', () => {
       await call('POST', '/v1/envelopes', { body: { ...body, recipients: [] } }),
       await call('GET', `/v1/sign/${'x'.repeat(43)}`),
       await call('GET', '/v1/sign/receipt', { headers: { 'x-sign-receipt': 'forged.receipt' } }),
+      await call('GET', `/v1/sign/copy/${docId}?c=forged.claim`),
     ];
-    expect(failures.map((f) => f.status)).toEqual([401, 404, 409, 400, 401, 401]);
+    expect(failures.map((f) => f.status)).toEqual([401, 404, 409, 400, 401, 401, 401]);
 
     for (const delivery of h.deliveries) {
       const header = delivery.headers['x-codevibe-signature'];

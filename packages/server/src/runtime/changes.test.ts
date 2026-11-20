@@ -61,3 +61,16 @@ describe('onEnvelopeChange', () => {
     }
   });
 });
+
+describe('mail meta', () => {
+  it('labels every envelope email with its kind, workspace, envelope and recipient', async () => {
+    const h = harness();
+    const envelope = await complete(h);
+    const kinds = h.mailer.sent.map((m) => m.meta?.kind);
+    expect(kinds).toEqual(['invite', 'completed_copy']);
+    for (const mail of h.mailer.sent) {
+      expect(mail.meta).toMatchObject({ workspaceId: 'default', envelopeId: envelope.id });
+      expect(mail.meta?.recipientId).toEqual(expect.any(String));
+    }
+  });
+});

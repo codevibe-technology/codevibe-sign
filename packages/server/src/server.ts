@@ -7,6 +7,7 @@ import type { SignServerOptions, WebhookDeliveryReport } from './options';
 import { senderRoutes } from './routes/sender';
 import { linkRoutes } from './routes/link';
 import { openApiRoutes } from './routes/openapi';
+import { copyRoutes } from './routes/copy';
 import { receiptRoutes } from './routes/receipt';
 import { signerRoutes } from './routes/signer';
 import { createRuntime } from './runtime/context';
@@ -86,6 +87,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
   app.route('/v1/envelopes', senderRoutes(rt));
   // Before the signer routes, whose `/:token` would otherwise take `receipt` for a token.
   app.route('/v1/sign/receipt', receiptRoutes(rt));
+  app.route('/v1/sign/copy', copyRoutes(rt));
   app.route('/v1/sign', signerRoutes(rt));
   app.route('/sign', linkRoutes(rt));
 
