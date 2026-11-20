@@ -26,7 +26,11 @@ let identity: TestP12;
 let sealed: Uint8Array;
 
 beforeAll(async () => {
-  identity = createTestP12({ commonName: 'Codevibe Sign Seal', organization: 'Codevibe' });
+  identity = createTestP12({
+    commonName: 'Codevibe Sign Seal',
+    organization: 'Codevibe',
+    notBefore: new Date(signingTime.getTime() - 86_400_000),
+  });
   sealed = await seal(await makePdf([{ size: A4 }, { size: A4 }]), {
     p12: identity.p12,
     passphrase: identity.passphrase,
