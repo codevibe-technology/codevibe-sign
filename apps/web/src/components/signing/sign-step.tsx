@@ -42,6 +42,15 @@ export function SignStep({
               : `Fill in the ${fieldCount} highlighted fields. "Next field" takes you to each one.`}
         </p>
       </div>
+      {view.envelope.changeNote ? (
+        <p
+          className="rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"
+          data-testid="change-note"
+        >
+          <span className="font-semibold">What changed:</span> {view.envelope.changeNote}
+        </p>
+      ) : null}
+
       <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface">
         {pdf ? (
           <SigningView

@@ -15,6 +15,8 @@ export interface SignerView {
     id: string;
     title: string;
     message: string | null;
+    /** For a revised envelope: what changed since the version that was declined. */
+    changeNote?: string | null;
     status: EnvelopeStatus;
     expiresAt: string | null;
   };

@@ -4,12 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { can, canVoidEnvelope } from '@/lib/roles';
 import { db } from '../db';
-import { findSealedDocument, sentBy } from '../envelopes';
+import { findSealedDocument, recordSender, sentBy } from '../envelopes';
 import { AppError } from '../errors';
 import { inspectUpload, verifyUpload } from '../pdf';
 import { assertWithin, workspacePlan } from '../plans';
 import { signApi, userPrincipal } from '../sign/api';
-import { workspaceAction } from './action';
+import { workspaceAction, type ActionContext } from './action';
 
 const id = z.string().min(1).max(100);
 const pdfFile = z.instanceof(File, { error: 'Choose a PDF file' });
@@ -106,5 +106,113 @@ export const verifyDocumentAction = workspaceAction(
       ? await findSealedDocument(db(), ctx.workspace.id, outcome.sha256)
       : null;
     return { ...outcome, fileName: input.file.name, envelope: match };
+  },
+);
+
+const actor = (ctx: { user: { name: string; email: string } }) =>
+  ctx.user.name.trim() || ctx.user.email;
+
+/**
+ * A fresh signing link for the recipient whose turn it is, for the admin to pass on by hand.
+ * Their earlier links stop working. The link is returned once and kept nowhere.
+ */
+export const shareLinkAction = workspaceAction(
+  'links.share',
+  z.object({ envelopeId: id, recipientId: id }),
+  async (ctx, input) => {
+    const api = signApi(userPrincipal(ctx.user.id, ctx.workspace.id, false, actor(ctx)));
+    const { url } = await api.shareLink(input.envelopeId, input.recipientId);
+    revalidatePath(`/w/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
+    return { url };
+  },
+);
+
+/** Corrects the name, email or phone of a recipient who has not acted yet. */
+export const correctRecipientAction = workspaceAction(
+  'envelopes.write',
+  z.object({
+    envelopeId: id,
+    recipientId: id,
+    name: z.string().trim().min(1, 'Enter a name').max(200, 'Keep the name under 200 characters'),
+    email: z.string().trim().max(254).optional(),
+    phone: z.string().trim().max(20).optional(),
+    resend: z.boolean().optional(),
+  }),
+  async (ctx, input) => {
+    const api = signApi(userPrincipal(ctx.user.id, ctx.workspace.id, false, actor(ctx)));
+    const before = (await api.get(input.envelopeId)).recipients.find(
+      (r) => r.id === input.recipientId,
+    );
+    const envelope = await api.correctRecipient(input.envelopeId, input.recipientId, {
+      name: input.name,
+      ...(input.email !== undefined ? { email: input.email } : {}),
+      ...(input.phone !== undefined ? { phone: input.phone } : {}),
+      ...(input.resend ? { resend: true } : {}),
+    });
+    revalidatePath(`/w/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
+    const after = envelope.recipients.find((r) => r.id === input.recipientId);
+    const invited =
+      after?.notifiedAt !== before?.notifiedAt || after?.lastRemindedAt !== before?.lastRemindedAt;
+    return { invited };
+  },
+);
+
+async function copyToDraft(
+  ctx: ActionContext,
+  envelopeId: string,
+  make: (api: ReturnType<typeof signApi>) => Promise<{ draft: { id: string } }>,
+) {
+  const mine = await sentBy(db(), ctx.workspace.id, ctx.user.id, [envelopeId]);
+  if (!canVoidEnvelope(ctx.role, mine.has(envelopeId))) {
+    throw new AppError('FORBIDDEN', 'Only an admin can change an envelope someone else sent.');
+  }
+  const api = signApi(userPrincipal(ctx.user.id, ctx.workspace.id, false, actor(ctx)));
+  const { draft } = await make(api);
+  await recordSender(db(), {
+    workspaceId: ctx.workspace.id,
+    envelopeId: draft.id,
+    userId: ctx.user.id,
+  });
+  revalidatePath(`/w/${ctx.workspace.slug}`, 'layout');
+  return { draftId: draft.id };
+}
+
+/**
+ * Recall and edit: voids a sent envelope and makes a draft copy to correct and send again.
+ * Allowed to whoever may void it.
+ */
+export const recallEnvelopeAction = workspaceAction(
+  'envelopes.write',
+  z.object({
+    envelopeId: id,
+    note: z.string().trim().max(900, 'Keep the note under 900 characters').optional(),
+  }),
+  (ctx, input) =>
+    copyToDraft(ctx, input.envelopeId, (api) => api.recall(input.envelopeId, input.note)),
+);
+
+/** Revise and resend: copies a declined envelope to a new draft. The declined one stays. */
+export const reviseEnvelopeAction = workspaceAction(
+  'envelopes.write',
+  z.object({ envelopeId: id }),
+  (ctx, input) => copyToDraft(ctx, input.envelopeId, (api) => api.revise(input.envelopeId)),
+);
+
+/** Replaces a draft's PDF; says which fields were moved and need checking. */
+export const replaceDocumentAction = workspaceAction(
+  'envelopes.write',
+  z.object({ envelopeId: id, documentId: id, file: pdfFile }),
+  async (ctx, input) => {
+    assertWithin(await workspacePlan(db(), ctx.workspace.id), 'fileBytes', input.file.size, 'file');
+    const form = new FormData();
+    form.set('document', input.file, input.file.name);
+    form.set('name', input.file.name);
+    const api = signApi(userPrincipal(ctx.user.id, ctx.workspace.id));
+    const { envelope, movedFields } = await api.replaceDocument(
+      input.envelopeId,
+      input.documentId,
+      form,
+    );
+    return { envelope, movedFields };
   },
 );

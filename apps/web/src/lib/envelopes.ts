@@ -1,5 +1,6 @@
 import type {
   AuditAction,
+  AuditEvent,
   AuthMethod,
   EnvelopeStatus,
   RecipientRole,
@@ -23,7 +24,16 @@ export interface EnvelopeSummary {
     role: RecipientRole;
     status: RecipientStatus;
     actedAt: string | null;
+    declineReason?: string | null;
   }[];
+}
+
+/** "Declined by Ravi: wrong salary" for a declined envelope's list row, or null. */
+export function declineLine(envelope: Pick<EnvelopeSummary, 'status' | 'recipients'>) {
+  if (envelope.status !== 'declined') return null;
+  const r = envelope.recipients.find((x) => x.status === 'declined');
+  if (!r) return null;
+  return r.declineReason ? `Declined by ${r.name}: ${r.declineReason}` : `Declined by ${r.name}`;
 }
 
 export interface EnvelopePage {
@@ -121,6 +131,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'envelope.declined': 'Declined',
   'envelope.expired': 'Expired',
   'envelope.voided': 'Voided',
+  'envelope.recalled': 'Recalled to correct',
+  'envelope.revised': 'Revised after the decline',
   'recipient.notified': 'Invited',
   'recipient.reminded': 'Reminded',
   'recipient.viewed': 'Opened the document',
@@ -128,8 +140,92 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'recipient.signed': 'Signed',
   'recipient.approved': 'Approved',
   'recipient.declined': 'Declined',
+  'recipient.link_shared': 'Link shared manually',
+  'recipient.corrected': 'Details corrected',
   'document.sealed': 'Document sealed',
 };
+
+/** `a***@example.com`: enough to recognise an address without showing all of it. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at < 1) return '***';
+  return `${email[0]}***${email.slice(at)}`;
+}
+
+export interface EventDetail {
+  /** The timeline line, for example "Link shared manually by Meera". */
+  label: string;
+  /** A second line with what changed, if any. */
+  note?: string;
+  /** The other envelope of a recall or revision. */
+  link?: { envelopeId: string; title: string; prefix: string };
+}
+
+const text = (value: unknown) => (typeof value === 'string' && value ? value : null);
+
+/** How the timeline shows one event, with who did it and the envelope it links to. */
+export function eventDetail(event: Pick<AuditEvent, 'action' | 'data'>): EventDetail {
+  const by = text(event.data?.by);
+  const byLine = by ? ` by ${by}` : '';
+  const base = actionLabel(event.action);
+  switch (event.action) {
+    case 'recipient.link_shared':
+      return { label: `${base}${byLine}` };
+    case 'recipient.corrected': {
+      const changes: string[] = [];
+      const oldName = text(event.data?.oldName);
+      const newName = text(event.data?.newName);
+      if (oldName && newName) changes.push(`name ${oldName} → ${newName}`);
+      const oldEmail = text(event.data?.oldEmail);
+      const newEmail = text(event.data?.newEmail);
+      if (oldEmail || newEmail) {
+        changes.push(
+          `email ${oldEmail ? maskEmail(oldEmail) : 'none'} → ${newEmail ? maskEmail(newEmail) : 'none'}`,
+        );
+      }
+      if (event.data?.oldPhone !== undefined || event.data?.newPhone !== undefined) {
+        changes.push('phone changed');
+      }
+      if (event.data?.invited === true) changes.push('new invitation sent');
+      return { label: `${base}${byLine}`, ...(changes.length ? { note: changes.join('; ') } : {}) };
+    }
+    case 'envelope.recalled':
+    case 'envelope.revised': {
+      const id = text(event.data?.replacementId);
+      return {
+        label: `${base}${byLine}`,
+        ...(id
+          ? {
+              link: {
+                envelopeId: id,
+                title: text(event.data?.replacementTitle) ?? 'the new draft',
+                prefix: 'Replaced by',
+              },
+            }
+          : {}),
+      };
+    }
+    case 'envelope.created': {
+      const recalled = text(event.data?.recalledFrom);
+      const revised = text(event.data?.revisedFrom);
+      const from = recalled ?? revised;
+      if (!from) return { label: base };
+      const title =
+        text(recalled ? event.data?.recalledFromTitle : event.data?.revisedFromTitle) ??
+        'the earlier envelope';
+      return {
+        label: recalled ? `Corrected copy made${byLine}` : `Revision made${byLine}`,
+        link: {
+          envelopeId: from,
+          title,
+          prefix: recalled ? 'Copy of the recalled' : 'Revision of the declined',
+        },
+      };
+    }
+    default:
+      return { label: base };
+  }
+}
 
 export const actionLabel = (action: string) =>
   (ACTION_LABELS as Record<string, string>)[action] ?? action;

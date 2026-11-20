@@ -48,6 +48,14 @@ export function ConsentStep({
       <h1 className="mt-1 text-xl font-bold" tabIndex={-1} data-autofocus>
         {company} asks you to {verb} &ldquo;{view.envelope.title}&rdquo;
       </h1>
+      {view.envelope.changeNote ? (
+        <p
+          className="mt-4 rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"
+          data-testid="change-note"
+        >
+          <span className="font-semibold">What changed:</span> {view.envelope.changeNote}
+        </p>
+      ) : null}
       {view.envelope.message ? (
         <blockquote className="mt-4 border-l-4 border-line-strong pl-3 whitespace-pre-line">
           {view.envelope.message}

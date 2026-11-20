@@ -23,7 +23,9 @@ import {
   type Problems,
   type SendFlowState,
   type StepKey,
+  withReplacedDocument,
 } from '@/lib/send-flow';
+import { replaceDocumentAction } from '@/server/actions/envelopes';
 import { StepDocuments } from './step-documents';
 import { StepFields } from './step-fields';
 import { StepRecipients } from './step-recipients';
@@ -47,19 +49,28 @@ export const emptyFlow = (): SendFlowState => ({
 
 const AUTOSAVE_MS = 1000;
 
+/** Why the envelope this draft revises was declined, to address before sending again. */
+export interface RevisionNote {
+  title: string;
+  declinedBy: string;
+  role: string;
+  reason: string | null;
+}
+
 export interface SendFlowProps {
   slug: string;
   workspaceId: string;
   me: { name: string; email: string };
   initial?: SendFlowState;
   initialStep?: StepKey;
+  revision?: RevisionNote;
 }
 
 /**
  * Upload, recipients, fields, review. The draft is created on the server once there is
  * someone to send to, and every later change is saved on its own a moment after it is made.
  */
-export function SendFlow({ slug, workspaceId, me, initial, initialStep }: SendFlowProps) {
+export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision }: SendFlowProps) {
   const router = useRouter();
   const [state, setState] = useState<SendFlowState>(initial ?? emptyFlow);
   const [step, setStep] = useState<StepKey>(initialStep ?? 'documents');
@@ -267,6 +278,23 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep }: SendFl
 
   const back = () => index > 0 && go(STEPS[index - 1]!.key);
 
+  async function replaceDocument(documentId: string, file: File) {
+    const envelopeId = latest.current.envelopeId;
+    if (!envelopeId) return { error: 'Save the draft first.' };
+    if (!(await saveNow())) return { error: 'The draft could not be saved. Try again.' };
+    const form = new FormData();
+    form.set('workspaceId', workspaceId);
+    form.set('envelopeId', envelopeId);
+    form.set('documentId', documentId);
+    form.set('file', file);
+    const result = await replaceDocumentAction(form);
+    if (!result.ok) return { error: result.error };
+    const next = withReplacedDocument(latest.current, result.data.envelope, documentId);
+    lastSaved.current = JSON.stringify(draftBody(next));
+    setState(next);
+    return { moved: result.data.movedFields.length };
+  }
+
   return (
     <div className="pb-24 sm:pb-0">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -288,6 +316,23 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep }: SendFl
         </Button>
       </div>
 
+      {revision ? (
+        <aside
+          aria-label="Why it was declined"
+          className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-ink"
+        >
+          <p className="font-semibold">
+            Declined by {revision.declinedBy} ({revision.role}): “{revision.title}”
+          </p>
+          <p className="mt-1 break-words whitespace-pre-line">
+            {revision.reason ?? 'No reason was given.'}
+          </p>
+          <p className="mt-1 text-muted">
+            Everyone signs this revision again; signatures on the declined one are not carried over.
+          </p>
+        </aside>
+      ) : null}
+
       <Stepper current={step} reached={reached} onSelect={go} />
 
       {step === 'documents' ? (
@@ -297,6 +342,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep }: SendFl
           locked={state.envelopeId !== null}
           error={problems.documents}
           onChange={(fn) => update((s) => ({ ...s, documents: fn(s.documents) }))}
+          {...(state.envelopeId ? { onReplace: replaceDocument } : {})}
         />
       ) : step === 'recipients' ? (
         <StepRecipients

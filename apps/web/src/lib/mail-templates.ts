@@ -101,6 +101,8 @@ export interface MailInput {
   role: 'signer' | 'approver' | 'viewer';
   /** The sender's own message on the envelope. */
   message?: string | null;
+  /** A revised envelope: what changed since the declined version. */
+  changeNote?: string | null;
   expiresAt?: string | null;
   /** Invitations and reminders: the personal signing link. */
   link?: string;
@@ -147,6 +149,7 @@ export function renderMail(
   const paragraphs = [`Hello ${input.recipientName},`, ...intro.split(/\n{2,}/)];
   const linkMail = kind === 'invite' || kind === 'reminder';
   if (linkMail && input.message) paragraphs.push(input.message);
+  if (linkMail && input.changeNote) paragraphs.push(`What changed: ${input.changeNote}`);
   if (linkMail && values.expires_on) {
     paragraphs.push(`The request expires on ${values.expires_on}.`);
   }
@@ -231,5 +234,36 @@ export function sampleInput(kind: MailKind): MailInput {
     link: 'https://sign.example.com/api/sign/your-personal-link',
     attached: true,
     envelopeStatus: 'voided',
+  };
+}
+
+/** To the member who sent an envelope: someone declined it, with their reason in full. */
+export function declineNotice(input: {
+  senderName: string;
+  title: string;
+  declinedBy: string;
+  role: 'signer' | 'approver' | 'viewer';
+  reason: string | null;
+  url: string;
+}): RenderedMail {
+  const role = input.role === 'approver' ? 'approver' : 'signer';
+  const paragraphs = [
+    `Hello ${input.senderName || 'there'},`,
+    `${input.declinedBy} (${role}) declined “${input.title}”.`,
+    input.reason ? `Their reason: ${input.reason}` : 'They did not give a reason.',
+    'You can revise it and send it again from the envelope page. Everyone signs the new version.',
+  ];
+  const button = { label: 'Open the envelope', href: input.url };
+  const footer = 'Sent by Codevibe Sign';
+  const brand: MailBrand = {
+    company: 'Codevibe Sign',
+    brandColor: DEFAULT_BRAND_COLOR,
+    logoUrl: null,
+    showBadge: false,
+  };
+  return {
+    subject: `Declined: ${input.title}`.replace(/[\r\n]+/g, ' '),
+    text: [...paragraphs, `${button.label}: ${button.href}`, footer].join('\n\n'),
+    html: layout(brand, paragraphs, button, [], footer),
   };
 }

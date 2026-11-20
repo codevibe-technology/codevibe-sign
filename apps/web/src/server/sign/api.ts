@@ -120,6 +120,39 @@ export function signApi(principal: Principal) {
       json<Envelope>(
         await call(`${envelope(id)}/remind`, jsonInit('POST', recipientId ? { recipientId } : {})),
       ),
+    shareLink: async (id: string, recipientId: string) =>
+      json<{ recipientId: string; url: string }>(
+        await call(
+          `${envelope(id)}/recipients/${encodeURIComponent(recipientId)}/link`,
+          jsonInit('POST'),
+        ),
+      ),
+    correctRecipient: async (
+      id: string,
+      recipientId: string,
+      body: { name?: string; email?: string; phone?: string; resend?: boolean },
+    ) =>
+      json<Envelope>(
+        await call(
+          `${envelope(id)}/recipients/${encodeURIComponent(recipientId)}`,
+          jsonInit('PATCH', body),
+        ),
+      ),
+    recall: async (id: string, note?: string) =>
+      json<{ draft: Envelope; recalled: Envelope }>(
+        await call(`${envelope(id)}/recall`, jsonInit('POST', note ? { note } : {})),
+      ),
+    revise: async (id: string) =>
+      json<{ draft: Envelope; declined: Envelope }>(
+        await call(`${envelope(id)}/revise`, jsonInit('POST')),
+      ),
+    replaceDocument: async (id: string, documentId: string, form: FormData) =>
+      json<{ envelope: Envelope; movedFields: string[] }>(
+        await call(`${envelope(id)}/documents/${encodeURIComponent(documentId)}`, {
+          method: 'PUT',
+          body: form,
+        }),
+      ),
     events: async (id: string) =>
       json<{ events: AuditEvent[]; chainValid: boolean }>(await call(`${envelope(id)}/events`)),
     certificate: async (id: string) =>
@@ -141,8 +174,10 @@ export const userPrincipal = (
   userId: string,
   workspaceId: string,
   readOnly = false,
+  actorName?: string,
 ): Principal => ({
   id: `user:${userId}`,
   workspaceId,
   ...(readOnly ? { readOnly } : {}),
+  ...(actorName ? { actorName } : {}),
 });

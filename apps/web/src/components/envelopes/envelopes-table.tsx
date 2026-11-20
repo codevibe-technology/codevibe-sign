@@ -25,6 +25,7 @@ import { cn } from '@/lib/cn';
 import {
   STATUS_FILTERS,
   isFinalStatus,
+  declineLine,
   peopleLine,
   progressOf,
   relativeTime,
@@ -368,6 +369,11 @@ export function EnvelopesTable({
                         {peopleLine(e.recipients.map((r) => r.name))}
                         {e.documents.length > 1 ? ` · ${e.documents.length} documents` : ''}
                       </p>
+                      {declineLine(e) ? (
+                        <p className="truncate text-danger" title={declineLine(e)!}>
+                          {declineLine(e)}
+                        </p>
+                      ) : null}
                       <div className="mt-1.5 md:hidden">
                         <StatusPill status={e.status} />
                       </div>

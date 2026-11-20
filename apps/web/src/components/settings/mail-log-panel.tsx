@@ -103,9 +103,7 @@ export function MailLogPanel({
                 <p className="truncate text-muted" title={row.subject}>
                   {row.subject}
                 </p>
-                {row.error ? (
-                  <p className="mt-1 break-words text-danger">{row.error}</p>
-                ) : null}
+                {row.error ? <p className="mt-1 break-words text-danger">{row.error}</p> : null}
                 <p className="mt-1 text-xs text-muted">
                   {row.attachmentCount > 0
                     ? `${row.attachmentCount} attached (${formatBytes(row.attachmentBytes)}) · `

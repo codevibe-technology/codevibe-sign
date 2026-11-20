@@ -16,7 +16,8 @@ export default async function EmailLogSettings({
   const { slug } = await params;
   const { envelope } = await searchParams;
   const { workspace } = await requireWorkspace(slug, 'workspace.manage');
-  const envelopeId = typeof envelope === 'string' && envelope.trim() ? envelope.trim().slice(0, 64) : null;
+  const envelopeId =
+    typeof envelope === 'string' && envelope.trim() ? envelope.trim().slice(0, 64) : null;
   const rows = await listMailLog(db(), workspace.id, { envelopeId });
   return (
     <MailLogPanel

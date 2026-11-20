@@ -307,6 +307,19 @@ describe('one-time code', () => {
 });
 
 describe('consent and signing', () => {
+  it('shows what changed in a revised envelope above the document', async () => {
+    server({
+      'GET /api/v1/sign/link': ok(
+        view({ envelope: { ...view().envelope, changeNote: 'Clause 4 now says 30 days.' } }),
+      ),
+      [BRAND]: ok(brand),
+    });
+    render(<SigningApp smsAvailable={false} />);
+    expect(await screen.findByTestId('change-note')).toHaveTextContent(
+      'What changed: Clause 4 now says 30 days.',
+    );
+  });
+
   it('needs the consent box ticked before the document opens', async () => {
     const calls = server({
       'GET /api/v1/sign/link': ok(view()),

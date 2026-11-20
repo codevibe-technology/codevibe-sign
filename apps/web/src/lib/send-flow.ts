@@ -15,6 +15,7 @@ export const MAX_DOCUMENTS = 20;
 export const MAX_RECIPIENTS = 50;
 export const TITLE_MAX = 200;
 export const MESSAGE_MAX = 5000;
+export const CHANGE_NOTE_MAX = 2000;
 
 export const STEPS = [
   { key: 'documents', label: 'Documents' },
@@ -51,6 +52,8 @@ export interface DraftRecipient {
 export interface DraftSettings {
   title: string;
   message: string;
+  /** For a revised envelope: what changed, shown to recipients as "What changed: …". */
+  changeNote?: string;
   expiresInDays: number;
   /** 0 turns automatic reminders off. */
   remindEveryDays: number;
@@ -190,6 +193,9 @@ export function settingsProblems(settings: DraftSettings): Problems {
   if (settings.message.length > MESSAGE_MAX) {
     problems.message = `Keep the message under ${MESSAGE_MAX} characters.`;
   }
+  if ((settings.changeNote ?? '').length > CHANGE_NOTE_MAX) {
+    problems.changeNote = `Keep the note under ${CHANGE_NOTE_MAX} characters.`;
+  }
   if (
     !Number.isInteger(settings.expiresInDays) ||
     settings.expiresInDays < 1 ||
@@ -258,6 +264,9 @@ export function settingsBody(settings: DraftSettings, fallbackTitle: string) {
   return {
     title: settings.title.trim() || fallbackTitle,
     message: settings.message.trim() ? settings.message.trim() : null,
+    ...(settings.changeNote !== undefined
+      ? { changeNote: settings.changeNote.trim() ? settings.changeNote.trim() : null }
+      : {}),
     expiresInDays: settings.expiresInDays,
     reminders,
   };
@@ -353,9 +362,32 @@ export function stateFromEnvelope(envelope: Envelope, now: Date = new Date()): S
     settings: {
       title: envelope.title,
       message: envelope.message ?? '',
+      ...(envelope.changeNote !== undefined ? { changeNote: envelope.changeNote } : {}),
       expiresInDays: Math.min(365, Math.max(1, days)),
       remindEveryDays: envelope.reminders.firstAfterDays > 0 ? envelope.reminders.everyDays : 0,
     },
+  };
+}
+
+/**
+ * Takes a replaced document from the server into the flow: its name and pages, and the fields
+ * as the server placed them.
+ */
+export function withReplacedDocument(
+  state: SendFlowState,
+  envelope: Envelope,
+  documentId: string,
+): SendFlowState {
+  const saved = envelope.documents.find((d) => d.id === documentId);
+  if (!saved) return state;
+  return {
+    ...state,
+    documents: state.documents.map((d) =>
+      d.id === documentId
+        ? { id: d.id, name: saved.name, size: 0, pages: saved.pageSizes ?? [] }
+        : d,
+    ),
+    fields: envelope.fields,
   };
 }
 

@@ -26,6 +26,7 @@ export type Permission =
   | 'envelopes.read'
   | 'envelopes.write'
   | 'envelopes.voidAny'
+  | 'links.share'
   | 'workspace.manage'
   | 'brand.manage'
   | 'apiKeys.manage'
@@ -38,6 +39,8 @@ const MINIMUM: Record<Permission, Role> = {
   'envelopes.read': 'viewer',
   'envelopes.write': 'member',
   'envelopes.voidAny': 'admin',
+  // A link handed out by hand signs as the recipient, so only admins may take one.
+  'links.share': 'admin',
   'workspace.manage': 'admin',
   'brand.manage': 'admin',
   'apiKeys.manage': 'admin',

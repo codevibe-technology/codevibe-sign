@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, Loader2, Lock, Trash2 } from 'lucide-react';
+import { FileText, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,6 +31,7 @@ export function StepDocuments({
   error,
   inspect = inspectDocumentAction,
   onChange,
+  onReplace,
 }: {
   workspaceId: string;
   documents: DraftDocument[];
@@ -43,9 +44,38 @@ export function StepDocuments({
   locked: boolean;
   error?: string;
   onChange: (update: (documents: DraftDocument[]) => DraftDocument[]) => void;
+  /**
+   * For a saved draft: uploads a new version of one document. Resolves with the fields that
+   * had to move, or an error message.
+   */
+  onReplace?: (documentId: string, file: File) => Promise<{ moved: number } | { error: string }>;
 }) {
   const [checking, setChecking] = useState<string[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
+  const [replacing, setReplacing] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function replace(documentId: string, file: File) {
+    if (!onReplace) return;
+    const problem = fileProblem(file);
+    if (problem) {
+      setProblems([problem]);
+      return;
+    }
+    setReplacing(documentId);
+    setProblems([]);
+    setNotice(null);
+    const result = await onReplace(documentId, file);
+    setReplacing(null);
+    if ('error' in result) setProblems([result.error]);
+    else {
+      setNotice(
+        result.moved === 0
+          ? `Replaced with ${file.name}. Every field is where it was.`
+          : `Replaced with ${file.name}. ${result.moved === 1 ? '1 field was' : `${result.moved} fields were`} moved because its page changed; check ${result.moved === 1 ? 'it' : 'them'} on the next steps.`,
+      );
+    }
+  }
 
   async function add(files: File[]) {
     const room = MAX_DOCUMENTS - documents.length;
@@ -94,7 +124,9 @@ export function StepDocuments({
       {locked ? (
         <p className="flex items-start gap-2 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-muted">
           <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-          {lockedNote}
+          {onReplace
+            ? 'The documents are saved with this draft. Replace a file with a new version if it changed; fields stay where they still fit.'
+            : lockedNote}
         </p>
       ) : (
         <FileDrop
@@ -104,6 +136,15 @@ export function StepDocuments({
           hint={`Up to ${MAX_DOCUMENTS} files, ${MAX_PDF_BYTES / MB} MB each. Password-protected PDFs cannot be signed; remove the password first.`}
         />
       )}
+
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink"
+        >
+          {notice}
+        </p>
+      ) : null}
 
       {problems.length > 0 || error ? (
         <div
@@ -132,6 +173,31 @@ export function StepDocuments({
                     {d.size ? ` · ${size(d.size)}` : ''}
                   </p>
                 </div>
+                {locked && onReplace ? (
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface-2">
+                    {replacing === d.id ? (
+                      <Loader2
+                        aria-hidden
+                        className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                      />
+                    ) : (
+                      <RefreshCw aria-hidden className="h-4 w-4" />
+                    )}
+                    Replace
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      className="sr-only"
+                      aria-label={`Replace ${d.name}`}
+                      disabled={replacing !== null}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (file) void replace(d.id, file);
+                      }}
+                    />
+                  </label>
+                ) : null}
                 {locked ? null : (
                   <Button
                     type="button"

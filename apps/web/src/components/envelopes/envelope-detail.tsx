@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -17,10 +18,12 @@ import {
   ROLE_OPTIONS,
   actionLabel,
   actionTone,
+  eventDetail,
   formatDateTime,
   relativeTime,
 } from '@/lib/envelopes';
 import type { CertificateView, SealCheck } from '@/server/sign/api';
+import { CorrectRecipientButton, ShareLinkButton } from './recipient-fixes';
 import { RemindButton } from './remind-button';
 import { RecipientStatusPill } from './status-pill';
 
@@ -136,11 +139,17 @@ export function RecipientsCard({
   currentIds,
   canRemind,
   copyMail = {},
+  canShareLinks = false,
+  canCorrect = false,
 }: {
   workspaceId: string;
   envelope: Envelope;
   currentIds: string[];
   canRemind: boolean;
+  /** Admins: a link to pass on by hand for whoever's turn it is. */
+  canShareLinks?: boolean;
+  /** Senders, on an open envelope: correct anyone who has not acted. */
+  canCorrect?: boolean;
   /** The completed-copy email to each recipient, by recipient id, from the mail log. */
   copyMail?: Record<string, CopyMailStatus>;
 }) {
@@ -159,6 +168,12 @@ export function RecipientsCard({
         {envelope.recipients.map((r, i) => {
           const current = currentIds.includes(r.id);
           const copy = envelope.status === 'completed' ? copyMail[r.id] : undefined;
+          const acted = r.status === 'signed' || r.status === 'approved' || r.status === 'declined';
+          const target = {
+            workspaceId,
+            envelopeId: envelope.id,
+            recipient: { id: r.id, name: r.name, email: r.email ?? null, phone: r.phone ?? null },
+          };
           return (
             <li key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <span
@@ -212,11 +227,22 @@ export function RecipientsCard({
                     success={`A fresh signing link is on its way to ${r.name}`}
                   />
                 ) : null}
+                {current && canShareLinks ? <ShareLinkButton {...target} /> : null}
+                {canCorrect && !acted ? (
+                  <CorrectRecipientButton {...target} current={current} />
+                ) : null}
               </div>
             </li>
           );
         })}
       </ol>
+      {canCorrect &&
+      envelope.recipients.some((r) => r.status === 'signed' || r.status === 'approved') ? (
+        <p className="border-t border-line px-5 py-3 text-xs text-muted">
+          Someone who has already signed cannot be changed here. Use Recall and edit to correct the
+          envelope and send it again.
+        </p>
+      ) : null}
     </Card>
   );
 }
@@ -225,10 +251,13 @@ export function Timeline({
   events,
   chainValid,
   envelope,
+  slug,
 }: {
   events: AuditEvent[];
   chainValid: boolean;
   envelope: Envelope;
+  /** Links a recalled or revised envelope to its copy. */
+  slug?: string;
 }) {
   const name = (id?: string) => envelope.recipients.find((r) => r.id === id)?.name;
   const shown = events.filter((e) => e.action !== 'envelope.updated');
@@ -246,6 +275,7 @@ export function Timeline({
           .map((e) => {
             const who = name(e.recipientId);
             const reason = typeof e.data?.reason === 'string' ? e.data.reason : null;
+            const detail = eventDetail(e);
             return (
               <li key={e.seq} className="relative flex gap-3 pb-4 last:pb-0">
                 <span
@@ -258,10 +288,26 @@ export function Timeline({
                 <div className="min-w-0 flex-1 text-sm">
                   <p className="text-ink">
                     {who ? <span className="font-semibold">{who}: </span> : null}
-                    {actionLabel(e.action)}
+                    {detail.label}
                     {e.data?.manual === true ? ' by the sender' : ''}
                   </p>
                   {reason ? <p className="text-muted">“{reason}”</p> : null}
+                  {detail.note ? <p className="text-muted">{detail.note}</p> : null}
+                  {detail.link ? (
+                    <p className="text-muted">
+                      {detail.link.prefix}{' '}
+                      {slug ? (
+                        <Link
+                          href={`/w/${slug}/envelopes/${encodeURIComponent(detail.link.envelopeId)}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {detail.link.title}
+                        </Link>
+                      ) : (
+                        detail.link.title
+                      )}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted">
                     <time dateTime={e.at}>{formatDateTime(e.at)}</time>
                     {e.context?.ip ? ` · IP ${e.context.ip}` : ''}

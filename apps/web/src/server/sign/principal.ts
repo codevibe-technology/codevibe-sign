@@ -8,7 +8,7 @@ export interface PrincipalDeps {
   /** The live key's id and workspace, or null. */
   resolveApiKey: (key: string) => Promise<{ id: string; workspaceId: string } | null>;
   /** The signed-in user behind the request's session cookie, or null. */
-  sessionUser: (headers: Headers) => Promise<{ id: string } | null>;
+  sessionUser: (headers: Headers) => Promise<{ id: string; name?: string | null } | null>;
   /** The user's role in the workspace, or null when they are not a member. */
   roleOf: (userId: string, workspaceId: string) => Promise<Role | null>;
   /** Whether the member sent this envelope from the app; see `canVoidEnvelope`. */
@@ -25,7 +25,9 @@ const holder = globalThis as unknown as { __cvsInProcess?: WeakMap<Request, Prin
 export const inProcess = (holder.__cvsInProcess ??= new WeakMap<Request, Principal>());
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
-const VOID_PATH = /\/v1\/envelopes\/([^/]+)\/void\/?$/;
+/** Withdrawing an envelope, or copying it to edit: what a member may do only to their own. */
+const VOID_PATH = /\/v1\/envelopes\/([^/]+)\/(?:void|recall|revise)\/?$/;
+const LINK_PATH = /\/v1\/envelopes\/[^/]+\/recipients\/[^/]+\/link\/?$/;
 
 /**
  * Resolves who is calling `/api/v1`: an in-process call, a workspace API key, or a signed-in
@@ -55,7 +57,11 @@ export function createAuthenticate(deps: PrincipalDeps) {
     if (!user) throw new HttpError('UNAUTHORIZED', 'Sign in to continue');
     const role = await deps.roleOf(user.id, workspaceId);
     if (!role) throw new HttpError('UNAUTHORIZED', 'You are not a member of this workspace');
-    const voiding = request.method === 'POST' && VOID_PATH.exec(new URL(request.url).pathname);
+    const path = new URL(request.url).pathname;
+    if (request.method === 'POST' && LINK_PATH.test(path) && !can(role, 'links.share')) {
+      throw new HttpError('FORBIDDEN', 'Only an admin can take a signing link to share');
+    }
+    const voiding = request.method === 'POST' && VOID_PATH.exec(path);
     if (voiding && can(role, 'envelopes.write')) {
       const envelopeId = decodeURIComponent(voiding[1]!);
       const own = (await deps.isSender?.(user.id, workspaceId, envelopeId)) ?? false;
@@ -67,6 +73,7 @@ export function createAuthenticate(deps: PrincipalDeps) {
       id: `user:${user.id}`,
       workspaceId,
       readOnly: !can(role, 'envelopes.write'),
+      ...(user.name ? { actorName: user.name } : {}),
     };
   };
 }

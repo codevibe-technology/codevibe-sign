@@ -13,6 +13,7 @@ const matrix: Record<Permission, Role[]> = {
   'envelopes.read': ['viewer', 'member', 'admin', 'owner'],
   'envelopes.write': ['member', 'admin', 'owner'],
   'envelopes.voidAny': ['admin', 'owner'],
+  'links.share': ['admin', 'owner'],
   'workspace.manage': ['admin', 'owner'],
   'brand.manage': ['admin', 'owner'],
   'apiKeys.manage': ['admin', 'owner'],

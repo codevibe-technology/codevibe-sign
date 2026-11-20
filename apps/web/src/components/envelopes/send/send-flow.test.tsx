@@ -7,6 +7,7 @@ import type { SendFlowState } from '@/lib/send-flow';
 
 const mocks = vi.hoisted(() => ({
   inspectDocumentAction: vi.fn(),
+  replaceDocumentAction: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/server/actions/envelopes', () => ({
   inspectDocumentAction: mocks.inspectDocumentAction,
+  replaceDocumentAction: mocks.replaceDocumentAction,
 }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
@@ -382,8 +384,76 @@ describe('reopening a draft', () => {
       <SendFlow slug="acme" workspaceId="ws_1" me={ME} initial={draft} initialStep="recipients" />,
     );
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(screen.getByText(/cannot be swapped/)).toBeTruthy();
+    expect(screen.getByText(/Replace a file with a new version/)).toBeTruthy();
     expect(screen.queryByLabelText('Choose files')).toBeNull();
     expect(screen.queryByRole('button', { name: /Remove nda.pdf/ })).toBeNull();
+  });
+
+  it('replaces a document and says which fields moved', async () => {
+    const user = userEvent.setup();
+    const field = {
+      id: 'f1',
+      documentId: 'doc_9',
+      recipientId: 'rcp_9',
+      type: 'signature' as const,
+      page: 0,
+      rect: { x: 10, y: 10, width: 150, height: 40 },
+      required: true,
+    };
+    mocks.replaceDocumentAction.mockResolvedValue({
+      ok: true,
+      data: {
+        envelope: {
+          documents: [
+            { id: 'doc_9', name: 'nda-v2.pdf', pageSizes: [{ width: 612, height: 792 }] },
+          ],
+          fields: [field],
+        },
+        movedFields: ['f1'],
+      },
+    });
+    render(
+      <SendFlow
+        slug="acme"
+        workspaceId="ws_1"
+        me={ME}
+        initial={{ ...draft, fields: [field] }}
+        initialStep="documents"
+      />,
+    );
+    await user.upload(screen.getByLabelText('Replace nda.pdf'), pdfFile('nda-v2.pdf'));
+    expect(await screen.findByText(/1 field was moved because its page changed/)).toBeTruthy();
+    expect(screen.getByText('nda-v2.pdf')).toBeTruthy();
+    const form = mocks.replaceDocumentAction.mock.calls[0]![0] as FormData;
+    expect(form.get('envelopeId')).toBe('env_9');
+    expect(form.get('documentId')).toBe('doc_9');
+  });
+
+  it('shows why the envelope it revises was declined and asks what changed', async () => {
+    const user = userEvent.setup();
+    render(
+      <SendFlow
+        slug="acme"
+        workspaceId="ws_1"
+        me={ME}
+        initial={{ ...draft, settings: { ...draft.settings, changeNote: '' } }}
+        initialStep="review"
+        revision={{
+          title: 'NDA',
+          declinedBy: 'Satyam Patel',
+          role: 'approver',
+          reason: 'Clause 4 is wrong',
+        }}
+      />,
+    );
+    const note = screen.getByRole('complementary', { name: 'Why it was declined' });
+    expect(note).toHaveTextContent('Declined by Satyam Patel (approver)');
+    expect(note).toHaveTextContent('Clause 4 is wrong');
+    await user.type(
+      screen.getByLabelText('Note to recipients about what changed (optional)'),
+      'Clause 4 fixed',
+    );
+    await waitFor(() => expect(calls.length).toBeGreaterThan(0), { timeout: 3000 });
+    expect((calls.at(-1)!.body as { changeNote: string }).changeNote).toBe('Clause 4 fixed');
   });
 });

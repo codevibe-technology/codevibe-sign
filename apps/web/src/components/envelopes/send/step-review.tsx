@@ -6,6 +6,7 @@ import { Field, Input, NativeSelect, Textarea } from '@/components/ui/field';
 import { AUTH_LABELS, ROLE_OPTIONS } from '@/lib/envelopes';
 import {
   EXPIRY_OPTIONS,
+  CHANGE_NOTE_MAX,
   MESSAGE_MAX,
   REMINDER_OPTIONS,
   TITLE_MAX,
@@ -32,7 +33,7 @@ export function StepReview({
 }) {
   const { settings } = state;
   const elsewhere = Object.entries(problems).filter(
-    ([key]) => !['title', 'message', 'expiresInDays'].includes(key),
+    ([key]) => !['title', 'message', 'changeNote', 'expiresInDays'].includes(key),
   );
   const expiryOptions = EXPIRY_OPTIONS.includes(settings.expiresInDays as never)
     ? EXPIRY_OPTIONS
@@ -68,6 +69,24 @@ export function StepReview({
               />
             )}
           </Field>
+          {settings.changeNote !== undefined ? (
+            <Field
+              label="Note to recipients about what changed (optional)"
+              hint="Shown as “What changed: …” in the invitation and above the document."
+              error={problems.changeNote}
+            >
+              {(props) => (
+                <Textarea
+                  {...props}
+                  rows={3}
+                  value={settings.changeNote ?? ''}
+                  maxLength={CHANGE_NOTE_MAX}
+                  onChange={(e) => onSettings({ changeNote: e.target.value })}
+                  placeholder="For example: the notice period is now 30 days, as you asked."
+                />
+              )}
+            </Field>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Expires after"

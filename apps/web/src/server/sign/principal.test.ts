@@ -5,14 +5,17 @@ import { createAuthenticate, inProcess } from './principal';
 
 const APP = 'https://sign.example.com';
 
-function setup(role: Role | null = 'member', sent: string[] = []) {
+function setup(role: Role | null = 'member', sent: string[] = [], withName = false) {
   return createAuthenticate({
     isSender: async (userId, workspaceId, envelopeId) =>
       userId === 'u1' && workspaceId === 'ws_a' && sent.includes(envelopeId),
     appUrl: APP,
     resolveApiKey: async (key) =>
       key === 'cvs_good' ? { id: 'key_1', workspaceId: 'ws_a' } : null,
-    sessionUser: async (headers) => (headers.get('cookie') === 'session' ? { id: 'u1' } : null),
+    sessionUser: async (headers) =>
+      headers.get('cookie') === 'session'
+        ? { id: 'u1', ...(withName ? { name: 'Asha Rao' } : {}) }
+        : null,
     roleOf: async (userId, workspaceId) =>
       userId === 'u1' && workspaceId === 'ws_a' ? role : null,
   });
@@ -105,5 +108,35 @@ describe('inProcess', () => {
     vi.resetModules();
     const second = (await import('./principal')).inProcess;
     expect(second).toBe(first);
+  });
+});
+
+describe('fixing envelopes after sending', () => {
+  const at = (path: string) =>
+    new Request(`${APP}/api/v1/envelopes/${path}`, {
+      method: 'POST',
+      headers: { cookie: 'session', 'x-workspace': 'ws_a', origin: APP },
+    });
+
+  it('lets only admins and owners take a signing link to share', async () => {
+    expect(await refusal(setup('member')(at('env_1/recipients/r1/link')))).toBe('FORBIDDEN');
+    expect(await setup('admin')(at('env_1/recipients/r1/link'))).toMatchObject({
+      workspaceId: 'ws_a',
+    });
+  });
+
+  it('lets members recall or revise only what they sent', async () => {
+    expect(await refusal(setup('member')(at('env_1/recall')))).toBe('FORBIDDEN');
+    expect(await refusal(setup('member')(at('env_1/revise')))).toBe('FORBIDDEN');
+    expect(await setup('member', ['env_1'])(at('env_1/recall'))).toMatchObject({
+      readOnly: false,
+    });
+    expect(await setup('admin')(at('env_1/revise'))).toMatchObject({ readOnly: false });
+  });
+
+  it('names the signed-in user for the audit trail', async () => {
+    expect(await setup('admin', [], true)(at('env_1/recipients/r1/link'))).toMatchObject({
+      actorName: 'Asha Rao',
+    });
   });
 });

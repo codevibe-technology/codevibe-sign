@@ -3,6 +3,8 @@ import { ArrowLeft, PenLine } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { RecallButton, ReviseButton } from '@/components/envelopes/copy-dialogs';
+import { DeclineBanner } from '@/components/envelopes/decline-banner';
 import { EnvelopeActions } from '@/components/envelopes/envelope-actions';
 import {
   CertificateCard,
@@ -63,6 +65,8 @@ export default async function EnvelopePage({
   const canVoid =
     !isFinalStatus(envelope.status) && canVoidEnvelope(role, sender?.userId === user.id);
   const currentIds = currentRecipients(envelope).map((r) => r.id);
+  // Recalling or revising copies the envelope for whoever may void it.
+  const canCopy = canWrite && canVoidEnvelope(role, sender?.userId === user.id);
 
   return (
     <>
@@ -101,6 +105,13 @@ export default async function EnvelopePage({
               </Link>
             </Button>
           ) : null}
+          {open && canCopy ? (
+            <RecallButton
+              slug={slug}
+              workspaceId={workspace.id}
+              envelope={{ id: envelope.id, title: envelope.title }}
+            />
+          ) : null}
           <EnvelopeActions
             workspaceId={workspace.id}
             envelope={{ id: envelope.id, title: envelope.title }}
@@ -109,6 +120,15 @@ export default async function EnvelopePage({
           />
         </div>
       </div>
+
+      <DeclineBanner
+        envelope={envelope}
+        action={
+          canCopy ? (
+            <ReviseButton slug={slug} workspaceId={workspace.id} envelopeId={envelope.id} />
+          ) : null
+        }
+      />
 
       {envelope.message ? (
         <blockquote className="mb-6 rounded-xl border-l-4 border-accent bg-surface px-4 py-3 text-sm whitespace-pre-line text-ink shadow-card">
@@ -124,6 +144,8 @@ export default async function EnvelopePage({
             currentIds={open ? currentIds : []}
             canRemind={canWrite}
             copyMail={copyMail}
+            canShareLinks={open && can(role, 'links.share')}
+            canCorrect={open && canWrite}
           />
           {can(role, 'workspace.manage') ? (
             <p className="-mt-3 text-right text-sm">
@@ -142,7 +164,7 @@ export default async function EnvelopePage({
           />
         </div>
         <div className="min-w-0 lg:col-span-2">
-          <Timeline events={events} chainValid={chainValid} envelope={envelope} />
+          <Timeline events={events} chainValid={chainValid} envelope={envelope} slug={slug} />
         </div>
       </div>
     </>

@@ -23,6 +23,9 @@ vi.mock('../workspaces', () => ({
 vi.mock('../envelopes', () => ({
   sentBy: async (_sql: unknown, _ws: string, _user: string, ids: string[]) =>
     new Set(ids.filter((id) => state.mine.has(id))),
+  recordSender: async (_sql: unknown, input: { envelopeId: string; userId: string }) => {
+    state.calls.push(`recordSender:${input.envelopeId}:${input.userId}`);
+  },
   findSealedDocument: async () => {
     state.calls.push('findSealedDocument');
     return null;
@@ -45,9 +48,38 @@ vi.mock('../pdf', () => ({
     };
   },
 }));
+vi.mock('../plans', () => ({
+  workspacePlan: async () => ({}),
+  assertWithin: () => undefined,
+}));
 vi.mock('../sign/api', () => ({
-  userPrincipal: (userId: string, workspaceId: string) => ({ id: `user:${userId}`, workspaceId }),
-  signApi: () => ({
+  userPrincipal: (
+    userId: string,
+    workspaceId: string,
+    _readOnly?: boolean,
+    actorName?: string,
+  ) => ({
+    id: `user:${userId}`,
+    workspaceId,
+    ...(actorName ? { actorName } : {}),
+  }),
+  signApi: (principal: { actorName?: string }) => ({
+    shareLink: async (id: string, recipientId: string) => {
+      state.calls.push(`share:${id}:${recipientId}:${principal.actorName ?? ''}`);
+      return { recipientId, url: 'https://sign.example.com/api/sign/secret' };
+    },
+    correctRecipient: async (id: string, recipientId: string, body: { email?: string }) => {
+      state.calls.push(`correct:${id}:${recipientId}:${body.email ?? ''}`);
+      return { recipients: [{ id: recipientId, notifiedAt: 'later' }] };
+    },
+    recall: async (id: string, note?: string) => {
+      state.calls.push(`recall:${id}:${note ?? ''}:${principal.actorName ?? ''}`);
+      return { draft: { id: 'env_copy' }, recalled: { id } };
+    },
+    revise: async (id: string) => {
+      state.calls.push(`revise:${id}`);
+      return { draft: { id: 'env_rev' }, declined: { id } };
+    },
     void: async (id: string) => {
       if (state.failVoid === id) throw new AppError('CONFLICT', 'Envelope is already completed');
       state.calls.push(`void:${id}`);
@@ -62,8 +94,16 @@ vi.mock('../sign/api', () => ({
   }),
 }));
 
-const { inspectDocumentAction, remindAction, verifyDocumentAction, voidEnvelopesAction } =
-  await import('./envelopes');
+const {
+  correctRecipientAction,
+  inspectDocumentAction,
+  recallEnvelopeAction,
+  remindAction,
+  reviseEnvelopeAction,
+  shareLinkAction,
+  verifyDocumentAction,
+  voidEnvelopesAction,
+} = await import('./envelopes');
 
 const ORDER: Role[] = ['viewer', 'member', 'admin', 'owner'];
 const pdf = () => {
@@ -210,5 +250,69 @@ describe('remindAction', () => {
     });
     state.recipientEmail = 'asha@example.com';
     expect(state.calls).toEqual(['remind:e1:r1']);
+  });
+});
+
+describe('shareLinkAction', () => {
+  it('is for admins and owners only, and names them in the audit trail', async () => {
+    const input = { workspaceId: WORKSPACE.id, envelopeId: 'env_1', recipientId: 'r1' };
+    for (const role of ORDER) {
+      state.role = role;
+      state.calls = [];
+      const result = await shareLinkAction(input);
+      if (role === 'admin' || role === 'owner') {
+        expect(result).toEqual({
+          ok: true,
+          data: { url: 'https://sign.example.com/api/sign/secret' },
+        });
+        expect(state.calls).toEqual(['share:env_1:r1:Asha']);
+      } else {
+        expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+        expect(state.calls).toEqual([]);
+      }
+    }
+  });
+});
+
+describe('correctRecipientAction', () => {
+  it('lets senders correct and reports a new invitation', async () => {
+    const input = {
+      workspaceId: WORKSPACE.id,
+      envelopeId: 'env_1',
+      recipientId: 'r1',
+      name: 'Asha',
+      email: 'asha.rao@example.com',
+    };
+    state.role = 'viewer';
+    expect(await correctRecipientAction(input)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    state.role = 'member';
+    expect(await correctRecipientAction(input)).toEqual({ ok: true, data: { invited: true } });
+    expect(state.calls).toContain('correct:env_1:r1:asha.rao@example.com');
+  });
+});
+
+describe('recall and revise', () => {
+  it('copy what the member sent and record them as the sender of the draft', async () => {
+    const recalled = await recallEnvelopeAction({
+      workspaceId: WORKSPACE.id,
+      envelopeId: 'env_mine',
+      note: 'Wrong date',
+    });
+    expect(recalled).toEqual({ ok: true, data: { draftId: 'env_copy' } });
+    expect(state.calls).toEqual(['recall:env_mine:Wrong date:Asha', 'recordSender:env_copy:u1']);
+    const revised = await reviseEnvelopeAction({
+      workspaceId: WORKSPACE.id,
+      envelopeId: 'env_mine',
+    });
+    expect(revised).toEqual({ ok: true, data: { draftId: 'env_rev' } });
+  });
+
+  it('refuse a member for an envelope someone else sent, but not an admin', async () => {
+    const input = { workspaceId: WORKSPACE.id, envelopeId: 'env_other' };
+    expect(await recallEnvelopeAction(input)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(await reviseEnvelopeAction(input)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(state.calls).toEqual([]);
+    state.role = 'admin';
+    expect(await recallEnvelopeAction(input)).toMatchObject({ ok: true });
   });
 });
