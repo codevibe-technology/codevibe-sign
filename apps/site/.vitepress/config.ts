@@ -158,6 +158,7 @@ export default defineConfig({
           { text: 'Aadhaar eSign with Leegality', link: '/guides/aadhaar-leegality' },
           { text: 'Webhooks', link: '/guides/webhooks' },
           { text: 'Fix an envelope after sending', link: '/guides/fix-after-sending' },
+          { text: 'Fields across pages and tags', link: '/guides/field-tags' },
         ],
       },
       {
