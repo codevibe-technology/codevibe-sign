@@ -50,6 +50,8 @@ export interface SigningViewLabels extends ViewerLabels {
   signatureTitle: string;
   initialsTitle: string;
   apply: string;
+  /** The button that fills every empty initials box with the adopted initials. */
+  fillInitials: (count: number) => string;
   missing: (count: number) => string;
   formatDate: (isoDate: string) => string;
 }
@@ -73,6 +75,7 @@ export const defaultSigningViewLabels: SigningViewLabels = {
   signatureTitle: 'Add your signature',
   initialsTitle: 'Add your initials',
   apply: 'Apply',
+  fillInitials: (count) => `Fill all my initials (${count})`,
   missing: (count) =>
     count === 1 ? '1 required field still needs you.' : `${count} required fields still need you.`,
   formatDate: (iso) => {
@@ -142,6 +145,8 @@ export function SigningView({
   const [adopted, setAdopted] = useState<Partial<Record<Adoptable, string>>>({});
   const [padField, setPadField] = useState<Field | null>(null);
   const [padValue, setPadValue] = useState<string | null>(null);
+  // Set when the pad was opened by "Fill all my initials": applying fills every empty box.
+  const [fillAll, setFillAll] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState('');
   const [showErrors, setShowErrors] = useState(false);
@@ -190,11 +195,41 @@ export function SigningView({
     setPadField(field);
   };
 
+  const emptyInitials = fields.filter((f) => f.type === 'initials' && !hasValue(f, values[f.id]));
+  const initialsCount = fields.filter((f) => f.type === 'initials').length;
+
+  const fillInitials = (value: string) =>
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const f of fields) {
+        if (f.type === 'initials' && !hasValue(f, next[f.id])) next[f.id] = value;
+      }
+      return next;
+    });
+
+  const fillAllInitials = () => {
+    const first = emptyInitials[0];
+    if (!first) return;
+    if (adopted.initials) {
+      fillInitials(adopted.initials);
+      return;
+    }
+    setFillAll(true);
+    setPadValue(null);
+    setPadField(first);
+  };
+
+  const closePad = () => {
+    setPadField(null);
+    setFillAll(false);
+  };
+
   const applyPad = () => {
     if (!padField) return;
     if (padValue) {
       setValue(padField.id, padValue);
       setAdopted((prev) => ({ ...prev, [padField.type]: padValue }));
+      if (fillAll && padField.type === 'initials') fillInitials(padValue);
     } else {
       setValues((prev) => {
         const next = { ...prev };
@@ -202,7 +237,7 @@ export function SigningView({
         return next;
       });
     }
-    setPadField(null);
+    closePad();
   };
 
   const submit = async () => {
@@ -384,6 +419,11 @@ export function SigningView({
           {labels.progress(done, required.length)}
         </p>
         <span className="cvs-spacer" />
+        {initialsCount > 1 && emptyInitials.length > 0 && (
+          <button type="button" className="cvs-button" onClick={fillAllInitials} disabled={busy}>
+            {labels.fillInitials(emptyInitials.length)}
+          </button>
+        )}
         <button type="button" className="cvs-button" onClick={goToNextField} disabled={busy}>
           {labels.nextField}
         </button>
@@ -405,14 +445,10 @@ export function SigningView({
       {padField && (
         <Dialog
           title={padField.type === 'initials' ? labels.initialsTitle : labels.signatureTitle}
-          onClose={() => setPadField(null)}
+          onClose={closePad}
           footer={
             <>
-              <button
-                type="button"
-                className="cvs-button cvs-button--ghost"
-                onClick={() => setPadField(null)}
-              >
+              <button type="button" className="cvs-button cvs-button--ghost" onClick={closePad}>
                 {labels.cancel}
               </button>
               <button

@@ -1,12 +1,21 @@
-import type { PdfFile, PdfSource } from './types';
+import type { PdfFile, PdfSource, TextItem } from './types';
 
 interface PdfjsViewport {
   width: number;
   height: number;
+  convertToViewportPoint?(x: number, y: number): [number, number];
+}
+
+interface PdfjsTextItem {
+  str?: string;
+  transform?: number[];
+  width?: number;
+  height?: number;
 }
 
 interface PdfjsPage {
   getViewport(params: { scale: number }): PdfjsViewport;
+  getTextContent?(): Promise<{ items: PdfjsTextItem[] }>;
   render(params: {
     canvasContext: CanvasRenderingContext2D;
     canvas: HTMLCanvasElement;
@@ -86,8 +95,34 @@ export async function loadPdf(file: PdfFile, options: LoadPdfOptions = {}): Prom
       }
       return canvas;
     },
+    async textItems(pageIndex) {
+      const page = await doc.getPage(pageIndex + 1);
+      const viewport = page.getViewport({ scale: 1 });
+      if (!page.getTextContent || !viewport.convertToViewportPoint) return [];
+      const content = await page.getTextContent();
+      return content.items.flatMap((item) => toTextItem(item, viewport));
+    },
     destroy() {
       void doc.destroy();
     },
   };
+}
+
+/**
+ * A text run's box on the page as shown: pdf.js gives the baseline origin and direction in
+ * PDF space; the viewport turns both ends into top-left coordinates, rotation included.
+ */
+function toTextItem(item: PdfjsTextItem, viewport: PdfjsViewport): TextItem[] {
+  const t = item.transform;
+  if (!item.str || !t || t.length < 6 || !viewport.convertToViewportPoint) return [];
+  const size = Math.hypot(t[2]!, t[3]!) || item.height || 0;
+  const length = Math.hypot(t[0]!, t[1]!) || 1;
+  const dx = (t[0]! / length) * (item.width ?? 0);
+  const dy = (t[1]! / length) * (item.width ?? 0);
+  const [x1, y1] = viewport.convertToViewportPoint(t[4]!, t[5]!);
+  const [x2, y2] = viewport.convertToViewportPoint(t[4]! + dx, t[5]! + dy);
+  const left = Math.min(x1, x2);
+  const width = Math.abs(x2 - x1) || Math.abs(y2 - y1);
+  const baseline = Math.max(y1, y2);
+  return [{ str: item.str, x: left, y: baseline - size, width, height: size }];
 }

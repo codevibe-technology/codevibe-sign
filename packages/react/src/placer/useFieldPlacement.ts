@@ -2,6 +2,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Field, FieldType, Rect, Recipient } from '@codevibe_technology/sign-core';
 import type { PageSize } from '../geometry';
 import {
+  fieldGroups,
+  initialsOnEveryPage,
+  repeatField as repeatCopies,
+  scaleRectBetween,
+  signatureOnLastPage,
+} from './multipage';
+import {
   createField,
   defaultFieldSizes,
   NUDGE_STEP,
@@ -52,13 +59,36 @@ export interface FieldPlacementState {
     patch: Partial<Pick<Field, 'recipientId' | 'required' | 'label'>>,
   ) => void;
   removeField: (id: string) => void;
+  /** Adds ready-made fields, for example placed from text tags. */
+  addFields: (fields: Field[]) => void;
+  /**
+   * The linked copies a field belongs to (itself included): copies made by "Repeat on pages",
+   * or a field moved away from its copies a moment ago. Empty when it stands alone.
+   */
+  groupOf: (id: string) => string[];
+  /** Copies a field onto `pages` (zero-based) of its document, at the same spot. */
+  repeatField: (id: string, pages: number[]) => number;
+  /** Gives every copy in the field's group its position, size, required flag and label. */
+  applyToGroup: (id: string) => void;
+  /** Deletes the field and every copy in its group. */
+  removeGroup: (id: string) => void;
+  /** Initials in the bottom-right corner of every page, for the current recipient. */
+  addInitialsEveryPage: () => number;
+  /** A signature on the last page of each document, for the current recipient. */
+  addSignatureLastPage: () => number;
   pageSize: (documentId: string, page: number) => PageSize | undefined;
   snapThreshold: number;
   minSize: number;
 }
 
+const pageSizeOf =
+  (sizes: Record<string, PageSize[]>) =>
+  (documentId: string, page: number): PageSize | undefined =>
+    sizes[documentId]?.[page];
+
 let counter = 0;
-function defaultId(): string {
+/** A new field id: a UUID where the platform has one. */
+export function newFieldId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
@@ -77,7 +107,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     fieldSizes,
     snapThreshold = 6,
     minSize = 8,
-    createId = defaultId,
+    createId = newFieldId,
   } = options;
 
   const [own, setOwn] = useState<Field[]>(defaultFields);
@@ -86,6 +116,9 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
   fieldsRef.current = fields;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A grouped field that is moved no longer sits with its copies; remember them so the
+  // change can still be applied to all.
+  const [remembered, setRemembered] = useState<Record<string, string[]>>({});
   const [chosenRecipient, setRecipientId] = useState<string | null>(null);
   const recipientId =
     chosenRecipient && recipients.some((r) => r.id === chosenRecipient)
@@ -106,9 +139,16 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     [pageSizes],
   );
 
+  const groupsOf = useCallback(
+    (list: Field[]) => fieldGroups(list, pageSizeOf(pageSizes)),
+    [pageSizes],
+  );
+
   const update = useCallback(
     (id: string, change: (field: Field, page: PageSize) => Field) => {
       const current = fieldsRef.current;
+      const group = groupsOf(current).get(id);
+      if (group) setRemembered((prev) => (prev[id] ? prev : { ...prev, [id]: group }));
       const index = current.findIndex((f) => f.id === id);
       const field = current[index];
       if (!field) return;
@@ -118,7 +158,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
       next[index] = change(field, page);
       commit(next);
     },
-    [commit, pageSize],
+    [commit, pageSize, groupsOf],
   );
 
   const addField = useCallback(
@@ -183,6 +223,108 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     [commit],
   );
 
+  const addFields = useCallback(
+    (added: Field[]) => {
+      if (added.length > 0) commit([...fieldsRef.current, ...added]);
+    },
+    [commit],
+  );
+
+  const groups = useMemo(() => groupsOf(fields), [groupsOf, fields]);
+
+  const groupOf = useCallback(
+    (id: string) => {
+      const live = groups.get(id);
+      if (live) return live;
+      const ids = new Set(fields.map((f) => f.id));
+      const kept = (remembered[id] ?? []).filter((member) => ids.has(member));
+      return kept.length > 1 ? kept : [];
+    },
+    [groups, remembered, fields],
+  );
+
+  const repeatField = useCallback(
+    (id: string, pages: number[]) => {
+      const field = fieldsRef.current.find((f) => f.id === id);
+      if (!field) return 0;
+      const taken = new Set(
+        fieldsRef.current
+          .filter((f) => groupOf(id).includes(f.id) || f.id === id)
+          .map((f) => f.page),
+      );
+      const copies = repeatCopies(
+        field,
+        pages,
+        (page) => pageSize(field.documentId, page),
+        createId,
+        taken,
+      );
+      addFields(copies);
+      return copies.length;
+    },
+    [groupOf, pageSize, createId, addFields],
+  );
+
+  const applyToGroup = useCallback(
+    (id: string) => {
+      const members = new Set(groupOf(id));
+      const source = fieldsRef.current.find((f) => f.id === id);
+      const from = source && pageSize(source.documentId, source.page);
+      if (!source || !from) return;
+      commit(
+        fieldsRef.current.map((f) => {
+          if (f.id === id || !members.has(f.id)) return f;
+          const to = pageSize(f.documentId, f.page);
+          if (!to) return f;
+          return {
+            ...f,
+            rect: scaleRectBetween(source.rect, from, to),
+            required: source.required,
+            ...(source.label !== undefined ? { label: source.label } : {}),
+          };
+        }),
+      );
+      setRemembered((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [groupOf, pageSize, commit],
+  );
+
+  const removeGroup = useCallback(
+    (id: string) => {
+      const members = new Set([id, ...groupOf(id)]);
+      commit(fieldsRef.current.filter((f) => !members.has(f.id)));
+      setSelectedId(null);
+    },
+    [groupOf, commit],
+  );
+
+  const preset = useCallback(
+    (make: typeof initialsOnEveryPage) => {
+      if (!recipientId) return 0;
+      const added = Object.entries(pageSizes).flatMap(([documentId, pages]) =>
+        pages.length > 0
+          ? make({
+              documentId,
+              recipientId,
+              pages,
+              createId,
+              ...(fieldSizes ? { sizes: fieldSizes } : {}),
+            })
+          : [],
+      );
+      addFields(added);
+      return added.length;
+    },
+    [recipientId, pageSizes, createId, fieldSizes, addFields],
+  );
+
+  const addInitialsEveryPage = useCallback(() => preset(initialsOnEveryPage), [preset]);
+  const addSignatureLastPage = useCallback(() => preset(signatureOnLastPage), [preset]);
+
   const selected = useMemo(
     () => fields.find((f) => f.id === selectedId) ?? null,
     [fields, selectedId],
@@ -201,6 +343,13 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     nudgeField,
     updateField,
     removeField,
+    addFields,
+    groupOf,
+    repeatField,
+    applyToGroup,
+    removeGroup,
+    addInitialsEveryPage,
+    addSignatureLastPage,
     pageSize,
     snapThreshold,
     minSize,

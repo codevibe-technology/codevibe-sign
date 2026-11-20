@@ -180,3 +180,86 @@ describe('useFieldPlacement', () => {
     expect(result.current.fields).toEqual([]);
   });
 });
+
+describe('FieldPlacer on many pages', () => {
+  it('repeats a field on every page as one group, and shows the group', async () => {
+    const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    fireEvent.change(screen.getByLabelText('Repeat on pages'), { target: { value: 'all' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    const fields = last();
+    expect(fields.map((f) => f.page)).toEqual([0, 1, 2, 3]);
+    expect(new Set(fields.map((f) => f.type))).toEqual(new Set(['initials']));
+    expect(fields.every((f) => f.rect.x === fields[0]!.rect.x)).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent('Added to 3 more pages.');
+    expect(screen.getAllByText('×4 pages')).toHaveLength(4);
+  });
+
+  it('checks typed page ranges against the page count', () => {
+    const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    fireEvent.change(screen.getByLabelText('Repeat on pages'), { target: { value: 'custom' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Pages…' }), { target: { value: '2-9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'This document has 4 pages; 9 is past the end.',
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'Pages…' }), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    expect(last().map((f) => f.page)).toEqual([0, 2]);
+  });
+
+  it('applies a move to the whole group, and deletes one or all', () => {
+    const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    const first = screen.getByRole('button', { name: 'Initials for Asha Rao, page 1' });
+    fireEvent.keyDown(first, { key: 'ArrowRight', shiftKey: true });
+    const moved = last().find((f) => f.page === 0)!;
+    expect(last().find((f) => f.page === 1)!.rect.x).toBe(moved.rect.x - 10);
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to all 4 in group' }));
+    expect(last().every((f) => f.rect.x === moved.rect.x)).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this one' }));
+    expect(last()).toHaveLength(3);
+    fireEvent.focus(screen.getByRole('button', { name: 'Initials for Asha Rao, page 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all 3' }));
+    expect(last()).toEqual([]);
+  });
+
+  it('adds initials on every page and a signature on the last one for the chosen recipient', () => {
+    const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
+    fireEvent.click(screen.getByRole('radio', { name: 'Vikram Shah' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Initials on every page' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Signature on last page' }));
+    const fields = last();
+    expect(fields.filter((f) => f.type === 'initials').map((f) => f.page)).toEqual([0, 1, 2, 3]);
+    expect(fields.filter((f) => f.type === 'signature').map((f) => f.page)).toEqual([3]);
+    expect(fields.every((f) => f.recipientId === 'r2')).toBe(true);
+  });
+
+  it('offers to place fields from text tags and places them', async () => {
+    const source = {
+      ...letterSource(2),
+      textItems: async (page: number) =>
+        page === 1
+          ? [
+              { str: '{{signature:1}}', x: 72, y: 600, width: 90, height: 12 },
+              { str: '{{initials:2}}', x: 500, y: 740, width: 80, height: 12 },
+              { str: '{{name:7}}', x: 72, y: 100, width: 60, height: 12 },
+            ]
+          : [],
+    };
+    const { last } = setup({ documents: [{ id: 'doc', source }] });
+    const button = await screen.findByRole('button', { name: 'Place fields from tags (found 3)' });
+    fireEvent.click(button);
+    expect(last().map((f) => [f.type, f.recipientId, f.page])).toEqual([
+      ['signature', 'r1', 1],
+      ['initials', 'r2', 1],
+    ]);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Placed 2; 1 tag names a recipient number nobody has.',
+    );
+    expect(screen.queryByRole('button', { name: /Place fields from tags/ })).toBeNull();
+  });
+});

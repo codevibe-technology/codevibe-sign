@@ -214,7 +214,26 @@ Every visible string comes from a `labels` prop with English defaults
 - `useSignaturePad(options)`: mode, strokes, undo and clear, typed text and font,
   upload, and `canvasProps` to spread on your own `<canvas>`.
 - `useFieldPlacement(options)`: fields, selection, `addField`, `moveField`,
-  `resizeField`, `nudgeField`, `updateField`, `removeField`. All rects in points.
+  `resizeField`, `nudgeField`, `updateField`, `removeField`, and for many pages
+  `repeatField`, `groupOf`, `applyToGroup`, `removeGroup`, `addInitialsEveryPage`,
+  `addSignatureLastPage`, `addFields`. All rects in points.
+
+### Many pages and text tags
+
+The placer's field panel repeats a field on all pages, every page but the first, the last
+page or typed pages ("1, 3, 5-7"), at the same spot relative to each page, so it lands in
+the same place on A4 and Letter and on turned pages. Copies stay plain fields: a group is
+any set of fields of one recipient and type at the same relative spot, so it is found again
+after a reload. Quick add places initials in the corner of every page or a signature on the
+last page.
+
+When pdf.js can read the document's text, tags such as `{{signature:1}}` are found and
+"Place fields from tags" covers each with a field. The number is the recipient's place in
+the signing order. Types: `signature`, `initials`, `date`, `name`, `text`, `checkbox`.
+
+The signing view asks for a signature or initials once; each further box then takes one
+tap, and "Fill all my initials" fills every initials box after the first is adopted.
+
 - `usePdfSources(documents, pdfOptions)`: resolves documents to page sources.
 
 ### Helpers
@@ -222,7 +241,9 @@ Every visible string comes from a `labels` prop with English defaults
 `validateFieldValues`, `toFieldValues`, `prefillValues`, `sortFields`, `fieldStatus`,
 `isoDate`; `pointsToPixels`, `pixelsToPoints`, `clientToPoints`, `scaleForWidth`,
 `clampRect`, `snapToPageEdges`, `flipVertical`; `createField`, `nudgeRect`,
-`defaultFieldSizes`; `encodeSignature`, `imageFileToSignature`; `loadPdf`.
+`defaultFieldSizes`; `parsePageRange`, `pagesForChoice`, `scaleRectBetween`,
+`fieldGroups`, `repeatField`, `initialsOnEveryPage`, `signatureOnLastPage`, `findTags`,
+`fieldsFromTags`; `encodeSignature`, `imageFileToSignature`; `loadPdf`.
 
 Signature images are always trimmed and re-encoded to PNG, and capped at core's
 `MAX_IMAGE_BYTES` (512 KB; 200 KB by default). Uploads accept PNG, JPEG and WebP up to

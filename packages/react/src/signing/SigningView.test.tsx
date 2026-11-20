@@ -189,3 +189,51 @@ describe('SigningView', () => {
     expect(screen.getByRole('textbox', { name: 'Text, required' })).toHaveValue('Nagpur');
   });
 });
+
+describe('SigningView with many signature boxes', () => {
+  const many = [
+    field('s1', 'signature', 'r1', { y: 100 }),
+    field('s2', 'signature', 'r1', { y: 300 }),
+    field('i1', 'initials', 'r1', { y: 500, width: 60, height: 40 }),
+    field('i2', 'initials', 'r1', { y: 560, width: 60, height: 40 }),
+    field('i3', 'initials', 'r1', { y: 620, width: 60, height: 40 }),
+  ];
+
+  async function adopt(name: string, title: string) {
+    fireEvent.click(screen.getAllByRole('button', { name })[0]!);
+    const dialog = screen.getByRole('dialog', { name: title });
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Type' }));
+    const apply = within(dialog).getByRole('button', { name: 'Apply' });
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply);
+  }
+
+  it('asks for the signature once, then fills each other box with one tap', async () => {
+    setup({ fields: many });
+    await adopt('Signature, required', 'Add your signature');
+    const second = screen.getAllByRole('button', { name: 'Signature, required' })[1]!;
+    expect(second).toHaveAttribute('data-state', 'empty');
+    fireEvent.click(second);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(second).toHaveAttribute('data-state', 'filled');
+  });
+
+  it('fills every empty initials box at once after adopting initials', async () => {
+    setup({ fields: many });
+    fireEvent.click(screen.getByRole('button', { name: 'Fill all my initials (3)' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add your initials' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Type' }));
+    const apply = within(dialog).getByRole('button', { name: 'Apply' });
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply);
+    for (const box of screen.getAllByRole('button', { name: 'Initials, required' })) {
+      expect(box).toHaveAttribute('data-state', 'filled');
+    }
+    expect(screen.queryByRole('button', { name: /Fill all my initials/ })).toBeNull();
+  });
+
+  it('offers no bulk fill with a single initials box', () => {
+    setup({ fields: [field('i1', 'initials', 'r1')] });
+    expect(screen.queryByRole('button', { name: /Fill all my initials/ })).toBeNull();
+  });
+});

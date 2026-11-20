@@ -28,6 +28,18 @@ export type { FieldPlacerProps, FieldPlacerLabels } from './placer/FieldPlacer';
 export { useFieldPlacement } from './placer/useFieldPlacement';
 export type { FieldPlacementState, UseFieldPlacementOptions } from './placer/useFieldPlacement';
 export { createField, defaultFieldSizes, nudgeRect } from './placer/placement';
+export {
+  fieldGroups,
+  initialsOnEveryPage,
+  pagesForChoice,
+  parsePageRange,
+  repeatField,
+  scaleRectBetween,
+  signatureOnLastPage,
+} from './placer/multipage';
+export type { PageList, PresetInput, RepeatChoice } from './placer/multipage';
+export { fieldsFromTags, findTags } from './placer/tags';
+export type { FieldTag, TagFieldsInput } from './placer/tags';
 export type { ArrowKey, Size } from './placer/placement';
 
 export {
@@ -44,7 +56,14 @@ export type { PixelRect } from './geometry';
 export { loadPdf } from './pdf/pdfjs';
 export type { LoadPdfOptions, PdfjsModule } from './pdf/pdfjs';
 export { usePdfSources } from './pdf/usePdfSources';
-export type { PdfFile, PdfSource, RenderPage, RenderedPage, ViewerDocument } from './pdf/types';
+export type {
+  PdfFile,
+  PdfSource,
+  RenderPage,
+  RenderedPage,
+  TextItem,
+  ViewerDocument,
+} from './pdf/types';
 export { defaultViewerLabels } from './viewer/DocumentPages';
 export type { ViewerLabels } from './viewer/DocumentPages';
 export { defaultFieldTypeLabels, recipientColorIndex } from './labels';

@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -21,8 +22,10 @@ import {
   type PageContext,
   type ViewerLabels,
 } from '../viewer/DocumentPages';
+import { pagesForChoice, type RepeatChoice } from './multipage';
 import { isArrowKey, type Size } from './placement';
-import { useFieldPlacement, type FieldPlacementState } from './useFieldPlacement';
+import { fieldsFromTags, findTags, type FieldTag } from './tags';
+import { newFieldId, useFieldPlacement, type FieldPlacementState } from './useFieldPlacement';
 
 export interface FieldPlacerLabels extends ViewerLabels {
   fieldTypes: Record<FieldType, string>;
@@ -37,6 +40,20 @@ export interface FieldPlacerLabels extends ViewerLabels {
   required: string;
   deleteField: string;
   resize: string;
+  repeatOn: string;
+  repeatChoices: Record<RepeatChoice, string>;
+  pagesPlaceholder: string;
+  applyRepeat: string;
+  repeated: (count: number) => string;
+  groupBadge: (pages: number) => string;
+  applyToGroup: (count: number) => string;
+  deleteThis: string;
+  deleteGroup: (count: number) => string;
+  presets: string;
+  initialsEveryPage: string;
+  signatureLastPage: string;
+  placeFromTags: (count: number) => string;
+  tagsPlaced: (placed: number, unmatched: number) => string;
 }
 
 export const defaultFieldPlacerLabels: FieldPlacerLabels = {
@@ -54,6 +71,34 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   required: 'Required',
   deleteField: 'Delete field',
   resize: 'Resize',
+  repeatOn: 'Repeat on pages',
+  repeatChoices: {
+    this: 'This page only',
+    all: 'All pages',
+    'except-first': 'Every page except the first',
+    last: 'Last page',
+    custom: 'Pages…',
+  },
+  pagesPlaceholder: 'For example 1, 3, 5-7',
+  applyRepeat: 'Repeat',
+  repeated: (count) =>
+    count === 0
+      ? 'Those pages already have this field.'
+      : count === 1
+        ? 'Added to 1 more page.'
+        : `Added to ${count} more pages.`,
+  groupBadge: (pages) => `×${pages} pages`,
+  applyToGroup: (count) => `Apply to all ${count} in group`,
+  deleteThis: 'Delete this one',
+  deleteGroup: (count) => `Delete all ${count}`,
+  presets: 'Quick add',
+  initialsEveryPage: 'Initials on every page',
+  signatureLastPage: 'Signature on last page',
+  placeFromTags: (count) => `Place fields from tags (found ${count})`,
+  tagsPlaced: (placed, unmatched) =>
+    unmatched === 0
+      ? `Placed ${placed} ${placed === 1 ? 'field' : 'fields'} from tags.`
+      : `Placed ${placed}; ${unmatched} ${unmatched === 1 ? 'tag names' : 'tags name'} a recipient number nobody has.`,
 };
 
 const FIELD_TYPES: FieldType[] = [
@@ -154,6 +199,67 @@ export function FieldPlacer({
   const paletteDragWasMove = useRef(false);
 
   const recipientName = (rid: string) => signers.find((r) => r.id === rid)?.name ?? '';
+
+  const [repeatChoice, setRepeatChoice] = useState<RepeatChoice>('all');
+  const [repeatPages, setRepeatPages] = useState('');
+  const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
+  const [tags, setTags] = useState<Record<string, FieldTag[]>>({});
+  const [tagsUsed, setTagsUsed] = useState(false);
+
+  // Looks once per loaded document for {{type:n}} tags in its text.
+  useEffect(() => {
+    let cancelled = false;
+    for (const doc of documents) {
+      const source = states[doc.id]?.source;
+      if (!source?.textItems || tags[doc.id]) continue;
+      const read = source.textItems;
+      void Promise.all(
+        source.pages.map((_, page) =>
+          read(page)
+            .then((items) => findTags(items, page))
+            .catch(() => [] as FieldTag[]),
+        ),
+      ).then((found) => {
+        if (!cancelled) setTags((prev) => ({ ...prev, [doc.id]: found.flat() }));
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [documents, states, tags]);
+
+  const tagCount = Object.values(tags).reduce((n, list) => n + list.length, 0);
+
+  const placeFromTags = () => {
+    const ordered = [...signers].sort((a, b) => a.order - b.order);
+    let placed = 0;
+    let unmatched = 0;
+    const added = Object.entries(tags).flatMap(([documentId, list]) => {
+      const result = fieldsFromTags(list, {
+        documentId,
+        recipients: ordered,
+        pageSizes: pageSizes[documentId] ?? [],
+        createId: createId ?? newFieldId,
+        ...(fieldSizes ? { sizes: fieldSizes } : {}),
+      });
+      placed += result.fields.length;
+      unmatched += result.unmatched.length;
+      return result.fields;
+    });
+    placement.addFields(added);
+    setTagsUsed(true);
+    setNotice({ text: labels.tagsPlaced(placed, unmatched), error: unmatched > 0 });
+  };
+
+  const repeatSelected = (field: Field) => {
+    const count = pageSizes[field.documentId]?.length ?? 0;
+    const pages = pagesForChoice(repeatChoice, count, field.page, repeatPages);
+    if ('error' in pages) {
+      setNotice({ text: pages.error, error: true });
+      return;
+    }
+    setNotice({ text: labels.repeated(placement.repeatField(field.id, pages.pages)) });
+  };
 
   const pageInView = (): { documentId: string; page: number } | null => {
     const container = scroller.current;
@@ -307,6 +413,11 @@ export function FieldPlacer({
             <span className="cvs-placed-label">
               {field.label || labels.fieldTypes[field.type]}
               {field.required && <span aria-hidden="true"> *</span>}
+              {placement.groupOf(field.id).length > 1 && (
+                <span className="cvs-placed-badge">
+                  {labels.groupBadge(placement.groupOf(field.id).length)}
+                </span>
+              )}
             </span>
             <span
               className="cvs-placed-resize"
@@ -362,6 +473,41 @@ export function FieldPlacer({
           {labels.paletteHint}
         </p>
 
+        <h3 className="cvs-panel-title">{labels.presets}</h3>
+        <div className="cvs-presets" role="group" aria-label={labels.presets}>
+          <button
+            type="button"
+            className="cvs-button"
+            disabled={signers.length === 0}
+            onClick={() => placement.addInitialsEveryPage()}
+          >
+            {labels.initialsEveryPage}
+          </button>
+          <button
+            type="button"
+            className="cvs-button"
+            disabled={signers.length === 0}
+            onClick={() => placement.addSignatureLastPage()}
+          >
+            {labels.signatureLastPage}
+          </button>
+          {tagCount > 0 && !tagsUsed && (
+            <button
+              type="button"
+              className="cvs-button cvs-button--primary"
+              disabled={signers.length === 0}
+              onClick={placeFromTags}
+            >
+              {labels.placeFromTags(tagCount)}
+            </button>
+          )}
+        </div>
+        {notice && (
+          <p className={notice.error ? 'cvs-error' : 'cvs-hint'} role="status">
+            {notice.text}
+          </p>
+        )}
+
         {selected && (
           <div className="cvs-inspector" role="group" aria-label={labels.selectedField}>
             <h3 className="cvs-panel-title">{labels.selectedField}</h3>
@@ -388,13 +534,66 @@ export function FieldPlacer({
               />
               {labels.required}
             </label>
-            <button
-              type="button"
-              className="cvs-button cvs-button--danger"
-              onClick={() => placement.removeField(selected.id)}
+            <label className="cvs-label" htmlFor={`${id}-repeat`}>
+              {labels.repeatOn}
+            </label>
+            <select
+              id={`${id}-repeat`}
+              className="cvs-input"
+              value={repeatChoice}
+              onChange={(e) => setRepeatChoice(e.target.value as RepeatChoice)}
             >
-              {labels.deleteField}
+              {(Object.keys(labels.repeatChoices) as RepeatChoice[]).map((choice) => (
+                <option key={choice} value={choice}>
+                  {labels.repeatChoices[choice]}
+                </option>
+              ))}
+            </select>
+            {repeatChoice === 'custom' && (
+              <input
+                className="cvs-input"
+                aria-label={labels.repeatChoices.custom}
+                placeholder={labels.pagesPlaceholder}
+                value={repeatPages}
+                onChange={(e) => setRepeatPages(e.target.value)}
+              />
+            )}
+            <button type="button" className="cvs-button" onClick={() => repeatSelected(selected)}>
+              {labels.applyRepeat}
             </button>
+            {placement.groupOf(selected.id).length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  className="cvs-button"
+                  onClick={() => placement.applyToGroup(selected.id)}
+                >
+                  {labels.applyToGroup(placement.groupOf(selected.id).length)}
+                </button>
+                <button
+                  type="button"
+                  className="cvs-button cvs-button--danger"
+                  onClick={() => placement.removeField(selected.id)}
+                >
+                  {labels.deleteThis}
+                </button>
+                <button
+                  type="button"
+                  className="cvs-button cvs-button--danger"
+                  onClick={() => placement.removeGroup(selected.id)}
+                >
+                  {labels.deleteGroup(placement.groupOf(selected.id).length)}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="cvs-button cvs-button--danger"
+                onClick={() => placement.removeField(selected.id)}
+              >
+                {labels.deleteField}
+              </button>
+            )}
           </div>
         )}
         <p className="cvs-hint" id={`${id}-keys`}>

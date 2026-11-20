@@ -831,6 +831,19 @@
   pointer-events: none;
 }
 
+.cvs-placed-badge {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.12);
+  font-size: 0.85em;
+}
+
+.cvs-presets {
+  display: grid;
+  gap: 6px;
+}
+
 .cvs-placed-resize {
   position: absolute;
   right: -7px;

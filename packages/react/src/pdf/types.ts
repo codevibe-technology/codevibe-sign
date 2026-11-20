@@ -13,10 +13,21 @@ export type RenderPage = (
   signal: AbortSignal,
 ) => Promise<RenderedPage>;
 
+/** A run of text on a page, in page points with a top-left origin, as the page is shown. */
+export interface TextItem {
+  str: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** Everything the viewers need about a document: page sizes for layout, and a renderer. */
 export interface PdfSource {
   pages: PageSize[];
   renderPage: RenderPage;
+  /** The page's text runs, when the renderer can read text; used to find field tags. */
+  textItems?: (pageIndex: number) => Promise<TextItem[]>;
   destroy?: () => void;
 }
 
