@@ -67,6 +67,30 @@ Codevibe Sign" badge; a footer line for the signing certificate; and a custom do
 signing links. The domain is stored and its DNS record shown; serving it is deployment work,
 described in [docs/APP-ARCHITECTURE.md](../../docs/APP-ARCHITECTURE.md#custom-signing-domains).
 
+## Plans and limits
+
+`PLAN_MODE=self-hosted` (the default) puts no limits on any workspace and shows no plan
+screens. `PLAN_MODE=hosted` is the Codevibe cloud: new workspaces start on the Free plan, and
+Settings → Plan and usage shows each limit with its meter. The limits are in
+[src/lib/plans.ts](src/lib/plans.ts); `FREE_PLAN_LIMITS` overrides the Free ones with JSON. A
+send, upload or invitation past a limit is refused with a message that names the limit, the
+usage and what to do; the API answers `403` with code `PLAN_LIMIT`. Hosted mode also serves
+the public home page at `/`, `/terms` and `/privacy`, and gives each new Free workspace a
+sample agreement to send to yourself.
+
+Move a workspace to another plan with `pnpm --filter web plan:set <workspace-slug> <free|cloud|unlimited>`
+(in the Docker image: `node ops/plan-set.mjs`). Every change is recorded in `app_plan_changes`.
+
+## Docs
+
+`pnpm --filter web build:docs` builds the docs site (`apps/site`) and copies it to
+`docs-dist`, which the app serves at `/docs`.
+
+## Deploying
+
+[deploy/README.md](../../deploy/README.md) runs the app and PostgreSQL with Docker Compose behind
+Traefik, from [Dockerfile](Dockerfile).
+
 ## Scripts
 
 | Script       | What it does                                                                           |
@@ -75,6 +99,10 @@ described in [docs/APP-ARCHITECTURE.md](../../docs/APP-ARCHITECTURE.md#custom-si
 | `build`      | Production build.                                                                      |
 | `start`      | Serves the production build.                                                           |
 | `db:migrate` | Migrates `DATABASE_URL`: the sign server's tables, then the app's.                     |
+| `plan:set`   | Moves a workspace to another plan and records the change.                              |
+| `build:docs` | Builds the docs site and copies it into `docs-dist` for `/docs`.                       |
+| `build:ops`  | Bundles `migrate` and `plan:set` into `ops/` for the Docker image.                     |
+| `sample:pdf` | Regenerates the first-run sample agreement PDF.                                        |
 | `dev:seal`   | Writes a self-signed seal certificate to `data/dev-seal.p12`.                          |
 | `test`       | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.          |
 | `smoke`      | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API. |

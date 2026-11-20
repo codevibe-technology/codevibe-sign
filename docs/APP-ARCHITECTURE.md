@@ -183,6 +183,9 @@ released.
 | `app_bulk_send_rows`     | `(bulk_id, line)`: the people and metadata for one envelope, its status, envelope id or error.           |
 | `app_webhooks`           | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.              |
 | `app_webhook_deliveries` | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days. |
+| `app_usage`              | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.      |
+| `app_plan_changes`       | Who moved a workspace from one plan to another, and when.                                                |
+| `app_first_run`          | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.             |
 | `sign_*`                 | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                    |
 
 Ids are prefixed random strings (`ws_…`, `key_…`, `inv_…`). Secrets (API keys, invitation
@@ -342,6 +345,27 @@ secret** replaces it at once. Endpoints can be edited, turned off and removed.
   again at delivery. `WEBHOOK_ALLOW_INSECURE=true` allows `http://` and private hosts for a
   receiver on your own machine.
 - Secrets are stored as they are, because each delivery is signed with them.
+
+## Plans and limits
+
+`app_workspaces.plan` is `free`, `cloud` or `unlimited`. `PLAN_MODE=self-hosted` treats every
+workspace as unlimited; `hosted` applies the plan. The limits live in `src/lib/plans.ts` and
+are enforced where the work happens, never in memory:
+
+| Limit                                  | Where                                                                                                                 |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Envelopes sent per month, stored bytes | `createPlanGate` in front of the sign API: reserved in `app_usage` before the server works, given back if it refuses. |
+| API-key requests per day               | The same gate, for `Authorization: Bearer` calls only.                                                                |
+| PDF size, envelope size                | The gate (create), and the upload checks of the send flow and the template editor.                                    |
+| Members (with open invitations)        | `createInvitation` and `acceptInvitation`, with the workspace row locked.                                             |
+| Active templates                       | Create, duplicate and restore, with the workspace row locked.                                                         |
+| Webhook endpoints                      | `createWebhook`, with the workspace row locked.                                                                       |
+| Rows per bulk send                     | `startBulkSendAction`, which also refuses more rows than sends left this month.                                       |
+| Custom domain, badge                   | `updateSigningSettings`; `getBrand` always shows the badge where the plan requires it.                                |
+| Free workspaces per owner              | `createWorkspace`, with the user's row locked.                                                                        |
+
+Every refusal is a `PlanLimitError` (`code: 'PLAN_LIMIT'`) whose message names the limit, the
+usage and what to do; the API answers `403` with `details: { limit, used, max, plan }`.
 
 ## Extension points for the next lanes
 
