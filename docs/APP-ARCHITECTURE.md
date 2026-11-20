@@ -134,6 +134,7 @@ Each membership has one role. Higher roles include everything below them.
 | ---------------------------------------------------- | :----: | :----: | :---: | :---: |
 | See envelopes, templates, the dashboard              |   ✓    |   ✓    |   ✓   |   ✓   |
 | Create, send, void envelopes; use and edit templates |        |   ✓    |   ✓   |   ✓   |
+| Bulk send from a template; stop a bulk send          |        |   ✓    |   ✓   |   ✓   |
 | Workspace name, brand, API keys, webhooks            |        |        |   ✓   |   ✓   |
 | Invite and remove members, admins and viewers        |        |        |   ✓   |   ✓   |
 | Make or remove owners, delete the workspace          |        |        |       |   ✓   |
@@ -165,19 +166,24 @@ server's migrations, then the app's, each recorded and taken under an advisory l
 migrations are plain SQL in `src/server/db/migrations.ts`, append only, never edited once
 released.
 
-| Table                  | Holds                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------- |
-| `auth_users`           | Person: name, email (unique, lower-case), avatar, email verified.                           |
-| `auth_sessions`        | Better Auth sessions (token, expiry, IP, user agent).                                       |
-| `auth_accounts`        | Linked sign-in methods (Google).                                                            |
-| `auth_verifications`   | Magic-link tokens.                                                                          |
-| `app_workspaces`       | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                  |
-| `app_members`          | `(workspace_id, user_id)` primary key, `role`.                                              |
-| `app_invitations`      | `workspace_id`, `email`, `role`, token SHA-256, expiry (7 days), accepted / revoked times.  |
-| `app_brand_settings`   | One row per workspace; see Branding.                                                        |
-| `app_api_keys`         | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked. |
-| `app_user_preferences` | `user_id`: theme, timezone, language.                                                       |
-| `sign_*`               | The sign server's own tables, now with `sign_envelopes.workspace_id`.                       |
+| Table                    | Holds                                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `auth_users`             | Person: name, email (unique, lower-case), avatar, email verified.                                        |
+| `auth_sessions`          | Better Auth sessions (token, expiry, IP, user agent).                                                    |
+| `auth_accounts`          | Linked sign-in methods (Google).                                                                         |
+| `auth_verifications`     | Magic-link tokens.                                                                                       |
+| `app_workspaces`         | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                               |
+| `app_members`            | `(workspace_id, user_id)` primary key, `role`.                                                           |
+| `app_invitations`        | `workspace_id`, `email`, `role`, token SHA-256, expiry (7 days), accepted / revoked times.               |
+| `app_brand_settings`     | One row per workspace; see Branding.                                                                     |
+| `app_api_keys`           | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked.              |
+| `app_user_preferences`   | `user_id`: theme, timezone, language.                                                                    |
+| `app_templates`          | `workspace_id`, name, description, `definition` (roles, fields, documents, settings), archived time.     |
+| `app_bulk_sends`         | One bulk send: template, who started it, status (`sending`, `done`, `cancelled`), total, worker lease.   |
+| `app_bulk_send_rows`     | `(bulk_id, line)`: the people and metadata for one envelope, its status, envelope id or error.           |
+| `app_webhooks`           | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.              |
+| `app_webhook_deliveries` | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days. |
+| `sign_*`                 | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                    |
 
 Ids are prefixed random strings (`ws_…`, `key_…`, `inv_…`). Secrets (API keys, invitation
 tokens) are 32 random bytes, shown once, stored only as SHA-256.
@@ -275,11 +281,73 @@ the token in an HttpOnly cookie for `/api/v1/sign` and redirects to `/sign`.
 - **Layout**: one column from 390 px up; headings take focus when the step changes; every
   control has a label; errors are announced.
 
+## Templates
+
+A template is a set of PDFs, roles (Employee, HR manager) and fields placed for those roles,
+plus the envelope's default title, message, expiry, reminders and signing order. It lives in
+`app_templates` with its PDFs in the file store under
+`templates/<workspaceId>/<templateId>/<documentId>.pdf`.
+
+- **Editor** (`/w/[slug]/templates/new`, `/[id]/edit`): Documents, Roles, Fields, Details. It
+  reuses the send flow's documents step, field placer and stepper; roles stand in for
+  recipients. Each picked PDF is checked and kept under `staged/<workspaceId>/<random>.pdf`
+  (`stageTemplateDocumentAction`); saving moves the staged files into the template, so no
+  request carries more than one PDF. A saved template keeps its documents: fields stay where
+  they were placed, and other files mean a new template.
+- **Checks**: `src/lib/templates.ts` holds the rules the editor shows (roles named once, a
+  signer or approver, a signature for every signer, a name); the server runs the same rules
+  and also checks every field sits on a page of one of the documents.
+- **List**: Active and Archived, with Use, Bulk send, Edit, Duplicate (copies the PDFs too) and
+  Archive or Restore. Viewers see the list only.
+- **Send** (`/[id]/send`): one name and email per role (and a mobile for SMS codes), with the
+  title and message prefilled. `sendFromTemplate` reads the PDFs from storage and calls
+  `POST /v1/envelopes` in-process with `send: true`, as the member, and records them as the
+  sender. Envelopes carry `metadata.templateId`.
+
+## Bulk send
+
+`/w/[slug]/templates/[id]/bulk` takes a CSV of up to 500 rows (1 MB). Columns are
+`<Role> name`, `<Role> email`, `<Role> phone` and `meta.<key>`, read with
+`@codevibe_technology/sign-templates`' `parseBulkCsv`; a role without columns gets one person
+for every row, typed in on the page. The page shows each problem with its row and column and
+marks the cell; problem rows are sent only when the sender ticks "skip". Columns that would
+prefill a field are refused for now (the API has no prefill on create).
+
+Starting a bulk send reads the CSV again on the server, stores one row per envelope and
+returns at once. A worker in the app process (`runBulkSend`) sends rows one by one as the
+member who started it, after checking they may still send. When the API's per-minute limit
+(60 by default) answers 429, the worker waits and carries on; each send holds a two-minute
+lease, so the tick picks up sends left by a restart and two processes never send the same row.
+The progress page polls every 2 s, lists every row with its envelope or error, offers the rows
+not sent as a CSV to fix, and can stop the send. Envelopes carry `metadata.bulkSendId` and
+`bulkSendLine`.
+
+## Webhooks
+
+**Settings → Webhooks** (admins) adds endpoints: URL, description and events (all, or a
+picked list). The signing secret (`whsec_…`) is shown once with a copy button, and **New
+secret** replaces it at once. Endpoints can be edited, turned off and removed.
+
+- `webhookTargets(workspaceId)` (`src/server/sign/webhooks.ts`) reads the enabled endpoints;
+  the sign server asks it when an event happens and again before each delivery, so turning
+  one off stops retries too.
+- The sign server's `onWebhookDelivery` hook writes every attempt to `app_webhook_deliveries`:
+  delivered, retrying (with the next try), failed (no more tries) or not sent (endpoint off).
+- **Send test event** posts a signed `webhook.test` event now (`sendTestWebhook`) and says
+  what the receiver answered. **Send again** on a delivery posts the same body under the same
+  id to the endpoint's current URL (`redeliverWebhook`). Neither is retried automatically.
+- The endpoint page lists the last 30 days of deliveries (all, or failed), each with its
+  payload, answer, attempts and a hint on what to fix.
+- URLs must be public `https`, checked with the sign server's `checkWebhookUrl` when saved and
+  again at delivery. `WEBHOOK_ALLOW_INSECURE=true` allows `http://` and private hosts for a
+  receiver on your own machine.
+- Secrets are stored as they are, because each delivery is signed with them.
+
 ## Extension points for the next lanes
 
-| Lane                    | Starts from                                                                                                           |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Custom signing domains  | `signing_domain` and `signing_domain_verified_at`; the steps under Custom signing domains.                            |
-| SMS codes               | An `OtpSender` for SMS in `src/server/sign/server.ts`, then `SMS_CODES = true`.                                       |
-| Templates and bulk send | `app/w/[slug]/templates/page.tsx`; `@codevibe_technology/sign-templates`; a `app_templates` table keyed by workspace. |
-| Webhooks UI             | `webhookTargets()` in `src/server/sign/webhooks.ts` reads an `app_webhooks` table (to add).                           |
+| Lane                    | Starts from                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| Custom signing domains  | `signing_domain` and `signing_domain_verified_at`; the steps under Custom signing domains.            |
+| SMS codes               | An `OtpSender` for SMS in `src/server/sign/server.ts`, then `SMS_CODES = true`.                       |
+| Prefill from a template | Needs `values` on `POST /v1/envelopes`; then lift the refusal of prefill columns in `previewBulkCsv`. |
+| Templates over the API  | `/v1/templates` routes in the app that call `sendFromTemplate`, guarded by API keys.                  |
