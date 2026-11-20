@@ -7,11 +7,21 @@ body:
       value: |
         Please do not report security problems here. Email security@codevibe.in instead (see SECURITY.md).
         Remove personal data and real documents from anything you paste.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - The cloud at sign.codevibe.in
+        - A self-hosted install of the web app
+        - A library or the standalone server
+    validations:
+      required: true
   - type: input
     id: package
     attributes:
-      label: Package and version
-      placeholder: '@codevibe_technology/sign-server 0.3.1'
+      label: Package or app, and version
+      placeholder: '@codevibe_technology/sign-server 0.3.1, or the commit you deployed'
     validations:
       required: true
   - type: textarea
