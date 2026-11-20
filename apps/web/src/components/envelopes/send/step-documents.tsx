@@ -11,6 +11,7 @@ import {
   localId,
   type DraftDocument,
 } from '@/lib/send-flow';
+import type { ActionResult } from '@/server/actions/action';
 import { inspectDocumentAction } from '@/server/actions/envelopes';
 import { FileDrop } from '../file-drop';
 
@@ -26,11 +27,18 @@ export function StepDocuments({
   workspaceId,
   documents,
   locked,
+  lockedNote = 'The documents are saved with this draft and cannot be swapped. To send other files, start a new envelope.',
   error,
+  inspect = inspectDocumentAction,
   onChange,
 }: {
   workspaceId: string;
   documents: DraftDocument[];
+  lockedNote?: string;
+  /** Checks a picked file on the server; the template editor also keeps it there. */
+  inspect?: (
+    form: FormData,
+  ) => Promise<ActionResult<{ pages: DraftDocument['pages']; stagedKey?: string }>>;
   /** The draft exists; its documents can no longer change. */
   locked: boolean;
   error?: string;
@@ -59,7 +67,7 @@ export function StepDocuments({
         const form = new FormData();
         form.set('workspaceId', workspaceId);
         form.set('file', file);
-        const result = await inspectDocumentAction(form);
+        const result = await inspect(form);
         if (!result.ok) {
           setProblems((prev) => [...prev, result.error]);
         } else {
@@ -72,6 +80,7 @@ export function StepDocuments({
               size: file.size,
               pages: result.data.pages,
               bytes,
+              ...(result.data.stagedKey ? { stagedKey: result.data.stagedKey } : {}),
             },
           ]);
         }
@@ -85,8 +94,7 @@ export function StepDocuments({
       {locked ? (
         <p className="flex items-start gap-2 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-muted">
           <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-          The documents are saved with this draft and cannot be swapped. To send other files, start
-          a new envelope.
+          {lockedNote}
         </p>
       ) : (
         <FileDrop

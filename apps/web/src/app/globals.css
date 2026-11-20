@@ -171,6 +171,16 @@
   --cvs-shadow: var(--shadow);
 }
 
+/* Recipient colours outside the placer too (role and recipient dots), in the light theme. */
+:root {
+  --cvs-recipient-0: #2b59c3;
+  --cvs-recipient-1: #d4561e;
+  --cvs-recipient-2: #1f8a5b;
+  --cvs-recipient-3: #8a3fc2;
+  --cvs-recipient-4: #b8326a;
+  --cvs-recipient-5: #0f7f93;
+}
+
 [data-theme='dark'] {
   --cvs-recipient-0: #6f96ff;
   --cvs-recipient-1: #ff8f5c;

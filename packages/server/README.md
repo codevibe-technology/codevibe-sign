@@ -292,6 +292,38 @@ exported for checking URLs when integrators register them.
 If you pass `fetch`, deliveries use it; the URL and addresses are still checked, but the
 connection cannot be pinned to the checked address.
 
+### Delivery log, tests and redelivery
+
+`onWebhookDelivery(report)` is called after every attempt with the delivery id, workspace,
+URL, event, the exact body, the attempt number, the outcome (`delivered`, `failed`, or
+`skipped` when the target was removed or turned off), the receiver's status, the error and
+when it will be retried. Keep the reports to show people a delivery log; a hook that throws
+is logged and does not affect the delivery.
+
+<!-- check:
+import type { SignServer } from '@codevibe_technology/sign-server';
+declare const sign: SignServer;
+-->
+
+```ts check
+const test = await sign.sendTestWebhook({
+  workspaceId: 'ws_1',
+  url: 'https://hooks.example.com/sign',
+});
+// test.outcome: 'delivered' | 'failed' | 'skipped'; test.status: the receiver's answer
+
+await sign.redeliverWebhook({
+  workspaceId: 'ws_1',
+  url: 'https://hooks.example.com/sign',
+  deliveryId: test.deliveryId,
+  body: test.body,
+});
+```
+
+`sendTestWebhook` posts a signed `webhook.test` event (no envelope) to one of the
+workspace's targets; `redeliverWebhook` posts an earlier body again under the same id. Both
+deliver once, now, and are never queued for retry.
+
 ## Background work
 
 Invitations, reminders, completion copies, webhooks and sealing are jobs in the store.

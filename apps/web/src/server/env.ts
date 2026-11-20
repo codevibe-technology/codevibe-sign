@@ -26,6 +26,7 @@ const schema = z.object({
   SINGLE_WORKSPACE: flag,
   AUTO_MIGRATE: flag,
   TRUST_PROXY: flag,
+  WEBHOOK_ALLOW_INSECURE: flag,
   SIGN_TICK_SECONDS: z.coerce.number().int().min(0).default(60),
 });
 

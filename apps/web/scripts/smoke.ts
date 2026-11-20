@@ -6,8 +6,9 @@ import { migrateAll } from '../src/server/migrate';
 
 /**
  * Boots the built app (`pnpm --filter web build` first) against DATABASE_URL and walks the
- * main paths over real HTTP: health, sign-in by magic link, the guards, the API with a
- * workspace key, and a signing link through to the branded signing page. Exits non-zero on the
+ * main paths over real HTTP: health, sign-in by magic link, the guards, the template and
+ * webhook pages, the API with a workspace key, and a signing link through to the branded
+ * signing page. Exits non-zero on the
  * first failure.
  */
 const url = process.env.DATABASE_URL;
@@ -93,7 +94,8 @@ try {
 
   const [user] = await sql<{ id: string }[]>`select id from auth_users where email = ${email}`;
   const workspaceId = `ws_${randomBytes(10).toString('hex')}`;
-  await sql`insert into app_workspaces (id, slug, name) values (${workspaceId}, ${`smoke-${Date.now()}`}, 'Smoke')`;
+  const slug = `smoke-${Date.now()}`;
+  await sql`insert into app_workspaces (id, slug, name) values (${workspaceId}, ${slug}, 'Smoke')`;
   await sql`insert into app_members (workspace_id, user_id, role) values (${workspaceId}, ${user!.id}, 'owner')`;
   const key = `cvs_${randomBytes(32).toString('base64url')}`;
   await sql`insert into app_api_keys (id, workspace_id, name, key_hash, prefix)
@@ -112,6 +114,40 @@ try {
     headers: { cookie, 'x-workspace': 'ws_other' },
   });
   check(otherWorkspace.status === 401, 'but not for a workspace they are not in');
+
+  const page = async (path: string, text: string) => {
+    const res = await get(path, { headers: { cookie } });
+    return res.status === 200 && (await res.text()).includes(text);
+  };
+  check(await page(`/w/${slug}/templates`, 'No templates yet'), 'the templates page renders');
+  check(await page(`/w/${slug}/templates/new`, 'New template'), 'the template editor renders');
+  const templateId = `tpl_${randomBytes(10).toString('hex')}`;
+  const definition = {
+    title: '',
+    message: '',
+    routing: 'sequential',
+    expiresInDays: 14,
+    remindEveryDays: 2,
+    roles: [{ id: 'r1', name: 'Employee', type: 'signer', auth: 'email_link' }],
+    documents: [
+      { id: 'd1', name: 'offer.pdf', size: 1, sha256: '', pages: [{ width: 595, height: 842 }] },
+    ],
+    fields: [],
+  };
+  await sql`insert into app_templates (id, workspace_id, name, definition)
+    values (${templateId}, ${workspaceId}, 'Smoke template', ${sql.json(definition)})`;
+  check(
+    await page(`/w/${slug}/templates/${templateId}/send`, 'Send: Smoke template'),
+    'sending from a template renders',
+  );
+  check(
+    await page(`/w/${slug}/templates/${templateId}/bulk`, 'Sample CSV'),
+    'bulk send from a template renders',
+  );
+  check(
+    await page(`/w/${slug}/settings/webhooks`, 'No endpoints yet'),
+    'the webhooks settings render',
+  );
 
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -141,8 +177,8 @@ try {
     opened.status === 303 && opened.headers.get('location') === `${base}/sign`,
     'the signing link redirects to /sign without the token',
   );
-  const page = await get('/sign');
-  check(page.status === 200, 'the signing page renders');
+  const signingPage = await get('/sign');
+  check(signingPage.status === 200, 'the signing page renders');
   const view = await get('/api/v1/sign/link', { headers: { cookie: linkCookie } });
   const signer = (await view.json()) as { workspaceId: string; recipient: { name: string } };
   check(signer.workspaceId === workspaceId, 'the page reads the envelope through the cookie');

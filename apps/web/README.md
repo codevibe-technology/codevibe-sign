@@ -35,6 +35,20 @@ up later from the envelopes list. Each envelope page shows the timeline, the rec
 progress, the certificate and whether the seal on the signed copy checks out; **Verify** checks
 any PDF someone sends back against this workspace's seal.
 
+## Templates and bulk send
+
+**Templates** keeps documents you send again and again. Upload the PDFs once, name the roles
+(Employee, HR manager), place their fields and save. **Use** fills each role with a person and
+sends; **Bulk send** takes a CSV with one row per envelope (up to 500), shows every row with
+its problems pointing at the column, and sends in the background while a progress page follows
+it. Download the sample CSV from the bulk page to start.
+
+## Webhooks
+
+**Settings → Webhooks** sends signed events to your own systems as envelopes are sent,
+signed, completed or declined. Pick the events, copy the secret (shown once), send a test
+event, and follow every delivery with its payload; failed ones can be sent again.
+
 ## Signing a document
 
 The link in the email opens `/sign`, headed with the sender's logo, colour and name. The

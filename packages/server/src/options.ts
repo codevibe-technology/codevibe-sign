@@ -82,6 +82,29 @@ export interface WebhookTarget {
   events: WebhookEvent[];
 }
 
+/** What happened to one webhook delivery attempt; see `onWebhookDelivery`. */
+export interface WebhookDeliveryReport {
+  /** The same on every attempt; receivers see it as `id` and `x-codevibe-delivery`. */
+  deliveryId: string;
+  workspaceId: string;
+  url: string;
+  /** The `type` in the body, for example `envelope.completed` or `webhook.test`. */
+  event: string;
+  /** The exact JSON that was (or would have been) posted. */
+  body: string;
+  /** 1 for the first attempt of a queued delivery; 1 for a test or a manual redelivery. */
+  attempt: number;
+  /** `skipped`: the workspace has no target with this URL any more, so nothing was sent. */
+  outcome: 'delivered' | 'failed' | 'skipped';
+  /** The receiver's HTTP status, when it answered. */
+  status: number | null;
+  error: string | null;
+  /** When the server tries again; null when it will not. */
+  retryAt: Date | null;
+  at: Date;
+  durationMs: number;
+}
+
 export interface SignServerOptions {
   store: ServerStore;
   files: FileStore;
@@ -105,6 +128,11 @@ export interface SignServerOptions {
    * The static `webhooks` serve the default workspace.
    */
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
+  /**
+   * Called after every webhook delivery attempt, including tests and redeliveries, for
+   * example to keep a delivery log. Errors it throws are logged and otherwise ignored.
+   */
+  onWebhookDelivery?: (report: WebhookDeliveryReport) => void | Promise<void>;
   /**
    * Path prefix the app is served under, for example `/api` when mounted inside another
    * framework. Routes and cookie paths start with it. Default none.

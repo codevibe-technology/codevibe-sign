@@ -296,6 +296,15 @@ describe('a full run against the server', () => {
     }
     expect(h.deliveries.length).toBeGreaterThan(0);
 
+    const test = await h.server.sendTestWebhook({
+      workspaceId: 'default',
+      url: 'https://hooks.example.com/sign',
+    });
+    expect(test.outcome).toBe('delivered');
+    const validateTest = validator({ $ref: '#/components/schemas/WebhookTestEvent' });
+    const testBody = JSON.parse(h.deliveries.at(-1)!.body);
+    expect(validateTest(testBody), JSON.stringify(validateTest.errors)).toBe(true);
+
     const missing = operations()
       .map((o) => o.operation.operationId)
       .filter((op) => !seen.has(op));

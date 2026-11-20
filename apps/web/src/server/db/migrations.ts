@@ -148,4 +148,86 @@ create table app_envelope_senders (
 create index app_envelope_senders_workspace_idx on app_envelope_senders (workspace_id, user_id);
 `,
   },
+  {
+    name: '0004_templates',
+    sql: `
+create table app_templates (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  name text not null,
+  description text,
+  definition jsonb not null,
+  created_by text references auth_users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  archived_at timestamptz
+);
+create index app_templates_workspace_idx on app_templates (workspace_id, archived_at, updated_at desc);
+
+create table app_bulk_sends (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  template_id text not null references app_templates (id) on delete cascade,
+  template_name text not null,
+  created_by text references auth_users (id) on delete set null,
+  status text not null default 'sending' check (status in ('sending', 'done', 'cancelled')),
+  total integer not null,
+  lease_until timestamptz,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+create index app_bulk_sends_workspace_idx on app_bulk_sends (workspace_id, created_at desc);
+create index app_bulk_sends_open_idx on app_bulk_sends (status) where status = 'sending';
+
+create table app_bulk_send_rows (
+  bulk_id text not null references app_bulk_sends (id) on delete cascade,
+  line integer not null,
+  input jsonb not null,
+  status text not null default 'pending' check (status in ('pending', 'sent', 'failed')),
+  envelope_id text,
+  error text,
+  updated_at timestamptz not null default now(),
+  primary key (bulk_id, line)
+);
+`,
+  },
+  {
+    name: '0005_webhooks',
+    sql: `
+create table app_webhooks (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  url text not null,
+  description text,
+  events text[] not null,
+  secret text not null,
+  enabled boolean not null default true,
+  created_by text references auth_users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, url)
+);
+
+create table app_webhook_deliveries (
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  delivery_id text not null,
+  webhook_id text not null references app_webhooks (id) on delete cascade,
+  url text not null,
+  event text not null,
+  body text not null,
+  status text not null check (status in ('delivered', 'failed', 'retrying', 'skipped')),
+  attempts integer not null default 0,
+  response_status integer,
+  error text,
+  next_retry_at timestamptz,
+  duration_ms integer,
+  created_at timestamptz not null default now(),
+  last_attempt_at timestamptz not null default now(),
+  primary key (webhook_id, delivery_id)
+);
+create index app_webhook_deliveries_webhook_idx
+  on app_webhook_deliveries (webhook_id, created_at desc);
+create index app_webhook_deliveries_age_idx on app_webhook_deliveries (last_attempt_at);
+`,
+  },
 ];

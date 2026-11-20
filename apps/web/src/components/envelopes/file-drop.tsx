@@ -11,6 +11,7 @@ export function FileDrop({
   title,
   hint,
   disabled,
+  accept = 'application/pdf,.pdf',
   children,
 }: {
   onFiles: (files: File[]) => void;
@@ -18,6 +19,8 @@ export function FileDrop({
   title: string;
   hint: ReactNode;
   disabled?: boolean;
+  /** File types the picker offers. */
+  accept?: string;
   children?: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -61,7 +64,7 @@ export function FileDrop({
           ref={input}
           id={id}
           type="file"
-          accept="application/pdf,.pdf"
+          accept={accept}
           multiple={multiple}
           disabled={disabled}
           className="sr-only"

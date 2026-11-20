@@ -17,7 +17,13 @@ import { consoleLogger, type Logger } from '../errors';
 import { normalizeApiKeys, type StoredApiKey } from '../http/auth';
 import { redactingLogger } from '../http/redact';
 import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
-import type { Limits, SealerOptions, SignServerOptions, WebhookTarget } from '../options';
+import type {
+  Limits,
+  SealerOptions,
+  SignServerOptions,
+  WebhookDeliveryReport,
+  WebhookTarget,
+} from '../options';
 import type { ServerStore } from '../store/types';
 import type { Principal } from '../tenancy';
 import { defaultTemplates, type MailTemplates, type WorkspaceMail } from '../templates';
@@ -46,6 +52,7 @@ export interface Runtime {
   apiKeys: StoredApiKey[];
   authenticate?: (request: Request) => Promise<Principal | null>;
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
+  onWebhookDelivery?: (report: WebhookDeliveryReport) => void | Promise<void>;
   /** Prefix of every route and cookie path, without a trailing slash; empty by default. */
   basePath: string;
   sealer: Required<Omit<SealerOptions, 'trust'>>;
@@ -143,6 +150,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),
+    ...(options.onWebhookDelivery ? { onWebhookDelivery: options.onWebhookDelivery } : {}),
     basePath,
     sealer: {
       p12: options.sealer.p12,

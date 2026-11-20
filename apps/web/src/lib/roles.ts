@@ -29,6 +29,7 @@ export type Permission =
   | 'workspace.manage'
   | 'brand.manage'
   | 'apiKeys.manage'
+  | 'webhooks.manage'
   | 'team.manage'
   | 'owners.manage'
   | 'workspace.delete';
@@ -40,6 +41,7 @@ const MINIMUM: Record<Permission, Role> = {
   'workspace.manage': 'admin',
   'brand.manage': 'admin',
   'apiKeys.manage': 'admin',
+  'webhooks.manage': 'admin',
   'team.manage': 'admin',
   'owners.manage': 'owner',
   'workspace.delete': 'owner',

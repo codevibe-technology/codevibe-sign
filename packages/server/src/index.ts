@@ -14,6 +14,7 @@ export type {
   SealerOptions,
   WebhookTarget,
   WebhookEvent,
+  WebhookDeliveryReport,
 } from './options';
 export {
   defaultPdfEngine,
@@ -25,7 +26,7 @@ export {
   type SealCheck,
 } from './engine';
 export type { TickResult, TickOptions } from './runtime/tick';
-export { signWebhook, verifyWebhook, SIGNATURE_HEADER } from './runtime/webhooks';
+export { signWebhook, verifyWebhook, SIGNATURE_HEADER, TEST_EVENT } from './runtime/webhooks';
 export {
   checkWebhookUrl,
   isPublicAddress,
