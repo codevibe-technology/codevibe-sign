@@ -1,0 +1,51 @@
+import Link from 'next/link';
+import { Wordmark } from '@/components/shell/brand-mark';
+import { Button } from '@/components/ui/button';
+import { DOCS_URL } from './links';
+
+const SECTIONS = [
+  { label: 'How it works', href: '/#how-it-works' },
+  { label: 'Features', href: '/#features' },
+  { label: 'Pricing', href: '/#pricing' },
+];
+
+/** The top bar of the public pages: wordmark, section links, docs and the way in. */
+export function SiteHeader() {
+  return (
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-header/95 text-header-ink backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
+        <Link href="/" className="shrink-0 rounded-md" aria-label="Codevibe Sign home">
+          <Wordmark />
+        </Link>
+        <nav aria-label="Site" className="ml-6 hidden items-center gap-1 md:flex">
+          {SECTIONS.map((s) => (
+            <a
+              key={s.href}
+              href={s.href}
+              className="rounded-md px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              {s.label}
+            </a>
+          ))}
+          <a
+            href={DOCS_URL}
+            className="rounded-md px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            Docs
+          </a>
+        </nav>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/sign-in"
+            className="hidden rounded-md px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 sm:inline-flex"
+          >
+            Sign in
+          </Link>
+          <Button asChild size="sm">
+            <Link href="/sign-in">Start free</Link>
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+}
