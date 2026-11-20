@@ -20,6 +20,7 @@ export {
 export type {
   ApiKey,
   EnvConfig,
+  EnvelopeChange,
   Limits,
   Logger,
   RunningSignServer,

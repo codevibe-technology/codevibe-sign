@@ -3,6 +3,7 @@ import {
   commitTransition,
   hasActed,
   isFinal,
+  type AuditEvent,
   type Envelope,
   type Id,
   type TransitionResult,
@@ -52,6 +53,7 @@ export async function mutate(rt: Runtime, id: Id, apply: Apply, scope?: Scope): 
       if (err instanceof VersionConflictError && attempt < MAX_ATTEMPTS) continue;
       throw err;
     }
+    await announce(rt, owner, committed.envelope.id, committed.events);
     await afterCommit(rt, stored.envelope, committed.envelope, jobs);
     return { envelope: committed.envelope, changed: true };
   }
@@ -67,8 +69,22 @@ export async function create(
   const jobs = await effectsToJobs(rt, committed.envelope, committed.effects, workspaceId);
   const options = workspaceId === DEFAULT_WORKSPACE ? undefined : { workspaceId };
   await rt.store.commit(committed.envelope, committed.events, 0, jobs, options);
+  await announce(rt, workspaceId, committed.envelope.id, committed.events);
   await dispatchJobs(rt, jobs);
   return committed.envelope;
+}
+
+/** Tells `onEnvelopeChange` what was just saved. Its failures never undo or fail the change. */
+async function announce(rt: Runtime, workspaceId: string, envelopeId: Id, events: AuditEvent[]) {
+  if (!rt.onEnvelopeChange || events.length === 0) return;
+  try {
+    await rt.onEnvelopeChange({ workspaceId, envelopeId, actions: events.map((e) => e.action) });
+  } catch (err) {
+    rt.logger.error('onEnvelopeChange failed', {
+      envelope: envelopeId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 /** Signing links stop working once their recipient has acted or the envelope is final. */

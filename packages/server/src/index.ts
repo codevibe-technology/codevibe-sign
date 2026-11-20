@@ -15,6 +15,7 @@ export type {
   WebhookTarget,
   WebhookEvent,
   WebhookDeliveryReport,
+  EnvelopeChange,
 } from './options';
 export {
   defaultPdfEngine,

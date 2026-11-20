@@ -105,6 +105,14 @@ export interface WebhookDeliveryReport {
   durationMs: number;
 }
 
+/** What one saved change to an envelope recorded; see `onEnvelopeChange`. */
+export interface EnvelopeChange {
+  workspaceId: string;
+  envelopeId: string;
+  /** The audit actions the change appended, in order, for example `recipient.signed`. */
+  actions: string[];
+}
+
 export interface SignServerOptions {
   store: ServerStore;
   files: FileStore;
@@ -133,6 +141,12 @@ export interface SignServerOptions {
    * example to keep a delivery log. Errors it throws are logged and otherwise ignored.
    */
   onWebhookDelivery?: (report: WebhookDeliveryReport) => void | Promise<void>;
+  /**
+   * Called once an envelope change is saved, with the audit actions it recorded: sent, viewed,
+   * signed, declined, completed, sealed, voided, reminded, expired and the rest. For example
+   * to tell open pages to refresh. Errors it throws are logged and otherwise ignored.
+   */
+  onEnvelopeChange?: (change: EnvelopeChange) => void | Promise<void>;
   /**
    * Path prefix the app is served under, for example `/api` when mounted inside another
    * framework. Routes and cookie paths start with it. Default none.

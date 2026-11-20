@@ -18,6 +18,7 @@ import { normalizeApiKeys, type StoredApiKey } from '../http/auth';
 import { redactingLogger } from '../http/redact';
 import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
 import type {
+  EnvelopeChange,
   Limits,
   SealerOptions,
   SignServerOptions,
@@ -53,6 +54,9 @@ export interface Runtime {
   authenticate?: (request: Request) => Promise<Principal | null>;
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
   onWebhookDelivery?: (report: WebhookDeliveryReport) => void | Promise<void>;
+  onEnvelopeChange?: (change: EnvelopeChange) => void | Promise<void>;
+  /** Base URL of the server, without a trailing slash. */
+  publicUrl: string;
   /** Prefix of every route and cookie path, without a trailing slash; empty by default. */
   basePath: string;
   sealer: Required<Omit<SealerOptions, 'trust'>>;
@@ -151,6 +155,8 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),
     ...(options.onWebhookDelivery ? { onWebhookDelivery: options.onWebhookDelivery } : {}),
+    ...(options.onEnvelopeChange ? { onEnvelopeChange: options.onEnvelopeChange } : {}),
+    publicUrl,
     basePath,
     sealer: {
       p12: options.sealer.p12,
