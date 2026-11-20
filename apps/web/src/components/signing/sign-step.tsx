@@ -31,10 +31,10 @@ export function SignStep({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-bold" tabIndex={-1} data-autofocus>
+        <h1 className="text-[22px] leading-tight font-bold" tabIndex={-1} data-autofocus>
           {view.envelope.title}
         </h1>
-        <p className="text-sm text-muted">
+        <p className="mt-1 text-sm text-muted">
           {approver
             ? 'Read the document, then approve it or decline.'
             : fieldCount === 1
@@ -51,7 +51,7 @@ export function SignStep({
         </p>
       ) : null}
 
-      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         {pdf ? (
           <SigningView
             documents={documents}

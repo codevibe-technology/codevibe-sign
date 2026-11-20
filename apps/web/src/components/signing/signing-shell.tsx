@@ -31,10 +31,13 @@ export function SigningShell({
   return (
     <div className="flex min-h-dvh flex-col" style={style} data-testid="signing-shell">
       <header
-        className="bg-header text-header-ink"
+        className="relative bg-nav text-white"
         style={color ? { background: color, color: textOn(color) } : undefined}
       >
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
+        {color ? null : (
+          <span aria-hidden className="absolute bottom-0 left-0 h-[3px] w-full bg-accent/80" />
+        )}
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           {brand?.logoUrl ? (
             <img
               src={brand.logoUrl}
@@ -51,16 +54,21 @@ export function SigningShell({
           ) : (
             <BrandMark />
           )}
-          <span className="truncate text-base font-semibold">{brand?.name ?? 'Codevibe Sign'}</span>
+          <span className="truncate font-display text-base font-semibold tracking-tight">
+            {brand?.name ?? 'Codevibe Sign'}
+          </span>
+          <span className="ml-auto hidden font-mono text-[10.5px] tracking-[0.12em] uppercase opacity-70 sm:inline">
+            Secure signing
+          </span>
         </div>
       </header>
-      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:py-8">
+      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10">
         {children}
       </main>
       {showBadge ? (
-        <footer className="px-4 pb-6 text-center text-xs text-muted">
+        <footer className="px-4 pb-6 text-center font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
           <span className="inline-flex items-center gap-1.5" data-testid="secured-badge">
-            <ShieldCheck aria-hidden className="h-4 w-4" />
+            <ShieldCheck aria-hidden className="h-3.5 w-3.5 text-accent" />
             Secured by Codevibe Sign
           </span>
         </footer>
@@ -87,13 +95,13 @@ export function SigningMessage({
     warning: 'bg-warning-soft text-warning',
   };
   return (
-    <section className="mx-auto max-w-lg rounded-2xl border border-line bg-surface p-6 text-center shadow-card sm:p-8">
+    <section className="mx-auto max-w-lg rounded-xl border border-line border-t-[3px] border-t-accent bg-surface p-6 text-center shadow-card sm:p-8">
       <span
-        className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full ${tones[tone]}`}
+        className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md ${tones[tone]}`}
       >
         {icon}
       </span>
-      <h1 className="text-xl font-bold" tabIndex={-1} data-autofocus>
+      <h1 className="text-[22px] leading-tight font-bold" tabIndex={-1} data-autofocus>
         {title}
       </h1>
       <div className="mt-2 space-y-3 text-muted">{children}</div>

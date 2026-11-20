@@ -18,8 +18,9 @@ export default async function SignInPage({
   if (await getSessionUser()) redirect(next);
   return (
     <AuthFrame>
-      <h1 className="text-2xl font-bold">Sign in</h1>
-      <p className="mt-1 mb-6 text-muted">We will email you a link. No password to remember.</p>
+      <p className="eyebrow mb-2">Codevibe Sign</p>
+      <h1 className="text-[26px] leading-tight font-bold">Sign in</h1>
+      <p className="mt-1.5 mb-6 text-muted">We will email you a link. No password to remember.</p>
       <SignInForm next={next} google={googleEnabled(env())} failed={params.error !== undefined} />
     </AuthFrame>
   );

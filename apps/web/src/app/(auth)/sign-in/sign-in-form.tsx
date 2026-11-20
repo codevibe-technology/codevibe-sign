@@ -55,7 +55,7 @@ export function SignInForm({
 
   if (sentTo) {
     return (
-      <div className="rounded-xl bg-accent-soft p-5" role="status">
+      <div className="rounded-lg border border-accent/40 bg-accent-soft p-5" role="status">
         <MailCheck aria-hidden className="mb-2 h-6 w-6" />
         <p className="font-semibold">Check your email</p>
         <p className="mt-1 text-sm">
@@ -95,7 +95,7 @@ export function SignInForm({
       </form>
       {google ? (
         <>
-          <div className="flex items-center gap-3 text-xs text-muted uppercase">
+          <div className="flex items-center gap-3 font-mono text-[11px] tracking-[0.1em] text-muted uppercase">
             <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
           </div>
           <Button

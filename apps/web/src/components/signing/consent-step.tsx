@@ -43,9 +43,9 @@ export function ConsentStep({
   }
 
   return (
-    <section className="mx-auto max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
-      <p className="text-sm text-muted">Hello {view.recipient.name},</p>
-      <h1 className="mt-1 text-xl font-bold" tabIndex={-1} data-autofocus>
+    <section className="mx-auto max-w-lg rounded-xl border border-line border-t-[3px] border-t-accent bg-surface p-6 shadow-card sm:p-8">
+      <p className="eyebrow">Hello {view.recipient.name}</p>
+      <h1 className="mt-2 text-[22px] leading-tight font-bold" tabIndex={-1} data-autofocus>
         {company} asks you to {verb} &ldquo;{view.envelope.title}&rdquo;
       </h1>
       {view.envelope.changeNote ? (
@@ -57,17 +57,20 @@ export function ConsentStep({
         </p>
       ) : null}
       {view.envelope.message ? (
-        <blockquote className="mt-4 border-l-4 border-line-strong pl-3 whitespace-pre-line">
+        <blockquote className="mt-4 border-l-[3px] border-accent pl-3 whitespace-pre-line">
           {view.envelope.message}
         </blockquote>
       ) : null}
-      <ul className="mt-4 space-y-2" aria-label="Documents">
+      <ul
+        className="mt-5 divide-y divide-line rounded-lg border border-line"
+        aria-label="Documents"
+      >
         {view.documents.map((d) => (
-          <li key={d.id} className="flex items-center gap-2 text-sm">
+          <li key={d.id} className="flex items-center gap-2 px-3 py-2.5 text-sm">
             <FileText aria-hidden className="h-4 w-4 shrink-0 text-muted" />
-            <span className="truncate">{d.name}</span>
-            <span className="shrink-0 text-muted">
-              · {d.pageCount} {d.pageCount === 1 ? 'page' : 'pages'}
+            <span className="truncate font-medium">{d.name}</span>
+            <span className="ml-auto shrink-0 font-mono text-[11px] text-muted">
+              {d.pageCount} {d.pageCount === 1 ? 'page' : 'pages'}
             </span>
           </li>
         ))}
