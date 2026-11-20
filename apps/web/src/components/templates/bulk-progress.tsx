@@ -139,7 +139,7 @@ export function BulkProgress({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={progress}
-            className="h-2.5 w-full overflow-hidden rounded-full bg-surface-2"
+            className="h-2.5 w-full overflow-hidden rounded-[2px] bg-surface-2"
           >
             <div
               className={cn(

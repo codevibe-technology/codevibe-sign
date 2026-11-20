@@ -219,12 +219,12 @@ export function BulkSendForm({
           </h2>
 
           <div className="flex flex-wrap gap-2" aria-live="polite">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1 text-sm font-semibold text-success">
+            <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-success-soft px-2.5 py-1 font-mono text-[11px] font-medium tracking-[0.06em] uppercase text-success">
               <CheckCircle2 aria-hidden className="h-4 w-4" />
               {preview.ready.length} ready
             </span>
             {badRows > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-3 py-1 text-sm font-semibold text-danger">
+              <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-danger-soft px-2.5 py-1 font-mono text-[11px] font-medium tracking-[0.06em] uppercase text-danger">
                 <AlertTriangle aria-hidden className="h-4 w-4" />
                 {badRows} {badRows === 1 ? 'row has' : 'rows have'} problems
               </span>

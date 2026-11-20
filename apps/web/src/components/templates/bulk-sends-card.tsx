@@ -37,7 +37,7 @@ export function BulkSendsCard({
                 </p>
                 {b.status === 'sending' ? (
                   <div
-                    className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-surface-2"
+                    className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-[2px] bg-surface-2"
                     aria-hidden
                   >
                     <div className="h-full bg-primary" style={{ width: `${bulkProgress(b)}%` }} />

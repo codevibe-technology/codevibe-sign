@@ -110,12 +110,9 @@ export function PlanUsage({
                     aria-valuemax={meter.max}
                     aria-valuenow={Math.min(meter.used, meter.max)}
                     aria-valuetext={`${meter.usedText} of ${meter.maxText}`}
-                    className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2"
+                    className="mt-2 h-2 overflow-hidden rounded-[2px] bg-surface-2"
                   >
-                    <div
-                      className={cn('h-full rounded-full', state?.bar)}
-                      style={{ width: `${width}%` }}
-                    />
+                    <div className={cn('h-full', state?.bar)} style={{ width: `${width}%` }} />
                   </div>
                 ) : null}
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">

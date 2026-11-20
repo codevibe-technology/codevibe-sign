@@ -109,7 +109,7 @@ export function SendTemplateForm({
                 className="rounded-xl border border-line bg-surface p-4 shadow-card"
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-surface-2 px-1.5 text-xs font-bold text-ink">
+                  <span className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-surface-2 px-1.5 font-mono text-[11px] font-semibold text-ink">
                     {definition.routing === 'sequential' ? i + 1 : '•'}
                   </span>
                   <RecipientDot index={roleColor(definition.roles, role.id)} />

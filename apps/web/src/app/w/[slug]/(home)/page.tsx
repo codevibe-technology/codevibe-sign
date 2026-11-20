@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   Ban,
   CheckCircle2,
   Clock,
@@ -30,21 +31,23 @@ import { startHere } from '@/server/sample-envelope';
 export const metadata: Metadata = { title: 'Dashboard' };
 
 const STATS = [
-  { key: 'draft', label: 'Drafts', icon: FilePen, tone: 'bg-surface-2 text-ink' },
+  { key: 'draft', label: 'Drafts', icon: FilePen, bar: 'bg-line-strong', iconTone: 'text-muted' },
   {
     key: 'waiting',
     label: 'Waiting for others',
     icon: Clock,
-    tone: 'bg-warning-soft text-warning',
+    bar: 'bg-warning',
+    iconTone: 'text-warning',
   },
   {
     key: 'completed',
     label: 'Completed',
     icon: CheckCircle2,
-    tone: 'bg-success-soft text-success',
+    bar: 'bg-success',
+    iconTone: 'text-success',
   },
-  { key: 'declined', label: 'Declined', icon: XCircle, tone: 'bg-danger-soft text-danger' },
-  { key: 'expired', label: 'Expired', icon: Hourglass, tone: 'bg-surface-2 text-muted' },
+  { key: 'declined', label: 'Declined', icon: XCircle, bar: 'bg-danger', iconTone: 'text-danger' },
+  { key: 'expired', label: 'Expired', icon: Hourglass, bar: 'bg-muted/50', iconTone: 'text-muted' },
 ] as const;
 
 const DOT: Record<string, string> = {
@@ -81,6 +84,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
     <>
       <PageHeader
         title={`Hello${user.name ? `, ${user.name.split(' ')[0]}` : ''}`}
+        eyebrow="Dashboard"
         description={`Here is what is happening in ${workspace.name}.`}
         badge={<LiveUpdates workspaceId={workspace.id} />}
         action={sendButton}
@@ -97,30 +101,31 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         aria-label="Envelopes by status"
         className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5"
       >
-        {STATS.map(({ key, label, icon: Icon, tone }) => (
+        {STATS.map(({ key, label, icon: Icon, bar, iconTone }) => (
           <Link
             key={key}
             href={`/w/${slug}/envelopes?status=${key}`}
             className="group rounded-xl last:col-span-2 lg:last:col-span-1"
           >
-            <Card className="flex h-full items-center gap-3 p-4 transition-colors group-hover:border-line-strong sm:p-5">
-              <span
-                className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                  tone,
-                )}
-              >
-                <Icon aria-hidden className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p
-                  className="font-display text-2xl leading-7 font-bold"
-                  data-testid={`count-${key}`}
-                >
-                  {counts[key]}
-                </p>
-                <p className="truncate text-sm text-muted">{label}</p>
+            <Card className="relative h-full overflow-hidden px-4 pt-4 pb-3.5 transition-[border-color,box-shadow] group-hover:border-line-strong group-hover:shadow-[0_8px_24px_rgb(13_27_42/0.08)] sm:px-5">
+              <span aria-hidden className={cn('absolute inset-x-0 top-0 h-[3px]', bar)} />
+              <div className="flex items-start justify-between gap-2">
+                <p className="eyebrow truncate">{label}</p>
+                <Icon aria-hidden strokeWidth={1.8} className={cn('h-4 w-4 shrink-0', iconTone)} />
               </div>
+              <p
+                className="mt-3 font-display text-[32px] leading-none font-bold tracking-tight"
+                data-testid={`count-${key}`}
+              >
+                {counts[key]}
+              </p>
+              <p className="mt-2 flex items-center gap-1 text-[13px] font-medium text-muted group-hover:text-primary">
+                View
+                <ArrowRight
+                  aria-hidden
+                  className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+                />
+              </p>
             </Card>
           </Link>
         ))}
@@ -143,6 +148,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
             {mine.length > 0 ? (
               <Card>
                 <CardHeader
+                  eyebrow="Your turn"
                   title="Waiting on you"
                   description="It is your turn on these. The signing link is in your email."
                 />
@@ -152,7 +158,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                       key={item.envelopeId}
                       className="flex flex-wrap items-center gap-3 px-5 py-3"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
                         <PenLine aria-hidden className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -182,6 +188,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
 
             <Card>
               <CardHeader
+                eyebrow="Activity"
                 title="Recent activity"
                 description="The latest steps across the workspace."
                 action={
@@ -199,7 +206,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                       <span
                         aria-hidden
                         className={cn(
-                          'mt-2 h-2 w-2 shrink-0 rounded-full',
+                          'mt-[7px] h-2 w-2 shrink-0 rounded-[2px]',
                           DOT[actionTone(item.action)],
                         )}
                       />
@@ -229,15 +236,28 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
           <div className="min-w-0 space-y-6 lg:col-span-2">
             {canSend ? (
               <Card className="overflow-hidden">
-                <div className="bg-header px-5 py-5 text-header-ink">
-                  <p className="font-display text-lg font-semibold">Send a document</p>
-                  <p className="mt-1 text-sm opacity-80">Four short steps, saved as you go.</p>
+                <div className="relative bg-nav px-5 pt-5 pb-6 text-white">
+                  <p className="font-mono text-[11px] tracking-[0.12em] text-accent uppercase">
+                    New envelope
+                  </p>
+                  <p className="mt-2 font-display text-xl font-semibold">Send a document</p>
+                  <p className="mt-1 text-sm text-nav-ink/75">Four short steps, saved as you go.</p>
+                  <span aria-hidden className="absolute bottom-0 left-5 h-[3px] w-10 bg-accent" />
                 </div>
-                <ol className="space-y-2 px-5 py-4 text-sm text-muted">
-                  <li>1. Upload one or more PDFs</li>
-                  <li>2. Add who signs, approves or gets a copy</li>
-                  <li>3. Drag signature boxes onto the pages</li>
-                  <li>4. Review and send</li>
+                <ol className="space-y-3 px-5 py-5 text-sm">
+                  {[
+                    'Upload one or more PDFs',
+                    'Add who signs, approves or gets a copy',
+                    'Drag signature boxes onto the pages',
+                    'Review and send',
+                  ].map((step, i) => (
+                    <li key={step} className="flex items-center gap-3">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] bg-surface-2 font-mono text-[11px] font-semibold text-ink">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="text-ink">{step}</span>
+                    </li>
+                  ))}
                 </ol>
                 <div className="px-5 pb-5">
                   <Button asChild className="w-full">
@@ -251,7 +271,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
             ) : null}
             <Card className="p-5">
               <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-ink">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-soft text-ink">
                   <ShieldCheck aria-hidden className="h-4 w-4" />
                 </span>
                 <div className="text-sm">

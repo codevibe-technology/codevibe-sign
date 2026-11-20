@@ -21,14 +21,15 @@ export function StartHereCard({
   const dismiss = useAction();
   if (hidden) return null;
   return (
-    <Card className="relative mb-6 overflow-hidden border-accent" data-testid="start-here">
+    <Card className="relative mb-6 overflow-hidden border-accent/60" data-testid="start-here">
+      <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-accent" />
       <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-ink">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-nav text-accent">
           <Sparkles aria-hidden className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1 pr-8 sm:pr-0">
-          <p className="text-sm font-semibold text-primary">Start here</p>
-          <h2 className="text-lg font-semibold">Sign your first document in a minute</h2>
+          <p className="eyebrow text-primary">Start here</p>
+          <h2 className="mt-1 text-lg font-semibold">Sign your first document in a minute</h2>
           <p className="mt-0.5 text-sm text-muted">
             A sample agreement is ready with you as the signer and the boxes in place. Press Send,
             open the email, sign it, then download the sealed copy.

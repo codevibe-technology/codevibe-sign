@@ -35,12 +35,15 @@ export default async function TemplatesPage({
   const canWrite = can(role, 'envelopes.write');
   const tab = (active: boolean) =>
     cn(
-      'inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold',
-      active ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink',
+      'inline-flex h-8 items-center gap-2 rounded-md border px-3 text-[13px] font-semibold transition-colors',
+      active
+        ? 'border-nav bg-nav text-white shadow-[inset_0_-2px_0_var(--accent)]'
+        : 'border-line bg-surface text-muted hover:border-line-strong hover:text-ink',
     );
   return (
     <>
       <PageHeader
+        eyebrow="Reuse"
         title="Templates"
         description="Reusable documents with their roles and fields already placed."
         action={
@@ -60,14 +63,14 @@ export default async function TemplatesPage({
           className={tab(!archived)}
           aria-current={archived ? undefined : 'page'}
         >
-          Active <span className="text-muted">{counts.active}</span>
+          Active <span className="font-mono text-[11px] opacity-70">{counts.active}</span>
         </Link>
         <Link
           href={`/w/${slug}/templates?view=archived`}
           className={tab(archived)}
           aria-current={archived ? 'page' : undefined}
         >
-          Archived <span className="text-muted">{counts.archived}</span>
+          Archived <span className="font-mono text-[11px] opacity-70">{counts.archived}</span>
         </Link>
       </nav>
       <div className="space-y-6">

@@ -211,10 +211,10 @@ export function EnvelopesTable({
               aria-pressed={active}
               onClick={() => setStatus(f.key as StatusFilterKey | null)}
               className={cn(
-                'h-8 shrink-0 rounded-full border px-3 text-sm font-medium transition-colors',
+                'h-8 shrink-0 rounded-md border px-3 text-[13px] font-semibold transition-colors',
                 active
-                  ? 'border-primary bg-primary text-primary-ink'
-                  : 'border-line-strong bg-surface text-ink hover:bg-surface-2',
+                  ? 'border-nav bg-nav text-white shadow-[inset_0_-2px_0_var(--accent)]'
+                  : 'border-line bg-surface text-muted hover:border-line-strong hover:text-ink',
               )}
             >
               {f.label}
@@ -224,7 +224,7 @@ export function EnvelopesTable({
       </div>
 
       {selected.size > 0 ? (
-        <div className="sticky top-16 z-20 mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary-soft px-4 py-2.5">
+        <div className="sticky top-14 z-20 mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary/40 bg-primary-soft px-4 py-2.5 shadow-card md:top-3">
           <p className="text-sm font-semibold text-ink">{selected.size} selected</p>
           <Button
             size="sm"
@@ -248,7 +248,7 @@ export function EnvelopesTable({
       {error ? (
         <div
           role="alert"
-          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger"
         >
           <span className="flex-1">{error}</span>
           <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -301,7 +301,7 @@ export function EnvelopesTable({
       ) : (
         <Card className="overflow-hidden">
           <table className="w-full table-fixed text-sm">
-            <thead className="bg-header text-left text-xs font-semibold tracking-wide text-header-ink uppercase">
+            <thead className="bg-nav text-left font-mono text-[10.5px] font-medium tracking-[0.1em] text-nav-ink uppercase">
               <tr>
                 {canWrite ? (
                   <th scope="col" className="w-11 py-3 pl-4">
@@ -341,7 +341,7 @@ export function EnvelopesTable({
                   <tr
                     key={e.id}
                     className={cn(
-                      'hover:bg-surface-2/60',
+                      'transition-colors hover:bg-surface-2/60',
                       selected.has(e.id) && 'bg-primary-soft/40',
                     )}
                   >
@@ -361,7 +361,7 @@ export function EnvelopesTable({
                     <td className="px-4 py-3">
                       <Link
                         href={href(e)}
-                        className="block truncate font-semibold text-ink hover:underline"
+                        className="block truncate font-semibold text-ink hover:text-primary"
                       >
                         {e.title}
                       </Link>
@@ -384,12 +384,12 @@ export function EnvelopesTable({
                     <td className="hidden px-4 py-3 lg:table-cell">
                       {progress.total > 0 ? (
                         <div>
-                          <p className="text-ink">
+                          <p className="font-mono text-[12px] text-ink">
                             {progress.done} of {progress.total}
                           </p>
-                          <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-surface-2">
+                          <div className="mt-1.5 h-1 w-20 overflow-hidden bg-surface-2">
                             <div
-                              className="h-full rounded-full bg-accent"
+                              className="h-full bg-accent"
                               style={{ width: `${(progress.done / progress.total) * 100}%` }}
                             />
                           </div>
@@ -459,12 +459,12 @@ function RowActions({
   onVoid: () => void;
 }) {
   const item =
-    'flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
+    'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
   const open = e.status === 'sent' || e.status === 'in_progress';
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-ink"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink"
         aria-label={`Actions for ${e.title}`}
       >
         <MoreHorizontal aria-hidden className="h-5 w-5" />
@@ -473,7 +473,7 @@ function RowActions({
         <DropdownMenu.Content
           align="end"
           sideOffset={6}
-          className="z-50 w-56 rounded-xl border border-line bg-surface p-1.5 text-ink shadow-card"
+          className="z-50 w-56 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
         >
           <DropdownMenu.Item asChild>
             <Link href={`/w/${slug}/envelopes/${e.id}`} className={item}>

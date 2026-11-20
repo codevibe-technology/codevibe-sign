@@ -32,6 +32,7 @@ export default async function EnvelopesPage({
   return (
     <>
       <PageHeader
+        eyebrow="Documents"
         title="Envelopes"
         description="Every document sent for signature from this workspace."
         badge={<LiveUpdates workspaceId={workspace.id} />}

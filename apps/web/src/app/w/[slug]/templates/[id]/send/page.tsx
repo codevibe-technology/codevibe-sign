@@ -21,6 +21,7 @@ export default async function SendTemplatePage({
   return (
     <>
       <PageHeader
+        eyebrow="Templates"
         title={`Send: ${template.name}`}
         description="Say who takes each role. The documents and fields come from the template."
       />

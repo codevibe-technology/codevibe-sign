@@ -36,6 +36,7 @@ export default async function BulkSendProgressPage({
         <ArrowLeft aria-hidden className="h-4 w-4" /> Templates
       </Link>
       <PageHeader
+        eyebrow="Templates"
         title={`Bulk send: ${bulk.templateName}`}
         description={`${bulk.total} ${bulk.total === 1 ? 'envelope' : 'envelopes'}, started ${bulk.createdAt.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}.`}
       />

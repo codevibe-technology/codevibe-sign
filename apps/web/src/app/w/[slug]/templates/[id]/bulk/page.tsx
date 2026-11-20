@@ -26,6 +26,7 @@ export default async function BulkSendPage({
   return (
     <>
       <PageHeader
+        eyebrow="Templates"
         title={`Bulk send: ${template.name}`}
         description={`One envelope per row of a CSV file, up to ${MAX_BULK_ROWS} at a time. Each person gets their own copy to sign.`}
       />

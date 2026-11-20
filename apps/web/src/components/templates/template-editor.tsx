@@ -144,9 +144,13 @@ export function TemplateEditor({ slug, workspaceId, initial }: TemplateEditorPro
 
   return (
     <div className="pb-24 sm:pb-0">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">
+          <p className="eyebrow mb-1.5 flex items-center gap-2">
+            <span aria-hidden className="h-[2px] w-5 bg-accent" />
+            Templates
+          </p>
+          <h1 className="text-[24px] leading-tight font-bold text-ink md:text-[26px]">
             {editing ? 'Edit template' : 'New template'}
             {state.name.trim() ? (
               <span className="font-normal text-muted">: {state.name.trim()}</span>

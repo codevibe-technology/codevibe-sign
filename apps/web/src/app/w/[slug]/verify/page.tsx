@@ -11,6 +11,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <PageHeader
+        eyebrow="Trust"
         title="Verify a document"
         description="Check that a signed PDF is exactly the one this workspace sealed, with nothing changed since."
       />

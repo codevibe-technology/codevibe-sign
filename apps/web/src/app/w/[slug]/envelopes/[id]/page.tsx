@@ -72,19 +72,21 @@ export default async function EnvelopePage({
     <>
       <Link
         href={`/w/${slug}/envelopes`}
-        className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
+        className="mb-3 inline-flex items-center gap-1.5 font-mono text-[11px] font-medium tracking-[0.1em] text-muted uppercase hover:text-primary"
       >
-        <ArrowLeft aria-hidden className="h-4 w-4" />
+        <ArrowLeft aria-hidden className="h-3.5 w-3.5" />
         Envelopes
       </Link>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold break-words text-ink">{envelope.title}</h1>
+            <h1 className="text-[26px] leading-tight font-bold break-words text-ink md:text-[30px]">
+              {envelope.title}
+            </h1>
             <StatusPill status={envelope.status} />
             <LiveUpdates workspaceId={workspace.id} envelopeId={envelope.id} />
           </div>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1.5 text-sm text-muted">
             {sender?.name
               ? `Sent by ${sender.name} · `
               : sender
@@ -131,7 +133,7 @@ export default async function EnvelopePage({
       />
 
       {envelope.message ? (
-        <blockquote className="mb-6 rounded-xl border-l-4 border-accent bg-surface px-4 py-3 text-sm whitespace-pre-line text-ink shadow-card">
+        <blockquote className="mb-6 rounded-lg border border-line border-l-[3px] border-l-accent bg-surface px-4 py-3 text-sm whitespace-pre-line text-ink">
           {envelope.message}
         </blockquote>
       ) : null}

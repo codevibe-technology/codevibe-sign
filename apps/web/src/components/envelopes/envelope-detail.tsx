@@ -40,12 +40,12 @@ const DOT: Record<string, string> = {
 
 export function ChainBadge({ valid }: { valid: boolean }) {
   return valid ? (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
+    <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-success-soft px-2 py-[3px] font-mono text-[10.5px] font-medium tracking-[0.06em] uppercase text-success">
       <Link2 aria-hidden className="h-3.5 w-3.5" />
       Audit chain intact
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-semibold text-danger">
+    <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-danger-soft px-2 py-[3px] font-mono text-[10.5px] font-medium tracking-[0.06em] uppercase text-danger">
       <ShieldAlert aria-hidden className="h-3.5 w-3.5" />
       Audit chain broken
     </span>
@@ -62,14 +62,14 @@ export function SealBadge({ check }: { check: SealCheck | null }) {
   }
   return check.valid ? (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success"
+      className="inline-flex items-center gap-1.5 rounded-[3px] bg-success-soft px-2 py-[3px] font-mono text-[10.5px] font-medium tracking-[0.06em] uppercase text-success"
       title={check.signer?.commonName ? `Sealed by ${check.signer.commonName}` : undefined}
     >
       <ShieldCheck aria-hidden className="h-3.5 w-3.5" />
       Seal verified
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-semibold text-danger">
+    <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-danger-soft px-2 py-[3px] font-mono text-[10.5px] font-medium tracking-[0.06em] uppercase text-danger">
       <ShieldAlert aria-hidden className="h-3.5 w-3.5" />
       Seal not valid
     </span>
@@ -100,7 +100,7 @@ export function DocumentsCard({
       <ul className="divide-y divide-line">
         {envelope.documents.map((d) => (
           <li key={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
               <FileText aria-hidden className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
@@ -179,7 +179,7 @@ export function RecipientsCard({
               <span
                 aria-hidden
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-mono text-[13px] font-semibold',
                   current ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-muted',
                 )}
               >
@@ -188,7 +188,7 @@ export function RecipientsCard({
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">
                   {r.name}
-                  <span className="ml-2 text-xs font-medium text-muted">
+                  <span className="ml-2 font-mono text-[10.5px] font-medium tracking-[0.06em] text-muted uppercase">
                     {ROLE_LABEL[r.role]} · {AUTH_LABELS[r.auth]}
                   </span>
                 </p>
@@ -277,11 +277,14 @@ export function Timeline({
             const reason = typeof e.data?.reason === 'string' ? e.data.reason : null;
             const detail = eventDetail(e);
             return (
-              <li key={e.seq} className="relative flex gap-3 pb-4 last:pb-0">
+              <li
+                key={e.seq}
+                className="relative flex gap-3 pb-5 before:absolute before:top-4 before:bottom-0 before:left-[4.5px] before:w-px before:bg-line last:pb-0 last:before:hidden"
+              >
                 <span
                   aria-hidden
                   className={cn(
-                    'relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-surface',
+                    'relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-[2px] ring-4 ring-surface',
                     DOT[actionTone(e.action)],
                   )}
                 />
@@ -308,7 +311,7 @@ export function Timeline({
                       )}
                     </p>
                   ) : null}
-                  <p className="text-xs text-muted">
+                  <p className="mt-0.5 font-mono text-[11px] text-muted">
                     <time dateTime={e.at}>{formatDateTime(e.at)}</time>
                     {e.context?.ip ? ` · IP ${e.context.ip}` : ''}
                   </p>

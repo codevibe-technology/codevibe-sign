@@ -26,7 +26,7 @@ import type { TemplateSummary } from '@/lib/templates';
 import { archiveTemplateAction, duplicateTemplateAction } from '@/server/actions/templates';
 
 const item =
-  'flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
+  'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
 
 export function TemplatesList({
   slug,
@@ -91,7 +91,7 @@ export function TemplatesList({
             key={t.id}
             className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:px-5"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
               <LayoutTemplate aria-hidden className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
@@ -135,7 +135,7 @@ export function TemplatesList({
               {canWrite ? (
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-ink"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink"
                     aria-label={`More for ${t.name}`}
                   >
                     <MoreHorizontal aria-hidden className="h-5 w-5" />
@@ -144,7 +144,7 @@ export function TemplatesList({
                     <DropdownMenu.Content
                       align="end"
                       sideOffset={6}
-                      className="z-50 w-52 rounded-xl border border-line bg-surface p-1.5 text-ink shadow-card"
+                      className="z-50 w-52 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
                     >
                       {archived ? null : (
                         <DropdownMenu.Item asChild>
