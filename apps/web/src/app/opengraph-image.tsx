@@ -37,11 +37,20 @@ export default function OpenGraphImage() {
             style={{
               width: 64,
               height: 64,
-              borderRadius: 16,
-              background: '#2DD4BF',
+              borderRadius: 10,
+              background: '#1B6AE0',
               display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
+          >
+            <svg width="40" height="40" viewBox="380 380 1172 1172" fill="none">
+              <g stroke="#ffffff" strokeWidth="108" strokeLinecap="butt" strokeLinejoin="miter">
+                <path d="M890 577V1508M424 1043H1356M561 713L1219 1371M561 1371L890 1043" />
+                <path d="M988 478H1454V943" />
+              </g>
+            </svg>
+          </div>
           <div style={{ fontSize: 40, fontWeight: 700 }}>Codevibe Sign</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -53,11 +62,11 @@ export default function OpenGraphImage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 16, fontSize: 26, fontWeight: 600 }}>
-          <div style={{ padding: '10px 28px', borderRadius: 999, background: '#1B6AE0' }}>Send</div>
+          <div style={{ padding: '10px 28px', borderRadius: 4, background: '#1B6AE0' }}>Send</div>
           <div
             style={{
               padding: '10px 28px',
-              borderRadius: 999,
+              borderRadius: 4,
               border: '2px solid #2DD4BF',
               color: '#2DD4BF',
             }}
@@ -67,7 +76,7 @@ export default function OpenGraphImage() {
           <div
             style={{
               padding: '10px 28px',
-              borderRadius: 999,
+              borderRadius: 4,
               background: '#2DD4BF',
               color: '#0D1B2A',
             }}

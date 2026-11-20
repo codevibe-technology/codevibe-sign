@@ -5,33 +5,34 @@
 :root,
 [data-theme='light'] {
   color-scheme: light;
-  --canvas: #f4f6fa;
+  /* Codevibe brand: navy #0D1B2A, blue #1B6AE0, teal #2DD4BF, off-white #F4F5F7. */
+  --canvas: #f4f5f7;
   --surface: #ffffff;
-  --surface-2: #eef2f8;
-  --line: #d9e0ea;
-  --line-strong: #b8c4d4;
-  --ink: #0d1b2a;
-  --muted: #526277;
+  --surface-2: #eef0f3;
+  --line: #e3e6eb;
+  --line-strong: #c9d0da;
+  --ink: #0f172a;
+  --muted: #5f6e84;
   --primary: #1b6ae0;
   --primary-hover: #1557ba;
-  --primary-soft: #e3edfc;
+  --primary-soft: #e6effc;
   --primary-ink: #ffffff;
   --accent: #2dd4bf;
-  --accent-soft: #d5f7f2;
+  --accent-soft: #d8f7f2;
   --accent-ink: #0d1b2a;
   --danger: #c9372c;
-  --danger-soft: #fbe7e5;
+  --danger-soft: #fbe9e7;
   --success: #12805c;
-  --success-soft: #dcf3ea;
+  --success-soft: #def4eb;
   --warning: #9a5b00;
-  --warning-soft: #fdf0d8;
+  --warning-soft: #fdf1da;
   --nav: #0d1b2a;
-  --nav-raised: #17304a;
+  --nav-raised: #1a2d42;
   --nav-ink: #e8eef6;
-  --nav-muted: #9db0c7;
+  --nav-muted: #8fa3bb;
   --header: #0d1b2a;
   --header-ink: #ffffff;
-  --shadow: 0 1px 2px rgb(13 27 42 / 0.06), 0 4px 12px rgb(13 27 42 / 0.06);
+  --shadow: 0 1px 2px rgb(13 27 42 / 0.05), 0 6px 18px rgb(13 27 42 / 0.06);
 }
 
 [data-theme='dark'] {
@@ -124,6 +125,13 @@
   --shadow-card: var(--shadow);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Codevibe corners are sharp: 4px controls, 8px cards. */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 5px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
 }
 
 @layer base {
@@ -139,6 +147,10 @@
   h2,
   h3 {
     @apply font-display tracking-tight;
+    text-wrap: balance;
+  }
+  h1 {
+    letter-spacing: -0.025em;
   }
   :focus-visible {
     outline: 2px solid var(--primary);
@@ -169,6 +181,26 @@
   --cvs-danger: var(--danger);
   --cvs-success: var(--success);
   --cvs-shadow: var(--shadow);
+  --cvs-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+  --cvs-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+  --cvs-radius: 8px;
+  --cvs-radius-sm: 4px;
+}
+
+/* Small mono label, the Codevibe eyebrow. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Thin scrollbars that follow the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 40%, transparent) transparent;
 }
 
 /* Recipient colours outside the placer too (role and recipient dots), in the light theme. */
