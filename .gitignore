@@ -12,3 +12,6 @@ coverage/
 **/.vitepress/cache/
 **/.vitepress/dist/
 .README.md.prepack
+deploy/.env
+deploy/secrets/
+deploy/backups/

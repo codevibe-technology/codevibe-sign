@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:docs": "pnpm --filter site build && tsx scripts/copy-docs.ts",
+    "build:ops": "tsup --config tsup.ops.config.ts",
     "start": "next start",
     "db:migrate": "tsx scripts/migrate.ts",
     "plan:set": "tsx scripts/plan-set.ts",
@@ -52,6 +53,7 @@
     "node-forge": "1.4.3",
     "pdf-lib": "1.17.1",
     "tailwindcss": "4.3.4",
+    "tsup": "8.3.5",
     "tsx": "4.23.15"
   }
 }

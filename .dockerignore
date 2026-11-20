@@ -10,3 +10,11 @@
 **/.env.*
 **/*.p12
 **/*.pfx
+**/.next
+**/.vitepress/cache
+**/.vitepress/dist
+apps/web/data
+apps/web/docs-dist
+apps/web/ops
+deploy/secrets
+deploy/backups

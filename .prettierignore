@@ -9,3 +9,4 @@ coverage
 apps/web/data/
 **/next-env.d.ts
 apps/web/docs-dist/
+apps/web/ops/

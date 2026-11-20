@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/.vitepress/dist/**',
       '**/.next/**',
       '**/docs-dist/**',
+      'apps/web/ops/**',
       '**/next-env.d.ts',
     ],
   },

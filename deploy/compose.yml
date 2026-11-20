@@ -1,0 +1,61 @@
+# Codevibe Sign: the web app and PostgreSQL behind an existing Traefik.
+# Every value comes from .env next to this file; see .env.example and README.md.
+name: codevibe-sign
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    image: codevibe-sign-web:${SIGN_IMAGE_TAG:-local}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      APP_URL: https://${SIGN_HOST}
+      FILES_DIR: /data/files
+      SEAL_P12_PATH: /run/secrets/seal.p12
+      TRUST_PROXY: 'true'
+    volumes:
+      - sign-files:/data
+      - ./secrets/seal.p12:/run/secrets/seal.p12:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - default
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK}
+      - traefik.http.routers.codevibe-sign.rule=Host(`${SIGN_HOST}`)
+      - traefik.http.routers.codevibe-sign.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.codevibe-sign.tls=true
+      - traefik.http.routers.codevibe-sign.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.codevibe-sign.loadbalancer.server.port=3000
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - sign-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - default
+
+volumes:
+  sign-files:
+  sign-db:
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK}
