@@ -82,7 +82,9 @@ has not changed since sealing. Signer intent is proven by the audit trail.
 - Documents that a law requires to be "signed" in the statutory sense need an
   electronic signature under IT Act s.3A, such as Aadhaar eSign through a licensed
   provider (`@codevibe_technology/sign-aadhaar`) or a DSC.
-- Some documents cannot be signed electronically at all (IT Act, First Schedule).
+- Some documents cannot be signed electronically at all (IT Act, First Schedule, as
+  amended by S.O. 4720(E) of 2022): wills, trusts, most powers of attorney and most
+  negotiable instruments other than cheques.
 
 This is not legal advice; integrators should take their own.
 

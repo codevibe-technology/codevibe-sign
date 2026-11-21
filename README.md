@@ -233,9 +233,23 @@ Codevibe Sign supports two kinds of signature. Under Indian law:
   technique in the Second Schedule, issued through a licensed eSign Service Provider. Use it, or
   a DSC, where a law requires a document to be signed in that statutory sense.
 
-Some documents cannot be signed electronically at all. The IT Act's First Schedule excludes
-negotiable instruments other than cheques, powers of attorney, trust deeds, wills and other
-testamentary dispositions, and contracts for the sale or conveyance of immovable property.
+Some documents cannot be signed electronically at all. The IT Act's First Schedule, as amended
+by notification S.O. 4720(E) of 26 September 2022, excludes:
+
+- wills and other testamentary dispositions;
+- trusts (trust deeds);
+- powers of attorney, except those that empower an entity regulated by the RBI, NHB, SEBI,
+  IRDAI or PFRDA to act for the person who executes them;
+- negotiable instruments other than cheques, except demand promissory notes and bills of
+  exchange issued in favour of or endorsed by such a regulated entity.
+
+The 2022 notification removed contracts for the sale or conveyance of immovable property from
+the list. Registration and stamp duty laws still apply to them. The web app shows a short notice
+when an envelope looks like one of the excluded documents; it does not block sending.
+
+A sealed PDF and its audit trail can be produced in court as an electronic record with the
+certificate in the Schedule to section 63 of the Bharatiya Sakshya Adhiniyam 2023. See
+[Electronic evidence (section 63 BSA)](https://sign.codevibe.in/docs/guides/section-63-certificate).
 
 Other countries have their own rules (for example eIDAS in the EU and the ESIGN Act in the US).
 This is not legal advice; take your own before relying on any signature for a particular

@@ -118,10 +118,12 @@ const FAQ: { q: string; a: ReactNode }[] = [
           that shows any later change to the PDF.
         </p>
         <p className="mt-3">
-          The Act does not cover some documents, such as wills, powers of attorney, trusts,
-          negotiable instruments other than cheques, and contracts for the sale of immovable
-          property. Where a law asks for an electronic signature listed in the Act&rsquo;s Second
-          Schedule, use Aadhaar eSign. For high-value agreements, check with your lawyer.
+          The Act does not cover some documents: wills, trust deeds, most powers of attorney and
+          most negotiable instruments other than cheques. Since a 2022 amendment, property sale
+          contracts are no longer on that list, though registration and stamp duty rules still
+          apply. Where a law asks for an electronic signature listed in the Act&rsquo;s Second
+          Schedule, use Aadhaar eSign. For high-value agreements, check with your lawyer. This is
+          not legal advice.
         </p>
       </>
     ),

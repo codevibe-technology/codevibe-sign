@@ -21,9 +21,11 @@ electronic means is not unenforceable just because it was formed that way, and t
 Contract Act applies to it as to any other contract.
 
 The evidence is the record: the audit trail of who opened, authenticated and signed, from which
-IP address and when, and the sealed file that shows nothing changed afterwards. Electronic
-records are admissible under the Indian evidence law, subject to its conditions on
-certification.
+IP address and when, and the sealed file that shows nothing changed afterwards. Under the
+Bharatiya Sakshya Adhiniyam 2023, s.61, an electronic record is not inadmissible because it is
+electronic; s.63 sets the conditions and asks for a certificate in the form in its Schedule. See
+[Electronic evidence (section 63 BSA)](/guides/section-63-certificate) for how to produce a
+sealed PDF in court.
 
 It suits offer letters, appointment letters, policies, NDAs, vendor agreements and most other
 business documents.
@@ -40,15 +42,30 @@ be "signed" in that statutory sense. Codevibe Sign supports it through
 
 ### Documents that cannot be signed electronically
 
-The IT Act's First Schedule excludes:
+Section 1(4) of the IT Act says the Act does not apply to the documents in its First Schedule.
+As amended by the Ministry of Electronics and Information Technology's notification
+[S.O. 4720(E) of 26 September 2022](https://www.cca.gov.in/sites/files/pdf/ACT/SO4720.pdf)
+(published in the Gazette on 4 October 2022), the Schedule now lists:
 
-- negotiable instruments other than cheques;
-- powers of attorney;
-- trust deeds;
-- wills and other testamentary dispositions;
-- contracts for the sale or conveyance of immovable property, or any interest in it.
+1. a negotiable instrument as defined in section 13 of the Negotiable Instruments Act 1881,
+   other than a cheque, and other than a demand promissory note or bill of exchange issued in
+   favour of or endorsed by an entity regulated by the RBI, NHB, SEBI, IRDAI or PFRDA;
+2. a power of attorney as defined in section 1A of the Powers of Attorney Act 1882, except one
+   that empowers such a regulated entity to act for, on behalf of and in the name of the person
+   who executes it;
+3. a trust as defined in section 3 of the Indian Trusts Act 1882;
+4. a will as defined in section 2(h) of the Indian Succession Act 1925, including any other
+   testamentary disposition.
 
-These need a signature on paper, and some also need stamping or registration.
+These still need a signature on paper, and some also need stamping or registration.
+
+The same notification omitted the old entry 5, "any contract for the sale or conveyance of
+immovable property or any interest in such property", so the IT Act no longer excludes those
+contracts. Registration, stamp duty and state rules on e-registration still apply, so many
+property documents still go through a sub-registrar on paper.
+
+The web app shows a short, dismissible notice when a document name or envelope title looks like
+one of the excluded kinds. It is a reminder only and never blocks sending.
 
 ## Elsewhere
 

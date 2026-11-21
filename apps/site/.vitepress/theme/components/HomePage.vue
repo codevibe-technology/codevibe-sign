@@ -211,8 +211,8 @@ const faqs = [
           </div>
         </div>
         <p class="fineprint">
-          Some documents cannot be signed electronically at all, such as wills, powers of attorney
-          and property sale deeds. This is not legal advice.
+          Some documents cannot be signed electronically at all, such as wills, trust deeds and most
+          powers of attorney. This is not legal advice.
           <a :href="withBase('/legal')">Read the legal notes</a>.
         </p>
       </div>
