@@ -1,3 +1,4 @@
+import { SignError } from '@codevibe_technology/sign-core';
 import {
   PDFArray,
   PDFDict,
@@ -52,7 +53,11 @@ export async function signatureFields(bytes: Uint8Array): Promise<SignatureField
   } catch {
     return [];
   }
+  return signatureFieldsOf(doc);
+}
 
+/** `signatureFields` for a document that is already loaded. */
+export function signatureFieldsOf(doc: PDFDocument): SignatureField[] {
   try {
     const form = resolve(doc, doc.catalog.get(name('AcroForm')));
     if (!(form instanceof PDFDict)) {
@@ -108,5 +113,20 @@ export async function signatureFields(bytes: Uint8Array): Promise<SignatureField
     return found;
   } catch {
     return [];
+  }
+}
+
+export const ALREADY_SIGNED_MESSAGE =
+  'This PDF already carries digital signatures. Signing it again here would remove them. Upload the unsigned original.';
+
+/**
+ * Refuses a document that carries signed signature fields. Every step that writes the file
+ * again (drawing fields, flattening forms, sealing) would destroy those signatures, so a
+ * signed file is turned away instead of silently losing them.
+ */
+export function assertUnsigned(doc: PDFDocument): void {
+  const count = signatureFieldsOf(doc).length;
+  if (count > 0) {
+    throw new SignError('PDF_ALREADY_SIGNED', ALREADY_SIGNED_MESSAGE, { signatureCount: count });
   }
 }

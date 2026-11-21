@@ -238,15 +238,17 @@ describe('inspect', () => {
     expect(run.stdout).toMatch(/Sealed\s+no/);
   });
 
-  it('shows the seal on a sealed file', async () => {
+  it('shows the seal on a sealed file, which cannot be signed again', async () => {
     const run = await cli(['inspect', 'sealed.pdf', '--json']);
-    expect(run.code).toBe(0);
+    expect(run.code).toBe(1);
     expect(JSON.parse(run.stdout)).toMatchObject({
-      usable: true,
+      usable: false,
+      problem: 'already_signed',
+      message:
+        'This PDF already carries digital signatures. Signing it again here would remove them. Upload the unsigned original.',
       sealed: true,
       signatureCount: 1,
       signer: 'Acme Seal (Acme)',
-      pageCount: 3,
     });
   });
 

@@ -138,4 +138,33 @@ describe('end to end with @codevibe_technology/sign-pdf', () => {
     expect(status).toBe(422);
     expect(json.error.code).toBe('DOCUMENT_INVALID');
   });
+
+  it('rejects a PDF that already carries signatures, and accepts the unsigned original', async () => {
+    const h = realHarness();
+    const signed = await seal(pdf, { p12, passphrase: 'seal-pass' });
+    const body = (bytes: Uint8Array) => ({
+      body: {
+        title: 'Offer letter',
+        documents: [{ name: 'offer.pdf', content: Buffer.from(bytes).toString('base64') }],
+        recipients: [{ name: 'A', email: 'a@example.com' }],
+      },
+    });
+    const rejected = await h.call('POST', '/v1/envelopes', body(signed));
+    expect(rejected.status).toBe(422);
+    expect(rejected.json.error).toEqual({
+      code: 'PDF_ALREADY_SIGNED',
+      message:
+        'This PDF already carries digital signatures. Signing it again here would remove them. Upload the unsigned original.',
+      details: { signatureCount: 1 },
+    });
+    const accepted = await h.call('POST', '/v1/envelopes', body(pdf));
+    expect(accepted.status).toBe(201);
+
+    const doc = accepted.json.documents[0].id;
+    const replaced = await h.call('PUT', `/v1/envelopes/${accepted.json.id}/documents/${doc}`, {
+      body: { name: 'offer.pdf', content: Buffer.from(signed).toString('base64') },
+    });
+    expect(replaced.status).toBe(422);
+    expect(replaced.json.error.code).toBe('PDF_ALREADY_SIGNED');
+  });
 });

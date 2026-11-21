@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFString } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe_technology/sign-core';
 import { inspectPdf, sha256Hex } from './inspect';
+import { seal } from './seal';
+import { ALREADY_SIGNED_MESSAGE } from './signatures';
 import { A4, makeEncryptedPdf, makePdf } from './testing/fixtures';
+import { createTestP12 } from './testing/p12';
 
 async function rejection(promise: Promise<unknown>): Promise<SignError> {
   const error = await promise.then(
@@ -165,6 +168,31 @@ describe('inspectPdf', () => {
     const error = await rejection(inspectPdf(empty));
     expect(error.code).toBe('DOCUMENT_INVALID');
     expect(error.details).toEqual({ reason: 'empty' });
+  });
+
+  it('rejects a PDF that already carries a digital signature', async () => {
+    const identity = createTestP12();
+    const signed = await seal(await makePdf([{ size: A4 }]), {
+      p12: identity.p12,
+      passphrase: identity.passphrase,
+    });
+    const error = await rejection(inspectPdf(signed));
+    expect(error.code).toBe('PDF_ALREADY_SIGNED');
+    expect(error.message).toBe(ALREADY_SIGNED_MESSAGE);
+    expect(error.message).toBe(
+      'This PDF already carries digital signatures. Signing it again here would remove them. Upload the unsigned original.',
+    );
+    expect(error.details).toEqual({ signatureCount: 1 });
+  });
+
+  it('accepts an unsigned PDF with an empty signature field', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage(A4);
+    doc.getForm().createTextField('name');
+    const field = doc.context.obj({ FT: 'Sig', T: PDFString.of('Sign here') });
+    doc.getForm().acroForm.addField(doc.context.register(field));
+    const info = await inspectPdf(await doc.save());
+    expect(info.pageCount).toBe(1);
   });
 });
 

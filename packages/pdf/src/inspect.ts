@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { SignError, type PageSize } from '@codevibe_technology/sign-core';
 import { pageGeometry } from './geometry';
 import { checkParseLimits, type ParseLimits } from './limits';
+import { assertUnsigned } from './signatures';
 
 export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -114,9 +115,10 @@ export async function loadPdf(
 }
 
 /**
- * Reads page count and displayed page sizes, rejecting files the signing flow cannot use.
- * Use it on every upload: it enforces the parser limits in a worker thread that is killed when
- * the file takes too long, before the file is parsed here.
+ * Reads page count and displayed page sizes, rejecting files the signing flow cannot use,
+ * including files that already carry digital signatures (`PDF_ALREADY_SIGNED`). Use it on
+ * every upload: it enforces the parser limits in a worker thread that is killed when the file
+ * takes too long, before the file is parsed here.
  */
 export async function inspectPdf(
   bytes: Uint8Array,
@@ -125,6 +127,7 @@ export async function inspectPdf(
   assertSizeAndHeader(bytes, options);
   await checkParseLimits(bytes, options.limits);
   const doc = await loadPdf(bytes, options);
+  assertUnsigned(doc);
   const pages = doc.getPages().map((page) => {
     const geometry = pageGeometry(page);
     return { width: geometry.width, height: geometry.height };

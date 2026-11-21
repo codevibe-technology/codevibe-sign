@@ -3,7 +3,7 @@ import { inspectPdf, sha256Hex, verifySeal } from '@codevibe_technology/sign-pdf
 import { formatBytes, isPdf, pageSize, signerName } from './format';
 import { EXIT, painter, parse, readInput, rows, UsageError, type Command } from './io';
 
-type Problem = 'not_pdf' | 'encrypted' | 'empty' | 'too_complex' | 'unreadable';
+type Problem = 'not_pdf' | 'encrypted' | 'empty' | 'too_complex' | 'already_signed' | 'unreadable';
 
 export interface InspectReport {
   file: string;
@@ -24,6 +24,8 @@ export interface InspectReport {
 function problemOf(error: unknown): { problem: Problem; message: string } {
   const fallback = 'The PDF could not be read. It may be damaged.';
   if (!(error instanceof SignError)) return { problem: 'unreadable', message: fallback };
+  if (error.code === 'PDF_ALREADY_SIGNED')
+    return { problem: 'already_signed', message: error.message };
   const reason = error.details?.reason;
   const problem: Problem =
     reason === 'encrypted'
@@ -100,7 +102,9 @@ export const inspect: Command = {
 
 Reads a PDF the way the server does before it accepts an upload, and prints its pages and
 sizes in PDF points (field boxes use the same units), whether it is encrypted and whether it
-carries a seal. Use it to check a file before you send it.
+carries a seal. Use it to check a file before you send it. A file that already carries
+digital signatures, such as a sealed one, is reported as not usable: signing it again would
+remove them.
 
 Options
   --json            Print the result as JSON
@@ -108,7 +112,7 @@ Options
 
 Exit codes
   0  the file is a readable PDF
-  1  the file is not a PDF, is password protected, or is damaged
+  1  the file is not a PDF, is password protected, is damaged, or is already signed
   2  invalid usage, or the file could not be read
 
 Examples
