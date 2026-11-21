@@ -100,8 +100,14 @@ package from `node_modules` or a bundler (Next.js, webpack, esbuild) inlines it.
 cannot start at all, the check throws a plain `Error`, not `DOCUMENT_INVALID`: the fault is the
 host's, not the file's.
 
-Errors: `DOCUMENT_TOO_LARGE`; `DOCUMENT_INVALID` with `details.reason` of `encrypted`,
-`unreadable`, `empty`, `timeout` or `limit` (then `details.limit` names it, with `details.max`).
+It also refuses a PDF that already carries digital signatures (signed `/Sig` fields), with
+`PDF_ALREADY_SIGNED` and `details.signatureCount`. Drawing fields and sealing write the file
+again, which would silently remove those signatures; ask for the unsigned original instead.
+The message is `ALREADY_SIGNED_MESSAGE`, ready to show as is.
+
+Errors: `DOCUMENT_TOO_LARGE`; `PDF_ALREADY_SIGNED`; `DOCUMENT_INVALID` with `details.reason` of
+`encrypted`, `unreadable`, `empty`, `timeout` or `limit` (then `details.limit` names it, with
+`details.max`).
 
 ### `sha256Hex(bytes) → string`
 
@@ -169,30 +175,66 @@ on new pages with their header repeated.
 
 ### `seal(pdfBytes, options) → Promise<Uint8Array>`
 
-Applies a PAdES baseline B-B signature: SubFilter `ETSI.CAdES.detached`, SHA-256 with RSA,
-signed attributes content-type, message-digest and signing-certificate-v2, signing time in
-the signature dictionary. The seal covers the whole file.
+Applies a PAdES signature: SubFilter `ETSI.CAdES.detached`, SHA-256 with RSA, signed
+attributes content-type, message-digest and signing-certificate-v2, signing time in the
+signature dictionary (baseline B-B). With `tsaUrl` it also carries an RFC 3161 signature
+timestamp as the unsigned attribute signature-time-stamp-token (baseline B-T). The seal
+covers the whole file and, being the first signature, is a certification signature with
+DocMDP permissions P=1: readers show the file as certified and flag any later change.
 
-| Option         | Purpose                                                     |
-| -------------- | ----------------------------------------------------------- |
-| `p12`          | PKCS#12 (`.p12`/`.pfx`) bytes with an RSA key and its cert. |
-| `passphrase`   | The file's passphrase.                                      |
-| `reason`       | Shown by PDF readers. Has a sensible default.               |
-| `location`     | Optional.                                                   |
-| `contactInfo`  | Optional.                                                   |
-| `signingTime`  | Defaults to now. Must fall inside the certificate validity. |
-| `maxBytes`     | Largest input PDF, 25 MB by default.                        |
-| `allowWeakKey` | Local development only; see below.                          |
+| Option               | Purpose                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `p12`                | PKCS#12 (`.p12`/`.pfx`) bytes with an RSA key, its cert and any issuer. |
+| `passphrase`         | The file's passphrase.                                                  |
+| `signer`             | A `SealProvider` to sign with instead of `p12`; see below.              |
+| `reason`             | Shown by PDF readers. Has a sensible default.                           |
+| `location`           | Optional.                                                               |
+| `contactInfo`        | Optional.                                                               |
+| `signingTime`        | Defaults to now. Must fall inside the certificate validity.             |
+| `maxBytes`           | Largest input PDF, 25 MB by default.                                    |
+| `allowWeakKey`       | Local development only; see below.                                      |
+| `tsaUrl`             | RFC 3161 timestamp authority, such as `http://timestamp.digicert.com`.  |
+| `tsaRequired`        | Fail when the authority fails. Default `true` when `tsaUrl` is set.     |
+| `tsaTimeoutMs`       | How long to wait for the authority, 15 seconds by default.              |
+| `onTimestampFailure` | Called with the error when an optional timestamp was skipped.           |
+| `certify`            | `false` makes an ordinary approval signature instead of certifying.     |
 
 The key must be RSA of at least 2048 bits and the certificate signed with SHA-256 or
 stronger, and valid (not expired, not yet to start) at the signing time. `allowWeakKey: true`
 accepts shorter keys and SHA-1 certificates, for throwaway keys in local development; never
 set it in production.
 
+The seal certificate may be a single self-signed certificate, or a leaf issued by your own
+private root (see `deploy/README.md`) or by a CA. A leaf issued by a CA must say `CA:FALSE`;
+when key usage is present it must allow digitalSignature or nonRepudiation, and when extended
+key usage is present it must include documentSigning (1.3.6.1.5.5.7.3.36), msDocumentSigning
+(1.3.6.1.4.1.311.10.3.12), Adobe authentic documents, emailProtection or any. Issuing
+certificates found in the `.p12` are checked (each signed the one below it, is a CA and is
+valid at the signing time) and embedded in the signature, so a verifier only needs the root.
+
+The timestamp is requested over the signature value with a fresh nonce. The answer must be
+granted, carry the same nonce and SHA-256 imprint, and be signed by the authority; otherwise
+sealing fails with `SEAL_FAILED` and `details.option` `tsaUrl`, unless `tsaRequired` is false.
+
+A file that already carries signatures is refused with `PDF_ALREADY_SIGNED`: sealing writes
+the whole file again and would remove them. Sealing after another signature (for example an
+Aadhaar eSign) needs an incremental update and an approval signature, which this version does
+not do yet.
+
+#### Signers
+
+`p12Signer({ p12, passphrase })` is what `seal()` uses by default. To keep the key elsewhere,
+pass `signer`, any object with `certificateChain()` (DER, seal certificate first) and
+`sign(data)` (SHA-256 with RSA PKCS#1 v1.5 over `data`, returning the raw signature).
+`pkcs11Signer()` (HSM or token) and `cscSigner()` (Cloud Signature Consortium remote signing)
+are typed placeholders in this version: each call fails with `SEAL_FAILED` and
+`details.provider`.
+
 The certificate is the operator's, not the signer's: it proves the file has not changed
 since sealing. Signer intent is proven by the certificate pages and the audit trail.
 Errors: `SEAL_FAILED` (bad file or passphrase, no RSA key, weak key or certificate with
-`details.keyBits` or `details.signatureAlgorithm`, certificate not valid at the signing time)
+`details.keyBits` or `details.signatureAlgorithm`, certificate not valid at the signing time,
+a certificate profile problem with `details.reason`, a timestamp failure), `PDF_ALREADY_SIGNED`
 and the `DOCUMENT_*` codes above.
 
 ### `sealCertificate({ p12, passphrase?, allowWeakKey?, at? }) → SealCertificate`
@@ -252,8 +294,12 @@ interface SealVerification {
   signer?: { commonName?: string; organization?: string };
   signedAt?: string; // ISO time
   signatureCount: number;
+  timestampedAt?: string; // ISO time from a valid RFC 3161 signature timestamp
 }
 ```
+
+`timestampedAt` is set only when the timestamp token's imprint matches the signature and the
+authority's signature on the token verifies; whether the authority is trusted is not checked.
 
 `valid` says nothing about who sealed the file: anyone can seal an altered copy with their
 own key and `verifySeal` will call it valid. It also runs without parser limits. Use

@@ -343,9 +343,6 @@ importers:
       '@pdf-lib/fontkit':
         specifier: 1.1.1
         version: 1.1.1
-      '@signpdf/placeholder-pdf-lib':
-        specifier: 3.4.0
-        version: 3.4.0(pdf-lib@1.17.1)
       '@signpdf/signpdf':
         specifier: 3.4.0
         version: 3.4.0
@@ -2902,12 +2899,6 @@ packages:
 
   '@shikijs/vscode-textmate@10.1.0':
     resolution: {integrity: sha512-cVBuhDQjBZaNMTwBquYfPydrUP+E3hE6oYGasx8h6ZrODIM7/r+gxLDXdd66oszbrggZHEntdE6j+5gYIVyMWQ==}
-
-  '@signpdf/placeholder-pdf-lib@3.4.0':
-    resolution: {integrity: sha512-rn3vvDwjxWTK/3LtcNX7ecKyocBjDUxVnU6CDagNsmD7qAeVz0pp/QrnAx3U0cHp2GuHsRi49oEUdw0hjJFpOg==}
-    engines: {node: '>=12', yarn: '>=1.22.18'}
-    peerDependencies:
-      pdf-lib: ^1.17.1
 
   '@signpdf/signpdf@3.4.0':
     resolution: {integrity: sha512-7s4t0qJvKjbJRWv5umPZYC1iyxBcPZYV5wMhNPgncj0sMUpvBtJ+aus2va/ETWTsHXRaeYLvtSP/r+xFotlztQ==}
@@ -8371,11 +8362,6 @@ snapshots:
       '@types/hast': 3.0.5
 
   '@shikijs/vscode-textmate@10.1.0': {}
-
-  '@signpdf/placeholder-pdf-lib@3.4.0(pdf-lib@1.17.1)':
-    dependencies:
-      '@signpdf/utils': 3.4.0
-      pdf-lib: 1.17.1
 
   '@signpdf/signpdf@3.4.0':
     dependencies:

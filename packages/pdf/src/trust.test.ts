@@ -4,6 +4,7 @@ import { SignError } from '@codevibe_technology/sign-core';
 import { seal } from './seal';
 import { createTestCa, createTestP12, type TestCa, type TestP12 } from './testing/p12';
 import { A4, makePdf } from './testing/fixtures';
+import { signAgainForTest } from './testing/signed';
 import { sealCertificate, verify } from './trust';
 
 let operator: TestP12;
@@ -86,7 +87,7 @@ describe('verify', () => {
       reason: 'not_whole_document',
     });
 
-    const twice = await seal(sealed, { p12: operator.p12, passphrase: operator.passphrase });
+    const twice = await signAgainForTest(sealed, operator);
     expect(await verify(twice, { trust })).toMatchObject({
       valid: false,
       reason: 'multiple_signatures',

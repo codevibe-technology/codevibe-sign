@@ -10,6 +10,14 @@ export type { CertificateData, CertificateOptions } from './certificate';
 export { maskEmail, maskPhone } from './mask';
 export { seal } from './seal';
 export type { SealOptions } from './seal';
+export { cscSigner, p12Signer, pkcs11Signer } from './signer';
+export type {
+  CscSignerOptions,
+  P12SignerOptions,
+  Pkcs11SignerOptions,
+  SealProvider,
+} from './signer';
+export { ALREADY_SIGNED_MESSAGE } from './signatures';
 export { verifySeal } from './verify';
 export type { SealSigner, SealVerification } from './verify';
 export { verify, sealCertificate } from './trust';

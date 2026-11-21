@@ -1,20 +1,23 @@
-import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import { SignPdf } from '@signpdf/signpdf';
-import { Signer, SUBFILTER_ETSI_CADES_DETACHED } from '@signpdf/utils';
+import { Signer } from '@signpdf/utils';
+import forge from 'node-forge';
 import { SignError } from '@codevibe_technology/sign-core';
-import {
-  assertSealIdentity,
-  buildCadesSignature,
-  certificateDer,
-  readP12,
-  type SigningIdentity,
-} from './cms';
+import { assertSealChain, buildCadesSignature } from './cms';
 import { loadPdf } from './inspect';
+import { addSignaturePlaceholder, signatureKind, type SignatureKind } from './placeholder';
+import { p12Signer, type SealProvider } from './signer';
+import { signatureFieldsOf } from './signatures';
+import { requestTimestamp } from './tsa';
 
 export interface SealOptions {
-  /** PKCS#12 (.p12 / .pfx) file with the operator's RSA key and certificate. */
-  p12: Uint8Array;
+  /**
+   * PKCS#12 (.p12 / .pfx) file with the operator's RSA key, its certificate and any issuing
+   * CA certificates. Required unless `signer` is given.
+   */
+  p12?: Uint8Array;
   passphrase?: string;
+  /** Where the seal key lives, when it is not a PKCS#12 file. Takes precedence over `p12`. */
+  signer?: SealProvider;
   /** Shown by PDF readers as the reason for the signature. */
   reason?: string;
   location?: string;
@@ -28,58 +31,145 @@ export interface SealOptions {
    * local development with throwaway keys; never in production.
    */
   allowWeakKey?: boolean;
+  /**
+   * RFC 3161 timestamp authority. When set, the seal carries a signature timestamp
+   * (PAdES B-T), so its time no longer rests on this server's clock alone.
+   */
+  tsaUrl?: string;
+  /**
+   * Refuse to seal when the timestamp authority fails. Defaults to true when `tsaUrl` is set.
+   * When false, the seal is made without a timestamp (B-B) and `onTimestampFailure` is called.
+   */
+  tsaRequired?: boolean;
+  /** Milliseconds to wait for the timestamp authority. Defaults to 15 seconds. */
+  tsaTimeoutMs?: number;
+  /** Called when an optional timestamp could not be obtained. */
+  onTimestampFailure?: (error: SignError) => void;
+  /**
+   * Make the seal a certification signature (DocMDP, no changes allowed) when it is the first
+   * signature in the file. Defaults to true; false makes an approval signature.
+   */
+  certify?: boolean;
 }
 
 const DEFAULT_REASON = 'Sealed to show the document has not changed since signing';
 const MIN_SIGNATURE_BYTES = 8192;
+/** Room for a timestamp token: the authority's signed TSTInfo plus its certificate chain. */
+const TIMESTAMP_BYTES = 16384;
 
 class CadesSigner extends Signer {
-  constructor(private readonly identity: SigningIdentity) {
+  constructor(private readonly build: (content: Buffer) => Promise<Buffer>) {
     super();
   }
 
   override async sign(content: Buffer): Promise<Buffer> {
-    return buildCadesSignature(content, this.identity);
+    return this.build(content);
   }
 }
 
 /** Room for the CMS structure: the certificate chain plus signature, attributes and slack. */
-function placeholderSize(identity: SigningIdentity): number {
-  const chainBytes = identity.chain.reduce((total, cert) => total + certificateDer(cert).length, 0);
-  return Math.max(MIN_SIGNATURE_BYTES, chainBytes + 4096);
+function placeholderSize(chainDer: string[], timestamped: boolean): number {
+  const chainBytes = chainDer.reduce((total, der) => total + der.length, 0);
+  return Math.max(MIN_SIGNATURE_BYTES, chainBytes + 4096) + (timestamped ? TIMESTAMP_BYTES : 0);
+}
+
+function parseCertificate(binary: string): forge.pki.Certificate {
+  try {
+    return forge.pki.certificateFromAsn1(forge.asn1.fromDer(binary));
+  } catch {
+    throw new SignError('SEAL_FAILED', 'The signer returned a certificate that is not valid.', {
+      option: 'signer',
+    });
+  }
+}
+
+function provider(options: SealOptions): SealProvider {
+  if (options.signer) return options.signer;
+  if (!options.p12) {
+    throw new SignError('SEAL_FAILED', 'seal() needs a p12 file or a signer.', {
+      option: 'p12',
+    });
+  }
+  return p12Signer({ p12: options.p12, passphrase: options.passphrase ?? '' });
+}
+
+/** Asks for a timestamp over the signature value, failing closed unless it is optional. */
+function timestamper(options: SealOptions) {
+  const url = options.tsaUrl?.trim();
+  if (!url) return undefined;
+  const required = options.tsaRequired ?? true;
+  return async (signature: Uint8Array): Promise<Uint8Array | null> => {
+    try {
+      return await requestTimestamp(url, signature, {
+        ...(options.tsaTimeoutMs ? { timeoutMs: options.tsaTimeoutMs } : {}),
+      });
+    } catch (error) {
+      const failure =
+        error instanceof SignError
+          ? error
+          : new SignError('SEAL_FAILED', 'The timestamp could not be obtained.', {
+              option: 'tsaUrl',
+            });
+      if (required) throw failure;
+      options.onTimestampFailure?.(failure);
+      return null;
+    }
+  };
 }
 
 /**
- * Applies a PAdES baseline B-B seal (ETSI.CAdES.detached, SHA-256, RSA) with the
- * operator's certificate. The seal covers the whole file; any later change to it
- * makes the seal invalid. Refuses RSA keys under 2048 bits, certificates signed with
- * anything weaker than SHA-256, and certificates not valid at the signing time.
+ * Applies a PAdES seal (ETSI.CAdES.detached, SHA-256, RSA) with the operator's certificate:
+ * baseline B-B, or B-T when `tsaUrl` is set. The seal covers the whole file and, as the first
+ * signature, certifies it with DocMDP (no changes allowed); any later change makes the seal
+ * invalid. Refuses RSA keys under 2048 bits, certificates signed with anything weaker than
+ * SHA-256, certificates not valid at the signing time or not meant for document signing, and
+ * files that already carry signatures (`PDF_ALREADY_SIGNED`).
  */
 export async function seal(pdfBytes: Uint8Array, options: SealOptions): Promise<Uint8Array> {
-  const identity = readP12(options.p12, options.passphrase ?? '');
   const signingTime = options.signingTime ?? new Date();
-  assertSealIdentity(identity, signingTime, options.allowWeakKey ?? false);
+  const signer = provider(options);
+  const chainDer = (await signer.certificateChain()).map((der) =>
+    Buffer.from(der).toString('binary'),
+  );
+  const chain = chainDer.map(parseCertificate);
+  assertSealChain(chain, signingTime, options.allowWeakKey ?? false);
 
   const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
-  const commonName = identity.certificate.subject.getField('CN') as { value?: string } | null;
+  // Sealing writes the whole file again, which would destroy existing signatures (an Aadhaar
+  // eSign from an ESP, for example). Sealing after them needs an incremental update appended
+  // after the signed bytes; until that exists, such a file is refused here.
+  const existing = signatureFieldsOf(doc).length;
+  if (existing > 0) {
+    throw new SignError(
+      'PDF_ALREADY_SIGNED',
+      'The PDF already carries digital signatures. Sealing writes the file again and would remove them.',
+      { signatureCount: existing, step: 'seal' },
+    );
+  }
+  const kind: SignatureKind = signatureKind(existing, options.certify ?? true);
+  const timestamp = timestamper(options);
+  const commonName = chain[0]!.subject.getField('CN') as { value?: string } | null;
 
   try {
-    pdflibAddPlaceholder({
-      pdfDoc: doc,
+    addSignaturePlaceholder(doc, {
+      kind,
       reason: options.reason ?? DEFAULT_REASON,
       location: options.location ?? '',
       contactInfo: options.contactInfo ?? '',
       name: commonName?.value ?? '',
       signingTime,
-      signatureLength: placeholderSize(identity),
-      subFilter: SUBFILTER_ETSI_CADES_DETACHED,
+      signatureLength: placeholderSize(chainDer, timestamp !== undefined),
     });
     const prepared = await doc.save({ useObjectStreams: false });
-    const signed = await new SignPdf().sign(
-      Buffer.from(prepared),
-      new CadesSigner(identity),
-      signingTime,
+    const cades = new CadesSigner((content) =>
+      buildCadesSignature(content, {
+        chain,
+        chainDer,
+        sign: (data) => signer.sign(data),
+        ...(timestamp ? { timestamp } : {}),
+      }),
     );
+    const signed = await new SignPdf().sign(Buffer.from(prepared), cades, signingTime);
     return new Uint8Array(signed);
   } catch (error) {
     if (error instanceof SignError) {

@@ -19,6 +19,7 @@ import {
   pngBase64,
   recipient,
 } from './testing/fixtures';
+import { signAgainForTest } from './testing/signed';
 import { parsePdfDate, verifySeal } from './verify';
 
 const signingTime = new Date('2026-11-19T10:20:30.000Z');
@@ -173,10 +174,23 @@ describe('seal and verifySeal', () => {
   });
 
   it('counts every signed signature field', async () => {
-    const twice = await seal(sealed, { p12: identity.p12, passphrase: identity.passphrase });
+    const twice = await signAgainForTest(sealed, identity);
     const result = await verifySeal(twice);
     expect(result.signatureCount).toBe(2);
     expect(result.valid).toBe(false);
+  });
+
+  it('never seals a file that already carries signatures', async () => {
+    const error = await rejection(
+      seal(sealed, { p12: identity.p12, passphrase: identity.passphrase }),
+    );
+    expect(error.code).toBe('PDF_ALREADY_SIGNED');
+    expect(error.details).toMatchObject({ signatureCount: 1, step: 'seal' });
+    const twice = await signAgainForTest(sealed, identity);
+    const again = await rejection(
+      seal(twice, { p12: identity.p12, passphrase: identity.passphrase }),
+    );
+    expect(again.details).toMatchObject({ signatureCount: 2 });
   });
 
   it('seals with a key whose certificate is not first in the file', async () => {

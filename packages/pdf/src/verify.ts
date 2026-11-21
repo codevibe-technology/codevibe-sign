@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import forge from 'node-forge';
 import { OID } from './cms';
 import { signatureFields } from './signatures';
+import { timestampInfo } from './tsa';
 
 const { asn1, pki } = forge;
 type Asn1 = forge.asn1.Asn1;
@@ -23,6 +24,12 @@ export interface SealVerification {
   signedAt?: string;
   /** Number of signatures found in the file. The first one is the one verified. */
   signatureCount: number;
+  /**
+   * ISO time from the RFC 3161 signature timestamp (PAdES B-T), when the seal carries one whose
+   * message imprint matches the signature. Whether the timestamp authority is trusted is not
+   * checked.
+   */
+  timestampedAt?: string;
 }
 
 const DIGESTS: Record<string, { node: string; forge: () => forge.md.MessageDigest }> = {
@@ -79,6 +86,7 @@ interface ParsedSignature {
   certificates: { node: Asn1; cert: forge.pki.Certificate | null }[];
   sidSerial?: Asn1;
   sidIssuer?: Asn1;
+  unsignedAttributes: Asn1[];
 }
 
 /** forge accepts an options object here, though its type definitions only declare a boolean. */
@@ -107,7 +115,12 @@ function parseCms(binary: string): ParsedSignature | null {
   const attributesNode = rest.find(
     (part) => part.tagClass === asn1.Class.CONTEXT_SPECIFIC && part.type === 0,
   );
-  const signatureNode = rest[rest.length - 1];
+  const signatureNode = rest.find(
+    (part) => part.tagClass === asn1.Class.UNIVERSAL && part.type === asn1.Type.OCTETSTRING,
+  );
+  const unsignedNode = rest.find(
+    (part) => part.tagClass === asn1.Class.CONTEXT_SPECIFIC && part.type === 1,
+  );
   const digestOid = oidOf(children(digestAlgorithm)[0]);
   if (!attributesNode || !signatureNode || !digestOid || typeof signatureNode.value !== 'string') {
     return null;
@@ -129,6 +142,7 @@ function parseCms(binary: string): ParsedSignature | null {
     certificates,
     sidIssuer: isIssuerAndSerial ? children(sid)[0] : undefined,
     sidSerial: isIssuerAndSerial ? children(sid)[1] : undefined,
+    unsignedAttributes: children(unsignedNode),
   };
 }
 
@@ -181,8 +195,27 @@ function signingTimeOf(attributes: Asn1[]): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+/** The time of a signature timestamp whose imprint is the digest of the signature value. */
+function timestampOf(parsed: ParsedSignature): string | undefined {
+  const token = attributeValue(parsed.unsignedAttributes, OID.signatureTimeStampToken);
+  if (!token) {
+    return undefined;
+  }
+  try {
+    const info = timestampInfo(new Uint8Array(Buffer.from(der(token), 'binary')));
+    const digest = DIGESTS[info.hashAlgorithm];
+    const imprint = digest
+      ? createHash(digest.node).update(Buffer.from(parsed.signature, 'binary')).digest('binary')
+      : undefined;
+    return imprint === info.hashedMessage ? info.genTime : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface SignatureCheck {
   valid: boolean;
+  timestampedAt?: string;
   signer?: SealSigner;
   signedAt?: string;
   signerCertificateDer?: string;
@@ -258,7 +291,13 @@ function checkSignature(signedContent: Buffer, cmsBinary: string): SignatureChec
   } catch {
     verified = false;
   }
-  return { ...invalid, valid: verified, signerCertificateDer: der(signerCert.node) };
+  const timestampedAt = verified ? timestampOf(parsed) : undefined;
+  return {
+    ...invalid,
+    valid: verified,
+    signerCertificateDer: der(signerCert.node),
+    ...(timestampedAt ? { timestampedAt } : {}),
+  };
 }
 
 /** What `examineSeal` learns about the first signature, beyond the public result. */
@@ -340,6 +379,7 @@ export async function examineSeal(bytes: Uint8Array): Promise<SealExamination> {
       valid: check.valid,
       ...(check.signer ? { signer: check.signer } : {}),
       ...(signedAt ? { signedAt } : {}),
+      ...(check.timestampedAt ? { timestampedAt: check.timestampedAt } : {}),
     },
     ...(check.signerCertificateDer ? { signerCertificateDer: check.signerCertificateDer } : {}),
     certificates: check.certificates,

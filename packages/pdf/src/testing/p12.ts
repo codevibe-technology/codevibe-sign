@@ -20,7 +20,42 @@ export interface TestP12Options {
   certificateDigest?: 'sha1' | 'sha256';
   /** Issue the certificate from this CA (and include the CA in the file) instead of self-signing. */
   issuer?: TestCa;
+  /**
+   * Extensions of the certificate. `basic` (default): CA:FALSE and key usage only.
+   * `seal-leaf`: what deploy/README.md issues from a private root (documentSigning and
+   * msDocumentSigning). `self-signed-ca`: the older single certificate with CA:TRUE.
+   * `ca-leaf` and `server-auth` are profiles the seal must refuse.
+   */
+  profile?: TestProfile;
 }
+
+export type TestProfile = 'basic' | 'seal-leaf' | 'self-signed-ca' | 'ca-leaf' | 'server-auth';
+
+const PROFILES: Record<TestProfile, object[]> = {
+  basic: [
+    { name: 'basicConstraints', cA: false },
+    { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
+  ],
+  'seal-leaf': [
+    { name: 'basicConstraints', cA: false },
+    { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
+    { name: 'extKeyUsage', '1.3.6.1.5.5.7.3.36': true, '1.3.6.1.4.1.311.10.3.12': true },
+  ],
+  'self-signed-ca': [
+    { name: 'basicConstraints', cA: true },
+    { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
+    { name: 'extKeyUsage', emailProtection: true, '1.3.6.1.4.1.311.10.3.12': true },
+  ],
+  'ca-leaf': [
+    { name: 'basicConstraints', cA: true },
+    { name: 'keyUsage', digitalSignature: true, keyCertSign: true },
+  ],
+  'server-auth': [
+    { name: 'basicConstraints', cA: false },
+    { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
+    { name: 'extKeyUsage', serverAuth: true },
+  ],
+};
 
 export interface TestP12 {
   p12: Uint8Array;
@@ -35,6 +70,7 @@ interface CertificateSpec {
   organization: string;
   issuer?: forge.pki.Certificate;
   ca?: boolean;
+  profile?: TestProfile;
   notBefore: Date;
   notAfter: Date;
   digest?: 'sha1' | 'sha256';
@@ -59,10 +95,7 @@ function makeCertificate(spec: CertificateSpec): forge.pki.Certificate {
           { name: 'basicConstraints', cA: true },
           { name: 'keyUsage', keyCertSign: true, cRLSign: true },
         ]
-      : [
-          { name: 'basicConstraints', cA: false },
-          { name: 'keyUsage', digitalSignature: true, nonRepudiation: true },
-        ],
+      : PROFILES[spec.profile ?? 'basic'],
   );
   cert.sign(
     spec.signingKey,
@@ -107,6 +140,7 @@ export function createTestP12(options: TestP12Options = {}): TestP12 {
     notBefore,
     notAfter,
     ...(options.certificateDigest ? { digest: options.certificateDigest } : {}),
+    ...(options.profile ? { profile: options.profile } : {}),
   });
   const chain = [cert];
   if (options.issuer) {
