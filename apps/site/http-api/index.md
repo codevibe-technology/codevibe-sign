@@ -49,20 +49,20 @@ Every error has the same body, and each code always comes with the same status:
 }
 ```
 
-| Status | Codes                                                                |
-| ------ | -------------------------------------------------------------------- |
-| 400    | `VALIDATION`                                                         |
-| 401    | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED`        |
-| 403    | `FIELD_NOT_YOURS`                                                    |
-| 404    | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND`             |
-| 409    | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT`                         |
-| 410    | `ENVELOPE_EXPIRED`                                                   |
-| 413    | `DOCUMENT_TOO_LARGE`                                                 |
-| 422    | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID` |
-| 423    | `OTP_LOCKED`                                                         |
-| 429    | `RATE_LIMITED`                                                       |
-| 500    | `SEAL_FAILED`, `INTERNAL`                                            |
-| 502    | `PROVIDER_ERROR`, `WEBHOOK_INVALID`                                  |
+| Status | Codes                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------ |
+| 400    | `VALIDATION`                                                                               |
+| 401    | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED`                              |
+| 403    | `FIELD_NOT_YOURS`                                                                          |
+| 404    | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND`                                   |
+| 409    | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT`                                               |
+| 410    | `ENVELOPE_EXPIRED`                                                                         |
+| 413    | `DOCUMENT_TOO_LARGE`                                                                       |
+| 422    | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |
+| 423    | `OTP_LOCKED`                                                                               |
+| 429    | `RATE_LIMITED`                                                                             |
+| 500    | `SEAL_FAILED`, `INTERNAL`                                                                  |
+| 502    | `PROVIDER_ERROR`, `WEBHOOK_INVALID`                                                        |
 
 Branch on `code`, not on `message`: messages are for people and may change.
 

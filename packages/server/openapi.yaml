@@ -27,7 +27,7 @@ info:
     | 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |
     | 410 | `ENVELOPE_EXPIRED` |
     | 413 | `DOCUMENT_TOO_LARGE` |
-    | 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID` |
+    | 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |
     | 423 | `OTP_LOCKED` |
     | 429 | `RATE_LIMITED` |
     | 500 | `SEAL_FAILED`, `INTERNAL` |
@@ -1619,6 +1619,7 @@ components:
     Unprocessable:
       description: |
         `DOCUMENT_INVALID`: a file is not a readable PDF.
+        `PDF_ALREADY_SIGNED`: a file already carries digital signatures; upload the unsigned original.
         `REQUIRED_FIELDS_MISSING`: required fields were left empty.
         `INVALID_FIELD_VALUE`: a value does not suit its field (PNG, date, length).
       content:
@@ -1724,6 +1725,7 @@ components:
         - REQUIRED_FIELDS_MISSING
         - INVALID_FIELD_VALUE
         - DOCUMENT_INVALID
+        - PDF_ALREADY_SIGNED
         - OTP_LOCKED
         - RATE_LIMITED
         - SEAL_FAILED
@@ -1749,6 +1751,7 @@ components:
         REQUIRED_FIELDS_MISSING: 422
         INVALID_FIELD_VALUE: 422
         DOCUMENT_INVALID: 422
+        PDF_ALREADY_SIGNED: 422
         OTP_LOCKED: 423
         RATE_LIMITED: 429
         SEAL_FAILED: 500
