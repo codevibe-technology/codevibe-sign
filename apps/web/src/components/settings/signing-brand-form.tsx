@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/field';
+import { defaultCertificateNote } from '@/lib/brand';
 import { updateSigningSettingsAction } from '@/server/actions/brand';
 import { useAction } from './use-action';
 
@@ -103,13 +104,13 @@ export function SigningBrandForm({
 
           <Field
             label="Certificate footer"
-            hint="Printed at the end of the signing certificate, for example your company's registered name and number."
+            hint={`Printed at the end of the signing certificate, for example your company's registered name and number. Left empty, the certificate says: ${defaultCertificateNote(appHost)}`}
             error={save.errors.certificateFooter}
           >
             {(props) => (
               <Input
                 {...props}
-                maxLength={200}
+                maxLength={400}
                 placeholder="Acme Private Limited, CIN U72900KA2020PTC000000"
                 value={footer}
                 onChange={(e) => setFooter(e.target.value)}

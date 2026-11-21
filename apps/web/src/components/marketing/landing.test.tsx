@@ -20,6 +20,15 @@ describe('Landing', () => {
       'href',
       'https://github.com/codevibe-technology/codevibe-sign',
     );
+    expect(within(hero).getByRole('link', { name: 'Check it here' })).toHaveAttribute(
+      'href',
+      '/verify',
+    );
+    const footer = screen.getByRole('navigation', { name: 'Footer' });
+    expect(within(footer).getByRole('link', { name: 'Verify a PDF' })).toHaveAttribute(
+      'href',
+      '/verify',
+    );
   });
 
   it('has every section, reachable from the header', () => {
@@ -62,7 +71,7 @@ describe('Landing', () => {
     expect(within(faq).getByText(/Nothing already sent is affected/)).toBeTruthy();
   });
 
-  it('links the footer to docs, GitHub, terms, privacy and Codevibe', () => {
+  it('links the footer to docs, the verify page, GitHub, terms, privacy and Codevibe', () => {
     render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
     const footer = screen.getByRole('navigation', { name: 'Footer' });
     const hrefs = within(footer)
@@ -70,6 +79,7 @@ describe('Landing', () => {
       .map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual([
       '/docs',
+      '/verify',
       'https://github.com/codevibe-technology/codevibe-sign',
       '/terms',
       '/privacy',

@@ -17,6 +17,8 @@ describe('docs files', () => {
     writeFileSync(join(root, 'guides', 'webhooks.html'), 'hooks');
     writeFileSync(join(root, 'assets', 'app.abc.js'), 'js');
     writeFileSync(join(root, 'openapi.json'), '{}');
+    writeFileSync(join(root, 'codevibe-sign-seal.crt'), 'cert');
+    writeFileSync(join(root, 'section-63-certificate-template.md'), '# Template');
     vi.stubEnv('DOCS_DIR', root);
   });
 
@@ -59,6 +61,13 @@ describe('docs files', () => {
     expect((await serveDocs(['openapi.json'])).headers.get('content-type')).toContain(
       'application/json',
     );
+
+    expect((await serveDocs(['codevibe-sign-seal.crt'])).headers.get('content-type')).toBe(
+      'application/x-x509-ca-cert',
+    );
+    expect(
+      (await serveDocs(['section-63-certificate-template.md'])).headers.get('content-type'),
+    ).toBe('text/markdown; charset=utf-8');
 
     const missing = await serveDocs(['nothing-here']);
     expect(missing.status).toBe(404);

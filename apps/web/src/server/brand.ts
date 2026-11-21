@@ -228,7 +228,7 @@ export interface SigningSettings {
   signingDomain: string | null;
 }
 
-export const FOOTER_MAX = 200;
+export const FOOTER_MAX = 400;
 
 export async function updateSigningSettings(
   sql: postgres.Sql,

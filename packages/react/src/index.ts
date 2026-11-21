@@ -40,6 +40,7 @@ export {
 export type { PageList, PresetInput, RepeatChoice } from './placer/multipage';
 export { fieldsFromTags, findTags } from './placer/tags';
 export type { FieldTag, TagFieldsInput } from './placer/tags';
+export { coveredText, fieldsOverText } from './placer/overlap';
 export type { ArrowKey, Size } from './placer/placement';
 
 export {

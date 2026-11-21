@@ -231,6 +231,11 @@ When pdf.js can read the document's text, tags such as `{{signature:1}}` are fou
 "Place fields from tags" covers each with a field. The number is the recipient's place in
 the signing order. Types: `signature`, `initials`, `date`, `name`, `text`, `checkbox`.
 
+With the same text, a signature or initials field that covers page text gets a dashed
+outline and an "Over text" badge, and the side panel says how many do. It is a warning
+only: the drawn signature would hide the words under it, but the sender may still place it.
+Signature lines (`____`), dots and tags under a field do not count.
+
 The signing view asks for a signature or initials once; each further box then takes one
 tap, and "Fill all my initials" fills every initials box after the first is adopted.
 
@@ -243,7 +248,7 @@ tap, and "Fill all my initials" fills every initials box after the first is adop
 `clampRect`, `snapToPageEdges`, `flipVertical`; `createField`, `nudgeRect`,
 `defaultFieldSizes`; `parsePageRange`, `pagesForChoice`, `scaleRectBetween`,
 `fieldGroups`, `repeatField`, `initialsOnEveryPage`, `signatureOnLastPage`, `findTags`,
-`fieldsFromTags`; `encodeSignature`, `imageFileToSignature`; `loadPdf`.
+`fieldsFromTags`, `coveredText`, `fieldsOverText`; `encodeSignature`, `imageFileToSignature`; `loadPdf`.
 
 Signature images are always trimmed and re-encoded to PNG, and capped at core's
 `MAX_IMAGE_BYTES` (512 KB; 200 KB by default). Uploads accept PNG, JPEG and WebP up to

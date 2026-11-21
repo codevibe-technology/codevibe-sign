@@ -78,3 +78,14 @@ export function formatSigningDate(value: string, timeZone?: string): string {
   const p = parts(date, timeZone ?? 'UTC');
   return `${p.day} ${MONTHS[Number(p.month) - 1] ?? p.month} ${p.year}`;
 }
+
+/** "19 Nov 2026 15:45 GMT+5:30" in the time zone (UTC when none is given). */
+export function formatSigningTime(value: string, timeZone?: string): string {
+  const date = parseDate(value);
+  if (!date) {
+    return value;
+  }
+  const zone = timeZone ?? 'UTC';
+  const p = parts(date, zone);
+  return `${p.day} ${MONTHS[Number(p.month) - 1] ?? p.month} ${p.year} ${p.hour}:${p.minute} ${p.timeZoneName}`;
+}

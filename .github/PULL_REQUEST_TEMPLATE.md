@@ -13,3 +13,4 @@
 - [ ] A changeset is added if a published package changes (`pnpm changeset`)
 - [ ] Docs and READMEs are updated if the public API changes
 - [ ] No secrets, real documents or personal data in code, tests or fixtures
+- [ ] Every commit is signed off (`git commit -s`) under the [DCO](../DCO)

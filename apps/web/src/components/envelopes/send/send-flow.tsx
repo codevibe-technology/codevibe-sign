@@ -26,6 +26,7 @@ import {
   withReplacedDocument,
 } from '@/lib/send-flow';
 import { replaceDocumentAction } from '@/server/actions/envelopes';
+import { ExcludedDocumentNotice } from '@/components/legal/excluded-document-notice';
 import { StepDocuments } from './step-documents';
 import { StepFields } from './step-fields';
 import { StepRecipients } from './step-recipients';
@@ -336,6 +337,10 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
           </p>
         </aside>
       ) : null}
+
+      <ExcludedDocumentNotice
+        names={[state.settings.title, ...state.documents.map((d) => d.name)]}
+      />
 
       <Stepper current={step} reached={reached} onSelect={go} />
 

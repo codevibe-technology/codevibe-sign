@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, isHexColor, textOn } from './brand';
+import { contrastRatio, defaultCertificateNote, isHexColor, textOn } from './brand';
 
 describe('brand colours', () => {
   it('accepts only #rrggbb', () => {
@@ -20,5 +20,15 @@ describe('brand colours', () => {
     expect(textOn('#0D1B2A')).toBe('#FFFFFF');
     expect(textOn('#2DD4BF')).toBe('#0D1B2A');
     expect(textOn('#FFE066')).toBe('#0D1B2A');
+  });
+});
+
+describe('default certificate note', () => {
+  it('explains the Adobe warning and points at this install, without dashes', () => {
+    const note = defaultCertificateNote('sign.codevibe.in');
+    expect(note).toContain("Adobe Reader may show 'signer identity unknown'.");
+    expect(note).toMatch(/Verify this document at sign\.codevibe\.in\/verify\.$/);
+    expect(note).not.toMatch(/[\u2013\u2014]/);
+    expect(note.length).toBeLessThanOrEqual(400);
   });
 });

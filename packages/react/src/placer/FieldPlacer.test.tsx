@@ -262,4 +262,34 @@ describe('FieldPlacer on many pages', () => {
     );
     expect(screen.queryByRole('button', { name: /Place fields from tags/ })).toBeNull();
   });
+
+  it('marks a signature field that covers page text and notes it in the side panel', async () => {
+    const source = {
+      ...letterSource(1),
+      textItems: async () => [
+        { str: '10. Notice period is thirty days.', x: 200, y: 380, width: 200, height: 12 },
+      ],
+    };
+    setup({ documents: [{ id: 'doc', source }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    const placed = await screen.findByRole('button', {
+      name: 'Signature for Asha Rao, page 1, Over text',
+    });
+    expect(placed).toHaveAttribute('data-over-text', 'true');
+    expect(within(placed).getByText('Over text')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'A signature or initials field covers page text.',
+    );
+  });
+
+  it('does not warn about fields placed on blank space', async () => {
+    const source = {
+      ...letterSource(1),
+      textItems: async () => [{ str: 'Heading', x: 72, y: 60, width: 60, height: 14 }],
+    };
+    setup({ documents: [{ id: 'doc', source }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    await screen.findByRole('button', { name: 'Signature for Asha Rao, page 1' });
+    expect(screen.queryByText(/covers page text/)).toBeNull();
+  });
 });

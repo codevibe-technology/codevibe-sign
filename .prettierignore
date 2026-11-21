@@ -10,3 +10,5 @@ apps/web/data/
 **/next-env.d.ts
 apps/web/docs-dist/
 apps/web/ops/
+# Fillable templates keep their blank lines (____) as typed.
+apps/site/public/*.md

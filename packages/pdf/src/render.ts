@@ -5,13 +5,13 @@ import {
   type FieldValue,
   type Recipient,
 } from '@codevibe_technology/sign-core';
-import { canEncode, embedFonts, type FontSet } from './fonts';
+import { canEncode, embedFonts, encodable, type FontSet } from './fonts';
 import { boxFrame, clampRect, fitContain, pageGeometry, type BoxFrame } from './geometry';
 import { loadPdf } from './inspect';
 import { sanitizeDocument } from './sanitize';
 import { reencodePng } from './png';
 import { fitText, LINE_HEIGHT } from './text';
-import { assertTimeZone, formatSigningDate } from './time';
+import { assertTimeZone, formatSigningDate, formatSigningTime } from './time';
 
 export interface RenderOptions {
   /** Draw only the fields that belong to this document. */
@@ -26,9 +26,19 @@ export interface RenderOptions {
   maxImageBytes?: number;
   /** Largest accepted input PDF, in bytes. Defaults to 25 MB. */
   maxBytes?: number;
+  /**
+   * Print the signer's name and signing time in small type at the foot of each signature
+   * box, under the drawn signature. Defaults to true. Boxes under 20 points tall are left
+   * without it.
+   */
+  signatureCaption?: boolean;
 }
 
 const INK = rgb(0.08, 0.09, 0.13);
+const CAPTION_INK = rgb(0.35, 0.38, 0.44);
+const CAPTION_MIN_BOX_HEIGHT = 20;
+const CAPTION_MAX_SIZE = 7;
+const CAPTION_MIN_SIZE = 3;
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const DEFAULT_MAX_IMAGE_BYTES = 1024 * 1024;
 
@@ -70,9 +80,10 @@ async function embedPng(doc: PDFDocument, field: Field, bytes: Uint8Array): Prom
   }
 }
 
-function drawImage(page: PDFPage, frame: BoxFrame, image: PDFImage): void {
-  const fit = fitContain(image.width, image.height, frame.width, frame.height);
-  const origin = frame.at(fit.x, fit.y);
+/** Draws the image centred in the box, above a strip of `reserved` points at its foot. */
+function drawImage(page: PDFPage, frame: BoxFrame, image: PDFImage, reserved = 0): void {
+  const fit = fitContain(image.width, image.height, frame.width, frame.height - reserved);
+  const origin = frame.at(fit.x, fit.y + reserved);
   page.drawImage(image, {
     x: origin.x,
     y: origin.y,
@@ -103,6 +114,50 @@ function drawText(page: PDFPage, frame: BoxFrame, text: string, font: PDFFont): 
       rotate: degrees(frame.rotate),
     });
   });
+}
+
+/** Height of the caption strip for a signature box, or 0 when the box is too small for one. */
+function captionStrip(frame: BoxFrame): number {
+  if (frame.height < CAPTION_MIN_BOX_HEIGHT) {
+    return 0;
+  }
+  const size = Math.min(CAPTION_MAX_SIZE, Math.max(CAPTION_MIN_SIZE + 1, frame.height * 0.14));
+  return size * LINE_HEIGHT;
+}
+
+/** "Asha Rao, 19 Nov 2026 15:45 GMT+5:30" on one line, shrunk or shortened to fit the box. */
+function drawCaption(
+  page: PDFPage,
+  frame: BoxFrame,
+  strip: number,
+  text: string,
+  font: PDFFont,
+): void {
+  const fitted = fitText(text, font, frame.width, strip, {
+    minSize: CAPTION_MIN_SIZE,
+    maxSize: CAPTION_MAX_SIZE,
+  });
+  const line = fitted.lines[0];
+  if (!line) {
+    return;
+  }
+  const width = font.widthOfTextAtSize(line, fitted.size);
+  const descent =
+    font.heightAtSize(fitted.size) - font.heightAtSize(fitted.size, { descender: false });
+  const origin = frame.at(Math.max(0, (frame.width - width) / 2), descent + 0.5);
+  page.drawText(line, {
+    x: origin.x,
+    y: origin.y,
+    size: fitted.size,
+    font,
+    color: CAPTION_INK,
+    rotate: degrees(frame.rotate),
+  });
+}
+
+function captionText(recipient: Recipient, timeZone: string | undefined): string {
+  const when = recipient.actedAt ? formatSigningTime(recipient.actedAt, timeZone) : undefined;
+  return [recipient.name.trim(), when].filter(Boolean).join(', ');
 }
 
 function drawCheckbox(page: PDFPage, frame: BoxFrame, checked: boolean): void {
@@ -146,7 +201,8 @@ function textFor(
 
 /**
  * Draws every field value onto the original pages: signature and initials images,
- * text, names and dates, and checkboxes. Field rects use core's top-left origin as the
+ * text, names and dates, and checkboxes. Each signature carries the signer's name and
+ * signing time in small type at the foot of its box (see `signatureCaption`). Field rects use core's top-left origin as the
  * page is displayed; rotated pages and offset crop boxes are handled. The pages are first
  * copied into a fresh document without active content and with form fields flattened (see
  * `sanitizeDocument`), so the file that is sealed holds only what the signer saw.
@@ -238,7 +294,16 @@ export async function renderFields(
           image = await embedPng(doc, field, bytes);
           images.set(value, image);
         }
-        drawImage(page, frame, image);
+        const caption =
+          field.type === 'signature' && options.signatureCaption !== false
+            ? captionText(recipient, options.timeZone)
+            : '';
+        const strip = caption ? captionStrip(frame) : 0;
+        drawImage(page, frame, image, strip);
+        if (strip > 0) {
+          fonts ??= await embedFonts(doc, options.font);
+          drawCaption(page, frame, strip, encodable(fonts.regular, caption), fonts.regular);
+        }
         break;
       }
       case 'checkbox': {

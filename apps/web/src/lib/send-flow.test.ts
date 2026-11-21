@@ -88,6 +88,10 @@ describe('files', () => {
 });
 
 describe('recipients', () => {
+  it('asks a new signer for a one-time code by email by default', () => {
+    expect(newRecipient().auth).toBe('email_otp');
+  });
+
   it('needs someone who signs or approves', () => {
     expect(recipientProblems([]).recipients).toMatch(/Add the people/);
     expect(recipientProblems([person({ role: 'viewer' })]).recipients).toMatch(

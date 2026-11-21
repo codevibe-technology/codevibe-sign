@@ -60,6 +60,30 @@ name without the prefix (`core`, `pdf`, `server`, `react`, `aadhaar`) or an area
 Write the subject in lower case and the imperative, without a full stop, in 72 characters or
 fewer. Add a body when the reason for the change is not obvious.
 
+## Sign off your commits (DCO)
+
+Every commit in a pull request from outside Codevibe must carry a sign-off line certifying the
+[Developer Certificate of Origin](DCO) 1.1: that you wrote the change, or otherwise have the
+right to submit it under the project's licences. Add it with `-s`:
+
+```sh
+git commit -s -m "fix(pdf): keep field boxes inside the page"
+```
+
+which appends
+
+```
+Signed-off-by: Your Name <you@example.com>
+```
+
+The name and email must match the commit author. Use your real name; we cannot accept
+anonymous sign-offs. To sign off commits you already made, run
+`git rebase --signoff main` and force-push your branch.
+
+A maintainer checks the sign-offs before merging, for example with
+`git log --format='%an <%ae>%n%(trailers:key=Signed-off-by)' main..HEAD`. There is no bot; a
+pull request with a missing sign-off is asked to add it.
+
 ## Changesets and the changelog
 
 Every pull request that changes a published package needs a changeset (`pnpm changeset`).
@@ -83,5 +107,10 @@ changes to sealing, verification, authentication or the audit log get a second r
 
 By contributing you agree that your contributions are licensed under the licence of the part you
 change: Apache-2.0 for the libraries and AGPL-3.0-only for `packages/server` and the apps (see
-[LICENSING.md](LICENSING.md)). Changes to the server or the apps may also need a short contributor
-licence agreement, which we will link here before we accept outside pull requests to those parts.
+[LICENSING.md](LICENSING.md)). Your `Signed-off-by` line records that agreement under the DCO.
+
+The server and the apps are also offered under a commercial licence. The DCO does not give
+Codevibe the right to include your change in that edition, so outside pull requests to
+`packages/server` or `apps/` will also need a short contributor licence agreement. We will link it
+here before we accept such pull requests; until then, contributions to the libraries and the docs
+are welcome under the DCO alone.

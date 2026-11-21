@@ -110,10 +110,14 @@ export const ROLE_OPTIONS: { value: RecipientRole; label: string; hint: string }
   { value: 'viewer', label: 'Gets a copy', hint: 'Receives the signed copy only.' },
 ];
 
+/**
+ * Identity checks a sender can pick, the default first. A one-time code is the default
+ * because a link alone proves only access to the inbox, which is weaker evidence.
+ */
 export const AUTH_OPTIONS: { value: Exclude<AuthMethod, 'aadhaar'>; label: string }[] = [
-  { value: 'email_link', label: 'Email link' },
-  { value: 'email_otp', label: 'Email link + code' },
+  { value: 'email_otp', label: 'Email link + code (recommended)' },
   { value: 'sms_otp', label: 'Email link + SMS code' },
+  { value: 'email_link', label: 'Email link only' },
 ];
 
 export const AUTH_LABELS: Record<AuthMethod, string> = {

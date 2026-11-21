@@ -179,6 +179,7 @@
   --cvs-accent-text: var(--primary-ink);
   --cvs-focus: var(--primary);
   --cvs-danger: var(--danger);
+  --cvs-warning: var(--warning);
   --cvs-success: var(--success);
   --cvs-shadow: var(--shadow);
   --cvs-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;

@@ -17,6 +17,7 @@ import {
 
 const signer = recipient();
 
+/** Renders one page. Signature captions are off so image placement can be checked exactly. */
 async function render(
   page: PageSpec,
   fields: Field[],
@@ -28,7 +29,7 @@ async function render(
     fields,
     values,
     [signer],
-    options,
+    { signatureCaption: false, ...options },
   );
   return pageContent(output, 0);
 }
@@ -58,6 +59,75 @@ async function rejection(promise: Promise<unknown>): Promise<SignError> {
   expect(error).toBeInstanceOf(SignError);
   return error as SignError;
 }
+
+describe('renderFields: signature caption', () => {
+  const draw = async (
+    rect: Field['rect'],
+    options: Parameters<typeof renderFields>[4] = {},
+    who = signer,
+    type: Field['type'] = 'signature',
+  ) =>
+    pageContent(
+      await renderFields(
+        await makePdf([{ blank: true, size: A4 }]),
+        [field(type, { rect })],
+        [{ fieldId: `f-${type}`, value: pngBase64(400, 100) }],
+        [who],
+        options,
+      ),
+      0,
+    );
+
+  it('prints the signer name and signing time under the signature', async () => {
+    const content = await draw({ x: 50, y: 50, width: 200, height: 60 });
+    expect(shownText(content)).toEqual(['Shubh Kumar, 19 Nov 2026 10:15 UTC']);
+    const [x, y, width, height] = imagePlacement(content);
+    const strip = 7 * 1.2;
+    expect(height).toBeCloseTo(Math.min(50, 60 - strip));
+    expect(y).toBeGreaterThan(841.89 - 110 + strip - 0.01);
+    expect(x! + width!).toBeLessThanOrEqual(250);
+    const [, , , , textX, textY] = textMatrix(content);
+    expect(textX).toBeGreaterThanOrEqual(50);
+    expect(textY).toBeGreaterThan(841.89 - 110);
+    expect(textY).toBeLessThan(841.89 - 110 + strip);
+  });
+
+  it('shows the time in the given time zone', async () => {
+    const content = await draw(
+      { x: 50, y: 50, width: 200, height: 60 },
+      { timeZone: 'Asia/Kolkata' },
+    );
+    expect(shownText(content)).toEqual(['Shubh Kumar, 19 Nov 2026 15:45 GMT+5:30']);
+  });
+
+  it('shrinks the caption to fit a narrow box and keeps it on one line', async () => {
+    const content = await draw({ x: 50, y: 50, width: 70, height: 40 });
+    const shown = shownText(content);
+    expect(shown).toHaveLength(1);
+    const size = Number(/\/\S+ ([\d.]+) Tf/.exec(content)![1]);
+    expect(size).toBeLessThan(7);
+    expect(size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('prints the name alone when the signing time is not known', async () => {
+    const content = await draw(
+      { x: 50, y: 50, width: 200, height: 60 },
+      {},
+      {
+        ...signer,
+        actedAt: undefined,
+      },
+    );
+    expect(shownText(content)).toEqual(['Shubh Kumar']);
+  });
+
+  it('leaves initials, small boxes and opted out renders without a caption', async () => {
+    const rect = { x: 50, y: 50, width: 200, height: 60 };
+    expect(shownText(await draw(rect, {}, signer, 'initials'))).toEqual([]);
+    expect(shownText(await draw({ ...rect, height: 18 }))).toEqual([]);
+    expect(shownText(await draw(rect, { signatureCaption: false }))).toEqual([]);
+  });
+});
 
 describe('renderFields: images', () => {
   it('places a signature at the top-left based rect on a portrait page', async () => {

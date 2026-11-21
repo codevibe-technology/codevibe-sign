@@ -15,3 +15,5 @@ coverage/
 deploy/.env
 deploy/secrets/
 deploy/backups/
+# Local notes for coding tools
+apps/web/AGENTS.md

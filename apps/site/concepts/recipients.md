@@ -33,6 +33,12 @@ the next order after the highest one so far.
 
 The method used is recorded in the audit log and printed on the certificate page.
 
+`email_link` proves only that someone could open the recipient's inbox, so a forwarded link is
+enough to sign. A one-time code is stronger evidence. The web app therefore starts every new
+signer and template role on `email_otp`; senders can still pick the link alone. The HTTP API and
+the core builder keep `email_link` as their default so existing integrations behave the same:
+pass `auth: 'email_otp'` to ask for a code.
+
 ## Status
 
 ```
