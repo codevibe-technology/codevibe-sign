@@ -200,16 +200,16 @@ most once a minute.
 Brand settings belong to a workspace and are read through `getBrand(workspaceId)`, which
 fills in Codevibe defaults for anything unset:
 
-| Setting                     | Notes                                                                                                                                                      |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Logo                        | PNG, JPEG or WebP, up to 512 KB, checked by its bytes. SVG is refused (scripts). Served from `/brand/<workspaceId>/logo` with `nosniff` and a sandbox CSP. |
-| Brand colour                | `#rrggbb`. Buttons on the signing page use it; text colour is picked for 4.5:1 contrast.                                                                   |
-| Font                        | `inter`, `space-grotesk`, `system`, `serif`.                                                                                                               |
-| Email sender name, reply-to | The `From` address stays the operator's, so SPF and DKIM keep passing; only its display name changes.                                                      |
-| Email template overrides    | Subject and opening text per email (invite, reminder, completed, cancelled) with `{{variables}}`; sent through the server's `workspaceMail` hook.          |
-| Signing-page custom domain  | Stored, unique across workspaces, with a verification time that resets when it changes. Routing and TLS are deployment work (below).                       |
-| Certificate footer          | A line printed at the end of the certificate, through the server's `certificateNote` hook.                                                                 |
-| "Secured by Codevibe Sign"  | Badge on the signing page and in emails; on by default.                                                                                                    |
+| Setting                     | Notes                                                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Logo                        | PNG, JPEG or WebP, up to 512 KB, checked by its bytes. SVG is refused (scripts). Served from `/brand/<workspaceId>/logo` with `nosniff` and a sandbox CSP.  |
+| Brand colour                | `#rrggbb`. Buttons on the signing page use it; text colour is picked for 4.5:1 contrast.                                                                    |
+| Font                        | `inter`, `space-grotesk`, `system`, `serif`.                                                                                                                |
+| Email sender name, reply-to | The `From` address stays the operator's, so SPF and DKIM keep passing; only its display name changes.                                                       |
+| Email template overrides    | Subject and opening text per email (invite, reminder, completed, cancelled) with `{{variables}}`; sent through the server's `workspaceMail` hook.           |
+| Signing-page custom domain  | Stored, unique across workspaces, with a verification time that resets when it changes. Routing and TLS are deployment work (below).                        |
+| Certificate footer          | A line printed at the end of the certificate, through the server's `certificateNote` hook. Empty means the default note on Adobe trust and the verify page. |
+| "Secured by Codevibe Sign"  | Badge on the signing page and in emails; on by default.                                                                                                     |
 
 **Settings → Brand** has three cards: the look (logo, colour, font, with a preview of the
 signing-page header), emails (sender name, reply-to and the four templates with a live

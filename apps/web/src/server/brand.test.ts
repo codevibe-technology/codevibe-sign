@@ -110,7 +110,7 @@ describe('signing settings checks', () => {
       updateSigningSettings(
         untouched,
         'ws_1',
-        { showBadge: true, certificateFooter: 'x'.repeat(201), signingDomain: '' },
+        { showBadge: true, certificateFooter: 'x'.repeat(401), signingDomain: '' },
         'app.example.com',
       ),
     ).rejects.toMatchObject({ field: 'certificateFooter' });
