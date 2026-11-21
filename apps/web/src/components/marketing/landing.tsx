@@ -25,7 +25,7 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { formatBytes, type PlanLimits } from '@/lib/plans';
-import { CONTACT_EMAIL, GITHUB_URL, SELF_HOST_DOCS } from './links';
+import { CONTACT_EMAIL, GITHUB_URL, SELF_HOST_DOCS, VERIFY_URL } from './links';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 
@@ -100,8 +100,8 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   },
   {
     icon: ShieldCheck,
-    title: 'Verify page',
-    text: 'Upload a PDF that comes back to you and see whether it is exactly the document your workspace sealed.',
+    title: 'Public verify page',
+    text: 'Anyone holding a signed PDF can drop it on the verify page, no account needed, and see whether it is unchanged, who signed and when.',
   },
 ];
 
@@ -309,6 +309,16 @@ export function Landing({ free, cloud }: { free: PlanLimits; cloud: PlanLimits }
               </div>
               <p className="mt-4 text-sm text-white/65">
                 A free cloud workspace, no card needed. Or run it on your own server with no limits.
+              </p>
+              <p className="mt-2 text-sm text-white/65">
+                Received a signed PDF?{' '}
+                <Link
+                  href={VERIFY_URL}
+                  className="font-semibold text-white underline-offset-2 hover:underline"
+                >
+                  Check it here
+                </Link>
+                .
               </p>
             </div>
             <HeroVisual />

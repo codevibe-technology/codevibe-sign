@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { Wordmark } from '@/components/shell/brand-mark';
-import { CODEVIBE_URL, CONTACT_EMAIL, DOCS_URL, GITHUB_URL } from './links';
+import { CODEVIBE_URL, CONTACT_EMAIL, DOCS_URL, GITHUB_URL, VERIFY_URL } from './links';
 
 const LINKS = [
   { label: 'Docs', href: DOCS_URL },
+  { label: 'Verify a PDF', href: VERIFY_URL },
   { label: 'GitHub', href: GITHUB_URL, external: true },
   { label: 'Terms', href: '/terms' },
   { label: 'Privacy', href: '/privacy' },

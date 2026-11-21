@@ -2,7 +2,12 @@ import 'server-only';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { SignError, type PageSize } from '@codevibe_technology/sign-core';
-import { inspectPdf, sealCertificate, verify } from '@codevibe_technology/sign-pdf';
+import {
+  inspectPdf,
+  sealCertificate,
+  verify,
+  type SealCertificate,
+} from '@codevibe_technology/sign-pdf';
 import { MAX_PDF_BYTES } from '@/lib/send-flow';
 import { env } from './env';
 import { AppError } from './errors';
@@ -39,11 +44,11 @@ export async function inspectUpload(
   }
 }
 
-const holder = globalThis as unknown as { __cvsSealFingerprint?: string };
+const holder = globalThis as unknown as { __cvsSealCertificate?: SealCertificate };
 
-/** SHA-256 of this install's seal certificate, read once. */
-function sealFingerprint(): string {
-  if (holder.__cvsSealFingerprint) return holder.__cvsSealFingerprint;
+/** This install's seal certificate (public part only), read once. */
+export function installSealCertificate(): SealCertificate {
+  if (holder.__cvsSealCertificate) return holder.__cvsSealCertificate;
   const config = env();
   if (!config.SEAL_P12_PATH) {
     throw new AppError(
@@ -51,12 +56,23 @@ function sealFingerprint(): string {
       'This install has no seal certificate yet (SEAL_P12_PATH), so nothing can be verified.',
     );
   }
-  holder.__cvsSealFingerprint = sealCertificate({
+  holder.__cvsSealCertificate = sealCertificate({
     p12: readFileSync(config.SEAL_P12_PATH),
     passphrase: config.SEAL_PASSPHRASE,
     allowWeakKey: config.SEAL_ALLOW_WEAK_KEY,
-  }).sha256;
-  return holder.__cvsSealFingerprint;
+  });
+  return holder.__cvsSealCertificate;
+}
+
+/** "6B6E D7EC ..." : a hex fingerprint in groups of four, the way Adobe Reader shows it. */
+export function groupFingerprint(hex: string): string {
+  return (
+    hex
+      .replace(/[^0-9a-f]/gi, '')
+      .toUpperCase()
+      .match(/.{1,4}/g)
+      ?.join(' ') ?? ''
+  );
 }
 
 export interface VerifyOutcome {
@@ -69,25 +85,35 @@ export interface VerifyOutcome {
   sha256: string;
 }
 
-const REASONS: Record<string, string> = {
+/** Who the result speaks for: a workspace in the app, or the install on its public page. */
+export type VerifyScope = 'workspace' | 'install';
+
+const SEALER: Record<VerifyScope, string> = {
+  workspace: 'this workspace',
+  install: 'Codevibe Sign on this site',
+};
+
+const reasons = (by: string): Record<string, string> => ({
   not_sealed:
     'This PDF carries no seal. It is not a document completed in Codevibe Sign, or it was printed or saved again without the seal.',
   signature_invalid: 'The seal is broken: the file was changed after it was sealed.',
   not_whole_document:
     'Something was added to the file after it was sealed, so it is not the original.',
-  multiple_signatures:
-    'The file carries more than one signature; only a single seal from this workspace is accepted.',
-  untrusted_signer:
-    'The seal is intact but was made by a different certificate, not by this workspace.',
-};
+  multiple_signatures: `The file carries more than one signature; only a single seal from ${by} is accepted.`,
+  untrusted_signer: `The seal is intact but was made by a different certificate, not by ${by}.`,
+});
 
 /** Checks that `bytes` is a file this install sealed and that nothing changed since. */
-export async function verifyUpload(bytes: Uint8Array): Promise<VerifyOutcome> {
+export async function verifyUpload(
+  bytes: Uint8Array,
+  scope: VerifyScope = 'workspace',
+): Promise<VerifyOutcome> {
+  const by = SEALER[scope];
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   if (bytes.byteLength > MAX_PDF_BYTES) {
     throw new AppError(
       'VALIDATION',
-      `The file is larger than ${MAX_PDF_BYTES / MB} MB; sealed documents from this workspace are smaller.`,
+      `The file is larger than ${MAX_PDF_BYTES / MB} MB; sealed documents from ${by} are smaller.`,
       'file',
     );
   }
@@ -98,7 +124,7 @@ export async function verifyUpload(bytes: Uint8Array): Promise<VerifyOutcome> {
       'file',
     );
   }
-  const fingerprint = sealFingerprint();
+  const fingerprint = installSealCertificate().sha256;
   try {
     const result = await verify(bytes, { trust: { fingerprints: [fingerprint] } });
     const signer = [result.signer?.commonName, result.signer?.organization]
@@ -107,8 +133,8 @@ export async function verifyUpload(bytes: Uint8Array): Promise<VerifyOutcome> {
     return {
       valid: result.valid,
       summary: result.valid
-        ? 'Authentic. This is exactly the document sealed by this workspace, unchanged since.'
-        : (REASONS[result.reason ?? ''] ?? 'The seal could not be confirmed.'),
+        ? `Authentic. This is exactly the document sealed by ${by}, unchanged since.`
+        : (reasons(by)[result.reason ?? ''] ?? 'The seal could not be confirmed.'),
       reason: result.reason ?? null,
       signer: signer || null,
       signedAt: result.signedAt ?? null,

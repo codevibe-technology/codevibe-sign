@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${appUrl}/`, changeFrequency: 'weekly', priority: 1 },
     { url: `${appUrl}/docs`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${appUrl}/verify`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${appUrl}/terms`, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${appUrl}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
   ];

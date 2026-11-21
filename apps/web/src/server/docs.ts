@@ -16,6 +16,9 @@ const TYPES: Record<string, string> = {
   '.woff': 'font/woff',
   '.xml': 'application/xml; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
+  '.crt': 'application/x-x509-ca-cert',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 
 /** Where the built docs are: `DOCS_DIR`, or `docs-dist` next to the app. */
