@@ -126,6 +126,10 @@ step is available on its own as `sanitizePdf(bytes)`.
   every chunk checksum and scanline filter must be valid, and only the header, palette,
   transparency and freshly compressed pixels are kept. Scaled to fit the box, aspect ratio
   kept, centred.
+- Under each `signature` image, in small grey type at the foot of the box, the signer's
+  name and signing time (`recipient.actedAt`, in `timeZone` or UTC), for example
+  `Asha Rao, 19 Nov 2026 15:45 GMT+5:30`. The image shrinks to make room. Boxes under 20
+  points tall get no caption; `signatureCaption: false` turns it off.
 - `text`, `name`, `date_signed`: Helvetica, sized down (to 6 pt) and wrapped to fit; text
   that still does not fit is cut with an ellipsis. `name` falls back to the recipient's
   name and `date_signed` to the recipient's `actedAt`. Dates print as `19 Nov 2026`.
