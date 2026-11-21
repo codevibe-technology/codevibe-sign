@@ -53,6 +53,10 @@ const people = {
 };
 
 describe('template roles', () => {
+  it('starts each role with a one-time code by email', () => {
+    expect(emptyTemplate().roles.map((r) => r.auth)).toEqual(['email_otp']);
+  });
+
   it('needs at least one role that acts, each named once', () => {
     expect(roleProblems([])).toEqual({ roles: expect.stringMatching(/at least one role/) });
     expect(roleProblems([{ ...roles[2]! }]).roles).toMatch(/signer or an approver/);

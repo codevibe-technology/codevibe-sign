@@ -95,7 +95,7 @@ export const newRole = (name = ''): TemplateRoleDef => ({
   id: localId('role'),
   name,
   type: 'signer',
-  auth: 'email_link',
+  auth: 'email_otp',
 });
 
 export const emptyTemplate = (): TemplateEditorState => ({

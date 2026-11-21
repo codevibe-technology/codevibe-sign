@@ -95,7 +95,7 @@ export const newRecipient = (): DraftRecipient => ({
   email: '',
   phone: '',
   role: 'signer',
-  auth: 'email_link',
+  auth: 'email_otp',
 });
 
 /** A title from the first file's name: "offer-letter_v2.pdf" becomes "Offer letter v2". */

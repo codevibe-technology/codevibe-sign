@@ -233,7 +233,7 @@ export function StepRecipients({
                     label="Identity check"
                     hint={
                       r.auth === 'email_link'
-                        ? 'The link in their email is enough.'
+                        ? 'The link in their email is enough. Weaker evidence: anyone with the email can sign.'
                         : r.auth === 'email_otp'
                           ? 'They also enter a code we email them.'
                           : 'They also enter a code we text to their phone.'
