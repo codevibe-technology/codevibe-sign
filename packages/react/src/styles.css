@@ -22,6 +22,7 @@
   --cvs-accent-text: #ffffff;
   --cvs-focus: #2b59c3;
   --cvs-danger: #c62f2f;
+  --cvs-warning: #a35f00;
   --cvs-success: #1f7a4d;
   --cvs-backdrop: rgb(15 18 25 / 0.45);
   --cvs-shadow: 0 1px 2px rgb(15 18 25 / 0.08), 0 4px 16px rgb(15 18 25 / 0.08);
@@ -52,6 +53,7 @@
   --cvs-accent-text: #0d1222;
   --cvs-focus: #8fb0ff;
   --cvs-danger: #ff7b72;
+  --cvs-warning: #f0b04c;
   --cvs-success: #5cc58f;
   --cvs-backdrop: rgb(0 0 0 / 0.6);
   --cvs-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
@@ -78,6 +80,7 @@
     --cvs-accent-text: #0d1222;
     --cvs-focus: #8fb0ff;
     --cvs-danger: #ff7b72;
+    --cvs-warning: #f0b04c;
     --cvs-success: #5cc58f;
     --cvs-backdrop: rgb(0 0 0 / 0.6);
     --cvs-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
@@ -1015,6 +1018,26 @@
   border-radius: 4px;
   background: rgb(0 0 0 / 0.12);
   font-size: 0.85em;
+}
+
+.cvs-placed[data-over-text] {
+  outline: 2px dashed var(--cvs-warning);
+  outline-offset: 2px;
+}
+
+.cvs-placed-warning {
+  background: var(--cvs-warning);
+  color: var(--cvs-surface);
+}
+
+.cvs-warning {
+  margin: 10px 0 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--cvs-warning);
+  background: color-mix(in srgb, var(--cvs-warning) 10%, var(--cvs-surface));
+  color: var(--cvs-text);
+  font-size: 0.85em;
+  line-height: 1.4;
 }
 
 .cvs-presets {

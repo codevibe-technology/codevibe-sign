@@ -12,7 +12,7 @@ import type { Field, FieldType, Recipient } from '@codevibe_technology/sign-core
 import { clientToPoints, pointsToPixels, type PageSize } from '../geometry';
 import { defaultFieldTypeLabels, mergeLabels, recipientColorIndex } from '../labels';
 import type { LoadPdfOptions } from '../pdf/pdfjs';
-import type { ViewerDocument } from '../pdf/types';
+import type { TextItem, ViewerDocument } from '../pdf/types';
 import { usePdfSources } from '../pdf/usePdfSources';
 import {
   DocumentPages,
@@ -23,6 +23,7 @@ import {
   type ViewerLabels,
 } from '../viewer/DocumentPages';
 import { pagesForChoice, type RepeatChoice } from './multipage';
+import { fieldsOverText } from './overlap';
 import { isArrowKey, type Size } from './placement';
 import { fieldsFromTags, findTags, type FieldTag } from './tags';
 import { newFieldId, useFieldPlacement, type FieldPlacementState } from './useFieldPlacement';
@@ -56,6 +57,8 @@ export interface FieldPlacerLabels extends ViewerLabels {
   tagsPlaced: (placed: number, unmatched: number) => string;
   fieldCount: (count: number) => string;
   selectHint: string;
+  overText: string;
+  overTextNote: (count: number) => string;
 }
 
 export const defaultFieldPlacerLabels: FieldPlacerLabels = {
@@ -105,6 +108,11 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
     count === 0 ? 'No fields' : `${count} ${count === 1 ? 'field' : 'fields'}`,
   selectHint:
     'Pick a signer, then drag a field onto the page. Click a placed field to change it here.',
+  overText: 'Over text',
+  overTextNote: (count) =>
+    count === 1
+      ? 'A signature or initials field covers page text. The drawn signature will hide it; move the field to a blank space if you can.'
+      : `${count} signature or initials fields cover page text. The drawn signatures will hide it; move them to blank space if you can.`,
 };
 
 const FIELD_TYPES: FieldType[] = [
@@ -210,9 +218,10 @@ export function FieldPlacer({
   const [repeatPages, setRepeatPages] = useState('');
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [tags, setTags] = useState<Record<string, FieldTag[]>>({});
+  const [pageText, setPageText] = useState<Record<string, TextItem[][]>>({});
   const [tagsUsed, setTagsUsed] = useState(false);
 
-  // Looks once per loaded document for {{type:n}} tags in its text.
+  // Reads each loaded document's text once: for {{type:n}} tags, and to spot fields over text.
   useEffect(() => {
     let cancelled = false;
     for (const doc of documents) {
@@ -220,19 +229,25 @@ export function FieldPlacer({
       if (!source?.textItems || tags[doc.id]) continue;
       const read = source.textItems;
       void Promise.all(
-        source.pages.map((_, page) =>
-          read(page)
-            .then((items) => findTags(items, page))
-            .catch(() => [] as FieldTag[]),
-        ),
-      ).then((found) => {
-        if (!cancelled) setTags((prev) => ({ ...prev, [doc.id]: found.flat() }));
+        source.pages.map((_, page) => read(page).catch(() => [] as TextItem[])),
+      ).then((pages) => {
+        if (cancelled) return;
+        setPageText((prev) => ({ ...prev, [doc.id]: pages }));
+        setTags((prev) => ({
+          ...prev,
+          [doc.id]: pages.flatMap((items, page) => findTags(items, page)),
+        }));
       });
     }
     return () => {
       cancelled = true;
     };
   }, [documents, states, tags]);
+
+  const overText = useMemo(
+    () => fieldsOverText(placement.fields, (documentId, page) => pageText[documentId]?.[page]),
+    [placement.fields, pageText],
+  );
 
   const tagCount = Object.values(tags).reduce((n, list) => n + list.length, 0);
 
@@ -398,15 +413,21 @@ export function FieldPlacer({
             className="cvs-placed"
             data-type={field.type}
             data-selected={selected || undefined}
+            data-over-text={overText.has(field.id) || undefined}
             data-cvs-color={color}
             role="button"
             tabIndex={0}
             aria-pressed={selected}
-            aria-label={labels.field(
-              labels.fieldTypes[field.type],
-              recipientName(field.recipientId),
-              field.page + 1,
-            )}
+            aria-label={[
+              labels.field(
+                labels.fieldTypes[field.type],
+                recipientName(field.recipientId),
+                field.page + 1,
+              ),
+              overText.has(field.id) ? labels.overText : '',
+            ]
+              .filter(Boolean)
+              .join(', ')}
             aria-describedby={`${id}-keys`}
             style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
             onPointerDown={(e) => startDrag(e, field, 'move', scale)}
@@ -423,6 +444,9 @@ export function FieldPlacer({
                 <span className="cvs-placed-badge">
                   {labels.groupBadge(placement.groupOf(field.id).length)}
                 </span>
+              )}
+              {overText.has(field.id) && (
+                <span className="cvs-placed-badge cvs-placed-warning">{labels.overText}</span>
               )}
             </span>
             <span
@@ -543,6 +567,12 @@ export function FieldPlacer({
             label={labels.recipient}
             countLabel={labels.fieldCount}
           />
+        )}
+
+        {overText.size > 0 && (
+          <p className="cvs-warning" role="status">
+            {labels.overTextNote(overText.size)}
+          </p>
         )}
 
         {selected ? (
