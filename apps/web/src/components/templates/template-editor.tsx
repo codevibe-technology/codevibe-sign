@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { StepDocuments } from '@/components/envelopes/send/step-documents';
 import { StepFields } from '@/components/envelopes/send/step-fields';
 import { Stepper } from '@/components/envelopes/send/stepper';
+import { ExcludedDocumentNotice } from '@/components/legal/excluded-document-notice';
 import { Button } from '@/components/ui/button';
 import type { DraftSettings, Problems } from '@/lib/send-flow';
 import {
@@ -174,6 +175,10 @@ export function TemplateEditor({ slug, workspaceId, initial }: TemplateEditorPro
           </Button>
         </div>
       </div>
+
+      <ExcludedDocumentNotice
+        names={[state.name, state.settings.title, ...state.documents.map((d) => d.name)]}
+      />
 
       <Stepper steps={STEPS} current={step} reached={reached} onSelect={go} />
 

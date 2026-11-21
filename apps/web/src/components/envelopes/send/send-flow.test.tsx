@@ -186,6 +186,34 @@ describe('step 1: documents', () => {
     await user.click(screen.getByRole('button', { name: 'Remove offer-letter.pdf' }));
     expect(screen.queryByText('offer-letter.pdf')).toBeNull();
   });
+
+  it('reminds the sender, without blocking, when a file looks like one the IT Act leaves out', async () => {
+    const user = userEvent.setup();
+    render(<SendFlow slug="acme" workspaceId="ws_1" me={ME} />);
+    await upload(user, pdfFile('General power of attorney.pdf'));
+    const notice = await screen.findByRole('complementary', {
+      name: 'Documents that cannot be signed electronically',
+    });
+    expect(notice).toHaveTextContent('Trust deeds');
+    expect(notice).toHaveTextContent('This is not legal advice.');
+    expect(notice).not.toHaveTextContent(/immovable/i);
+    await user.click(within(notice).getByRole('button', { name: 'Dismiss this notice' }));
+    expect(
+      screen.queryByRole('complementary', {
+        name: 'Documents that cannot be signed electronically',
+      }),
+    ).toBeNull();
+    await next(user);
+    expect(await screen.findByRole('list', { name: 'Recipients' })).toBeTruthy();
+  });
+
+  it('shows no notice for ordinary documents', async () => {
+    const user = userEvent.setup();
+    render(<SendFlow slug="acme" workspaceId="ws_1" me={ME} />);
+    await upload(user, pdfFile());
+    await screen.findByRole('list', { name: 'Documents' });
+    expect(screen.queryByText(/may not let you sign electronically/)).toBeNull();
+  });
 });
 
 async function toRecipients(user: ReturnType<typeof userEvent.setup>) {
