@@ -155,6 +155,8 @@ export default defineConfig({
           { text: 'Send your first envelope', link: '/guides/first-envelope' },
           { text: 'Add the React signing view', link: '/guides/react-signing-view' },
           { text: 'Verify a sealed PDF', link: '/guides/verify-pdf' },
+          { text: 'Trust the seal in Adobe', link: '/guides/trust-seal-adobe' },
+          { text: 'Electronic evidence (s.63 BSA)', link: '/guides/section-63-certificate' },
           { text: 'Aadhaar eSign with Leegality', link: '/guides/aadhaar-leegality' },
           { text: 'Webhooks', link: '/guides/webhooks' },
           { text: 'Fix an envelope after sending', link: '/guides/fix-after-sending' },
