@@ -73,3 +73,31 @@ describe('parseEnv mail settings', () => {
     expect(message).not.toContain(graph.MS_CLIENT_SECRET);
   });
 });
+
+describe('parseEnv seal timestamp settings', () => {
+  it('leaves the timestamp authority off by default', () => {
+    const config = parseEnv(required);
+    expect(config.SEAL_TSA_URL).toBeUndefined();
+    expect(config.SEAL_TSA_REQUIRED).toBeUndefined();
+  });
+
+  it('reads the authority URL and an explicit required flag', () => {
+    const config = parseEnv({
+      ...required,
+      SEAL_TSA_URL: 'http://timestamp.digicert.com',
+      SEAL_TSA_REQUIRED: 'false',
+    });
+    expect(config.SEAL_TSA_URL).toBe('http://timestamp.digicert.com');
+    expect(config.SEAL_TSA_REQUIRED).toBe(false);
+    expect(parseEnv({ ...required, SEAL_TSA_REQUIRED: '1' }).SEAL_TSA_REQUIRED).toBe(true);
+  });
+
+  it('names the variable when a value is wrong', () => {
+    expect(problems({ ...required, SEAL_TSA_URL: 'ftp://tsa.example.com' })).toContain(
+      'SEAL_TSA_URL',
+    );
+    expect(problems({ ...required, SEAL_TSA_REQUIRED: 'maybe' })).toContain(
+      'SEAL_TSA_REQUIRED must be true or false',
+    );
+  });
+});

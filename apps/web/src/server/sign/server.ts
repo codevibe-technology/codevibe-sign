@@ -87,6 +87,9 @@ function build(): SignServer {
       p12: readFileSync(config.SEAL_P12_PATH),
       passphrase: config.SEAL_PASSPHRASE,
       allowWeakKey: config.SEAL_ALLOW_WEAK_KEY,
+      ...(config.SEAL_TSA_URL
+        ? { tsaUrl: config.SEAL_TSA_URL, tsaRequired: config.SEAL_TSA_REQUIRED ?? true }
+        : {}),
     },
     apiKeys: [],
     authenticate: authenticate(),

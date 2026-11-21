@@ -26,6 +26,18 @@ const schema = z.object({
   SEAL_P12_PATH: z.string().optional(),
   SEAL_PASSPHRASE: z.string().default(''),
   SEAL_ALLOW_WEAK_KEY: flag,
+  SEAL_TSA_URL: z
+    .url({
+      protocol: /^https?$/,
+      error:
+        'SEAL_TSA_URL must be an http:// or https:// URL, for example http://timestamp.digicert.com',
+    })
+    .optional(),
+  /** Unset means "required when SEAL_TSA_URL is set". */
+  SEAL_TSA_REQUIRED: z
+    .enum(['true', 'false', '1', '0'], { error: 'SEAL_TSA_REQUIRED must be true or false' })
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true' || value === '1')),
   SIGN_SESSION_SECRET: z.string().min(32).optional(),
   SINGLE_WORKSPACE: flag,
   AUTO_MIGRATE: flag,
