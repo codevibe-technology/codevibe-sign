@@ -26,15 +26,17 @@ export async function inspectUpload(
     }
     const reason = typeof err.details?.reason === 'string' ? err.details.reason : '';
     const message =
-      err.code === 'DOCUMENT_TOO_LARGE'
-        ? `${name} is larger than ${MAX_PDF_BYTES / MB} MB. Compress it or split it into smaller files.`
-        : reason === 'encrypted'
-          ? `${name} is password protected. Remove the password (print it to a new PDF) and add it again.`
-          : reason === 'empty'
-            ? `${name} has no pages.`
-            : /not a PDF/i.test(err.message)
-              ? `${name} is not a PDF. Save or export it as PDF and add it again.`
-              : `${name} could not be read; it may be damaged or too complex. Save it as PDF again and retry.`;
+      err.code === 'PDF_ALREADY_SIGNED'
+        ? err.message
+        : err.code === 'DOCUMENT_TOO_LARGE'
+          ? `${name} is larger than ${MAX_PDF_BYTES / MB} MB. Compress it or split it into smaller files.`
+          : reason === 'encrypted'
+            ? `${name} is password protected. Remove the password (print it to a new PDF) and add it again.`
+            : reason === 'empty'
+              ? `${name} has no pages.`
+              : /not a PDF/i.test(err.message)
+                ? `${name} is not a PDF. Save or export it as PDF and add it again.`
+                : `${name} could not be read; it may be damaged or too complex. Save it as PDF again and retry.`;
     throw new AppError('VALIDATION', message, 'file');
   }
 }
