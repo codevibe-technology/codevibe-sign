@@ -109,33 +109,90 @@ does not exist. Busy responses from Microsoft are retried like any other failed 
 
 ## 4. Seal certificate
 
-Every completed document is sealed with this certificate. Create it on the server, so the
-private key never travels:
+Every completed document is sealed with this certificate. The recommended setup is a small
+private root that issues the seal certificate: readers who trust the root keep trusting new
+seal keys after a rotation. Create both on the server, so the seal key never travels:
 
 ```sh
 cd /opt/codevibe-sign/deploy
 mkdir -p secrets && chmod 700 secrets && cd secrets
 export SEAL_PASSPHRASE="$(grep '^SEAL_PASSPHRASE=' ../.env | cut -d= -f2-)"
-openssl req -x509 -newkey rsa:3072 -sha256 -days 1095 -noenc \
-  -keyout seal.key -out seal.crt \
+
+# The private root, once. It only issues seal certificates.
+openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -noenc \
+  -keyout root.key -out root.crt \
+  -subj "/CN=Codevibe Sign Root/O=Codevibe Technology/C=IN" \
+  -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign"
+
+# The seal certificate, issued by the root: an end-entity certificate for document signing.
+printf '%s\n' \
+  'basicConstraints=critical,CA:FALSE' \
+  'keyUsage=critical,digitalSignature,nonRepudiation' \
+  'extendedKeyUsage=1.3.6.1.5.5.7.3.36,1.3.6.1.4.1.311.10.3.12' \
+  'subjectKeyIdentifier=hash' \
+  'authorityKeyIdentifier=keyid' > seal.ext
+openssl req -new -newkey rsa:3072 -sha256 -noenc -keyout seal.key -out seal.csr \
   -subj "/CN=Codevibe Sign/O=Codevibe Technology/C=IN"
-openssl pkcs12 -export -inkey seal.key -in seal.crt -name "Codevibe Sign seal" \
+openssl x509 -req -in seal.csr -CA root.crt -CAkey root.key -CAcreateserial \
+  -sha256 -days 1095 -extfile seal.ext -out seal.crt
+
+# Key, seal certificate and root in one file, with 3DES so every reader can open it.
+openssl pkcs12 -export -inkey seal.key -in seal.crt -certfile root.crt \
+  -name "Codevibe Sign seal" -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 \
   -out seal.p12 -passout env:SEAL_PASSPHRASE
-shred -u seal.key
+shred -u seal.key seal.csr seal.ext
 sudo chown 1001:1001 seal.p12 && sudo chmod 400 seal.p12
-openssl x509 -in seal.crt -noout -subject -enddate
+openssl x509 -in seal.crt -noout -subject -issuer -enddate
+openssl x509 -in root.crt -noout -fingerprint -sha256
 ```
 
 On OpenSSL 1.1, use `-nodes` instead of `-noenc`. The app runs as user 1001, which is why
-the file belongs to it. Keep `seal.crt`: it is the public half, and you can publish it so
-others can check your seal. A self-signed seal proves the document has not changed since it
-was sealed; to have PDF readers also show the signer as trusted, buy a document-signing
-certificate from a certificate authority on the Adobe trust list and put its `.p12` here
-instead.
+the file belongs to it.
+
+Then take `root.key` off the server: copy it to your password manager or an offline drive,
+and run `shred -u root.key root.srl`. You need it again only to issue the next seal
+certificate. Keep `root.crt` and `seal.crt`: they are the public halves. Publish `root.crt`
+and its SHA-256 fingerprint so others can trust your seal.
+
+To rotate the seal key later, bring `root.key` back, run the seal certificate, `pkcs12` and
+`shred` steps again (same `root.crt`), restart, and remove `root.key` once more.
+
+A single self-signed certificate still works, and installs that already use one need no
+change:
+
+```sh
+openssl req -x509 -newkey rsa:3072 -sha256 -days 1095 -noenc \
+  -keyout seal.key -out seal.crt \
+  -subj "/CN=Codevibe Sign/O=Codevibe Technology/C=IN" \
+  -addext "keyUsage=critical,digitalSignature,nonRepudiation" \
+  -addext "extendedKeyUsage=1.3.6.1.5.5.7.3.36,1.3.6.1.4.1.311.10.3.12"
+openssl pkcs12 -export -inkey seal.key -in seal.crt -name "Codevibe Sign seal" \
+  -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 \
+  -out seal.p12 -passout env:SEAL_PASSPHRASE
+shred -u seal.key
+```
+
+Either kind proves the document has not changed since it was sealed. To have PDF readers
+also show the signer as trusted without importing your root, buy a document-signing
+certificate from a certificate authority on the Adobe trust list and put its `.p12` (with
+its chain) here instead.
 
 Put a copy of `seal.p12` and `.env` in your password manager or secrets store. Losing the
 seal does not break documents already sealed, but new ones would carry a different
 certificate.
+
+### Timestamps
+
+Set `SEAL_TSA_URL` in `.env`, for example to DigiCert's free authority
+`http://timestamp.digicert.com`, and every seal also carries an RFC 3161 timestamp
+(PAdES B-T). The signing time is then vouched for by the authority, not only by this server,
+which is what validators rely on once the seal certificate has expired. Only a hash of the
+seal leaves the server. While the authority is unreachable, sealing fails and is retried;
+set `SEAL_TSA_REQUIRED=false` to seal without the timestamp instead (a warning is logged).
+
+Sealed documents are certified (DocMDP, no changes allowed): PDF readers show "Certified by"
+and report any later edit.
 
 ## 5. First start
 
