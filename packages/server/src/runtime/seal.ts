@@ -69,6 +69,12 @@ export async function runSeal(
     const output = await rt.pdf.seal(withCertificate, {
       ...rt.sealer,
       signingTime: rt.clock.now(),
+      onTimestampFailure: (error) =>
+        rt.logger.warn('sealed without a timestamp', {
+          envelopeId: envelope.id,
+          documentId: document.id,
+          error: error.message,
+        }),
     });
     if (rt.sealTrust && rt.pdf.verify) {
       const check = await rt.pdf.verify(output, { trust: rt.sealTrust });

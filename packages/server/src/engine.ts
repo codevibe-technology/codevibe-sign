@@ -23,6 +23,12 @@ export interface SealOptions {
   signingTime: Date;
   /** Accept weak keys; local development only. */
   allowWeakKey?: boolean;
+  /** RFC 3161 timestamp authority for a PAdES B-T seal. */
+  tsaUrl?: string;
+  /** Fail when the timestamp authority fails. Default true when `tsaUrl` is set. */
+  tsaRequired?: boolean;
+  /** Called when an optional timestamp could not be obtained. */
+  onTimestampFailure?: (error: Error) => void;
 }
 
 /** Certificates a sealed file may come from; see `verify` in `@codevibe_technology/sign-pdf`. */

@@ -35,11 +35,21 @@ export type ApiKey =
     };
 
 export interface SealerOptions {
-  /** PKCS#12 file with the operator certificate and private key. */
+  /** PKCS#12 file with the operator certificate and private key, and any issuing CA. */
   p12: Uint8Array;
   passphrase: string;
   reason?: string;
   location?: string;
+  /**
+   * RFC 3161 timestamp authority, for example `http://timestamp.digicert.com`. Sealed files
+   * then carry a trusted signing time (PAdES B-T).
+   */
+  tsaUrl?: string;
+  /**
+   * Fail the seal when the timestamp authority fails, so the job is retried. Default true when
+   * `tsaUrl` is set; when false the file is sealed without a timestamp and a warning is logged.
+   */
+  tsaRequired?: boolean;
   /**
    * Seal with an RSA key under 2048 bits or a certificate signed with SHA-1. For local
    * development with throwaway keys only; by default the server refuses to start with one.

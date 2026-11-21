@@ -341,6 +341,45 @@ describe('effects', () => {
 });
 
 describe('sealing', () => {
+  it('passes the timestamp authority to the seal and logs an optional timestamp failure', async () => {
+    const { fakePdfEngine } = await import('../testing/fake-pdf');
+    const engine = fakePdfEngine();
+    const seen: { tsaUrl?: string; tsaRequired?: boolean }[] = [];
+    const h = harness({
+      sealer: {
+        p12: new Uint8Array([1]),
+        passphrase: '',
+        tsaUrl: 'http://tsa.example.com',
+        tsaRequired: false,
+      },
+      pdf: {
+        ...engine,
+        seal: async (pdf, options) => {
+          seen.push({ tsaUrl: options.tsaUrl, tsaRequired: options.tsaRequired });
+          options.onTimestampFailure?.(new Error('tsa down'));
+          return engine.seal(pdf, options);
+        },
+      },
+    });
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', {
+      body: envelopeBody({ send: true, routing: 'parallel' }),
+    });
+    for (const [i, email] of ['asha@example.com', 'ravi@example.com'].entries()) {
+      const recipient = envelope.recipients[i];
+      const fieldId = envelope.fields.find(
+        (f: { recipientId: string; type: string }) =>
+          f.recipientId === recipient.id && f.type === 'signature',
+      ).id;
+      await h.call('POST', `/v1/sign/${h.tokenFor(email)}/submit`, {
+        body: { consent: true, values: [{ fieldId, value: PNG }] },
+      });
+    }
+    expect(seen[0]).toEqual({ tsaUrl: 'http://tsa.example.com', tsaRequired: false });
+    expect(h.logs).toContainEqual(
+      expect.objectContaining({ level: 'warn', message: 'sealed without a timestamp' }),
+    );
+  });
+
   it('keeps a sealed file that does not verify against the operator certificate', async () => {
     const h = harness({
       pdf: fakePdfEngine({

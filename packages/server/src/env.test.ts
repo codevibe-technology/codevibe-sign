@@ -91,6 +91,24 @@ describe('configFromEnv', () => {
     expect(configFromEnv(env({ SMTP_SECURE: 'true' })).server.smtp.secure).toBe(true);
   });
 
+  it('reads the timestamp authority, required unless turned off', () => {
+    const url = 'http://timestamp.digicert.com';
+    expect(configFromEnv(env({ SEAL_TSA_URL: ` ${url} ` })).server.seal).toMatchObject({
+      tsaUrl: url,
+      tsaRequired: true,
+    });
+    expect(
+      configFromEnv(env({ SEAL_TSA_URL: url, SEAL_TSA_REQUIRED: 'FALSE' })).server.seal,
+    ).toMatchObject({ tsaUrl: url, tsaRequired: false });
+    expect(configFromEnv(env({ SEAL_TSA_URL: '' })).server.seal).not.toHaveProperty('tsaUrl');
+    expect(problems({ SEAL_TSA_URL: 'timestamp.digicert.com' })).toEqual([
+      'SEAL_TSA_URL must be an http:// or https:// URL',
+    ]);
+    expect(problems({ SEAL_TSA_URL: url, SEAL_TSA_REQUIRED: 'maybe' })).toEqual([
+      'SEAL_TSA_REQUIRED must be true or false',
+    ]);
+  });
+
   it('allows an empty passphrase but not a missing one', () => {
     expect(configFromEnv(env({ SEAL_P12_PASSPHRASE: '' })).server.seal.passphrase).toBe('');
     expect(problems({ SEAL_P12_PASSPHRASE: undefined })).toEqual([

@@ -25,7 +25,14 @@ export interface StandaloneConfig {
   databaseUrl: string;
   filesDir: string;
   smtp: { host: string; port: number; secure: boolean; user?: string; pass?: string; from: string };
-  seal: { p12: Uint8Array; passphrase: string; reason?: string; location?: string };
+  seal: {
+    p12: Uint8Array;
+    passphrase: string;
+    reason?: string;
+    location?: string;
+    tsaUrl?: string;
+    tsaRequired?: boolean;
+  };
   apiKeys: string[];
   publicUrl: string;
   /** How often reminders, expiry and retries run. Default 60 seconds. */

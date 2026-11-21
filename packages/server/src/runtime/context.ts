@@ -59,7 +59,8 @@ export interface Runtime {
   publicUrl: string;
   /** Prefix of every route and cookie path, without a trailing slash; empty by default. */
   basePath: string;
-  sealer: Required<Omit<SealerOptions, 'trust'>>;
+  sealer: Required<Omit<SealerOptions, 'trust' | 'tsaUrl' | 'tsaRequired'>> &
+    Pick<SealerOptions, 'tsaUrl' | 'tsaRequired'>;
   /** What a sealed file must be signed by to verify; empty when the engine cannot tell. */
   sealTrust: SealTrust | null;
   signingUrl: (token: string) => string;
@@ -164,6 +165,10 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
       reason: options.sealer.reason ?? 'Signed and sealed by Codevibe Sign',
       location: options.sealer.location ?? '',
       allowWeakKey: options.sealer.allowWeakKey ?? false,
+      ...(options.sealer.tsaUrl ? { tsaUrl: options.sealer.tsaUrl } : {}),
+      ...(options.sealer.tsaRequired !== undefined
+        ? { tsaRequired: options.sealer.tsaRequired }
+        : {}),
     },
     sealTrust: sealTrust(options, pdf),
     signingUrl: options.signingUrl ?? ((token) => `${publicUrl}${basePath}/sign/${token}`),

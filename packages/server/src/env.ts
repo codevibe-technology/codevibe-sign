@@ -91,6 +91,15 @@ export function configFromEnv(env: EnvVars): EnvConfig {
   const passphrase = env.SEAL_P12_PASSPHRASE;
   if (passphrase === undefined) problems.push('SEAL_P12_PASSPHRASE is required');
 
+  const tsaUrl = env.SEAL_TSA_URL?.trim() || undefined;
+  if (tsaUrl && !/^https?:\/\/[^\s/]+/i.test(tsaUrl)) {
+    problems.push('SEAL_TSA_URL must be an http:// or https:// URL');
+  }
+  const tsaRequiredRaw = env.SEAL_TSA_REQUIRED?.trim().toLowerCase();
+  if (tsaRequiredRaw && tsaRequiredRaw !== 'true' && tsaRequiredRaw !== 'false') {
+    problems.push('SEAL_TSA_REQUIRED must be true or false');
+  }
+
   const apiKeys = need('API_KEYS')
     .split(',')
     .map((key) => key.trim())
@@ -123,6 +132,10 @@ export function configFromEnv(env: EnvVars): EnvConfig {
   const location = env.SEAL_LOCATION?.trim();
   if (reason) seal.reason = reason;
   if (location) seal.location = location;
+  if (tsaUrl) {
+    seal.tsaUrl = tsaUrl;
+    seal.tsaRequired = tsaRequiredRaw !== 'false';
+  }
 
   return {
     server: {

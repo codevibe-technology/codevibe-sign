@@ -18,25 +18,27 @@ The image runs as the unprivileged `node` user, stores files under `/data` and c
 
 ## Environment
 
-| Variable                 | Required | Default           | Notes                                                                                                   |
-| ------------------------ | -------- | ----------------- | ------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | yes      |                   | PostgreSQL, `postgres://` or `postgresql://`.                                                           |
-| `PUBLIC_URL`             | yes      |                   | Base URL used in signing links. `https`, or `http` for localhost only.                                  |
-| `API_KEYS`               | yes      |                   | Comma-separated keys for your backend, each at least 32 characters.                                     |
-| `SEAL_P12_BASE64`        | yes      |                   | Your sealing certificate and key as a base64 PKCS#12 file.                                              |
-| `SEAL_P12_PASSPHRASE`    | yes      |                   | May be empty, but must be set.                                                                          |
-| `SMTP_HOST`              | yes      |                   |                                                                                                         |
-| `SMTP_FROM`              | yes      |                   | For example `Sign <sign@example.com>`.                                                                  |
-| `SMTP_PORT`              | no       | `587`             |                                                                                                         |
-| `SMTP_SECURE`            | no       | port is 465       | `true` for implicit TLS.                                                                                |
-| `SMTP_USER`, `SMTP_PASS` | no       |                   | Set both or neither.                                                                                    |
-| `FILES_DIR`              | no       | `/data/files`     | Where documents and sealed files are stored.                                                            |
-| `SEAL_REASON`            | no       |                   | Reason written into the PDF seal.                                                                       |
-| `SEAL_LOCATION`          | no       |                   | Location written into the PDF seal.                                                                     |
-| `TICK_INTERVAL_SECONDS`  | no       | `60`              | How often reminders, expiry and retries run (5 to 3600).                                                |
-| `TRUST_PROXY`            | no       | `false`           | `true` to read client IPs from `X-Forwarded-For` behind your proxy.                                     |
-| `TRUSTED_PROXY_HOPS`     | no       | `1`               | Proxies in front of the server; the client IP is that many entries from the right of `X-Forwarded-For`. |
-| `PORT`, `HOST`           | no       | `3000`, `0.0.0.0` |                                                                                                         |
+| Variable                 | Required | Default           | Notes                                                                                                    |
+| ------------------------ | -------- | ----------------- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | yes      |                   | PostgreSQL, `postgres://` or `postgresql://`.                                                            |
+| `PUBLIC_URL`             | yes      |                   | Base URL used in signing links. `https`, or `http` for localhost only.                                   |
+| `API_KEYS`               | yes      |                   | Comma-separated keys for your backend, each at least 32 characters.                                      |
+| `SEAL_P12_BASE64`        | yes      |                   | Your sealing certificate and key as a base64 PKCS#12 file.                                               |
+| `SEAL_P12_PASSPHRASE`    | yes      |                   | May be empty, but must be set.                                                                           |
+| `SMTP_HOST`              | yes      |                   |                                                                                                          |
+| `SMTP_FROM`              | yes      |                   | For example `Sign <sign@example.com>`.                                                                   |
+| `SMTP_PORT`              | no       | `587`             |                                                                                                          |
+| `SMTP_SECURE`            | no       | port is 465       | `true` for implicit TLS.                                                                                 |
+| `SMTP_USER`, `SMTP_PASS` | no       |                   | Set both or neither.                                                                                     |
+| `FILES_DIR`              | no       | `/data/files`     | Where documents and sealed files are stored.                                                             |
+| `SEAL_REASON`            | no       |                   | Reason written into the PDF seal.                                                                        |
+| `SEAL_LOCATION`          | no       |                   | Location written into the PDF seal.                                                                      |
+| `SEAL_TSA_URL`           | no       |                   | RFC 3161 timestamp authority, for example `http://timestamp.digicert.com`. Seals then carry a timestamp. |
+| `SEAL_TSA_REQUIRED`      | no       | `true`            | With `SEAL_TSA_URL`: `false` seals without a timestamp when the authority fails, and logs a warning.     |
+| `TICK_INTERVAL_SECONDS`  | no       | `60`              | How often reminders, expiry and retries run (5 to 3600).                                                 |
+| `TRUST_PROXY`            | no       | `false`           | `true` to read client IPs from `X-Forwarded-For` behind your proxy.                                      |
+| `TRUSTED_PROXY_HOPS`     | no       | `1`               | Proxies in front of the server; the client IP is that many entries from the right of `X-Forwarded-For`.  |
+| `PORT`, `HOST`           | no       | `3000`, `0.0.0.0` |                                                                                                          |
 
 All problems are reported together at start-up, by variable name only; values are never
 printed.
