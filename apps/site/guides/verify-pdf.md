@@ -12,7 +12,20 @@ A sealed file can be checked by anyone who has it, without contacting the server
 Open the file and the signature panel. Reader shows whether the document has been modified
 since it was sealed. If the operator's certificate comes from a trusted issuer, Reader also
 shows who sealed it; with a self-signed certificate it shows the identity as unknown, while
-still detecting changes.
+still detecting changes. To make Reader trust the sign.codevibe.in seal, import its
+certificate: see [Trust the Codevibe Sign seal in Adobe](./trust-seal-adobe).
+
+## On the verify page
+
+Anyone can drop a sealed PDF on the public page at `/verify` of the install that sealed it,
+[sign.codevibe.in/verify](https://sign.codevibe.in/verify) for the cloud. No account is needed.
+It shows whether the seal is intact and was made by that install, the signers and their times,
+and whether the audit chain still matches. The file is checked in memory on the server and not
+stored. The page also shows the seal certificate's fingerprint and serves the certificate at
+`/verify/certificate`.
+
+To produce a sealed PDF as evidence in an Indian court, see
+[Electronic evidence (section 63 BSA)](./section-63-certificate).
 
 ## In code
 
