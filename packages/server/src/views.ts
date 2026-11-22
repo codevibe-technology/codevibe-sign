@@ -1,3 +1,4 @@
+import { maskEmail } from '@codevibe_technology/sign-pdf';
 import {
   currentRecipients,
   hasActed,
@@ -6,34 +7,43 @@ import {
   type Recipient,
 } from '@codevibe_technology/sign-core';
 
-/** What a signer may see: the envelope basics and their own fields only. */
+/**
+ * What a signer may see: the envelope basics and their own fields only. While a one-time code
+ * is still owed, the holder of the link has not shown they are the recipient, so they get no
+ * more than the invitation email already says: no message, documents, fields or values, and
+ * the address only in masked form.
+ */
 export function signerView(
   envelope: Envelope,
   recipient: Recipient,
   workspaceId: string,
   auth: { required: boolean; authenticated: boolean },
 ) {
-  const fields = envelope.fields.filter((f) => f.recipientId === recipient.id);
+  const locked = auth.required && !auth.authenticated;
+  const fields = locked ? [] : envelope.fields.filter((f) => f.recipientId === recipient.id);
   const fieldIds = new Set(fields.map((f) => f.id));
+  const email = recipient.email ?? null;
   return {
     workspaceId,
     envelope: {
       id: envelope.id,
       title: envelope.title,
-      message: envelope.message ?? null,
-      changeNote: envelope.changeNote ?? null,
+      message: locked ? null : (envelope.message ?? null),
+      changeNote: locked ? null : (envelope.changeNote ?? null),
       status: envelope.status,
       expiresAt: envelope.expiresAt ?? null,
     },
     recipient: {
       id: recipient.id,
       name: recipient.name,
-      email: recipient.email ?? null,
+      email: locked && email ? maskEmail(email) : email,
       role: recipient.role,
       status: recipient.status,
       auth: recipient.auth,
     },
-    documents: envelope.documents.map((d) => ({ id: d.id, name: d.name, pageCount: d.pageCount })),
+    documents: locked
+      ? []
+      : envelope.documents.map((d) => ({ id: d.id, name: d.name, pageCount: d.pageCount })),
     fields,
     values: envelope.values.filter((v) => fieldIds.has(v.fieldId)),
     otpRequired: auth.required,

@@ -262,6 +262,33 @@ describe('OTP', () => {
     expect((await h.call('POST', `/v1/sign/${token}/view`)).status).toBe(401);
   });
 
+  it('shows no message, fields, values or full address before the code is checked', async () => {
+    const h = harness();
+    const body = { ...otpBody(), message: 'Your salary is 18 lakh a year.' };
+    await h.call('POST', '/v1/envelopes', { body });
+    const token = h.tokenFor('asha@example.com');
+    const before = await h.call('GET', `/v1/sign/${token}`);
+    expect(before.status).toBe(200);
+    expect(before.json.envelope.message).toBeNull();
+    expect(before.json.fields).toEqual([]);
+    expect(before.json.values).toEqual([]);
+    expect(before.json.documents).toEqual([]);
+    expect(JSON.stringify(before.json)).not.toContain('asha@example.com');
+    expect(before.json.recipient.name).toBe('Asha Rao');
+
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const { json: session } = await h.call('POST', `/v1/sign/${token}/otp/verify`, {
+      body: { code: h.otp.sent.at(-1)!.code },
+    });
+    const after = await h.call('GET', `/v1/sign/${token}`, {
+      headers: { 'x-sign-session': session.sessionToken },
+    });
+    expect(after.json.envelope.message).toBe('Your salary is 18 lakh a year.');
+    expect(after.json.fields).toHaveLength(1);
+    expect(after.json.documents).toHaveLength(1);
+    expect(after.json.recipient.email).toBe('asha@example.com');
+  });
+
   it('issues a session after the right code, by header or cookie', async () => {
     const { h, envelope, token } = await otpEnvelope();
     const sendCode = await h.call('POST', `/v1/sign/${token}/otp`);
