@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import type { AuditEvent, Envelope } from '@codevibe_technology/sign-core';
 import {
   CheckCircle2,
@@ -19,7 +20,6 @@ import {
   actionLabel,
   actionTone,
   eventDetail,
-  formatDateTime,
   relativeTime,
 } from '@/lib/envelopes';
 import type { CertificateView, SealCheck } from '@/server/sign/api';
@@ -207,16 +207,22 @@ export function RecipientsCard({
                     )}
                     data-testid={`copy-mail-${r.id}`}
                   >
-                    {copyMailLine(copy)}
+                    {copy.status === 'sent' ? (
+                      <>
+                        Copy emailed <LocalTime iso={copy.at} format="short" />
+                      </>
+                    ) : (
+                      copyMailLine(copy)
+                    )}
                   </p>
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <RecipientStatusPill status={r.status} />
                 {r.actedAt ? (
-                  <span className="text-xs text-muted" title={formatDateTime(r.actedAt)}>
+                  <time dateTime={r.actedAt} className="text-xs text-muted">
                     {relativeTime(r.actedAt)}
-                  </span>
+                  </time>
                 ) : null}
                 {current && canRemind ? (
                   <RemindButton
@@ -312,7 +318,7 @@ export function Timeline({
                     </p>
                   ) : null}
                   <p className="mt-0.5 font-mono text-[11px] text-muted">
-                    <time dateTime={e.at}>{formatDateTime(e.at)}</time>
+                    <LocalTime iso={e.at} />
                     {e.context?.ip ? ` · IP ${e.context.ip}` : ''}
                   </p>
                 </div>
@@ -363,7 +369,9 @@ export function CertificateCard({
             <Hash value={certificate.envelopeId} />
           </dd>
           <dt className="text-muted">Completed</dt>
-          <dd>{certificate.completedAt ? formatDateTime(certificate.completedAt) : 'Not yet'}</dd>
+          <dd>
+            {certificate.completedAt ? <LocalTime iso={certificate.completedAt} /> : 'Not yet'}
+          </dd>
           <dt className="text-muted">Audit head</dt>
           <dd className="min-w-0">
             {certificate.auditHead ? <Hash value={certificate.auditHead} /> : '—'}
@@ -415,7 +423,7 @@ export function CertificateCard({
                     {r.actions.map((a, i) => (
                       <li key={i}>
                         <span className="text-ink">{actionLabel(a.action)}</span> ·{' '}
-                        {formatDateTime(a.at)}
+                        <LocalTime iso={a.at} />
                         {a.ip ? ` · ${a.ip}` : ''}
                       </li>
                     ))}

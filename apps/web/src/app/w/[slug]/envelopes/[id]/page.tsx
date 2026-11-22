@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import { currentRecipients } from '@codevibe_technology/sign-core';
 import { ArrowLeft, PenLine } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -15,7 +16,7 @@ import {
 import { StatusPill } from '@/components/envelopes/status-pill';
 import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
-import { formatDateTime, isFinalStatus, isOpen, relativeTime } from '@/lib/envelopes';
+import { isFinalStatus, isOpen, relativeTime } from '@/lib/envelopes';
 import { can, canVoidEnvelope } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
@@ -92,9 +93,8 @@ export default async function EnvelopePage({
               : sender
                 ? ''
                 : 'Created through the API · '}
-            {envelope.sentAt
-              ? `sent ${formatDateTime(envelope.sentAt)}`
-              : `created ${formatDateTime(envelope.createdAt)}`}
+            {envelope.sentAt ? 'sent ' : 'created '}
+            <LocalTime iso={envelope.sentAt ?? envelope.createdAt} />
             {envelope.expiresAt && open ? ` · expires ${relativeTime(envelope.expiresAt)}` : ''}
           </p>
         </div>

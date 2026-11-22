@@ -284,13 +284,18 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   });
 }
 
-export const formatDateTime = (iso: string) =>
+/**
+ * `23 Nov 2026, 00:23` in `timeZone`, or in the zone of whatever runs this when none is given.
+ * A server-rendered page does not know the reader's zone: show times with `LocalTime` there.
+ */
+export const formatDateTime = (iso: string, timeZone?: string) =>
   new Date(iso).toLocaleString('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    ...(timeZone ? { timeZone } : {}),
   });
 
 export const SORTS = [

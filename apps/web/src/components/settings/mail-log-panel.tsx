@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import { Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import {
   MAIL_LOG_RETENTION_DAYS,
   formatBytes,
   mailKindLabel,
-  mailTime,
   type MailLogStatus,
 } from '@/lib/mail-log';
 
@@ -125,9 +125,7 @@ export function MailLogPanel({
               </div>
               <div className="flex flex-col items-end gap-1">
                 <StatusLabel status={row.status} />
-                <time dateTime={row.createdAt} className="text-xs text-muted">
-                  {mailTime(row.createdAt)}
-                </time>
+                <LocalTime iso={row.createdAt} format="short" className="text-xs text-muted" />
               </div>
             </li>
           ))}
