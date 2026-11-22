@@ -123,6 +123,7 @@ function build(): SignServer {
     publicUrl: config.APP_URL,
     signingPageUrl: `${config.APP_URL}/sign`,
     trustProxy: config.TRUST_PROXY,
+    ...(config.SIGN_TIME_ZONE ? { timeZone: config.SIGN_TIME_ZONE } : {}),
     effects: 'background',
     sessionSecret: sessionSecret(config),
   });
