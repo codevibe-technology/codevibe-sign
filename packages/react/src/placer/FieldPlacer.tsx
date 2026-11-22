@@ -542,6 +542,7 @@ export function FieldPlacer({
         <div
           ref={scroller}
           className="cvs-scroller"
+          tabIndex={0}
           onPointerDown={(e) => {
             if (e.target === e.currentTarget) placement.select(null);
           }}
