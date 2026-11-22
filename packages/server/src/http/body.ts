@@ -12,7 +12,7 @@ export async function readJson(c: Context, optional = false): Promise<unknown> {
 }
 
 /** Characters that cannot go in a file name on common systems, or that would break the header. */
-const UNSAFE_NAME = /[\u0000-\u001f\u007f"*/:<>?\\|]+/g;
+const UNSAFE_NAME = /[\p{Cc}"*/:<>?\\|]+/gu;
 
 /**
  * `Content-Disposition` for a download. `filename` is a plain ASCII fallback for old clients;
