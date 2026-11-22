@@ -60,6 +60,8 @@ const IPV6_BLOCKED: Range[] = [
   [[0xfe, 0x80], 10],
   [[0xfe, 0xc0], 10],
   [[0xff], 8],
+  // IPv4-translated (::ffff:0:a.b.c.d), which a translator turns back into an IPv4 address.
+  [[0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 0], 96],
 ];
 
 function inRange(bytes: number[], [prefix, bits]: Range): boolean {
