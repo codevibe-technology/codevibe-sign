@@ -176,6 +176,11 @@ export interface SigningSession {
   fields: Field[];
   values: FieldValue[];
   otpRequired: boolean;
+  /**
+   * While `otpRequired` is true and this is false, `documents`, `fields` and `values` are
+   * empty, the message is null and the email address is masked. Call `session()` again after
+   * `verifyOtp`.
+   */
   authenticated: boolean;
   /** False while earlier signers in a sequential envelope have not acted. */
   canAct: boolean;

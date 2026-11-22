@@ -1,6 +1,7 @@
 ---
 '@codevibe_technology/sign-server': minor
 '@codevibe_technology/sign-react': patch
+'@codevibe_technology/sign-client': patch
 'codevibe-sign': minor
 ---
 
@@ -13,3 +14,6 @@ webhook targets. Updates hono and @hono/node-server for security advisories.
 
 React: the page scroll area of the signing view and the field placer can be reached and
 scrolled from the keyboard.
+
+Client: `SigningSession` documents that `documents`, `fields` and `values` are empty until the
+one-time code has been checked; call `session()` again after `verifyOtp`.
