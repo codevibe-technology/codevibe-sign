@@ -52,6 +52,8 @@ export interface CertificateInput {
   events: AuditEvent[];
   /** The workspace's line for the end of the certificate, from `certificateNote`. */
   note?: string;
+  /** IANA zone the times are also shown in, next to UTC. */
+  timeZone?: string;
 }
 
 /**
@@ -66,7 +68,7 @@ export interface PdfEngine {
     fields: Field[],
     values: FieldValue[],
     recipients: Recipient[],
-    options: { documentId: string },
+    options: { documentId: string; timeZone?: string },
   ): Promise<Uint8Array>;
   appendCertificate(pdf: Uint8Array, input: CertificateInput): Promise<Uint8Array>;
   /** Must be the last change to the file: anything after it breaks the seal. */

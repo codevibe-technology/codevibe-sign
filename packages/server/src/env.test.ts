@@ -170,4 +170,11 @@ describe('configFromEnv', () => {
       expect(text).not.toContain('secret@db');
     }
   });
+  it('reads TIME_ZONE and refuses a zone that does not exist', () => {
+    expect(configFromEnv(env({ TIME_ZONE: 'Asia/Kolkata' })).timeZone).toBe('Asia/Kolkata');
+    expect(configFromEnv(env()).timeZone).toBeUndefined();
+    expect(problems({ TIME_ZONE: 'Mars/Phobos' })).toEqual([
+      'TIME_ZONE must be an IANA time zone, for example Asia/Kolkata',
+    ]);
+  });
 });

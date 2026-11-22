@@ -59,12 +59,14 @@ export async function runSeal(
     const values = envelope.values.filter((v) => fieldIds.has(v.fieldId));
     const rendered = await rt.pdf.renderFields(original, fields, values, envelope.recipients, {
       documentId: document.id,
+      ...(rt.timeZone ? { timeZone: rt.timeZone } : {}),
     });
     const withCertificate = await rt.pdf.appendCertificate(rendered, {
       envelope,
       document,
       events: history,
       ...(note ? { note } : {}),
+      ...(rt.timeZone ? { timeZone: rt.timeZone } : {}),
     });
     const output = await rt.pdf.seal(withCertificate, {
       ...rt.sealer,

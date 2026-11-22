@@ -194,6 +194,13 @@ export interface SignServerOptions {
    * for example a company registration number. Read when the envelope is sealed.
    */
   certificateNote?: (workspaceId: string) => Promise<string | null>;
+  /**
+   * IANA time zone, for example `Asia/Kolkata`, for the dates printed on signed documents:
+   * "date signed" fields, the line under each signature, and the local time next to UTC on
+   * the certificate page. Default UTC, where someone signing early in the morning in India
+   * gets the previous day's date.
+   */
+  timeZone?: string;
   /** Signs signer session tokens. Set it when more than one process serves requests. */
   sessionSecret?: string;
   /** Signing links stay valid this many days unless the envelope expires sooner. Default 30. */
