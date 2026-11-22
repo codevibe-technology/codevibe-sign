@@ -1,11 +1,5 @@
 import type { NextConfig } from 'next';
-
-const securityHeaders = [
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-];
+import { headerRules } from './src/lib/security-headers';
 
 const config: NextConfig = {
   // The Docker image runs the self-contained server; `next start` keeps working without it.
@@ -28,7 +22,7 @@ const config: NextConfig = {
     proxyClientMaxBodySize: '21mb',
   },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return headerRules({ development: process.env.NODE_ENV === 'development' });
   },
 };
 
