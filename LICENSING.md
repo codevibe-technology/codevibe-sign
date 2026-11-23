@@ -3,6 +3,10 @@
 Codevibe Sign is open source under two licences. Which one applies depends on the part you use,
 and the two are kept apart: no Apache-2.0 package contains or depends on AGPL code.
 
+<p align="center">
+  <img src=".github/assets/licensing.png" alt="Two licences, kept apart: the libraries are Apache-2.0 and installing codevibe-sign never installs AGPL code; the server and web app are AGPL-3.0, with a commercial licence on request" width="100%">
+</p>
+
 | Part                                                                                                                                                          | Licence                                | What it means for you                                                                                                                                                                                                               |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Libraries: `codevibe-sign`, `@codevibe_technology/sign-core`, `sign-pdf`, `sign-react`, `sign-client`, `sign-templates` and `sign-aadhaar`, plus the examples | [Apache-2.0](LICENSES/Apache-2.0.txt)  | Use them in any project, open or closed, commercial or not. Keep the licence and the [NOTICE](NOTICE) file with copies you distribute.                                                                                              |
@@ -38,3 +42,19 @@ a commercial licence. Codevibe Technology Private Limited can offer one because 
 sign a [contributor licence agreement](CONTRIBUTING.md#contributor-licence-agreement).
 
 The names and logos are covered separately by [TRADEMARKS.md](TRADEMARKS.md).
+
+---
+
+<p align="center">
+  <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-logo">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/codevibe-logo-light.png">
+      <img src=".github/assets/codevibe-logo-dark.png" alt="Codevibe" height="28">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  Built and maintained by <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=built-by"><b>Codevibe</b></a>, a software development agency in Gurugram, India.<br>
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Codevibe Sign</a> · <a href="https://sign.codevibe.in/docs?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Docs</a> · <a href="https://codevibe.in/tools/codevibe-sign?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Product page</a> · <a href="mailto:hello@codevibe.in">hello@codevibe.in</a>
+</p>

@@ -7,6 +7,27 @@ How the project defends itself, and what is left to deployers, is described in
 [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md). If you run the server, work through
 [docs/SECURITY-CHECKLIST.md](docs/SECURITY-CHECKLIST.md) before going live.
 
+## The seal certificate and the sealing key
+
+Every completed PDF is sealed with a certificate. The **certificate** is public on purpose: it
+holds only the public key, so anyone can use it to check a seal, and nobody can use it to make
+one. The **private key** that makes seals is the secret.
+
+- Files completed on sign.codevibe.in are sealed with `CN=Codevibe Sign, O=Codevibe Technology, C=IN`,
+  SHA-256 fingerprint
+  `6B6E D7EC C18F C1B1 B6F5 514C 58C2 13B4 8840 528D 665D F007 0D63 90AF 73DF 9C80`. Download it
+  from [sign.codevibe.in/verify/certificate](https://sign.codevibe.in/verify/certificate) and
+  check files at [sign.codevibe.in/verify](https://sign.codevibe.in/verify). What a PDF reader
+  shows for the seal is explained in
+  [How the seal works in PDF readers](https://sign.codevibe.in/docs/guides/seal-in-pdf-readers).
+- The private key never leaves the server and is never committed: `*.p12` and `deploy/secrets/`
+  are in `.gitignore`. The server refuses RSA keys under 2048 bits, SHA-1 or MD5 certificates
+  and certificates that are not valid yet.
+- If you self-host, your files are sealed with **your own** certificate. Keep the `.p12` and its
+  passphrase in `deploy/secrets/` or a secret manager, back them up offline, and publish your
+  certificate's fingerprint so recipients can check your files.
+- A leaked, weak or misused sealing key is in scope. Report it straight away.
+
 ## Reporting a vulnerability
 
 Email **security@codevibe.in**. Please do not open a public issue, pull request or discussion.

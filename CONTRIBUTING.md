@@ -121,3 +121,19 @@ libraries and AGPL-3.0-only for `packages/server` and the apps (see
 [LICENSING.md](LICENSING.md)). The [contributor licence agreement](CLA.md) records the rights
 you give Codevibe, including the right to offer the server and the apps under a commercial
 licence too.
+
+---
+
+<p align="center">
+  <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-logo">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/codevibe-logo-light.png">
+      <img src=".github/assets/codevibe-logo-dark.png" alt="Codevibe" height="28">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  Built and maintained by <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=built-by"><b>Codevibe</b></a>, a software development agency in Gurugram, India.<br>
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Codevibe Sign</a> · <a href="https://sign.codevibe.in/docs?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Docs</a> · <a href="https://codevibe.in/tools/codevibe-sign?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Product page</a> · <a href="mailto:hello@codevibe.in">hello@codevibe.in</a>
+</p>
