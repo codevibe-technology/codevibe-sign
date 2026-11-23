@@ -49,8 +49,10 @@ cover all of them.
 - A person who is in several of your workspaces counts as one member.
 - Being invited into someone else's workspace is always possible. It takes a place on their
   account, not on yours.
-- Only you, the account owner, can change the plan, pay, see invoices and set up Aadhaar
-  eSign. Admins of your workspaces can see the plan and usage.
+- You, the account owner, can change the plan, pay, see invoices and set up Aadhaar eSign.
+  You can also make someone a Billing admin, who can do the same billing tasks without
+  managing the team or settings. Admins of your workspaces can see the plan and usage, but
+  not invoices.
 - A workspace stays on the account of the person who created it, and they stay an owner of it.
 
 If you already had more than one Free workspace when this changed, you keep all of them and
