@@ -14,20 +14,22 @@ jobs:
     if: github.repository_owner == 'codevibe-technology' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      id-token: write
+      contents: write # the version commit, tags and GitHub releases
+      pull-requests: write # the "version packages" pull request
+      id-token: write # npm trusted publishing (OIDC) and provenance
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # No dependency cache here: a release never restores files an earlier run saved.
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
+          node-version: 24
+      # Trusted publishing needs npm 11.5.1 or newer. pnpm hands the upload to this npm.
+      - run: npm install -g npm@^11.5.1
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+      - run: pnpm check:types
       - uses: changesets/action@v1
         with:
           version: pnpm version-packages
@@ -36,6 +38,10 @@ jobs:
           commit: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # npm checks this workflow through OIDC, so publishing needs no token. NPM_TOKEN is
+          # only a fallback for the very first publish, before the packages exist on npm and
+          # their trusted publishers can be set. Delete the secret and this line once all
+          # eight packages list this workflow as their trusted publisher.
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Provenance needs a public repository.
           NPM_CONFIG_PROVENANCE: 'true'

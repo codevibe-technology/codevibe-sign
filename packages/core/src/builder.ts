@@ -68,7 +68,7 @@ export interface RecipientInput {
   role?: RecipientRole;
   /** Defaults to one after the highest signer or approver order (viewers default to 1). */
   order?: number;
-  /** Defaults to `email_link` with an email address, otherwise `sms_otp`. */
+  /** Defaults to `email_otp` with an email address, otherwise `sms_otp`. */
   auth?: AuthMethod;
 }
 
@@ -395,7 +395,7 @@ export function addRecipient(
     name: input.name.trim(),
     role,
     order: input.order ?? defaultOrder(envelope, role),
-    auth: input.auth ?? (email ? 'email_link' : 'sms_otp'),
+    auth: input.auth ?? (email ? 'email_otp' : 'sms_otp'),
     status: 'pending',
     ...(email && { email }),
     ...(phone && { phone }),

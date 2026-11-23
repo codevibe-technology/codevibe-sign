@@ -9,11 +9,17 @@ Aadhaar eSign through an eSign provider you hold an account with. It defines a s
 `EsignProvider` interface and ships an adapter for [Leegality](https://www.leegality.com). For a
 walkthrough, see [Aadhaar eSign with Leegality](/guides/aadhaar-leegality).
 
+::: warning Standalone library
+This package is not yet wired into the Codevibe Sign server or the web app. Neither of them
+calls it, and sending an envelope with `auth: 'aadhaar'` does not start an Aadhaar eSign for
+you. Today you call the provider from your own backend and store the signed file yourself.
+:::
+
 ```sh
 pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 ```
 
-Node 20 or later. The package uses `fetch` and `node:crypto`.
+Node 22 or later. The package uses `fetch` and `node:crypto`.
 
 | Export                    | What it is                                                                                                      |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------- |

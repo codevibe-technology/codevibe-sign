@@ -36,6 +36,22 @@ describe('sender authentication', () => {
 });
 
 describe('POST /v1/envelopes', () => {
+  it('asks for a one-time code unless the request names another method', async () => {
+    const h = harness();
+    const { json } = await h.call('POST', '/v1/envelopes', {
+      body: envelopeBody({
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com' },
+          { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
+        ],
+      }),
+    });
+    expect(json.recipients.map((r: { auth: string }) => r.auth)).toEqual([
+      'email_otp',
+      'email_link',
+    ]);
+  });
+
   it('creates a draft with documents, recipients and fields', async () => {
     const h = harness();
     const { status, json } = await h.call('POST', '/v1/envelopes', { body: envelopeBody() });

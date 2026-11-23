@@ -30,7 +30,7 @@ describe('instantiate', () => {
       documents: [{ name: 'offer.pdf', fileKey: 'templates/offer.pdf', pageCount: 2 }],
     });
     expect(envelope.recipients).toMatchObject([
-      { name: 'Asha Rao', email: 'asha@example.com', role: 'signer', order: 1, auth: 'email_link' },
+      { name: 'Asha Rao', email: 'asha@example.com', role: 'signer', order: 1, auth: 'email_otp' },
       { name: 'Meera Iyer', email: 'hr@example.com', role: 'signer', order: 2, auth: 'email_otp' },
     ]);
     expect(envelope.fields).toHaveLength(4);

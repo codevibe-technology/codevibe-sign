@@ -97,7 +97,7 @@ try {
     documents: [{ name: 'smoke.pdf', content: Buffer.from(pdf).toString('base64') }],
     recipients: [
       { name: 'Asha Rao', email: 'asha@example.com', auth: 'email_otp' },
-      { name: 'Ravi Kumar', email: 'ravi@example.com' },
+      { name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
     ],
   });
   check(created.status === 201, 'create a draft with a real PDF');

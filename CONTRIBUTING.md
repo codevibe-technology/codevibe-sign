@@ -56,33 +56,44 @@ docs(server): document the webhook retry policy
 ```
 
 Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`. The scope is the package
-name without the prefix (`core`, `pdf`, `server`, `react`, `aadhaar`) or an area such as `ci`.
+name without the prefix (`core`, `pdf`, `server`, `client`, `react`, `templates`, `aadhaar`) or an
+area such as `ci`.
 Write the subject in lower case and the imperative, without a full stop, in 72 characters or
 fewer. Add a body when the reason for the change is not obvious.
 
-## Sign off your commits (DCO)
+## Contributor licence agreement
 
-Every commit in a pull request from outside Codevibe must carry a sign-off line certifying the
-[Developer Certificate of Origin](DCO) 1.1: that you wrote the change, or otherwise have the
-right to submit it under the project's licences. Add it with `-s`:
+Before a pull request from outside Codevibe can be merged, its author signs the
+[Codevibe Sign contributor licence agreement](CLA.md). You keep the ownership of what you
+contribute. The agreement gives Codevibe Technology Private Limited a licence to publish it and
+the right to relicense it, which is what lets us offer the AGPL server and apps under a
+commercial licence as well, and it commits us to keep every accepted contribution available
+under the project's open-source licence.
 
-```sh
-git commit -s -m "fix(pdf): keep field boxes inside the page"
+Signing takes one comment. When you open your first pull request, the CLA Assistant posts a
+comment asking you to reply with:
+
+```
+I have read the CLA Document and I hereby sign the CLA
 ```
 
-which appends
+The check on the pull request then turns green, and your signature covers every later
+contribution. You do not need to sign off commits (`git commit -s` is not required).
 
-```
-Signed-off-by: Your Name <you@example.com>
-```
+If you contribute as part of your job, ask your employer to sign the
+[corporate agreement](CLA-CORPORATE.md) and send it to hello@codevibe.in. We then add the people
+it names to the allowlist, so their pull requests pass without a comment.
 
-The name and email must match the commit author. Use your real name; we cannot accept
-anonymous sign-offs. To sign off commits you already made, run
-`git rebase --signoff main` and force-push your branch.
+Both agreements are marked "draft, for legal review" until our lawyers have approved the final
+text.
 
-A maintainer checks the sign-offs before merging, for example with
-`git log --format='%an <%ae>%n%(trailers:key=Signed-off-by)' main..HEAD`. There is no bot; a
-pull request with a missing sign-off is asked to add it.
+## Releases
+
+Packages are published to npm by the release workflow, with npm trusted publishing: GitHub
+proves to npm which workflow is publishing, so no long-lived token is stored, and every release
+carries a provenance statement. Merging changesets into `main` opens a "version packages" pull
+request; merging that one publishes. The eight published packages share one version number and
+are always released together.
 
 ## Changesets and the changelog
 
@@ -100,17 +111,13 @@ Changelog policy:
 ## Pull requests
 
 Keep pull requests focused on one concern. CI runs lint, format check, build, type check and
-tests on Node 22 and 24, and all of them must pass. A maintainer reviews every pull request;
+tests on Node 22 and 24, and all of them must pass, along with the CLA check. A maintainer reviews every pull request;
 changes to sealing, verification, authentication or the audit log get a second review.
 
 ## Licence
 
-By contributing you agree that your contributions are licensed under the licence of the part you
-change: Apache-2.0 for the libraries and AGPL-3.0-only for `packages/server` and the apps (see
-[LICENSING.md](LICENSING.md)). Your `Signed-off-by` line records that agreement under the DCO.
-
-The server and the apps are also offered under a commercial licence. The DCO does not give
-Codevibe the right to include your change in that edition, so outside pull requests to
-`packages/server` or `apps/` will also need a short contributor licence agreement. We will link it
-here before we accept such pull requests; until then, contributions to the libraries and the docs
-are welcome under the DCO alone.
+Your contributions are published under the licence of the part you change: Apache-2.0 for the
+libraries and AGPL-3.0-only for `packages/server` and the apps (see
+[LICENSING.md](LICENSING.md)). The [contributor licence agreement](CLA.md) records the rights
+you give Codevibe, including the right to offer the server and the apps under a commercial
+licence too.

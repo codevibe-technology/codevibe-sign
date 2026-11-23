@@ -20,7 +20,21 @@ The rules (who signs when, reminders, expiry, the audit chain) come from
 pnpm add @codevibe_technology/sign-server
 ```
 
-Node 20 or later.
+Node 22 or later. This package is AGPL-3.0-only; the libraries are Apache-2.0. See
+[LICENSING.md](https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md).
+
+## Run it from the command line
+
+```sh
+npx @codevibe_technology/sign-server start --memory
+```
+
+`start --memory` keeps everything in memory, seals with a generated self-signed certificate and
+prints emails, one-time codes and a fresh API key to the terminal, for local development.
+Without `--memory`, `start` runs the same service as the Docker image from the
+[same variables](/getting-started/docker); `--port`, `--host`, `--public-url`, `--database-url`,
+`--files-dir` and `--seal <file.p12>` override theirs. Installed, the command is
+`codevibe-sign-server`.
 
 ## Standalone example
 

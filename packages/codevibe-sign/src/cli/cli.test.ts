@@ -5,15 +5,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createSignClient, createSignerClient } from '@codevibe_technology/sign-client';
-import { seal, sealCertificate } from '@codevibe_technology/sign-pdf';
+import { createDevSeal, seal, sealCertificate } from '@codevibe_technology/sign-pdf';
 import { PDFDocument, PDFString } from 'pdf-lib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDevSeal } from '../dev-seal';
 
 const BIN = fileURLToPath(new URL('../../dist/cli.js', import.meta.url));
-const PNG =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 interface Run {
   code: number | null;
@@ -94,7 +90,7 @@ describe('codevibe-sign', () => {
   it('prints help and the version', async () => {
     const help = await cli(['--help']);
     expect(help.code).toBe(0);
-    for (const command of ['start', 'verify', 'inspect', 'keygen', 'hash', 'api-key']) {
+    for (const command of ['verify', 'inspect', 'keygen', 'hash', 'api-key']) {
       expect(help.stdout).toContain(`  ${command} `);
     }
     const version = await cli(['--version']);
@@ -105,7 +101,7 @@ describe('codevibe-sign', () => {
     expect((await cli([])).stdout).toContain('Usage');
   });
 
-  it.each(['start', 'verify', 'inspect', 'keygen', 'hash', 'api-key'])(
+  it.each(['verify', 'inspect', 'keygen', 'hash', 'api-key'])(
     'prints help for %s',
     async (command) => {
       const run = await cli([command, '--help']);
@@ -329,82 +325,5 @@ describe('api-key', () => {
       sha256: string;
     };
     expect(json.sha256).toBe(createHash('sha256').update(json.key).digest('hex'));
-  });
-});
-
-/** Resolves once the text `read()` returns matches, polling as the child writes. */
-async function waitFor(read: () => string, pattern: RegExp): Promise<string> {
-  const deadline = Date.now() + 15_000;
-  while (!pattern.test(read())) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${pattern}:\n${read()}`);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  return read();
-}
-
-describe('start', () => {
-  it('runs in memory, completes an envelope, and shuts down cleanly', async () => {
-    const child = spawn(process.execPath, [BIN, 'start', '--memory', '--port', '0'], {
-      cwd: dir,
-      env: { PATH: process.env.PATH ?? '', NO_COLOR: '1' },
-    });
-    let output = '';
-    child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
-    try {
-      const banner = await waitFor(() => output, /Press Ctrl\+C to stop/);
-      expect(banner).toContain('memory mode');
-      const port = /Health\s+http:\/\/localhost:(\d+)\/health/.exec(banner)?.[1];
-      const apiKey = /API key\s+(\S+)/.exec(banner)?.[1];
-      expect(port).toBeDefined();
-      const baseUrl = `http://127.0.0.1:${port}`;
-
-      const health = await fetch(`${baseUrl}/health`);
-      expect(await health.json()).toEqual({ ok: true });
-
-      const sign = createSignClient({ baseUrl, apiKey: apiKey! });
-      const envelope = await sign.envelopes.create({
-        title: 'Offer letter',
-        send: true,
-        documents: [
-          { key: 'doc', name: 'offer.pdf', content: await readFile(join(dir, 'plain.pdf')) },
-        ],
-        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
-        fields: [
-          { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 640, width: 180, height: 48 },
-        ],
-      });
-      await waitFor(() => output, /\/sign\/[A-Za-z0-9_-]{20,}/);
-      const token = /\/sign\/([A-Za-z0-9_-]{20,})/.exec(output)![1]!;
-      const signer = createSignerClient({ baseUrl, token });
-      const session = await signer.session();
-      await signer.view();
-      await signer.submit([{ fieldId: session.fields[0]!.id, value: PNG }]);
-
-      const sealed = await sign.envelopes.downloadDocument(envelope.id, envelope.documents[0]!.id, {
-        version: 'sealed',
-      });
-      await writeFile(join(dir, 'from-server.pdf'), new Uint8Array(sealed));
-      const verified = await cli(['verify', 'from-server.pdf', '--json']);
-      expect(JSON.parse(verified.stdout)).toMatchObject({ valid: true, signatureCount: 1 });
-    } finally {
-      const exit = new Promise<number | null>((resolve) => child.once('exit', resolve));
-      child.kill('SIGINT');
-      expect(await exit).toBe(0);
-    }
-    expect(output).toContain('SIGINT received, closing');
-  }, 30_000);
-
-  it('lists every missing variable without --memory', async () => {
-    const run = await cli(['start']);
-    expect(run.code).toBe(2);
-    expect(run.stderr).toContain('DATABASE_URL is required');
-    expect(run.stderr).toContain('API_KEYS is required');
-    expect(run.stderr).toContain('codevibe-sign start --memory');
-  });
-
-  it('rejects a bad port', async () => {
-    const run = await cli(['start', '--memory', '--port', 'eighty']);
-    expect(run.code).toBe(2);
-    expect(run.stderr).toContain('--port');
   });
 });

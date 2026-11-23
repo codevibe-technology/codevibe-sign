@@ -10,7 +10,7 @@ values onto the pages, appends a signing certificate, and seals the result with 
 signature so any later change is detectable. It also verifies that seal against the
 certificate you trust.
 
-Node 20 or later. Built on [pdf-lib](https://pdf-lib.js.org), `@signpdf` and
+Node 22 or later. Built on [pdf-lib](https://pdf-lib.js.org), `@signpdf` and
 `node-forge`.
 
 ## Install
@@ -199,6 +199,14 @@ and the `DOCUMENT_*` codes above.
 Opens the PKCS#12 file with the same checks as `seal()` and returns
 `{ pem, sha256, subject, notBefore, notAfter }`. Call it at start-up to fail early, and keep
 `sha256` (or `pem`) as what `verify()` should trust.
+
+### `createDevSeal(options?) → DevSeal`
+
+Creates a self-signed RSA-2048 sealing certificate for development and tests and returns
+`{ p12, passphrase, certificatePem, sha256, notBefore, notAfter }`. Options: `commonName`,
+`organization`, `days` (default 365, at most 3650), `passphrase` (generated when omitted) and
+`notBefore`. PDF readers show seals made with it as untrusted; production needs a certificate
+issued by a certificate authority. Node only.
 
 ### `verify(bytes, { trust, limits? }) → Promise<VerifyResult>`
 

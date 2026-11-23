@@ -85,7 +85,7 @@ const envelope = await client.envelopes.create({
   documents: [{ name: 'offer.pdf', content: await samplePdf() }],
   recipients: [
     { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_otp' },
-    { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com' },
+    { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
   ],
   fields: [
     { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 640, width: 200, height: 50 },

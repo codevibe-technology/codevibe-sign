@@ -117,7 +117,7 @@ describe.each(stores)('signing over HTTP ($name store)', (setup) => {
       documents: [{ name: 'offer.pdf', content: Buffer.from(pdf).toString('base64') }],
       recipients: [
         { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_otp' },
-        { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com' },
+        { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
       ],
     });
     expect(created.status).toBe(201);

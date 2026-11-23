@@ -116,9 +116,9 @@ export function envelopeBody(overrides: Record<string, unknown> = {}) {
     title: 'Offer letter',
     documents: [{ key: 'offer', name: 'offer.pdf', content: pdfBase64(2) }],
     recipients: [
-      { key: 'asha', name: 'Asha Rao', email: 'asha@example.com' },
-      { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com' },
-      { key: 'hr', name: 'HR Team', email: 'hr@example.com', role: 'viewer' },
+      { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
+      { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
+      { key: 'hr', name: 'HR Team', email: 'hr@example.com', role: 'viewer', auth: 'email_link' },
     ],
     fields: [
       { recipient: 'asha', type: 'signature', page: 1, x: 72, y: 600, width: 180, height: 48 },

@@ -60,11 +60,11 @@ const features = [
 const faqs = [
   {
     q: 'Is it free?',
-    a: 'Yes. The libraries are Apache-2.0 and the server and app are AGPL-3.0, free to self-host. You pay only for what you run it on: your server, your mail and SMS delivery, and eSign credits with your provider if you use Aadhaar eSign.',
+    a: 'Yes. Self-hosting is free and unlimited: the libraries are Apache-2.0 and the server and app are AGPL-3.0, and you pay only for what you run them on. On sign.codevibe.in the Free plan costs Rs 0 and covers 10 envelopes a month. A paid Cloud plan with higher limits is coming soon; until then, write to hello@codevibe.in from a Free workspace to be upgraded.',
   },
   {
     q: 'Can I use it in production today?',
-    a: 'Not yet. Every package works end to end and is tested, but nothing is published to npm and the APIs may change before 0.1. Try it now and wait for 0.1 before you rely on it.',
+    a: 'Yes, with care. The packages are on npm from version 0.1.0 and every one is tested end to end. Until 1.0 a minor release may change an API, so pin the version you install and read the changelog before you upgrade.',
   },
   {
     q: 'Do my documents leave my servers?',
@@ -84,11 +84,11 @@ const faqs = [
   },
   {
     q: 'Can I build a commercial product on it?',
-    a: 'Yes. The licence allows it. The licence does not cover the Codevibe names and logos, so please do not call your product or hosted service "Codevibe Sign".',
+    a: 'Yes. The Apache-2.0 libraries, including everything npm i codevibe-sign installs, can go into any product, open or closed. The AGPL-3.0 server can run next to it unchanged. Neither licence covers the Codevibe names and logos, so please do not call your product or hosted service "Codevibe Sign".',
   },
   {
     q: 'Which stack does it need?',
-    a: 'Node 20 or later and PostgreSQL for the server. Your own backend can be in any language, since it talks to the server over HTTP. The UI components are for React.',
+    a: 'Node 22 or later and PostgreSQL for the server. Your own backend can be in any language, since it talks to the server over HTTP. The UI components are for React.',
   },
 ];
 </script>
@@ -156,8 +156,8 @@ const faqs = [
             API with an API key.
           </p>
           <p class="note">
-            <span class="badge">Pre-release</span>
-            Not on npm yet; build it from the repository. The API may change before 0.1.
+            <span class="badge">Before 1.0</span>
+            On npm from 0.1.0. The API may change in a minor release before 1.0.
           </p>
           <a class="text-link" :href="withBase('/getting-started/node')">Read the Node guide</a>
         </div>

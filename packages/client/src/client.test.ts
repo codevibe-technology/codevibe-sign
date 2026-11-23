@@ -132,7 +132,10 @@ describe('sender and signer clients against the server', () => {
   it('declines through the signer client', async () => {
     const { client, signerFor } = setup();
     const envelope = await client.envelopes.create(
-      offer({ recipients: [{ key: 'asha', name: 'Asha', email: 'asha@example.com' }], send: true }),
+      offer({
+        recipients: [{ key: 'asha', name: 'Asha', email: 'asha@example.com', auth: 'email_link' }],
+        send: true,
+      }),
     );
     const signer = signerFor('asha@example.com');
     const result = await signer.decline('Wrong salary');
@@ -289,7 +292,9 @@ describe('fixing an envelope after sending', () => {
 
     const other = await client.envelopes.create({
       ...offer({
-        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
+        ],
       }),
       send: true,
     });

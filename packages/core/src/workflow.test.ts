@@ -557,7 +557,7 @@ describe('markViewed and markAuthenticated', () => {
       data: { method: 'email_otp' },
     });
     const byDefault = markAuthenticated(envelope, { recipientId: a! }, d());
-    expect(byDefault.events[0]!.data).toEqual({ method: 'email_link' });
+    expect(byDefault.events[0]!.data).toEqual({ method: envelope.recipients[0]!.auth });
     expect(byDefault.envelope.recipients).toEqual(envelope.recipients);
   });
 

@@ -19,11 +19,15 @@ parts you need.
 For the HTTP API itself, with every route, schema and error code, see the
 [HTTP API reference](/http-api), which you can try against your own server.
 
-All packages are pre-release (`0.0.0`) and their APIs may change before 0.1.
+All packages share one version number and are released together, starting at `0.1.0`. Their
+APIs may change in a minor release before 1.0.
+
+`codevibe-sign` and every library above except `sign-server` are Apache-2.0.
+`@codevibe_technology/sign-server` is AGPL-3.0-only and is installed on its own.
 
 ## Conventions
 
-- TypeScript, strict, ESM first, with CommonJS builds and type declarations. Node 20 or later.
+- TypeScript, strict, ESM first, with CommonJS builds and type declarations. Node 22 or later.
 - Each package's public API is exported only from its entry point.
 - Errors are `SignError` instances with a stable `code`, never bare strings. See the
   [error codes](/api/core#error-codes).

@@ -14,7 +14,7 @@ the browser and in tests.
 pnpm add @codevibe_technology/sign-core
 ```
 
-Node 20 or later, or any runtime with Web Crypto.
+Node 22 or later, or any runtime with Web Crypto.
 
 ## Errors
 
@@ -27,19 +27,19 @@ field to fix, for example `recipients.r1.email`.
 
 Edits are allowed only while the envelope is a `draft`.
 
-| Function                                                             | Notes                                                                     |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `createEnvelope(input, { clock, ids })` → `TransitionResult`         | Starts a draft; emits `envelope.created`.                                 |
-| `updateEnvelope(envelope, patch, { clock })` → `Envelope`            | Title, message, routing, reminders, expiry, metadata.                     |
-| `addDocument(envelope, input, { ids })` → `{ envelope, document }`   | `pageSizes` (PDF points) enables bounds checks for fields.                |
-| `removeDocument(envelope, documentId)` → `Envelope`                  | Also removes its fields.                                                  |
-| `addRecipient(envelope, input, { ids })` → `{ envelope, recipient }` | Defaults: `signer`, next order, `email_link` (or `sms_otp` with a phone). |
-| `updateRecipient(envelope, recipientId, patch)` → `Envelope`         |                                                                           |
-| `removeRecipient(envelope, recipientId)` → `Envelope`                | Also removes their fields.                                                |
-| `addField(envelope, input, { ids })` → `{ envelope, field }`         | Signers and approvers only; box must sit inside the page.                 |
-| `moveField(envelope, fieldId, { rect, page?, documentId? })`         |                                                                           |
-| `removeField(envelope, fieldId)` → `Envelope`                        |                                                                           |
-| `validateForSend(envelope, now)` → `ValidationIssue[]`               | Empty means ready. Every signer needs a required signature field.         |
+| Function                                                             | Notes                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `createEnvelope(input, { clock, ids })` → `TransitionResult`         | Starts a draft; emits `envelope.created`.                                |
+| `updateEnvelope(envelope, patch, { clock })` → `Envelope`            | Title, message, routing, reminders, expiry, metadata.                    |
+| `addDocument(envelope, input, { ids })` → `{ envelope, document }`   | `pageSizes` (PDF points) enables bounds checks for fields.               |
+| `removeDocument(envelope, documentId)` → `Envelope`                  | Also removes its fields.                                                 |
+| `addRecipient(envelope, input, { ids })` → `{ envelope, recipient }` | Defaults: `signer`, next order, `email_otp` (or `sms_otp` with a phone). |
+| `updateRecipient(envelope, recipientId, patch)` → `Envelope`         |                                                                          |
+| `removeRecipient(envelope, recipientId)` → `Envelope`                | Also removes their fields.                                               |
+| `addField(envelope, input, { ids })` → `{ envelope, field }`         | Signers and approvers only; box must sit inside the page.                |
+| `moveField(envelope, fieldId, { rect, page?, documentId? })`         |                                                                          |
+| `removeField(envelope, fieldId)` → `Envelope`                        |                                                                          |
+| `validateForSend(envelope, now)` → `ValidationIssue[]`               | Empty means ready. Every signer needs a required signature field.        |
 
 ## Workflow
 

@@ -8,7 +8,7 @@ export default defineConfig({
   format: ['esm'],
   outExtension: () => ({ js: '.mjs' }),
   platform: 'node',
-  target: 'node20',
+  target: 'node22',
   noExternal: [/.*/],
   splitting: false,
   clean: true,

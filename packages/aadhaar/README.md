@@ -3,6 +3,11 @@
 Aadhaar eSign for Codevibe Sign, through an eSign provider you hold an account with. It defines a
 small `EsignProvider` interface and ships an adapter for [Leegality](https://www.leegality.com).
 
+> **Standalone library.** This package is not yet wired into the Codevibe Sign server or the
+> web app. Neither of them calls it, and sending an envelope with `auth: 'aadhaar'` does not
+> start an Aadhaar eSign for you. Today you call the provider from your own backend, as shown
+> below, and store the signed file yourself. Built-in support in the server is on the roadmap.
+
 ## What Aadhaar eSign is
 
 Under the Information Technology Act, 2000, an electronic record can be authenticated with an
@@ -32,7 +37,7 @@ and give this package your API credentials. Each eSign is billed to your account
 pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 ```
 
-Node 20 or later. The package uses `fetch` and `node:crypto`.
+Node 22 or later. The package uses `fetch` and `node:crypto`.
 
 ## How the flow works
 
@@ -150,6 +155,10 @@ by configuration rather than guessed:
 - **Response `status` on success**: the published sample shows `status: 0` beside a success
   message, so a returned `documentId` is treated as success.
 - **Webhook versions** other than 2.5 are not documented in the API reference.
+
+## Docs
+
+Guides and the full API reference are at [sign.codevibe.in](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-aadhaar&utm_content=body).
 
 ## Licence
 

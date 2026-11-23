@@ -3,14 +3,13 @@ import { hash } from './hash';
 import { inspect } from './inspect';
 import { EXIT, UsageError, wantsColor, type Command, type Io } from './io';
 import { keygen } from './keygen';
-import { startCommand } from './start';
 import { verify } from './verify';
 import { VERSION } from './version';
 
-const COMMANDS: Command[] = [startCommand(), verify, inspect, keygen, hash, apiKey];
+const COMMANDS: Command[] = [verify, inspect, keygen, hash, apiKey];
 
 const HELP = `codevibe-sign ${VERSION}
-Open-source e-signatures: send PDFs for signature, seal them, verify them offline.
+Open-source e-signatures: check, inspect and prepare PDFs for signing, offline.
 
 Usage
   codevibe-sign <command> [options]
@@ -24,9 +23,12 @@ Options
   --no-color        Disable colours (also respects NO_COLOR)
 
 Examples
-  npx codevibe-sign start --memory
   npx codevibe-sign verify signed.pdf --trust seal.pem
   npx codevibe-sign inspect offer-letter.pdf
+  npx codevibe-sign keygen --out seal.p12
+
+The signing server is a separate package under AGPL-3.0:
+  npx @codevibe_technology/sign-server start --memory
 
 Docs: https://sign.codevibe.in?utm_source=cli`;
 

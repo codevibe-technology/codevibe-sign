@@ -30,8 +30,14 @@ describe('end to end with @codevibe_technology/sign-pdf', () => {
         routing: 'parallel',
         documents: [{ name: 'offer.pdf', content }],
         recipients: [
-          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com' },
-          { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', role: 'approver' },
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
+          {
+            key: 'ravi',
+            name: 'Ravi Kumar',
+            email: 'ravi@example.com',
+            role: 'approver',
+            auth: 'email_link',
+          },
         ],
         fields: [
           { recipient: 'asha', type: 'signature', page: 1, x: 72, y: 600, width: 180, height: 48 },

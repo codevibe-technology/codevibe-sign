@@ -1,12 +1,15 @@
 # codevibe-sign
 
-Open-source e-signatures for your own product. Send PDFs for signature, collect signatures in
-the order you choose, and get back one sealed file with a certificate page and an audit trail
-anyone can verify offline. Your documents stay on your servers.
+Open-source e-signatures for your own product, under Apache-2.0. Seal PDFs with a PAdES
+signature, verify sealed files offline, send documents for signature through a Codevibe Sign
+server and put the signing page in your own React app.
 
-This is the one package to install: the signing server, the typed client, the PDF tools, the
-React components and a `codevibe-sign` command line, with subpath imports so each bundle only
-carries what it uses.
+This is the one library package to install: the typed API client, the PDF tools, the core
+rules, the React components and a `codevibe-sign` command line, with subpath imports so each
+bundle only carries what it uses. Everything in it is Apache-2.0, so it fits any product, open
+or closed. The signing server is a separate package under AGPL-3.0,
+[`@codevibe_technology/sign-server`](https://www.npmjs.com/package/@codevibe_technology/sign-server);
+this package does not contain it or depend on it.
 
 <p>
   <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=nav">Docs</a> ·
@@ -17,15 +20,23 @@ carries what it uses.
   <a href="#licence">Licence</a>
 </p>
 
-> Pre-release: APIs may change before 0.1.
+> Pre-release: APIs may change before 1.0.
 
 ## Quick start
 
-Start a server with nothing to set up. Everything lives in memory, the seal certificate is
-generated, and emails and one-time codes are printed to the terminal:
+Check a sealed PDF, with nothing to set up:
 
 ```sh
-npx codevibe-sign start --memory
+npx codevibe-sign verify signed.pdf
+```
+
+To send a document for signature you need a Codevibe Sign server. Use the hosted one at
+[sign.codevibe.in](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body), or run your own. The server is its own
+package (AGPL-3.0); this starts it with everything in memory, a generated seal certificate, and
+emails and one-time codes printed to the terminal:
+
+```sh
+npx @codevibe_technology/sign-server start --memory
 ```
 
 It prints an API key and the address. Send a PDF for signature with that key:
@@ -43,14 +54,11 @@ curl -s http://localhost:3000/v1/envelopes \
   }'
 ```
 
-The invitation, with Asha's signing link, appears in the server's output. Once she signs, the
-sealed PDF is at `GET /v1/envelopes/:id/documents/:docId`, and you can check it yourself:
+The invitation, with Asha's signing link, appears in the server's output, followed by the
+one-time code she is asked for. Once she signs, the sealed PDF is at
+`GET /v1/envelopes/:id/documents/:docId`, and `codevibe-sign verify` checks it.
 
-```sh
-npx codevibe-sign verify signed.pdf
-```
-
-Needs Node.js 20 or newer. For the real service (PostgreSQL, SMTP, your own certificate), see
+Needs Node.js 22 or newer. For the real service (PostgreSQL, SMTP, your own certificate), see
 [Self-host](https://sign.codevibe.in/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body).
 
 ## Install
@@ -70,7 +78,6 @@ npm install codevibe-sign react react-dom
 ```text
 codevibe-sign <command> [options]
 
-  start     Run the signing server (add --memory to try it with no setup)
   verify    Check that a sealed PDF is unchanged and sealed by who you expect
   inspect   Pages, page sizes, encryption and seal of a PDF
   keygen    Create a self-signed sealing certificate for development
@@ -82,22 +89,8 @@ Every command takes `--help`; `codevibe-sign --version` prints the version. Comm
 report on a file take `--json`. Exit codes: `0` success, `1` the check failed (invalid seal,
 unusable PDF), `2` invalid usage or a file that could not be read.
 
-### start
-
-```sh
-npx codevibe-sign start --memory                       # try it, nothing saved
-codevibe-sign start                                    # the real service, from environment variables
-codevibe-sign start --seal seal.p12 --public-url https://sign.example.com
-```
-
-Without `--memory` it runs the same service as the Docker image from the same variables:
-`DATABASE_URL`, `PUBLIC_URL`, `API_KEYS`, `SEAL_P12_BASE64`, `SEAL_P12_PASSPHRASE`,
-`SMTP_HOST`, `SMTP_FROM` and the optional ones in the
-[variable reference](https://sign.codevibe.in/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body).
-`--port`, `--host`, `--public-url`, `--database-url`, `--files-dir` and `--seal <file.p12>`
-override their variable. Passwords and keys are read from the environment only. Every missing
-or invalid variable is reported at once, by name. `Ctrl+C` lets running work finish before it
-exits.
+The commands work on files on your machine and never start a server. To run one, use
+`npx @codevibe_technology/sign-server start` or the Docker image.
 
 ### verify
 
@@ -140,24 +133,6 @@ or is generated and printed.
 
 ## Use it from code
 
-Run the server inside your own Node app:
-
-<!-- check: declare const p12: Uint8Array; -->
-
-```ts check
-import { startSignServer } from 'codevibe-sign/server';
-
-const sign = await startSignServer({
-  databaseUrl: process.env.DATABASE_URL!,
-  filesDir: './data/files',
-  smtp: { host: 'smtp.example.com', port: 587, secure: false, from: 'Sign <sign@example.com>' },
-  seal: { p12, passphrase: process.env.SEAL_P12_PASSPHRASE! },
-  apiKeys: [process.env.SIGN_API_KEY!],
-  publicUrl: 'https://sign.example.com',
-});
-await sign.listen(3000);
-```
-
 Send envelopes from your backend:
 
 <!-- check: declare const offer: Uint8Array; -->
@@ -191,32 +166,34 @@ const result = await verify(pdf, { trust: { certificates: [operatorPem] } });
 if (!result.valid) console.log(`Not valid: ${result.reason}`);
 ```
 
-| Import                 | What you get                                                                                    | Runs in                 |
-| ---------------------- | ----------------------------------------------------------------------------------------------- | ----------------------- |
-| `codevibe-sign`        | The most used parts of all of the below, plus `createDevSeal()` for tests.                      | Node                    |
-| `codevibe-sign/server` | `createSignServer`, `startSignServer`, `configFromEnv` and the storage, file and mail adapters. | Node                    |
-| `codevibe-sign/client` | `createSignClient`, `createSignerClient`, `verifyWebhook`, `readWebhook`. No dependencies.      | Node, browsers, edge    |
-| `codevibe-sign/pdf`    | `verify`, `verifySeal`, `seal`, `inspectPdf`, `sealCertificate` and the drawing helpers.        | Node                    |
-| `codevibe-sign/core`   | Types, the signing rules and `verifyChain` for the audit log. No I/O.                           | anywhere                |
-| `codevibe-sign/react`  | `SigningView`, `SignaturePad`, `FieldPlacer`; styles in `codevibe-sign/react/styles.css`.       | browsers, needs `react` |
+| Import                 | What you get                                                                                              | Runs in                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `codevibe-sign`        | The most used parts of all of the below.                                                                  | Node                    |
+| `codevibe-sign/client` | `createSignClient`, `createSignerClient`, `verifyWebhook`, `readWebhook`. No dependencies.                | Node, browsers, edge    |
+| `codevibe-sign/pdf`    | `verify`, `verifySeal`, `seal`, `inspectPdf`, `sealCertificate`, `createDevSeal` and the drawing helpers. | Node                    |
+| `codevibe-sign/core`   | Types, the signing rules and `verifyChain` for the audit log. No I/O.                                     | anywhere                |
+| `codevibe-sign/react`  | `SigningView`, `SignaturePad`, `FieldPlacer`; styles in `codevibe-sign/react/styles.css`.                 | browsers, needs `react` |
 
 ## Packages
 
-`codevibe-sign` re-exports these scoped packages. Install one directly if you only need that
-part.
+`codevibe-sign` re-exports these scoped packages, all Apache-2.0. Install one directly if you
+only need that part.
 
 | Package                                                                                              | What it does                                                         |
 | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`@codevibe_technology/sign-server`](https://www.npmjs.com/package/@codevibe_technology/sign-server) | HTTP API and runtime with adapters for storage, files, mail and OTP. |
 | [`@codevibe_technology/sign-client`](https://www.npmjs.com/package/@codevibe_technology/sign-client) | Typed client for the HTTP API, signing sessions and webhooks.        |
 | [`@codevibe_technology/sign-pdf`](https://www.npmjs.com/package/@codevibe_technology/sign-pdf)       | Draws fields, appends the certificate page, seals and verifies PDFs. |
 | [`@codevibe_technology/sign-core`](https://www.npmjs.com/package/@codevibe_technology/sign-core)     | Envelopes, routing, reminders, expiry and the audit chain. No I/O.   |
 | [`@codevibe_technology/sign-react`](https://www.npmjs.com/package/@codevibe_technology/sign-react)   | Signature pad, signing view and field placement components.          |
 
-Aadhaar eSign and templates are separate:
+Aadhaar eSign and templates are separate Apache-2.0 packages:
 [`@codevibe_technology/sign-aadhaar`](https://www.npmjs.com/package/@codevibe_technology/sign-aadhaar)
 and
 [`@codevibe_technology/sign-templates`](https://www.npmjs.com/package/@codevibe_technology/sign-templates).
+
+The server is not part of this package.
+[`@codevibe_technology/sign-server`](https://www.npmjs.com/package/@codevibe_technology/sign-server)
+is licensed under AGPL-3.0-only and is installed on its own, or run from the Docker image.
 
 ## Learn more
 
@@ -229,8 +206,8 @@ and
 
 ## Licence
 
-This package is Apache-2.0 © Codevibe. The server it re-exports (`codevibe-sign/server` and
-`codevibe-sign start`) comes from `@codevibe_technology/sign-server` under AGPL-3.0-only, which
-is free to use and self-host, including inside your company; you only have to share changes
-if you offer a modified server to others over a network. See
+Apache-2.0 © Codevibe. Everything `npm i codevibe-sign` installs from Codevibe is Apache-2.0:
+this package and the `sign-client`, `sign-pdf` and `sign-core` packages it depends on, with
+`sign-react` bundled in. None of it is AGPL code. The signing server and the web app are
+separate and licensed under AGPL-3.0-only; see
 [LICENSING.md](https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md).

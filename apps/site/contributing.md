@@ -66,14 +66,21 @@ Keep each pull request to one concern. CI runs lint, format check, build, type c
 on Node 22 and 24. A maintainer reviews every pull request, and changes to sealing,
 verification, authentication or the audit log get a second review.
 
-Sign off every commit with `git commit -s`. The `Signed-off-by: Your Name <you@example.com>` line
-certifies the
-[Developer Certificate of Origin 1.1](https://github.com/codevibe-technology/codevibe-sign/blob/main/DCO):
-that you wrote the change or have the right to submit it. Use your real name, matching the commit
-author. A maintainer checks sign-offs before merging.
+## Contributor licence agreement
 
-By contributing you agree that your contributions are licensed under the licence of the part you
-change: Apache-2.0 for the libraries, AGPL-3.0-only for `packages/server` and the apps (see
+Before your first pull request is merged, you sign the
+[contributor licence agreement](https://github.com/codevibe-technology/codevibe-sign/blob/main/CLA.md).
+The CLA Assistant asks for it with a comment on the pull request, and you sign by replying with
+the sentence it shows. You keep the ownership of what you contribute; the agreement gives
+Codevibe Technology Private Limited a licence to publish it and the right to relicense it, and
+it commits Codevibe to keep accepted contributions available under the project's open-source
+licence. You do not need to sign off commits.
+
+If you contribute as part of your job, your employer signs the
+[corporate agreement](https://github.com/codevibe-technology/codevibe-sign/blob/main/CLA-CORPORATE.md)
+instead. Both texts are marked "draft, for legal review" until the final wording is approved.
+
+Your contributions are published under the licence of the part you change: Apache-2.0 for the
+libraries, AGPL-3.0-only for `packages/server` and the apps (see
 [LICENSING.md](https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md)). The
-server and the apps are also offered under a commercial licence, so outside pull requests to those
-parts will also need a short contributor licence agreement, linked here before we accept them.
+server and the apps are also offered under a commercial licence, which the agreement allows.

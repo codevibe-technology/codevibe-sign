@@ -3,7 +3,7 @@ import type { Clock, Hasher, IdGenerator, RandomSource } from './ports';
 function webCrypto(): Crypto {
   const crypto = globalThis.crypto;
   if (!crypto?.subtle) {
-    throw new Error('Web Crypto is not available in this runtime (Node 20+ or a modern browser).');
+    throw new Error('Web Crypto is not available in this runtime (Node 22+ or a modern browser).');
   }
   return crypto;
 }

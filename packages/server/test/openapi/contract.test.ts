@@ -182,8 +182,14 @@ describe('a full run against the server', () => {
       documents: [{ key: 'offer', name: 'offer.pdf', content }],
       recipients: [
         { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_otp' },
-        { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', role: 'approver' },
-        { key: 'hr', name: 'HR', email: 'hr@example.com', role: 'viewer' },
+        {
+          key: 'ravi',
+          name: 'Ravi Kumar',
+          email: 'ravi@example.com',
+          role: 'approver',
+          auth: 'email_link',
+        },
+        { key: 'hr', name: 'HR', email: 'hr@example.com', role: 'viewer', auth: 'email_link' },
       ],
       fields: [
         { recipient: 'asha', type: 'signature', page: 1, x: 72, y: 600, width: 180, height: 48 },

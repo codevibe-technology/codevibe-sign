@@ -212,6 +212,10 @@ reordering keys or spelling out a default keeps the version, while any change to
 envelope would contain gives a new one. Store templates by version if you need to show later
 exactly which definition produced an envelope.
 
+## Docs
+
+Guides and the full API reference are at [sign.codevibe.in](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-templates&utm_content=body).
+
 ## Licence
 
 Apache-2.0 © Codevibe

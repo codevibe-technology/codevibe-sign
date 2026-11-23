@@ -3,17 +3,18 @@
 Send documents for signature in minutes and get back a sealed PDF anyone can check. Codevibe
 Sign is open-source e-signing: upload a PDF, add who signs, place the fields and send. Signers
 sign in their browser, with no account. The finished PDF carries a PAdES seal, a signing
-certificate and a hash-chained audit trail that can be verified offline. Use it on the free
-cloud, run the same app on your own server with Docker, or build signing into your own product
-with the TypeScript libraries.
+certificate and a hash-chained audit trail that can be verified offline. Start on the Free plan
+at sign.codevibe.in, run the same app on your own server with Docker at no cost and with no
+limits, or build signing into your own product with the TypeScript libraries.
 
 **[Website](https://sign.codevibe.in)** · **[Docs](https://sign.codevibe.in/docs)** ·
 **[Self-hosting runbook](deploy/README.md)** · **[npm](https://www.npmjs.com/package/codevibe-sign)**
 
 ## Get started
 
-**Cloud.** Create a free workspace at [sign.codevibe.in](https://sign.codevibe.in). A sample
-agreement is waiting in it, so you can send yourself a document and sign it in a minute.
+**Cloud.** Create a workspace on the Free plan at [sign.codevibe.in](https://sign.codevibe.in).
+A sample agreement is waiting in it, so you can send yourself a document and sign it in a
+minute. See [Plans](#plans) for what Free includes.
 
 **Self-host the app with Docker.** The web app, its HTTP API and these docs, with PostgreSQL,
 behind your Traefik. No limits, and your documents never leave your server.
@@ -32,18 +33,28 @@ backups, a restore drill and upgrades.
 **Use the libraries.** Add signing to your own Node or React app:
 
 ```sh
-npm i codevibe-sign              # or try the server first: npx codevibe-sign start --memory
+npm i codevibe-sign
 ```
 
-See [Using the libraries](#using-the-libraries) below.
+`codevibe-sign` is Apache-2.0 from end to end: the API client, the PDF tools, the core rules,
+the React components and a command line. See [Using the libraries](#using-the-libraries) below.
 
-**Licence in short.** The libraries are Apache-2.0: use them in any product, open or closed.
-The server and the web app are AGPL-3.0: run and change them freely, and share your changes if
-you offer a modified version to others over a network. The Codevibe names and logos are not
-covered by either licence. Details in [LICENSING.md](LICENSING.md).
+**Licence in short.** The libraries, `codevibe-sign` included, are Apache-2.0: use them in any
+product, open or closed. The server (`@codevibe_technology/sign-server`) and the web app are
+AGPL-3.0: run and change them freely, and share your changes if you offer a modified version to
+others over a network. `npm i codevibe-sign` never installs AGPL code. The Codevibe names and
+logos are not covered by either licence. Details in [LICENSING.md](LICENSING.md).
 
 > Status: pre-release. The packages are under active development and the APIs below may change
-> before 0.1.
+> before 1.0.
+
+## Plans
+
+| Plan      | Price                         | What you get                                                                                                          |
+| --------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Free      | Rs 0                          | A workspace on sign.codevibe.in: 10 envelopes a month, 3 members, 5 templates, 1 webhook and the API.                 |
+| Cloud     | Coming soon, upgrade by email | Higher limits, your own signing domain and no badge. Write to hello@codevibe.in from a Free workspace to be upgraded. |
+| Self-host | Free and unlimited            | The same app on your own server with Docker. No usage limits, and your documents never leave your server.             |
 
 ## Features
 
@@ -58,7 +69,8 @@ covered by either licence. Details in [LICENSING.md](LICENSING.md).
 - An append-only audit log chained with SHA-256.
 - Templates and bulk send from a CSV, in the web app.
 - Signed outbound webhooks with retries.
-- Optional Aadhaar eSign through your own account with a licensed provider.
+- An Aadhaar eSign library (`@codevibe_technology/sign-aadhaar`) for your own account with a
+  licensed provider. It is standalone for now: the server and the web app do not call it yet.
 - React components for signing and field placement, unstyled and themed with CSS variables.
 
 ## How it works
@@ -76,18 +88,19 @@ covered by either licence. Details in [LICENSING.md](LICENSING.md).
 
 ## Packages
 
-| Package                                                 | What it does                                                                                     |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [`codevibe-sign`](packages/codevibe-sign)               | The one to install: all of the below behind subpath imports, plus the CLI.                       |
-| [`@codevibe_technology/sign-core`](packages/core)       | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O.          |
-| [`@codevibe_technology/sign-pdf`](packages/pdf)         | Draws fields, appends the certificate page, seals and verifies PDFs.                             |
-| [`@codevibe_technology/sign-server`](packages/server)   | HTTP API and runtime with adapters for storage, files, mail and OTP.                             |
-| [`@codevibe_technology/sign-client`](packages/client)   | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.             |
-| [`@codevibe_technology/sign-react`](packages/react)     | Signature pad, signing view and field placement components.                                      |
-| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.                          |
-| [`apps/web`](apps/web)                                  | The web app: workspaces, sending, templates, bulk send, webhooks, signing page, docs at `/docs`. |
-| [`apps/server`](apps/server)                            | Docker image of the standalone service.                                                          |
-| [`examples/`](examples)                                 | Runnable examples: embedding the server, handling webhooks, a React signing page.                |
+| Package                                                     | Licence    | What it does                                                                                            |
+| ----------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| [`codevibe-sign`](packages/codevibe-sign)                   | Apache-2.0 | The library package to install: client, PDF tools, core and React behind subpath imports, plus the CLI. |
+| [`@codevibe_technology/sign-core`](packages/core)           | Apache-2.0 | Domain model and rules: envelopes, routing, reminders, expiry, the audit chain. No I/O.                 |
+| [`@codevibe_technology/sign-pdf`](packages/pdf)             | Apache-2.0 | Draws fields, appends the certificate page, seals and verifies PDFs.                                    |
+| [`@codevibe_technology/sign-client`](packages/client)       | Apache-2.0 | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.                    |
+| [`@codevibe_technology/sign-react`](packages/react)         | Apache-2.0 | Signature pad, signing view and field placement components.                                             |
+| [`@codevibe_technology/sign-templates`](packages/templates) | Apache-2.0 | Reusable templates with roles, prefilled fields and bulk send from CSV.                                 |
+| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar)     | Apache-2.0 | Aadhaar eSign through a licensed eSign provider, with your own account. Standalone for now.             |
+| [`@codevibe_technology/sign-server`](packages/server)       | AGPL-3.0   | HTTP API and runtime with adapters for storage, files, mail and OTP, and the `start` command.           |
+| [`apps/web`](apps/web)                                      | AGPL-3.0   | The web app: workspaces, sending, templates, bulk send, webhooks, signing page, docs at `/docs`.        |
+| [`apps/server`](apps/server)                                | AGPL-3.0   | Docker image of the standalone service.                                                                 |
+| [`examples/`](examples)                                     | Apache-2.0 | Runnable examples: embedding the server, handling webhooks, a React signing page.                       |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
@@ -96,13 +109,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 ### Try it in a minute
 
 ```sh
-npx codevibe-sign start --memory
+npx @codevibe_technology/sign-server start --memory
 ```
 
-This runs the server with everything in memory: a generated seal certificate, emails and
-one-time codes printed to the terminal, and a fresh API key. Send it a PDF with the `curl`
-command it prints, sign through the link that appears in its output, then check the sealed
-file with `npx codevibe-sign verify signed.pdf`. Nothing is saved when it stops.
+This runs the server (its own AGPL-3.0 package) with everything in memory: a generated seal
+certificate, emails and one-time codes printed to the terminal, and a fresh API key. Send it a
+PDF with the `curl` command it prints, sign through the link and the code that appear in its
+output, then check the sealed file with `npx codevibe-sign verify signed.pdf`. Nothing is saved
+when it stops.
 
 ### Install
 
@@ -110,15 +124,22 @@ file with `npx codevibe-sign verify signed.pdf`. Nothing is saved when it stops.
 npm i codevibe-sign
 ```
 
-One package with subpath imports, so each bundle only carries what it uses:
-`codevibe-sign/server`, `codevibe-sign/client`, `codevibe-sign/pdf`, `codevibe-sign/core` and
-`codevibe-sign/react`. The [package README](packages/codevibe-sign) lists the CLI commands.
+One Apache-2.0 package with subpath imports, so each bundle only carries what it uses:
+`codevibe-sign/client`, `codevibe-sign/pdf`, `codevibe-sign/core` and `codevibe-sign/react`.
+The [package README](packages/codevibe-sign) lists the CLI commands: `verify`, `inspect`,
+`keygen`, `hash` and `api-key`.
 
 ### Embed the server
 
+The server is a separate package under AGPL-3.0:
+
+```sh
+npm i @codevibe_technology/sign-server
+```
+
 ```ts check
 import { readFile } from 'node:fs/promises';
-import { startSignServer } from 'codevibe-sign/server';
+import { startSignServer } from '@codevibe_technology/sign-server';
 
 const sign = await startSignServer({
   databaseUrl: process.env.DATABASE_URL!,
@@ -204,8 +225,8 @@ docs) runs from [deploy/](deploy/README.md) with Docker Compose. For only the HT
 `apps/server` builds a Docker image that runs the standalone service from environment
 variables: a PostgreSQL `DATABASE_URL`, a directory for files, SMTP settings, your sealing
 certificate as a PKCS#12 file and the API keys your backend uses. See
-[apps/server/README.md](apps/server/README.md). Without Docker, `npx codevibe-sign start` runs
-the same service from the same variables. You run it, so documents, keys and personal data
+[apps/server/README.md](apps/server/README.md). Without Docker,
+`npx @codevibe_technology/sign-server start` runs the same service from the same variables. You run it, so documents, keys and personal data
 never leave your infrastructure.
 
 ## Security
@@ -229,9 +250,10 @@ Codevibe Sign supports two kinds of signature. Under Indian law:
   valid and enforceable (Information Technology Act 2000, s.10A, with the Indian Contract Act).
   The audit trail and the sealed file are the evidence of who agreed and when. This suits offer
   letters, policies, NDAs and most business documents.
-- **Aadhaar eSign** (`@codevibe_technology/sign-aadhaar`). An electronic signature under IT Act s.3A, using a
-  technique in the Second Schedule, issued through a licensed eSign Service Provider. Use it, or
-  a DSC, where a law requires a document to be signed in that statutory sense.
+- **Aadhaar eSign** (`@codevibe_technology/sign-aadhaar`). An electronic signature under IT Act
+  s.3A, using a technique in the Second Schedule, issued through a licensed eSign Service
+  Provider. Use it, or a DSC, where a law requires a document to be signed in that statutory
+  sense. The package is a standalone library today and is not yet wired into the server.
 
 Some documents cannot be signed electronically at all. The IT Act's First Schedule, as amended
 by notification S.O. 4720(E) of 26 September 2022, excludes:
@@ -257,7 +279,8 @@ document.
 
 ## Roadmap
 
-- Aadhaar eSign on the cloud, through a licensed eSign provider.
+- The Cloud plan on sign.codevibe.in.
+- Aadhaar eSign in the server and the web app, through a licensed eSign provider.
 - More eSign providers behind the same `EsignProvider` interface.
 - Translations of the signing experience and emails (i18n).
 
@@ -265,12 +288,12 @@ Ideas and pull requests are welcome; open an issue to discuss larger changes fir
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commands, the commit convention and how
-releases work. Everyone taking part agrees to the [Code of Conduct](CODE_OF_CONDUCT.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commands, the commit convention, the
+contributor licence agreement and how releases work. Everyone taking part agrees to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 
-The libraries are Apache-2.0, so you can use them in any product. The server and the apps are
-AGPL-3.0: free to use and self-host, and if you offer a modified version to others as a hosted
-service you share your changes. [LICENSING.md](LICENSING.md) explains it in plain words. The
+The libraries are Apache-2.0, so you can use them in any product; `npm i codevibe-sign` only
+ever installs Apache-2.0 code. The server and the apps are AGPL-3.0: free to use and self-host,
+and if you offer a modified version to others as a hosted service you share your changes. [LICENSING.md](LICENSING.md) explains it in plain words. The
 licences do not cover the Codevibe names and logos; see [TRADEMARKS.md](TRADEMARKS.md).

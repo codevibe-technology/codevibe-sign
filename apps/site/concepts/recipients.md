@@ -26,18 +26,17 @@ the next order after the highest one so far.
 
 | Method       | How the recipient proves it is them                                                  |
 | ------------ | ------------------------------------------------------------------------------------ |
-| `email_link` | Opening the private signing link sent to their email. The default.                   |
-| `email_otp`  | The link, plus a six-digit code sent by email.                                       |
+| `email_otp`  | The link, plus a six-digit code sent by email. The default.                          |
+| `email_link` | Opening the private signing link sent to their email.                                |
 | `sms_otp`    | The link, plus a six-digit code sent by SMS. Default when only a phone is given.     |
 | `aadhaar`    | Aadhaar eSign through your provider. See [Aadhaar eSign](/guides/aadhaar-leegality). |
 
 The method used is recorded in the audit log and printed on the certificate page.
 
 `email_link` proves only that someone could open the recipient's inbox, so a forwarded link is
-enough to sign. A one-time code is stronger evidence. The web app therefore starts every new
-signer and template role on `email_otp`; senders can still pick the link alone. The HTTP API and
-the core builder keep `email_link` as their default so existing integrations behave the same:
-pass `auth: 'email_otp'` to ask for a code.
+enough to sign. A one-time code is stronger evidence, so it is the default everywhere: the web
+app, the HTTP API, templates and the core builder all start a recipient with an email address on
+`email_otp`. Pass `auth: 'email_link'` when the link alone is enough for a document.
 
 ## Status
 

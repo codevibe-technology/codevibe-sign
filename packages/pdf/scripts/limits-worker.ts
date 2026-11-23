@@ -17,7 +17,7 @@ async function bundleLimitsWorker(): Promise<string> {
     bundle: true,
     platform: 'node',
     format: 'cjs',
-    target: 'node20',
+    target: 'node22',
     minify: true,
     legalComments: 'inline',
     write: false,

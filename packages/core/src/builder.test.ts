@@ -148,7 +148,7 @@ describe('addRecipient', () => {
     expect(a.recipient).toMatchObject({
       role: 'signer',
       order: 1,
-      auth: 'email_link',
+      auth: 'email_otp',
       status: 'pending',
       email: 'asha@example.com',
     });

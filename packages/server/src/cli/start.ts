@@ -1,24 +1,18 @@
 import { randomBytes } from 'node:crypto';
 import { createServer, type AddressInfo } from 'node:net';
 import { SignError } from '@codevibe_technology/sign-core';
-import { sealCertificate } from '@codevibe_technology/sign-pdf';
-import {
-  configFromEnv,
-  consoleMailer,
-  consoleOtpSender,
-  createSignServer,
-  listen,
-  memoryFileStore,
-  memoryStore,
-  startSignServer,
-  type EnvVars,
-  type SealerOptions,
-} from '@codevibe_technology/sign-server';
-import { createDevSeal } from '../dev-seal';
+import { createDevSeal, sealCertificate } from '@codevibe_technology/sign-pdf';
+import { consoleMailer, consoleOtpSender } from '../adapters/mail';
+import { memoryFileStore } from '../adapters/files';
+import { configFromEnv, type EnvVars } from '../env';
+import { listen, startSignServer } from '../node';
+import type { SealerOptions } from '../options';
+import { createSignServer } from '../server';
+import { memoryStore } from '../store/memory';
 import { VERSION } from './version';
 import { EXIT, painter, parse, readInput, rows, UsageError, type Command, type Io } from './io';
 
-/** Resolves on SIGINT or SIGTERM; tests and embedders can pass their own. */
+/** Resolves on SIGINT or SIGTERM; tests can pass their own. */
 export type StopSignal = () => Promise<NodeJS.Signals>;
 
 const processSignal: StopSignal = () =>
@@ -174,8 +168,8 @@ async function startStandalone(env: EnvVars, io: Io, stop: StopSignal): Promise<
   } catch (error) {
     if (error instanceof SignError && error.code === 'VALIDATION') {
       io.err(
-        `${error.message}\n\nSet them as environment variables or flags (codevibe-sign start --help).\n` +
-          `To try it without any setup: codevibe-sign start --memory`,
+        `${error.message}\n\nSet them as environment variables or flags (codevibe-sign-server start --help).\n` +
+          `To try it without any setup: codevibe-sign-server start --memory`,
       );
       return EXIT.usage;
     }
@@ -197,7 +191,7 @@ async function startStandalone(env: EnvVars, io: Io, stop: StopSignal): Promise<
         ['Seal', sealNote],
         ['API keys', `${config.server.apiKeys.length} from API_KEYS`],
       ]) +
-      `\n\nNew API key: run codevibe-sign api-key, add it to API_KEYS and restart.\n` +
+      `\n\nNew API key: run npx codevibe-sign api-key, add it to API_KEYS and restart.\n` +
       `Press Ctrl+C to stop.`,
   );
   const signal = await stop();
@@ -211,8 +205,8 @@ export function startCommand(stop: StopSignal = processSignal): Command {
     name: 'start',
     summary: 'Run the signing server (add --memory to try it with no setup)',
     help: `Usage
-  codevibe-sign start --memory [options]   try it: in-memory, nothing to set up
-  codevibe-sign start [options]            the real service, from environment variables
+  codevibe-sign-server start --memory [options]   try it: in-memory, nothing to set up
+  codevibe-sign-server start [options]            the real service, from environment variables
 
 --memory keeps everything in memory, seals with a generated self-signed certificate,
 prints emails and one-time codes to the console and prints a fresh API key. For local
@@ -237,8 +231,8 @@ The seal passphrase, SMTP password and API keys are read from the environment on
 Variables: https://sign.codevibe.in/getting-started/docker?utm_source=cli
 
 Examples
-  npx codevibe-sign start --memory
-  SEAL_P12_PASSPHRASE=... codevibe-sign start --seal seal.p12 --public-url https://sign.example.com`,
+  npx @codevibe_technology/sign-server start --memory
+  SEAL_P12_PASSPHRASE=... codevibe-sign-server start --seal seal.p12 --public-url https://sign.example.com`,
 
     async run(args, io) {
       const { values, positionals } = parse(args, FLAGS);

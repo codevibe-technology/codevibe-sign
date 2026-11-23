@@ -151,7 +151,7 @@ export function parseRecipients(body: Obj, existingIds: Id[]): RecipientSpec[] {
     const path = `recipients[${i}].`;
     const r = parseJsonObject(raw, `recipients[${i}]`);
     const role = oneOf(r, 'role', path, ROLES, 'signer');
-    const auth = oneOf(r, 'auth', path, AUTH, 'email_link');
+    const auth = oneOf(r, 'auth', path, AUTH, 'email_otp');
     const email = str(r, 'email', path, { max: 254, optional: true })?.toLowerCase();
     const phone = str(r, 'phone', path, { max: 20, optional: true });
     if (email !== undefined && !EMAIL.test(email)) {

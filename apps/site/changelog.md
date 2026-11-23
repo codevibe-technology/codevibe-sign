@@ -9,7 +9,8 @@ description: Where to find release notes for each Codevibe Sign package.
 import { GITHUB_URL } from './.vitepress/site';
 </script>
 
-There are no releases yet. The packages are pre-release and their APIs may change before 0.1.
+The first release is 0.1.0. All eight packages share one version number and are released
+together. Their APIs may change in a minor release before 1.0.
 
 Each package keeps its own `CHANGELOG.md`, written by changesets at release time. Release notes
 will also be published on <a :href="`${GITHUB_URL}/releases`">GitHub releases</a>.

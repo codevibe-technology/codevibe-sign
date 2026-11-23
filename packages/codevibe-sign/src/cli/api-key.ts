@@ -17,7 +17,7 @@ Options
 
 Examples
   codevibe-sign api-key
-  API_KEYS="$(codevibe-sign api-key)" codevibe-sign start`,
+  API_KEYS="$(codevibe-sign api-key)" npx @codevibe_technology/sign-server start`,
 
   async run(args, io) {
     const { values, positionals } = parse(args, { json: { type: 'boolean' } });

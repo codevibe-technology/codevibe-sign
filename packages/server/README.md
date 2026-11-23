@@ -5,6 +5,10 @@ one-time codes, runs signing sessions, delivers signed webhooks and produces the
 with its certificate page. It is a [Hono](https://hono.dev) app, so you can mount it in your
 own server or run it on its own.
 
+This package is licensed under AGPL-3.0-only, unlike the Codevibe Sign libraries, which are
+Apache-2.0. Running it unchanged, or calling its API from your own product, asks nothing of
+you; see [Licence](#licence).
+
 The rules (who signs when, reminders, expiry, the audit chain) come from
 `@codevibe_technology/sign-core`; drawing, the certificate page and the PAdES seal come from
 `@codevibe_technology/sign-pdf`.
@@ -15,7 +19,39 @@ The rules (who signs when, reminders, expiry, the audit chain) come from
 pnpm add @codevibe_technology/sign-server
 ```
 
-Node 20 or later.
+Node 22 or later.
+
+## Run it from the command line
+
+The package ships a `codevibe-sign-server` command. Try the server with nothing to set up:
+
+```sh
+npx @codevibe_technology/sign-server start --memory
+```
+
+`--memory` keeps everything in memory, seals with a generated self-signed certificate, prints
+emails and one-time codes to the terminal and prints a fresh API key. It is for local
+development only: everything is gone when it stops.
+
+Without `--memory` it runs the same service as the Docker image, from the same environment
+variables:
+
+```sh
+npx @codevibe_technology/sign-server start
+npx @codevibe_technology/sign-server start --seal seal.p12 --public-url https://sign.example.com
+```
+
+It reads `DATABASE_URL`, `PUBLIC_URL`, `API_KEYS`, `SEAL_P12_BASE64`, `SEAL_P12_PASSPHRASE`,
+`SMTP_HOST`, `SMTP_FROM` and the optional ones in the
+[variable reference](https://sign.codevibe.in/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=sign-server&utm_content=body).
+`--port`, `--host`, `--public-url`, `--database-url`, `--files-dir` and `--seal <file.p12>`
+override their variable. Passwords and keys are read from the environment only. Every missing
+or invalid variable is reported at once, by name, and `Ctrl+C` lets running work finish before
+it exits.
+
+Self-hosting is either this command or the Docker image. To make a development certificate or
+an API key, use the Apache-2.0 tools: `npx codevibe-sign keygen --out seal.p12` and
+`npx codevibe-sign api-key`.
 
 ## Standalone example
 
@@ -111,6 +147,10 @@ All sender routes need `Authorization: Bearer <api key>`. POST routes accept an
 | `GET /v1/envelopes/:id/documents/:docId`              | The sealed PDF once complete, else the original (`?version=`).                                          |
 | `GET /v1/envelopes/:id/documents/:docId/verification` | `verify()` on the stored sealed file: `{ valid, reason, signer, signedAt, certificateSha256, sha256 }`. |
 | `GET /v1/envelopes/:id/certificate`                   | Hashes, recipients and their actions, as JSON.                                                          |
+
+A recipient with an email address signs with `auth: 'email_otp'` unless the request says
+otherwise: the signing link plus a six-digit code sent by email. Pass `auth: 'email_link'` when
+the link alone is enough, or `sms_otp` with a phone number.
 
 ```json
 {
@@ -382,4 +422,11 @@ anything that looks like a signing token are replaced, and fields such as `autho
 
 ## Licence
 
-AGPL-3.0-only © Codevibe. See [LICENSING.md](../../LICENSING.md).
+AGPL-3.0-only © Codevibe. You can use, self-host and change the server freely, including
+inside your company. If you let other people use a modified version over a network, you offer
+them your changes under the same licence. A commercial licence is available from
+hello@codevibe.in. See
+[LICENSING.md](https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md).
+
+Guides and the HTTP API reference are at
+[sign.codevibe.in](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-server&utm_content=body).
