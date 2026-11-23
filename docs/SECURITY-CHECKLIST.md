@@ -27,9 +27,8 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       The server refuses to start with a shorter key, a SHA-1 certificate or an expired one.
       `sealer.allowWeakKey` exists for throwaway keys in local development; never set it in
       production.
-- [ ] Prefer a certificate from a CA that Adobe Reader trusts (AATL) if recipients will open the
-      sealed files in Reader. A self-issued certificate still detects changes but shows as
-      "unknown signer".
+- [ ] Any certificate detects changes. Use one from a public document-signing CA if recipients'
+      PDF readers should name the sealer on their own, without adding your certificate.
 - [ ] Keep the PKCS#12 file and its passphrase in a secret manager (Docker or Kubernetes secrets,
       Vault, a cloud KMS or secret store). Never commit them, never bake them into an image, and
       never put them in a `.env` file that is copied around.
@@ -191,8 +190,9 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 
 ## Before go-live
 
-- [ ] Send a test envelope end to end, open the sealed PDF in Adobe Reader and confirm the seal
-      shows as valid and the certificate page lists the right people and times.
+- [ ] Send a test envelope end to end, check the sealed PDF on the verify page and in a PDF
+      reader that checks signatures, and confirm the certificate page lists the right people
+      and times and its QR code opens the record.
 - [ ] Change one byte of the sealed file and confirm `verify()` and Reader both report it, and
       that `GET /v1/envelopes/:id/documents/:docId/verification` reports the stored file as
       valid.

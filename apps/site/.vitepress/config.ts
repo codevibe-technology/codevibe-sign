@@ -198,7 +198,7 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
             { text: 'Add the React signing view', link: '/guides/react-signing-view' },
             { text: 'Reuse a document with templates', link: '/guides/templates' },
             { text: 'Verify a sealed PDF', link: '/guides/verify-pdf' },
-            { text: 'Trust the seal in Adobe', link: '/guides/trust-seal-adobe' },
+            { text: 'How the seal works in PDF readers', link: '/guides/seal-in-pdf-readers' },
             { text: 'Electronic evidence (s.63 BSA)', link: '/guides/section-63-certificate' },
             { text: 'Aadhaar eSign with Leegality', link: '/guides/aadhaar-leegality' },
             { text: 'Webhooks', link: '/guides/webhooks' },

@@ -253,7 +253,7 @@ are typed placeholders in this version: each call fails with `SEAL_FAILED` and
 `details.provider`.
 
 The certificate is the operator's, not the signer's: it proves the file has not changed
-since sealing. Signer intent is proven by the certificate pages and the audit trail.
+since sealing. Signer intent is proven by the certificate page and the audit trail.
 Errors: `SEAL_FAILED` (bad file or passphrase, no RSA key, weak key or certificate with
 `details.keyBits` or `details.signatureAlgorithm`, certificate not valid at the signing time,
 a certificate profile problem with `details.reason`, a timestamp failure), `PDF_ALREADY_SIGNED`

@@ -174,13 +174,21 @@ shred -u seal.key
 ```
 
 Either kind proves the document has not changed since it was sealed. To have PDF readers
-also show the signer as trusted without importing your root, buy a document-signing
-certificate from a certificate authority on the Adobe trust list and put its `.p12` (with
-its chain) here instead.
+also name the sealer as trusted on their own, buy a document-signing certificate from a
+certificate authority on the readers' trust lists and put its `.p12` (with its chain) here
+instead.
 
 Put a copy of `seal.p12` and `.env` in your password manager or secrets store. Losing the
 seal does not break documents already sealed, but new ones would carry a different
 certificate.
+
+### Public record pages
+
+Each sealed document's certificate page carries a QR code and a link to
+`<APP_URL>/r/<record id>`: a public page with the seal status, the signers and the audit trail,
+never the document. Keep `APP_URL` at the address people can reach, because it is printed
+inside the sealed files. An admin can turn records off for a workspace in **Settings >
+Workspace**; certificates are then printed without a code.
 
 ### Timestamps
 

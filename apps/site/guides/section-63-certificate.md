@@ -71,13 +71,14 @@ For each signed document:
 
    Print the result, or a screenshot of the verify page, as the hash report.
 
-3. **The signing certificate pages** at the end of the sealed PDF. They list each recipient,
-   how they proved who they were, their IP address, browser and the time of each action, the
-   SHA-256 of the original file and the head of the audit chain.
+3. **The signing certificate page** at the end of the sealed PDF. It lists each recipient,
+   how they proved who they were and when they signed, the SHA-256 of the original file and
+   the head of the audit chain. The audit trail, with the IP address and browser of each
+   action, is on the envelope page for workspace members and can be exported from there.
 4. **The verify page result**, which shows that the seal is intact, which certificate made it
    and that the audit chain still matches.
 5. **The seal certificate** and its fingerprint, from
-   [Trust the Codevibe Sign seal in Adobe](/guides/trust-seal-adobe), if the other side wants
+   [How the seal works in PDF readers](/guides/seal-in-pdf-readers), if the other side wants
    to check the seal independently.
 
 ### Filling in Part A for a Codevibe Sign record

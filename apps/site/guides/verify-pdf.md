@@ -1,19 +1,35 @@
 ---
 title: Verify a sealed PDF
-description: Check that a sealed PDF has not changed and that its audit chain is intact, in Adobe Reader or in code.
+description: Check that a sealed PDF has not changed and that its audit chain is intact, from its QR code, on the verify page or in code.
 ---
 
 # Verify a sealed PDF
 
 A sealed file can be checked by anyone who has it, without contacting the server that made it.
 
-## In Adobe Reader
+## From the certificate page
 
-Open the file and the signature panel. Reader shows whether the document has been modified
-since it was sealed. If the operator's certificate comes from a trusted issuer, Reader also
-shows who sealed it; with a self-signed certificate it shows the identity as unknown, while
-still detecting changes. To make Reader trust the sign.codevibe.in seal, import its
-certificate: see [Trust the Codevibe Sign seal in Adobe](./trust-seal-adobe).
+The last page of a sealed PDF is its signing certificate: the document, who sent it, who
+signed, how and when, and the document's SHA-256 fingerprint. Scan the QR code on it, or open
+the link printed beside it, to see the public record of that signing at `/r/<record id>` on
+the install that sealed it. The record shows:
+
+- whether the sealed file kept by the install still passes its seal check and matches the
+  fingerprint recorded when it was sealed;
+- the title, completion time and sender, and each signer with a partly hidden email address,
+  the method and the time;
+- the fingerprints of the document as sent and as sealed;
+- the audit trail, with the result of the hash-chain check.
+
+It never shows the document, IP addresses, browser details or one-time codes. The
+certificate and the audit trail can be downloaded from it as PDF, and the trail as JSON. The
+record id is a random 144-bit value, not the envelope id. Whoever sent the envelope can turn
+its record off from the envelope page, and a workspace can turn records off altogether in
+**Settings > Workspace**; the link then answers "not available" and new certificates carry no
+QR code.
+
+A PDF reader that checks digital signatures also reports whether the file changed after
+sealing; see [How the seal works in PDF readers](./seal-in-pdf-readers).
 
 ## On the verify page
 

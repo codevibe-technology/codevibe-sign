@@ -37,7 +37,7 @@ const features = [
   },
   {
     title: 'PAdES seal',
-    text: 'The final PDF carries a PAdES signature made with your certificate. Any later edit shows up in Adobe Reader.',
+    text: 'The final PDF carries a PAdES signature made with your certificate. Any later edit breaks the seal.',
   },
   {
     title: 'Aadhaar eSign',
@@ -76,7 +76,7 @@ const faqs = [
   },
   {
     q: 'What certificate do I need to seal files?',
-    a: 'A PKCS#12 file with a certificate and key. It identifies you as the operator, not the signer. A self-signed certificate works for testing; for files other people will open in Adobe Reader, use one from a trusted issuer.',
+    a: 'A PKCS#12 file with a certificate and key. It identifies you as the operator, not the signer. A self-signed certificate works for testing; in production, use one from a certificate authority.',
   },
   {
     q: 'Does Codevibe sell Aadhaar eSign?',

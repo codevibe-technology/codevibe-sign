@@ -44,7 +44,7 @@ Envelope ──< Document ──< Field >── Recipient
   `signature`, `initials`, `date_signed`, `name`, `text`, `checkbox`. Each field
   belongs to one recipient and may be required.
 - **AuditEvent**: every action, append-only, chained by SHA-256 (`hash = sha256(prevHash + canonical(event))`).
-  The chain is printed on the certificate page and can be verified offline.
+  The chain head is printed on the certificate page and the chain can be verified offline.
 
 ### Envelope status
 
@@ -74,11 +74,14 @@ ports they need as arguments; nothing is global.
 ## Sealing
 
 1. Draw every field value onto the original pages.
-2. Append a certificate page: envelope id, document SHA-256 before and after,
-   each recipient (name, email or phone, authentication used, IP, user agent,
-   time of each action) and the audit chain head hash.
+2. Append a one-page certificate: document title, envelope id, status and completion
+   time, sender, each recipient (name, masked email or phone, authentication used,
+   time of signing), the document SHA-256, the audit chain head hash and, when the
+   integrator supplies one, a QR code and link to a record page. IP addresses, user
+   agents and the event list stay in the audit log, not in the file.
 3. Apply a PAdES-B detached signature with the operator's certificate (PKCS#12).
-   Any later edit makes the seal invalid in Adobe Reader and in `verify()`.
+   It covers the whole file, certificate page included; any later edit makes the
+   seal invalid in `verify()` and in PDF readers that check signatures.
 
 The operator certificate is the platform's, not the signer's: it proves the file
 has not changed since sealing. Signer intent is proven by the audit trail.

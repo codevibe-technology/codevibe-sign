@@ -64,7 +64,7 @@ logos are not covered by either licence. Details in [LICENSING.md](LICENSING.md)
 - Signer authentication by email link, email OTP or SMS OTP, with rate limits.
 - Signatures drawn, typed or uploaded.
 - A sealed PDF: field values flattened onto the pages, a certificate page appended and a PAdES
-  signature applied with your certificate, so any later edit shows up in Adobe Reader and in
+  signature applied with your certificate, so any later edit breaks the seal and shows up in
   `verify()`.
 - An append-only audit log chained with SHA-256.
 - Templates and bulk send from a CSV, in the web app.
@@ -81,8 +81,8 @@ logos are not covered by either licence. Details in [LICENSING.md](LICENSING.md)
    order are notified. Each one opens the link, authenticates if required, fills their fields
    and signs or declines. Every step is recorded in the audit log.
 3. **Seal.** After the last required action, the server draws the values onto the pages,
-   appends the certificate page (document hashes, each recipient's actions, IP and user agent,
-   the audit chain head) and applies the seal.
+   appends the certificate page (who signed, how and when, the document fingerprint, the audit
+   chain head and a QR code to the record) and applies the seal.
 4. **Verify.** Anyone with the file can check the seal and the audit chain, without contacting
    the server that produced it.
 

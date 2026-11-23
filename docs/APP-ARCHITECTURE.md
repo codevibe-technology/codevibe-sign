@@ -102,6 +102,28 @@ Rules the server enforces:
 - Idempotency keys and rate limits are scoped by workspace and principal.
 - A `readOnly` principal (the viewer role) may only use `GET` routes.
 
+### Public records
+
+A completed envelope gets a public record at `/r/<id>`: the page the QR code on its signing
+certificate opens. The id is 18 random bytes (144 bits) as base64url, made when the envelope is
+sealed (`certificateDetails` hook, `app_public_records`); it is not the envelope id and says
+nothing about it.
+
+- The page shows the seal status (the stored sealed file is verified and its SHA-256 compared
+  with the one recorded at sealing), title, completion time, sender, signers with masked
+  contact details, both fingerprints and the audit trail with the chain check. The view is
+  built field by field in `src/server/public-records.ts`: no IP address, browser, event data,
+  message, typed value or file key can reach it. The signed document is never served there.
+- Downloads: the certificate as its own PDF, and the audit trail as PDF or JSON, built from the
+  same stripped data.
+- Whoever may void the envelope may turn its record off and on again. A workspace can turn
+  records off in Settings (default on): no new records are made, certificates carry no QR
+  code and existing links stop answering. A revoked record, a workspace with records off and
+  an unknown id all answer the same 404.
+- `noindex` (meta, `X-Robots-Tag` and robots.txt), `Referrer-Policy: no-referrer`, no cache, no
+  third-party requests, and at most 60 views or downloads per client address in ten minutes.
+- The link uses `APP_URL`, so a self-hosted install prints its own host.
+
 ### Workspace addresses
 
 A workspace lives at `/dashboard/<slug>`. People choose the slug when they create the
@@ -218,29 +240,30 @@ server's migrations, then the app's, each recorded and taken under an advisory l
 migrations are plain SQL in `src/server/db/migrations.ts`, append only, never edited once
 released.
 
-| Table                           | Holds                                                                                                    |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `auth_users`                    | Person: name, email (unique, lower-case), avatar, email verified.                                        |
-| `auth_sessions`                 | Better Auth sessions (token, expiry, IP, user agent).                                                    |
-| `auth_accounts`                 | Linked sign-in methods (Google) and the password hash.                                                   |
-| `auth_verifications`            | Magic-link tokens.                                                                                       |
-| `app_workspaces`                | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                               |
-| `app_workspace_slug_history`    | `slug` (primary key): an old address, the workspace it leads to and when it was given up.                |
-| `app_workspace_address_changes` | Who changed a workspace's address, from what to what, and when.                                          |
-| `app_members`                   | `(workspace_id, user_id)` primary key, `role`.                                                           |
-| `app_invitations`               | `workspace_id`, `email`, optional `name`, `role`, token SHA-256, expiry (7 days), accepted / revoked.    |
-| `app_brand_settings`            | One row per workspace; see Branding.                                                                     |
-| `app_api_keys`                  | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked.              |
-| `app_user_preferences`          | `user_id`: theme, timezone, language.                                                                    |
-| `app_templates`                 | `workspace_id`, name, description, `definition` (roles, fields, documents, settings), archived time.     |
-| `app_bulk_sends`                | One bulk send: template, who started it, status (`sending`, `done`, `cancelled`), total, worker lease.   |
-| `app_bulk_send_rows`            | `(bulk_id, line)`: the people and metadata for one envelope, its status, envelope id or error.           |
-| `app_webhooks`                  | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.              |
-| `app_webhook_deliveries`        | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days. |
-| `app_usage`                     | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.      |
-| `app_plan_changes`              | Who moved a workspace from one plan to another, and when.                                                |
-| `app_first_run`                 | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.             |
-| `sign_*`                        | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                    |
+| Table                           | Holds                                                                                                       |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `auth_users`                    | Person: name, email (unique, lower-case), avatar, email verified.                                           |
+| `auth_sessions`                 | Better Auth sessions (token, expiry, IP, user agent).                                                       |
+| `auth_accounts`                 | Linked sign-in methods (Google) and the password hash.                                                      |
+| `auth_verifications`            | Magic-link tokens.                                                                                          |
+| `app_workspaces`                | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                                  |
+| `app_workspace_slug_history`    | `slug` (primary key): an old address, the workspace it leads to and when it was given up.                   |
+| `app_workspace_address_changes` | Who changed a workspace's address, from what to what, and when.                                             |
+| `app_public_records`            | `id` (the random id in `/r/<id>`), `workspace_id`, `envelope_id` (unique), when it was revoked and by whom. |
+| `app_members`                   | `(workspace_id, user_id)` primary key, `role`.                                                              |
+| `app_invitations`               | `workspace_id`, `email`, optional `name`, `role`, token SHA-256, expiry (7 days), accepted / revoked.       |
+| `app_brand_settings`            | One row per workspace; see Branding.                                                                        |
+| `app_api_keys`                  | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked.                 |
+| `app_user_preferences`          | `user_id`: theme, timezone, language.                                                                       |
+| `app_templates`                 | `workspace_id`, name, description, `definition` (roles, fields, documents, settings), archived time.        |
+| `app_bulk_sends`                | One bulk send: template, who started it, status (`sending`, `done`, `cancelled`), total, worker lease.      |
+| `app_bulk_send_rows`            | `(bulk_id, line)`: the people and metadata for one envelope, its status, envelope id or error.              |
+| `app_webhooks`                  | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.                 |
+| `app_webhook_deliveries`        | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days.    |
+| `app_usage`                     | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.         |
+| `app_plan_changes`              | Who moved a workspace from one plan to another, and when.                                                   |
+| `app_first_run`                 | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.                |
+| `sign_*`                        | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                       |
 
 ### Time zones
 
@@ -271,16 +294,16 @@ most once a minute.
 Brand settings belong to a workspace and are read through `getBrand(workspaceId)`, which
 fills in Codevibe defaults for anything unset:
 
-| Setting                     | Notes                                                                                                                                                       |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Logo                        | PNG, JPEG or WebP, up to 512 KB, checked by its bytes. SVG is refused (scripts). Served from `/brand/<workspaceId>/logo` with `nosniff` and a sandbox CSP.  |
-| Brand colour                | `#rrggbb`. Buttons on the signing page use it; text colour is picked for 4.5:1 contrast.                                                                    |
-| Font                        | `inter`, `space-grotesk`, `system`, `serif`.                                                                                                                |
-| Email sender name, reply-to | The `From` address stays the operator's, so SPF and DKIM keep passing; only its display name changes.                                                       |
-| Email template overrides    | Subject and opening text per email (invite, reminder, completed, cancelled) with `{{variables}}`; sent through the server's `workspaceMail` hook.           |
-| Signing-page custom domain  | Stored, unique across workspaces, with a verification time that resets when it changes. Routing and TLS are deployment work (below).                        |
-| Certificate footer          | A line printed at the end of the certificate, through the server's `certificateNote` hook. Empty means the default note on Adobe trust and the verify page. |
-| "Secured by Codevibe Sign"  | Badge on the signing page and in emails; on by default.                                                                                                     |
+| Setting                     | Notes                                                                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Logo                        | PNG, JPEG or WebP, up to 512 KB, checked by its bytes. SVG is refused (scripts). Served from `/brand/<workspaceId>/logo` with `nosniff` and a sandbox CSP. |
+| Brand colour                | `#rrggbb`. Buttons on the signing page use it; text colour is picked for 4.5:1 contrast.                                                                   |
+| Font                        | `inter`, `space-grotesk`, `system`, `serif`.                                                                                                               |
+| Email sender name, reply-to | The `From` address stays the operator's, so SPF and DKIM keep passing; only its display name changes.                                                      |
+| Email template overrides    | Subject and opening text per email (invite, reminder, completed, cancelled) with `{{variables}}`; sent through the server's `workspaceMail` hook.          |
+| Signing-page custom domain  | Stored, unique across workspaces, with a verification time that resets when it changes. Routing and TLS are deployment work (below).                       |
+| Certificate footer          | A line printed at the end of the certificate, through the server's `certificateNote` hook. Empty means the default line naming the verify page.            |
+| "Secured by Codevibe Sign"  | Badge on the signing page and in emails; on by default.                                                                                                    |
 
 **Settings → Brand** has three cards: the look (logo, colour, font, with a preview of the
 signing-page header), emails (sender name, reply-to and the four templates with a live

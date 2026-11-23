@@ -209,7 +209,7 @@ accepts shorter keys and SHA-1 certificates, for throwaway keys in local develop
 set it in production.
 
 The certificate is the operator's, not the signer's: it proves the file has not changed
-since sealing. Signer intent is proven by the certificate pages and the audit trail.
+since sealing. Signer intent is proven by the certificate page and the audit trail.
 Errors: `SEAL_FAILED` (bad file or passphrase, no RSA key, weak key or certificate with
 `details.keyBits` or `details.signatureAlgorithm`, certificate not valid at the signing time)
 and the `DOCUMENT_*` codes above.
