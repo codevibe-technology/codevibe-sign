@@ -3,7 +3,8 @@
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Input, NativeSelect } from '@/components/ui/field';
-import { searchTimeZones, timeZones, zoneLabel } from '@/lib/preferences';
+import { useHydrated } from '@/components/ui/use-hydrated';
+import { searchTimeZones, timeZones, zoneLabel, zoneName } from '@/lib/preferences';
 
 interface TimeZoneSelectProps {
   id: string;
@@ -21,6 +22,8 @@ interface TimeZoneSelectProps {
  */
 export function TimeZoneSelect({ id, value, onChange, blank, ...aria }: TimeZoneSelectProps) {
   const [query, setQuery] = useState('');
+  // The server's offsets may be worded differently from the browser's; names come first.
+  const hydrated = useHydrated();
   // The list comes from the browser, so the first paint only has the saved zone.
   const [zones, setZones] = useState<string[]>(value ? [value] : []);
   useEffect(() => setZones(timeZones()), []);
@@ -52,7 +55,7 @@ export function TimeZoneSelect({ id, value, onChange, blank, ...aria }: TimeZone
         {blank ? <option value="">{blank}</option> : null}
         {shown.map((zone) => (
           <option key={zone} value={zone}>
-            {zoneLabel(zone)}
+            {hydrated ? zoneLabel(zone) : zoneName(zone)}
           </option>
         ))}
       </NativeSelect>

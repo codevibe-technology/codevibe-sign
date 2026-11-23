@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +21,54 @@ const options = () =>
   within(screen.getByLabelText('Time zone'))
     .getAllByRole('option')
     .map((o) => (o as HTMLOptionElement).value);
+
+describe('the first paint of a time zone form', () => {
+  /** An `Intl` that words offsets the way another machine might: `UTC+05:30`. */
+  function otherMachine() {
+    const Real = Intl.DateTimeFormat;
+    return vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
+      this: unknown,
+      ...args: ConstructorParameters<typeof Intl.DateTimeFormat>
+    ) {
+      const real = new Real(...args);
+      return {
+        ...real,
+        format: real.format.bind(real),
+        resolvedOptions: real.resolvedOptions.bind(real),
+        formatToParts: (date?: Date) =>
+          real
+            .formatToParts(date)
+            .map((part) => (part.type === 'timeZoneName' ? { ...part, value: 'UTC+05:30' } : part)),
+      } as Intl.DateTimeFormat;
+    } as unknown as typeof Intl.DateTimeFormat);
+  }
+
+  it('is the same on the server and in the browser, however each words the offset', async () => {
+    const form = <WorkspaceTimeZoneForm workspaceId="ws_1" timeZone="Asia/Kolkata" chosen />;
+    const server = otherMachine();
+    const html = renderToString(form);
+    server.mockRestore();
+    expect(html).toContain('Asia/Kolkata');
+    expect(html).not.toMatch(/UTC\+05:30|GMT\+5:30/);
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.append(container);
+    const mismatches: unknown[] = [];
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let root: ReturnType<typeof hydrateRoot>;
+    await act(async () => {
+      root = hydrateRoot(container, form, { onRecoverableError: (e) => mismatches.push(e) });
+    });
+    expect(mismatches).toEqual([]);
+    expect(errors).not.toHaveBeenCalled();
+    expect(within(container).getByTestId('zone-now')).toHaveTextContent(
+      /dated in Asia\/Kolkata \(GMT\+5:30\)/,
+    );
+    await act(async () => root.unmount());
+    container.remove();
+  });
+});
 
 describe('WorkspaceTimeZoneForm', () => {
   it('shows the zone in use and says when it is only the default', () => {

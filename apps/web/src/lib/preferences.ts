@@ -55,7 +55,13 @@ export function searchTimeZones(zones: readonly string[], query: string, at?: Da
   });
 }
 
-/** `Asia/Kolkata (GMT+5:30)`: a zone with its current offset from UTC, for lists and notes. */
+/** `Asia/Kolkata`: a zone's name as people read it, the same on every machine. */
+export const zoneName = (zone: string): string => zone.replaceAll('_', ' ');
+
+/**
+ * `Asia/Kolkata (GMT+5:30)`: a zone with its current offset from UTC, for lists and notes. The
+ * offset's wording depends on the machine, so a server and a browser may not agree on it.
+ */
 export function zoneLabel(zone: string, at: Date = new Date()): string {
   const name = zone.replaceAll('_', ' ');
   try {

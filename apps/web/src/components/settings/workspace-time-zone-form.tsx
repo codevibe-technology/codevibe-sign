@@ -4,7 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
-import { zoneLabel } from '@/lib/preferences';
+import { useHydrated } from '@/components/ui/use-hydrated';
+import { zoneLabel, zoneName } from '@/lib/preferences';
 import { setWorkspaceTimeZoneAction } from '@/server/actions/workspace';
 import { TimeZoneSelect } from './time-zone-select';
 import { useAction } from './use-action';
@@ -23,6 +24,7 @@ export function WorkspaceTimeZoneForm({
   const [saved, setSaved] = useState(timeZone);
   const [zone, setZone] = useState(timeZone);
   const { pending, errors, run } = useAction();
+  const hydrated = useHydrated();
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -52,8 +54,8 @@ export function WorkspaceTimeZoneForm({
             {(props) => <TimeZoneSelect {...props} value={zone} onChange={setZone} />}
           </Field>
           <p className="text-sm text-muted" data-testid="zone-now">
-            Documents signed from now on are dated in {zoneLabel(saved)}. Ones already signed keep
-            their dates.
+            Documents signed from now on are dated in{' '}
+            {hydrated ? zoneLabel(saved) : zoneName(saved)}. Ones already signed keep their dates.
           </p>
         </CardBody>
         <CardFooter>
