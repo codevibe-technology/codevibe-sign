@@ -53,6 +53,6 @@
     "@codevibe_technology/sign-core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "22.10.1"
+    "@types/node": "26.6.6"
   }
 }

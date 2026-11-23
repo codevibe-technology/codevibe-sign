@@ -52,14 +52,14 @@
   "dependencies": {
     "@codevibe_technology/sign-core": "workspace:*",
     "@pdf-lib/fontkit": "1.1.1",
-    "@signpdf/signpdf": "3.4.0",
-    "@signpdf/utils": "3.4.0",
+    "@signpdf/signpdf": "4.0.0",
+    "@signpdf/utils": "4.0.0",
     "node-forge": "1.4.3",
     "pdf-lib": "1.17.1",
     "regenerator-runtime": "0.14.1"
   },
   "devDependencies": {
-    "@types/node": "20.19.43",
+    "@types/node": "26.6.6",
     "@types/node-forge": "1.3.14",
     "esbuild": "0.28.2"
   }
