@@ -44,6 +44,7 @@ export {
 } from './errors';
 export { memoryRateLimiter, type RateLimiter, type RateLimitResult } from './http/rate-limit';
 export { defaultTemplates, escapeHtml } from './templates';
+export type { ApiDocument, ApiEnvelope } from './views';
 export type {
   MailTemplates,
   RenderedMail,

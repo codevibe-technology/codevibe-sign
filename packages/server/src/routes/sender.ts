@@ -35,7 +35,7 @@ import { sealedFileKey } from '../runtime/seal';
 import { revisionRoutes } from './revisions';
 import { checkPdf, loadScoped, originalFileKey } from './shared';
 import { principalScope, type Principal } from '../tenancy';
-import { certificateView, envelopeSummary } from '../views';
+import { apiEnvelope, certificateView, envelopeSummary } from '../views';
 
 type SenderEnv = { Variables: { principal: Principal } };
 
@@ -150,14 +150,16 @@ export function senderRoutes(rt: Runtime) {
       documents.map((upload, i) => rt.files.put(keys[i]!, upload.bytes, 'application/pdf')),
     );
     try {
-      return c.json(await create(rt, result, c.get('principal').workspaceId), 201);
+      return c.json(apiEnvelope(await create(rt, result, c.get('principal').workspaceId)), 201);
     } catch (err) {
       await Promise.allSettled(keys.map((key) => rt.files.delete(key)));
       throw err;
     }
   });
 
-  app.get('/:id', async (c) => c.json(await getEnvelope(rt, c.req.param('id'), scopeOf(c))));
+  app.get('/:id', async (c) =>
+    c.json(apiEnvelope(await getEnvelope(rt, c.req.param('id'), scopeOf(c)))),
+  );
 
   app.patch('/:id', async (c) => {
     const body = parseJsonObject(await readJson(c));
@@ -177,7 +179,7 @@ export function senderRoutes(rt: Runtime) {
         if (err instanceof VersionConflictError && attempt < 2) continue;
         throw err;
       }
-      return c.json(next);
+      return c.json(apiEnvelope(next));
     }
   });
 
@@ -188,7 +190,7 @@ export function senderRoutes(rt: Runtime) {
       (current) => send(current, deps),
       scopeOf(c),
     );
-    return c.json(envelope);
+    return c.json(apiEnvelope(envelope));
   });
 
   app.post('/:id/void', async (c) => {
@@ -201,7 +203,7 @@ export function senderRoutes(rt: Runtime) {
       (current) => voidEnvelope(current, { reason }, deps),
       scopeOf(c),
     );
-    return c.json(envelope);
+    return c.json(apiEnvelope(envelope));
   });
 
   app.post('/:id/remind', async (c) => {
@@ -216,7 +218,7 @@ export function senderRoutes(rt: Runtime) {
       (current) => remind(current, recipientId ? { recipientId } : {}, deps),
       scopeOf(c),
     );
-    return c.json(envelope);
+    return c.json(apiEnvelope(envelope));
   });
 
   app.get('/:id/events', async (c) => {

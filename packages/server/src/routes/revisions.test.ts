@@ -230,7 +230,9 @@ describe('POST /v1/envelopes/:id/recall', () => {
       ['hr@example.com', 'pending'],
     ]);
     expect(draft.fields).toHaveLength(envelope.fields.length);
-    const original = await h.files.get(draft.documents[0].fileKey);
+    const original = await h.files.get(
+      (await h.store.load(draft.id))!.envelope.documents[0]!.fileKey,
+    );
     expect(original).toEqual(fakePdf(2));
 
     expect((await events(envelope.id)).map((e) => [e.action, e.data]).slice(-2)).toEqual([
@@ -332,7 +334,9 @@ describe('PUT /v1/envelopes/:id/documents/:docId', () => {
       .map((f: { id: string }) => f.id);
     expect(shorter.json.movedFields.sort()).toEqual(onSecondPage.sort());
     expect(shorter.json.envelope.fields.every((f: { page: number }) => f.page === 0)).toBe(true);
-    const stored = await h.files.get(shorter.json.envelope.documents[0].fileKey);
+    const stored = await h.files.get(
+      (await h.store.load(shorter.json.envelope.id))!.envelope.documents[0]!.fileKey,
+    );
     expect(stored).toEqual(fakePdf(1));
   });
 
@@ -357,5 +361,36 @@ describe('PUT /v1/envelopes/:id/documents/:docId', () => {
       },
     );
     expect(bad.status).toBe(422);
+  });
+});
+
+describe('storage paths', () => {
+  it('never appear in an answer that carries an envelope', async () => {
+    const { h, send } = setup();
+    const bodies: unknown[] = [];
+    const call = async (method: string, path: string, body?: unknown) => {
+      const result = await h.call(method, path, { headers: acme, ...(body ? { body } : {}) });
+      expect(result.status).toBeLessThan(300);
+      bodies.push(result.json);
+      return result.json;
+    };
+
+    const draft = await call('POST', '/v1/envelopes', envelopeBody());
+    await call('PATCH', `/v1/envelopes/${draft.id}`, { title: 'Offer letter v2' });
+    await call('PUT', `/v1/envelopes/${draft.id}/documents/${draft.documents[0].id}`, {
+      content: pdfBase64(2),
+    });
+    await call('POST', `/v1/envelopes/${draft.id}/send`);
+    h.advance(16 * 60_000);
+    await call('POST', `/v1/envelopes/${draft.id}/remind`);
+    await call('GET', `/v1/envelopes/${draft.id}`);
+    await call('GET', '/v1/envelopes');
+    await call('POST', `/v1/envelopes/${draft.id}/recall`, { note: 'Wrong date' });
+    const second = await send();
+    await call('POST', `/v1/envelopes/${second.id}/void`, { reason: 'No longer needed' });
+
+    expect(bodies).toHaveLength(9);
+    expect(JSON.stringify(bodies)).not.toMatch(/fileKey|original\.pdf|envelopes\/[^"]+\.pdf/);
+    expect(JSON.stringify(h.deliveries.map((d) => d.body))).not.toContain('fileKey');
   });
 });

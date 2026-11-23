@@ -52,7 +52,9 @@ describe('POST /v1/envelopes', () => {
     const asha = json.recipients[0].id;
     expect(json.fields[0]).toMatchObject({ recipientId: asha, page: 1, required: true });
     expect(json.auditHead).toMatch(/^[0-9a-f]{64}$/);
-    expect(await h.files.get(json.documents[0].fileKey)).toEqual(fakePdf(2));
+    expect(json.documents[0]).not.toHaveProperty('fileKey');
+    const stored = (await h.store.load(json.id))!.envelope.documents[0]!;
+    expect(await h.files.get(stored.fileKey)).toEqual(fakePdf(2));
     expect(h.mailer.sent).toHaveLength(0);
   });
 

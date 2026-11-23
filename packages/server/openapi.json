@@ -1535,7 +1535,6 @@
               "name": "offer.pdf",
               "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d",
               "pageCount": 1,
-              "fileKey": "envelopes/7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37/documents/0/original.pdf",
               "pageSizes": [{ "width": 595.28, "height": 841.89 }]
             }
           ],
@@ -1766,7 +1765,7 @@
       "Document": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "name", "sha256", "pageCount", "fileKey"],
+        "required": ["id", "name", "sha256", "pageCount"],
         "properties": {
           "id": { "$ref": "#/components/schemas/Id" },
           "name": { "type": "string" },
@@ -1775,10 +1774,6 @@
             "description": "SHA-256 of the original file."
           },
           "pageCount": { "type": "integer", "minimum": 1 },
-          "fileKey": {
-            "type": "string",
-            "description": "Where the server's file store keeps the original."
-          },
           "pageSizes": {
             "type": "array",
             "description": "Size of each page in PDF points, in page order.",

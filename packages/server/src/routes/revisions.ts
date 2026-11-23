@@ -18,6 +18,7 @@ import { create, mutate } from '../runtime/mutate';
 import { issueToken } from '../runtime/notify';
 import type { StoredEnvelope } from '../store/types';
 import { DEFAULT_WORKSPACE, type Principal } from '../tenancy';
+import { apiEnvelope } from '../views';
 import { checkPdf, loadScoped, originalFileKey } from './shared';
 
 type SenderEnv = { Variables: { principal: Principal } };
@@ -138,7 +139,7 @@ export function revisionRoutes(app: Hono<SenderEnv>, rt: Runtime) {
         ),
       scopeOf(c),
     );
-    return c.json(envelope);
+    return c.json(apiEnvelope(envelope));
   });
 
   app.post('/:id/recall', async (c) => {
@@ -173,7 +174,7 @@ export function revisionRoutes(app: Hono<SenderEnv>, rt: Runtime) {
         ),
       scopeOf(c),
     );
-    return c.json({ draft, recalled }, 201);
+    return c.json({ draft: apiEnvelope(draft), recalled: apiEnvelope(recalled) }, 201);
   });
 
   app.post('/:id/revise', async (c) => {
@@ -198,7 +199,7 @@ export function revisionRoutes(app: Hono<SenderEnv>, rt: Runtime) {
         ),
       scopeOf(c),
     );
-    return c.json({ draft, declined }, 201);
+    return c.json({ draft: apiEnvelope(draft), declined: apiEnvelope(declined) }, 201);
   });
 
   app.put('/:id/documents/:docId', async (c) => {
@@ -228,7 +229,7 @@ export function revisionRoutes(app: Hono<SenderEnv>, rt: Runtime) {
       throw err;
     }
     await rt.files.delete(current.fileKey).catch(() => undefined);
-    return c.json({ envelope, movedFields: moved });
+    return c.json({ envelope: apiEnvelope(envelope), movedFields: moved });
   });
 }
 

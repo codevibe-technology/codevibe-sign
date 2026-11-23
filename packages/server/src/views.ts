@@ -3,9 +3,28 @@ import {
   currentRecipients,
   hasActed,
   type AuditEvent,
+  type Document,
   type Envelope,
   type Recipient,
 } from '@codevibe_technology/sign-core';
+
+export type ApiDocument = Omit<Document, 'fileKey'>;
+export type ApiEnvelope = Omit<Envelope, 'documents'> & { documents: ApiDocument[] };
+
+/**
+ * An envelope as the API answers with it: everything except where the file store keeps each
+ * document, which is the server's own business.
+ */
+export function apiEnvelope(envelope: Envelope): ApiEnvelope {
+  return {
+    ...envelope,
+    documents: envelope.documents.map((document) => {
+      const { fileKey, ...rest } = document;
+      void fileKey;
+      return rest;
+    }),
+  };
+}
 
 /**
  * What a signer may see: the envelope basics and their own fields only. While a one-time code
