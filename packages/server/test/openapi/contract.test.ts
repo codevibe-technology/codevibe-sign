@@ -97,6 +97,35 @@ describe('the OpenAPI document', () => {
     }
   });
 
+  it('describes every error code in a sentence', () => {
+    const codes = spec.components.schemas.ErrorCode;
+    const descriptions = codes['x-descriptions'] as Record<string, string>;
+    expect(Object.keys(descriptions).sort()).toEqual([...codes.enum].sort());
+    for (const code of codes.enum) expect(descriptions[code], code).toMatch(/^[A-Z].*\.$/);
+  });
+
+  it('has response examples that match their schemas', () => {
+    for (const { operation } of operations()) {
+      for (const [status, raw] of Object.entries(operation.responses)) {
+        const json = (deref(raw).content as Json | undefined)?.['application/json'] as
+          | Json
+          | undefined;
+        if (!json?.schema) continue;
+        const examples = [
+          ...(json.example !== undefined ? [json.example] : []),
+          ...Object.values((json.examples ?? {}) as Json).map((e) => deref(e).value),
+        ];
+        const validate = validator(json.schema as Json);
+        for (const example of examples) {
+          expect(
+            validate(example),
+            `${operation.operationId} ${status}: ${JSON.stringify(validate.errors)}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
   it('has request examples that match their schemas', () => {
     for (const { operation } of operations()) {
       const media = deref(operation.requestBody)?.content as Json | undefined;

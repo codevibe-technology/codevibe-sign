@@ -1640,6 +1640,33 @@
           "PROVIDER_ERROR": 502,
           "WEBHOOK_INVALID": 502
         },
+        "x-descriptions": {
+          "VALIDATION": "The request is malformed. `details.issues` lists each problem as `{ path, message }`.",
+          "UNAUTHORIZED": "The API key is missing or not valid.",
+          "TOKEN_INVALID": "The signing link is unknown, already used, expired or withdrawn.",
+          "OTP_INVALID": "The one-time code is wrong (`details.attemptsLeft`), or the signing session is missing (`details.otpRequired`).",
+          "OTP_EXPIRED": "The one-time code timed out, or none was sent.",
+          "FIELD_NOT_YOURS": "A value names a field that belongs to another recipient.",
+          "FORBIDDEN": "The credential may only read; only `GET` routes are allowed.",
+          "ENVELOPE_NOT_FOUND": "No envelope with this id in the caller's workspace.",
+          "RECIPIENT_NOT_FOUND": "No recipient with this id on the envelope.",
+          "NOT_FOUND": "No route or document at this address.",
+          "INVALID_STATE": "Not allowed in the envelope's current status (`details.status`).",
+          "NOT_YOUR_TURN": "Sequential routing, and an earlier recipient has not acted yet.",
+          "CONFLICT": "Another request changed the envelope, or one with the same `Idempotency-Key` is still running. Try again.",
+          "ENVELOPE_EXPIRED": "The envelope is past its expiry date.",
+          "DOCUMENT_TOO_LARGE": "A PDF or the whole request is over the size limit (`details.maxBytes`).",
+          "REQUIRED_FIELDS_MISSING": "Required fields were left empty.",
+          "INVALID_FIELD_VALUE": "A value does not suit its field, for example a signature that is not a PNG or a date that does not parse.",
+          "DOCUMENT_INVALID": "A file is not a readable PDF.",
+          "PDF_ALREADY_SIGNED": "A file already carries digital signatures. Upload the unsigned original.",
+          "OTP_LOCKED": "Too many wrong guesses, or too many codes for this envelope (`details.reason`).",
+          "RATE_LIMITED": "Too many requests. Wait the number of seconds in `Retry-After`.",
+          "SEAL_FAILED": "The sealed PDF could not be produced. Safe to retry with the same `Idempotency-Key`.",
+          "INTERNAL": "An unexpected server error. Safe to retry with the same `Idempotency-Key`.",
+          "PROVIDER_ERROR": "An outside provider, such as an Aadhaar eSign service, failed or answered with something unexpected.",
+          "WEBHOOK_INVALID": "A provider's callback could not be verified."
+        },
         "description": "A stable error code. `x-status` maps each code to the HTTP status it always comes with."
       },
       "Error": {
