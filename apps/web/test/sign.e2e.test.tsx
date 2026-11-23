@@ -256,7 +256,10 @@ describe('send through the app, then sign through the /sign page', () => {
     expect(
       await screen.findByRole('heading', { name: 'Acme HR asks you to sign “Offer <letter>”' }),
     ).toBeTruthy();
-    expect(screen.getByRole('banner').style.background).toBe('rgb(15, 118, 110)');
+    expect(
+      screen.getByRole('banner').querySelector<HTMLElement>('[data-brand-stripe]')?.style
+        .background,
+    ).toBe('rgb(15, 118, 110)');
     expect(screen.queryByText('Secured by Codevibe Sign')).toBeNull();
 
     await user.click(screen.getByRole('checkbox', { name: /legally binding/ }));

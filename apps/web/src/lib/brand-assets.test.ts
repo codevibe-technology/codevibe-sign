@@ -156,7 +156,7 @@ describe('the lockup', () => {
       'src/components/marketing/site-footer.tsx': '<Wordmark surface="dark"',
       'src/components/shell/app-shell.tsx': '<Wordmark surface="dark"',
       'src/components/shell/status-page.tsx': '<Wordmark surface="dark"',
-      'src/components/signing/signing-shell.tsx': '<Wordmark surface="dark"',
+      'src/components/signing/signing-shell.tsx': '<Wordmark surface="light"',
     };
     for (const [file, use] of Object.entries(placed)) expect(text(web, file)).toContain(use);
     const named = sources(join(web, 'src')).filter((file) =>

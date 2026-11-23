@@ -170,7 +170,9 @@ describe('signing page states', () => {
       </SigningShell>,
     );
     const header = screen.getByRole('banner');
-    expect(header.style.background).toBe('rgb(15, 118, 110)');
+    expect(header.querySelector<HTMLElement>('[data-brand-stripe]')?.style.background).toBe(
+      'rgb(15, 118, 110)',
+    );
     expect(within(header).getByText('Acme HR')).toBeTruthy();
     expect(header.querySelector('img')?.getAttribute('src')).toBe(brand.logoUrl);
     expect(screen.getByTestId('signing-shell').style.getPropertyValue('--primary')).toBe('#0F766E');

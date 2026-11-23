@@ -1,9 +1,10 @@
 'use client';
 
 import { LocalTime } from '@/components/ui/local-time';
-import { FileText } from 'lucide-react';
+import { CalendarClock, FileText, Fingerprint, MailCheck, PenLine, Quote } from 'lucide-react';
 import { useId, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { esignProviderName } from '@/lib/envelopes';
 import type { SignerView } from '@/lib/signing';
 
 export const CONSENT_TEXT =
@@ -25,7 +26,12 @@ export function ConsentStep({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const id = useId();
-  const verb = view.recipient.role === 'approver' ? 'approve' : 'sign';
+  const approver = view.recipient.role === 'approver';
+  const verb = approver ? 'approve' : 'sign';
+  const own = view.fields.filter((f) => f.recipientId === view.recipient.id);
+  const count = own.length;
+  const aadhaar = view.recipient.auth === 'aadhaar';
+  const pages = view.documents.reduce((n, d) => n + d.pageCount, 0);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -43,46 +49,101 @@ export function ConsentStep({
     }
   }
 
+  const steps = [
+    {
+      icon: FileText,
+      text: `Read the document${pages > 1 ? ` (${pages} pages)` : ''}`,
+    },
+    {
+      icon: PenLine,
+      text: approver
+        ? 'Approve it, or decline and say why'
+        : count === 1
+          ? 'Fill in the 1 highlighted field and sign'
+          : `Fill in the ${count} highlighted fields and sign`,
+    },
+    aadhaar
+      ? {
+          icon: Fingerprint,
+          text: `Confirm with an Aadhaar one-time code on ${esignProviderName(view.esign?.provider ?? 'leegality')}`,
+        }
+      : { icon: MailCheck, text: 'Get the signed copy by email once everyone has signed' },
+  ];
+
   return (
-    <section className="mx-auto max-w-lg rounded-xl border border-line border-t-[3px] border-t-accent bg-surface p-6 shadow-card sm:p-8">
-      <p className="eyebrow">Hello {view.recipient.name}</p>
-      <h1 className="mt-2 text-[22px] leading-tight font-bold" tabIndex={-1} data-autofocus>
-        {company} asks you to {verb} &ldquo;{view.envelope.title}&rdquo;
-      </h1>
-      {view.envelope.changeNote ? (
-        <p
-          className="mt-4 rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"
-          data-testid="change-note"
+    <section className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgb(13_27_42/0.06),0_18px_40px_-18px_rgb(13_27_42/0.25)]">
+      <div className="px-6 pt-7 pb-6 sm:px-9 sm:pt-9">
+        <p className="eyebrow">Hello {view.recipient.name}</p>
+        <h1
+          className="mt-2 text-[24px] leading-tight font-bold sm:text-[28px]"
+          tabIndex={-1}
+          data-autofocus
         >
-          <span className="font-semibold">What changed:</span> {view.envelope.changeNote}
-        </p>
-      ) : null}
-      {view.envelope.message ? (
-        <blockquote className="mt-4 border-l-[3px] border-accent pl-3 whitespace-pre-line">
-          {view.envelope.message}
-        </blockquote>
-      ) : null}
-      <ul
-        className="mt-5 divide-y divide-line rounded-lg border border-line"
-        aria-label="Documents"
+          {company} asks you to {verb} &ldquo;{view.envelope.title}&rdquo;
+        </h1>
+        {view.envelope.changeNote ? (
+          <p
+            className="mt-4 rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm whitespace-pre-line text-ink"
+            data-testid="change-note"
+          >
+            <span className="font-semibold">What changed:</span> {view.envelope.changeNote}
+          </p>
+        ) : null}
+        {view.envelope.message ? (
+          <figure className="mt-5 rounded-xl bg-surface-2 px-4 py-3.5">
+            <figcaption className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold tracking-wide text-muted uppercase">
+              <Quote aria-hidden className="h-3.5 w-3.5" />
+              Message from {company}
+            </figcaption>
+            <blockquote className="text-[15px] whitespace-pre-line text-ink">
+              {view.envelope.message}
+            </blockquote>
+          </figure>
+        ) : null}
+        <ul className="mt-5 space-y-2" aria-label="Documents">
+          {view.documents.map((d) => (
+            <li
+              key={d.id}
+              className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-3 text-sm"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                <FileText aria-hidden className="h-[18px] w-[18px]" />
+              </span>
+              <span className="min-w-0 flex-1 truncate font-semibold text-ink">{d.name}</span>
+              <span className="shrink-0 font-mono text-[11px] text-muted">
+                {d.pageCount} {d.pageCount === 1 ? 'page' : 'pages'}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {view.envelope.expiresAt ? (
+          <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+            <CalendarClock aria-hidden className="h-4 w-4" />
+            Please {verb} by <LocalTime iso={view.envelope.expiresAt} />.
+          </p>
+        ) : null}
+
+        <ol className="mt-6 grid gap-2 sm:grid-cols-3" aria-label="What happens next">
+          {steps.map(({ icon: Icon, text }, i) => (
+            <li key={text} className="flex gap-3 rounded-xl bg-canvas px-3 py-3 sm:flex-col">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-primary shadow-[0_1px_2px_rgb(13_27_42/0.08)]">
+                <Icon aria-hidden className="h-4 w-4" />
+              </span>
+              <span className="text-[13px] leading-snug text-ink">
+                <span className="sr-only">Step {i + 1}: </span>
+                {text}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <form
+        onSubmit={submit}
+        noValidate
+        className="space-y-4 border-t border-line bg-surface-2/60 px-6 py-6 sm:px-9"
       >
-        {view.documents.map((d) => (
-          <li key={d.id} className="flex items-center gap-2 px-3 py-2.5 text-sm">
-            <FileText aria-hidden className="h-4 w-4 shrink-0 text-muted" />
-            <span className="truncate font-medium">{d.name}</span>
-            <span className="ml-auto shrink-0 font-mono text-[11px] text-muted">
-              {d.pageCount} {d.pageCount === 1 ? 'page' : 'pages'}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {view.envelope.expiresAt ? (
-        <p className="mt-3 text-sm text-muted">
-          Please {verb} by <LocalTime iso={view.envelope.expiresAt} />.
-        </p>
-      ) : null}
-      <form onSubmit={submit} noValidate className="mt-6 space-y-4">
-        <div className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-3">
+        <div className="flex items-start gap-3">
           <input
             id={id}
             type="checkbox"
@@ -93,9 +154,9 @@ export function ConsentStep({
             }}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${id}-error` : undefined}
-            className="mt-1 h-5 w-5 shrink-0 accent-primary"
+            className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-primary"
           />
-          <label htmlFor={id} className="text-sm leading-6">
+          <label htmlFor={id} className="cursor-pointer text-[13.5px] leading-6 text-ink">
             {CONSENT_TEXT}
           </label>
         </div>
@@ -104,7 +165,12 @@ export function ConsentStep({
             {error}
           </p>
         ) : null}
-        <Button type="submit" pending={pending} className="h-12 w-full text-base">
+        <Button
+          type="submit"
+          pending={pending}
+          pill
+          className="h-12 w-full text-base shadow-[0_10px_22px_-10px_var(--primary)]"
+        >
           Continue to the document
         </Button>
       </form>
