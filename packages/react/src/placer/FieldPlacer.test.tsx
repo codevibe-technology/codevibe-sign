@@ -510,6 +510,8 @@ describe('FieldPlacer editing tools', () => {
       ).toBeInTheDocument();
       expect(within(summary).queryByText(/Add a signature for Ravi Kumar/)).toBeNull();
       expect(within(summary).getByText(/Add a signature for Asha Rao/)).toBeInTheDocument();
+      const ravi = screen.getByText('Aadhaar eSign, no fields');
+      expect(ravi).not.toHaveAttribute('data-empty');
     });
   });
 });

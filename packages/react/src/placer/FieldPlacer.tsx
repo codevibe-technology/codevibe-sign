@@ -112,6 +112,8 @@ export interface FieldPlacerLabels extends ViewerLabels {
   addSignatureFor: (name: string) => string;
   /** In the summary, for an Aadhaar eSign signer. */
   aadhaarSummary: string;
+  /** Next to an Aadhaar eSign signer in the recipient list, in place of the field count. */
+  aadhaarCount: string;
   showField: string;
   fieldLabel: string;
   fieldLabelHint: string;
@@ -218,6 +220,7 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   noSignature: 'No signature field yet.',
   addSignatureFor: (name) => `Add a signature for ${name}`,
   aadhaarSummary: 'Aadhaar eSign: no fields. The eSign provider places the signature.',
+  aadhaarCount: 'Aadhaar eSign, no fields',
   showField: 'Show it',
   fieldLabel: 'Label',
   fieldLabelHint: 'The name the signer sees on this field.',
@@ -1118,6 +1121,7 @@ export function FieldPlacer({
             recipients={signers}
             label={labels.recipient}
             countLabel={labels.fieldCount}
+            aadhaarLabel={labels.aadhaarCount}
           />
         )}
 

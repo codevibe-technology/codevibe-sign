@@ -30,11 +30,14 @@ export function RecipientSwitcher({
   recipients,
   label,
   countLabel,
+  aadhaarLabel,
 }: {
   placement: FieldPlacementState;
   recipients: Recipient[];
   label: string;
   countLabel: (count: number) => string;
+  /** In place of the count for an Aadhaar eSign signer, who has no fields. */
+  aadhaarLabel: string;
 }) {
   const id = useId();
   return (
@@ -45,6 +48,7 @@ export function RecipientSwitcher({
       {recipients.map((r, index) => {
         const count = placement.fields.filter((f) => f.recipientId === r.id).length;
         const active = placement.recipientId === r.id;
+        const esign = r.auth === 'aadhaar' && r.role === 'signer';
         return (
           <div
             key={r.id}
@@ -65,9 +69,9 @@ export function RecipientSwitcher({
             </label>
             <span
               className="cvs-recipient-count"
-              data-empty={(count === 0 && r.role === 'signer') || undefined}
+              data-empty={(count === 0 && r.role === 'signer' && !esign) || undefined}
             >
-              {countLabel(count)}
+              {esign && count === 0 ? aadhaarLabel : countLabel(count)}
             </span>
             {active && <Icon name="check" className="cvs-recipient-tick" />}
           </div>
