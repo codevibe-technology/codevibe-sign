@@ -50,6 +50,19 @@ describe('the signing receipt', () => {
     expect(JSON.stringify(json)).not.toMatch(/Ravi|ravi@|hr@/);
   });
 
+  it('hands out the audit trail as a PDF once the envelope is complete', async () => {
+    const { h, envelope, receipt, signRavi, docId } = await signedByAsha();
+    const headers = { 'x-sign-receipt': receipt };
+    const url = `/v1/sign/receipt/documents/${docId}?file=audit-trail`;
+    expect((await h.call('GET', url, { headers })).status).toBe(409);
+    await signRavi();
+    const trail = await h.call('GET', url, { headers });
+    expect(trail.status).toBe(200);
+    expect(trail.res.headers.get('content-type')).toBe('application/pdf');
+    expect(trail.res.headers.get('content-disposition')).toContain('audit-trail.pdf');
+    expect(await trail.res.text()).toContain(`audit-trail=${envelope.id}`);
+  });
+
   it('hands out the sealed copy only once everyone has signed', async () => {
     const { h, receipt, signRavi, docId } = await signedByAsha();
     const headers = { 'x-sign-receipt': receipt };

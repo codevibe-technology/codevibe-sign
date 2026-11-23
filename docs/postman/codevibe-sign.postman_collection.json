@@ -776,7 +776,7 @@
                 {
                   "key": "file",
                   "value": "",
-                  "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.",
+                  "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt, `audit-trail` for the envelope's audit trail as a PDF once it is complete. Leave out for the signed document.",
                   "disabled": true
                 }
               ],
