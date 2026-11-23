@@ -1,40 +1,51 @@
 import 'server-only';
 import type { Mailer } from '@codevibe_technology/sign-core';
-import { escapeHtml } from '@codevibe_technology/sign-server';
-import { BRAND_NAME, LOCKUP } from '@/lib/brand-assets';
+import { renderEmail, standardLinks, type EmailDetail } from '@/lib/email-layout';
 import { ROLE_LABELS, type Role } from '@/lib/roles';
+import { mailOrg } from './mail-identity';
 
-/** The lockup as a PNG from the app the link points at, at 28 px tall: mail clients drop SVG. */
-function logo(url: string): string {
-  const src = new URL(LOCKUP.email, url).href;
-  const width = Math.round((LOCKUP.width * 28) / LOCKUP.height);
-  return `<img src="${escapeHtml(src)}" alt="${BRAND_NAME}" width="${width}" height="28" style="display:block;border:0;height:28px;width:${width}px">`;
-}
-
-function layout(title: string, lines: string[], action: { label: string; url: string }) {
-  const text = [...lines, '', `${action.label}: ${action.url}`].join('\n');
-  const html = `<!doctype html><html><body style="margin:0;background:#F4F6FA;font-family:Inter,Arial,sans-serif;color:#0D1B2A">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
-<table role="presentation" width="100%" style="max-width:520px;background:#FFFFFF;border:1px solid #D9E0EA;border-radius:12px">
-<tr><td style="padding:24px 28px 0">${logo(action.url)}</td></tr>
-<tr><td style="padding:16px 28px 20px;border-bottom:4px solid #2DD4BF;font-weight:700;font-size:18px">${escapeHtml(title)}</td></tr>
-<tr><td style="padding:24px 28px;font-size:15px;line-height:1.6">
-${lines.map((line) => `<p style="margin:0 0 12px">${escapeHtml(line)}</p>`).join('')}
-<p style="margin:24px 0 8px"><a href="${escapeHtml(action.url)}" style="display:inline-block;background:#1B6AE0;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${escapeHtml(action.label)}</a></p>
-<p style="margin:16px 0 0;font-size:13px;color:#5B6B80">Or paste this link into your browser:<br>${escapeHtml(action.url)}</p>
-</td></tr></table></td></tr></table></body></html>`;
-  return { text, html };
+/**
+ * An account email from Codevibe Sign itself, with the lockup served by the app the link
+ * points at: mail clients drop SVG, and a self-hosted install serves its own copy.
+ */
+function layout(content: {
+  title: string;
+  lines: string[];
+  action: { label: string; url: string };
+  reason: string;
+  details?: EmailDetail[];
+  notes?: string[];
+}) {
+  const appUrl = new URL(content.action.url).origin;
+  const org = mailOrg();
+  return renderEmail({
+    appUrl,
+    preheader: content.lines[0]!,
+    header: { kind: 'codevibe' },
+    heading: content.title,
+    paragraphs: content.lines,
+    ...(content.details ? { details: content.details } : {}),
+    button: { label: content.action.label, href: content.action.url },
+    ...(content.notes ? { notes: content.notes } : {}),
+    footer: {
+      reason: content.reason,
+      lines: org ? [org] : [],
+      links: standardLinks(appUrl),
+    },
+  });
 }
 
 export async function sendMagicLink(mailer: Mailer, to: string, url: string) {
-  const body = layout(
-    'Sign in to Codevibe Sign',
-    [
+  const body = layout({
+    title: 'Sign in to Codevibe Sign',
+    lines: [
       'Use the button below to sign in. The link works once and expires in 10 minutes.',
       'If you did not ask to sign in, you can ignore this email.',
     ],
-    { label: 'Sign in', url },
-  );
+    action: { label: 'Sign in', url },
+    reason:
+      'You got this email because someone asked to sign in to Codevibe Sign with this address.',
+  });
   await mailer.send({
     to,
     subject: 'Your sign-in link for Codevibe Sign',
@@ -54,14 +65,21 @@ export async function sendInvitation(
     role: Role;
   },
 ) {
-  const body = layout(
-    `Join ${input.workspaceName} on Codevibe Sign`,
-    [
-      `${input.inviterName} invited you to the ${input.workspaceName} workspace as ${ROLE_LABELS[input.role].toLowerCase()}.`,
-      'The invitation expires in 7 days.',
+  const role = ROLE_LABELS[input.role];
+  const body = layout({
+    title: `Join ${input.workspaceName} on Codevibe Sign`,
+    lines: [
+      `${input.inviterName} invited you to the ${input.workspaceName} workspace as ${role.toLowerCase()}.`,
     ],
-    { label: 'Accept invitation', url: input.url },
-  );
+    details: [
+      { label: 'Workspace', value: input.workspaceName },
+      { label: 'Invited by', value: input.inviterName },
+      { label: 'Role', value: role },
+      { label: 'Expires', value: 'In 7 days' },
+    ],
+    action: { label: 'Accept invitation', url: input.url },
+    reason: `You got this email because ${input.inviterName} invited this address to a workspace on Codevibe Sign. If you were not expecting it, you can ignore it.`,
+  });
   await mailer.send({
     to: input.to,
     subject: `${input.inviterName} invited you to ${input.workspaceName}`,
@@ -71,14 +89,16 @@ export async function sendInvitation(
 }
 
 export async function sendPasswordReset(mailer: Mailer, to: string, url: string, minutes: number) {
-  const body = layout(
-    'Choose a new password',
-    [
+  const body = layout({
+    title: 'Choose a new password',
+    lines: [
       `Use the button below to choose a new password for Codevibe Sign. The link works once and expires in ${minutes} minutes.`,
       'If you did not ask for this, you can ignore this email. Your password stays as it is.',
     ],
-    { label: 'Choose a new password', url },
-  );
+    action: { label: 'Choose a new password', url },
+    reason:
+      'You got this email because someone asked to reset the password of the Codevibe Sign account with this address.',
+  });
   await mailer.send({
     to,
     subject: 'Choose a new password for Codevibe Sign',
@@ -88,14 +108,16 @@ export async function sendPasswordReset(mailer: Mailer, to: string, url: string,
 }
 
 export async function sendPasswordChanged(mailer: Mailer, to: string, signInUrl: string) {
-  const body = layout(
-    'Your password was changed',
-    [
+  const body = layout({
+    title: 'Your password was changed',
+    lines: [
       'The password for your Codevibe Sign account was just set or changed.',
       'If that was you, there is nothing to do. If it was not, choose a new password now with "Forgot password" on the sign-in page, and tell the admin of your workspace.',
     ],
-    { label: 'Open the sign-in page', url: signInUrl },
-  );
+    action: { label: 'Open the sign-in page', url: signInUrl },
+    reason:
+      'You got this email because the password of your Codevibe Sign account changed. We send it for every change, to keep your account safe.',
+  });
   await mailer.send({
     to,
     subject: 'Your Codevibe Sign password was changed',
@@ -195,10 +217,24 @@ export async function sendTransferMail(
     },
   };
   const mail = content[kind];
+  const details: EmailDetail[] =
+    kind === 'offered'
+      ? [
+          { label: 'Workspace', value: ws },
+          { label: 'From', value: input.ownerName },
+          ...(input.expiresOn ? [{ label: 'Open until', value: input.expiresOn }] : []),
+        ]
+      : [];
   await mailer.send({
     to: input.to,
     subject: mail.subject,
-    ...layout(mail.title, mail.lines, { label: mail.label, url: input.url }),
+    ...layout({
+      title: mail.title,
+      lines: mail.lines,
+      action: { label: mail.label, url: input.url },
+      ...(details.length ? { details } : {}),
+      reason: `You got this email because of a transfer of the ${ws} workspace on Codevibe Sign.`,
+    }),
     meta: { kind: 'workspace_transfer', workspaceId: input.workspaceId },
   });
 }

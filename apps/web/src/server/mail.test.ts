@@ -22,7 +22,7 @@ describe('sendInvitation', () => {
   it('starts with the Codevibe Sign lockup from the app the link points at', async () => {
     const mail = await invitation('Asha Rao');
     expect(mail.html).toContain(
-      '<img src="https://sign.example.com/brand/logo-email.png" alt="Codevibe Sign" width="171" height="28"',
+      '<img src="https://sign.example.com/brand/logo-email.png" alt="Codevibe Sign" width="183" height="30"',
     );
   });
 
