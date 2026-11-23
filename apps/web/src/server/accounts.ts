@@ -123,7 +123,8 @@ export async function accountWorkspaces(sql: Sql, accountId: string): Promise<Ac
 
 /**
  * Moves an account to a plan. The old per-workspace column is kept in step, so a build from
- * before accounts still reads a sensible plan if the install is rolled back.
+ * before accounts still reads a sensible plan if the install is rolled back (which also needs
+ * the not-null rule on `account_id` dropped; see "Rolling back" in deploy/README.md).
  */
 export async function setAccountPlan(
   tx: postgres.TransactionSql,

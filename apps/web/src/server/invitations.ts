@@ -167,13 +167,15 @@ export async function acceptInvitation(
     );
   }
   await sql.begin(async (tx) => {
+    // The account first, then the invitation: the same order inviting takes them in, so an
+    // accept and a fresh invitation to the same address wait for each other.
+    const plan = await lockedPlan(tx, invitation.workspaceId);
     const used = await tx`update app_invitations set accepted_at = ${now}
       where id = ${invitation.id} and accepted_at is null and revoked_at is null
       returning id`;
     if (used.length === 0) {
       throw new AppError('NOT_FOUND', 'This invitation is no longer valid. Ask for a new one');
     }
-    const plan = await lockedPlan(tx, invitation.workspaceId);
     if (plan && !(await isAccountPerson(tx, plan.accountId, { userId: user.id }))) {
       const seats = await countSeats(tx, plan.accountId, now);
       assertRoom(plan, 'members', seats.members);

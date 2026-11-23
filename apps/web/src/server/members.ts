@@ -67,7 +67,10 @@ export async function changeRole(sql: postgres.Sql, change: Change & { role: Rol
   await sql.begin(async (tx) => {
     const { target, lastOwner, holdsAccount } = await lockTarget(tx, change);
     if (target.role === change.role) return;
-    if (holdsAccount) throw new AppError('CONFLICT', ACCOUNT_HOLDER_STAYS, 'role');
+    // Whoever holds the account may always be made an owner, never anything less.
+    if (holdsAccount && change.role !== 'owner') {
+      throw new AppError('CONFLICT', ACCOUNT_HOLDER_STAYS, 'role');
+    }
     if (lastOwner) {
       throw new AppError('CONFLICT', 'Make someone else an owner first', 'role');
     }

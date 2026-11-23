@@ -361,18 +361,20 @@ create temporary table tmp_workspace_owner on commit drop as
 select
   w.id as workspace_id,
   case w.plan when 'unlimited' then 2 when 'cloud' then 1 else 0 end as plan_rank,
-  coalesce(
-    (
-      select m.user_id from app_members m where m.workspace_id = w.id
-      order by
-        (m.role = 'owner' and m.user_id = w.created_by) desc,
-        case m.role when 'owner' then 0 when 'admin' then 1 when 'member' then 2 else 3 end,
-        m.created_at, m.user_id
-      limit 1
-    ),
-    (select u.id from auth_users u where u.id = w.created_by)
+  (
+    select m.user_id from app_members m where m.workspace_id = w.id
+    order by
+      (m.role = 'owner' and m.user_id = w.created_by) desc,
+      case m.role when 'owner' then 0 when 'admin' then 1 when 'member' then 2 else 3 end,
+      m.created_at, m.user_id
+    limit 1
   ) as user_id
 from app_workspaces w;
+
+-- Whoever holds the account of a workspace manages its billing, which takes the owner role.
+update app_members m set role = 'owner'
+from tmp_workspace_owner t
+where m.workspace_id = t.workspace_id and m.user_id = t.user_id and m.role <> 'owner';
 
 insert into app_accounts (id, owner_user_id, plan)
 select
@@ -393,7 +395,9 @@ update app_workspaces w set account_id = 'acct_' || substr(md5('orphan' || w.id)
 where w.account_id is null;
 
 -- The per-workspace plan is no longer read. It is kept equal to the account's, so a build from
--- before accounts still finds a sensible plan if the install is rolled back.
+-- before accounts still finds a sensible plan if the install is rolled back. Such a build
+-- does not fill account_id, so the column's not-null rule has to be dropped first; see
+-- "Rolling back" in deploy/README.md.
 update app_workspaces w set plan = a.plan
 from app_accounts a where a.id = w.account_id and w.plan <> a.plan;
 
@@ -402,6 +406,8 @@ create index app_workspaces_account_idx on app_workspaces (account_id);
 
 alter table app_plan_changes add column account_id text references app_accounts (id) on delete cascade;
 alter table app_plan_changes alter column workspace_id drop not null;
+update app_plan_changes c set account_id = w.account_id
+from app_workspaces w where w.id = c.workspace_id;
 create index app_plan_changes_account_idx on app_plan_changes (account_id, created_at desc);
 `,
   },
@@ -582,6 +588,7 @@ create table app_esign_usage (
   ended_at timestamptz
 );
 create index app_esign_usage_account on app_esign_usage (account_id, started_at desc);
+create index app_esign_usage_workspace on app_esign_usage (workspace_id, started_at desc);
 `,
   },
   {

@@ -80,6 +80,10 @@ describe.skipIf(!url)('moving existing workspaces onto accounts', () => {
     ]);
     // Nobody at all.
     await workspace('empty', 'free', null, []);
+    // Nobody is in it any more, though whoever created it still has a login.
+    await workspace('abandoned', 'free', id('asha'), []);
+    await sql`insert into app_plan_changes (id, workspace_id, from_plan, to_plan, changed_by)
+      values ('plan_old', 'ws_ravi-cloud', 'free', 'cloud', 'operator')`;
   });
 
   afterAll(async () => {
@@ -107,6 +111,8 @@ describe.skipIf(!url)('moving existing workspaces onto accounts', () => {
     expect(byslug['handed-over']).toMatchObject({ owner: 'zoe', plan: 'cloud' });
     expect(byslug['no-owner']).toMatchObject({ owner: 'zoe', plan: 'cloud' });
     expect(byslug.empty).toMatchObject({ owner: null, plan: 'free' });
+    // It does not count against Asha, who could not open it.
+    expect(byslug.abandoned).toMatchObject({ owner: null, plan: 'free' });
     expect(rows.every((r) => r.source === 'operator')).toBe(true);
 
     const [counts] = await sql<{ accounts: number; owners: number; loose: number }[]>`
@@ -114,7 +120,28 @@ describe.skipIf(!url)('moving existing workspaces onto accounts', () => {
         (select count(*)::int from app_accounts) as accounts,
         (select count(distinct owner_user_id)::int from app_accounts) as owners,
         (select count(*)::int from app_workspaces where account_id is null) as loose`;
-    expect(counts).toEqual({ accounts: 5, owners: 4, loose: 0 });
+    expect(counts).toEqual({ accounts: 6, owners: 4, loose: 0 });
+  });
+
+  it('makes whoever got the account an owner, and files old plan changes under it', async () => {
+    const [zoe] = await sql<{ role: string }[]>`
+      select role from app_members where workspace_id = 'ws_no-owner' and user_id = ${id('zoe')}`;
+    expect(zoe!.role).toBe('owner');
+    const [mia] = await sql<{ role: string }[]>`
+      select role from app_members where workspace_id = 'ws_no-owner' and user_id = ${id('mia')}`;
+    expect(mia!.role).toBe('member');
+    const [change] = await sql<{ account_id: string; expected: string }[]>`
+      select c.account_id, w.account_id as expected
+      from app_plan_changes c join app_workspaces w on w.id = c.workspace_id
+      where c.id = 'plan_old'`;
+    expect(change!.account_id).toBe(change!.expected);
+  });
+
+  it('refuses to start on a database an unreleased build already changed', async () => {
+    await sql`insert into app_migrations (name) values ('0013_billing')`;
+    await expect(migrateAll(sql)).rejects.toThrow(/unreleased build.*0013_billing/);
+    await sql`delete from app_migrations where name = '0013_billing'`;
+    expect(await migrateAll(sql)).not.toContain('app/0013_accounts');
   });
 
   it('keeps a Free owner of several workspaces working but refuses another', async () => {
