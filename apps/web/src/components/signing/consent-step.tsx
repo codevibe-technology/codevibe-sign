@@ -28,7 +28,9 @@ export function ConsentStep({
   const id = useId();
   const approver = view.recipient.role === 'approver';
   const verb = approver ? 'approve' : 'sign';
-  const own = view.fields.filter((f) => f.recipientId === view.recipient.id);
+  const own = view.fields.filter(
+    (f) => f.recipientId === view.recipient.id && f.type !== 'aadhaar',
+  );
   const count = own.length;
   const aadhaar = view.recipient.auth === 'aadhaar';
   const pages = view.documents.reduce((n, d) => n + d.pageCount, 0);
@@ -58,9 +60,11 @@ export function ConsentStep({
       icon: PenLine,
       text: approver
         ? 'Approve it, or decline and say why'
-        : count === 1
-          ? 'Fill in the 1 highlighted field and sign'
-          : `Fill in the ${count} highlighted fields and sign`,
+        : aadhaar && count === 0
+          ? `Nothing to fill in: ${esignProviderName(view.esign?.provider ?? 'leegality')} places your signature`
+          : count === 1
+            ? 'Fill in the 1 highlighted field and sign'
+            : `Fill in the ${count} highlighted fields and sign`,
     },
     aadhaar
       ? {
