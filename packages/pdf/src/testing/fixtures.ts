@@ -213,3 +213,37 @@ export function shownText(content: string): string[] {
 export function numbers(text: string): number[] {
   return text.trim().split(/\s+/).map(Number);
 }
+
+/**
+ * Reads the QR code drawn on a page back out of its content stream: the white square and the
+ * dark runs inside it, painted into RGBA pixels a QR decoder accepts.
+ */
+export function qrPixels(
+  content: string,
+): { data: Uint8ClampedArray; width: number; height: number } | null {
+  const boxes = [...content.matchAll(/([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) re/g)].map((m) => ({
+    x: Number(m[1]),
+    y: Number(m[2]),
+    width: Number(m[3]),
+    height: Number(m[4]),
+  }));
+  const [frame, ...runs] = boxes;
+  if (!frame || runs.length === 0) {
+    return null;
+  }
+  const scale = 8 / Math.min(...runs.map((run) => run.height));
+  const side = Math.round(frame.width * scale);
+  const data = new Uint8ClampedArray(side * side * 4).fill(255);
+  for (const run of runs) {
+    const left = Math.round((run.x - frame.x) * scale);
+    const top = Math.round((frame.y + frame.height - run.y - run.height) * scale);
+    const right = Math.round((run.x + run.width - frame.x) * scale);
+    const bottom = top + Math.round(run.height * scale);
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        data.fill(0, (y * side + x) * 4, (y * side + x) * 4 + 3);
+      }
+    }
+  }
+  return { data, width: side, height: side };
+}

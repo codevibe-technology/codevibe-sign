@@ -1,8 +1,8 @@
-import { PDFDocument } from 'pdf-lib';
+import jsQR from 'jsqr';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { SignError, type AuditEvent, type Recipient } from '@codevibe_technology/sign-core';
-import { appendCertificate } from './certificate';
-import { sha256Hex } from './inspect';
+import { appendCertificate, certificatePdf, type CertificateData } from './certificate';
 import {
   A4,
   document,
@@ -10,9 +10,12 @@ import {
   event,
   makePdf,
   pageContent,
+  qrPixels,
   recipient,
   shownText,
 } from './testing/fixtures';
+
+const RECORD_URL = 'https://sign.example.com/r/Zk3vQ9xLm2Tn8RbYc4Wd7HsA';
 
 const signer = recipient({ status: 'signed' });
 const approver = recipient({
@@ -42,6 +45,19 @@ const events: AuditEvent[] = [
   event(7, 'envelope.completed'),
 ];
 
+const signers = (count: number): Recipient[] =>
+  Array.from({ length: count }, (_, index) =>
+    recipient({
+      id: `r${index}`,
+      name: `Signer number ${index}`,
+      email: `person${index}@example.com`,
+      order: index,
+    }),
+  );
+
+const signedBy = (recipients: Recipient[]): AuditEvent[] =>
+  recipients.map((r, index) => event(index + 1, 'recipient.signed', { recipientId: r.id }));
+
 async function certificateText(bytes: Uint8Array, firstPage: number): Promise<string[]> {
   const doc = await PDFDocument.load(bytes);
   const text: string[] = [];
@@ -49,6 +65,10 @@ async function certificateText(bytes: Uint8Array, firstPage: number): Promise<st
     text.push(...shownText(await pageContent(bytes, index)));
   }
   return text;
+}
+
+async function pageCount(bytes: Uint8Array): Promise<number> {
+  return (await PDFDocument.load(bytes)).getPageCount();
 }
 
 async function rejection(promise: Promise<unknown>): Promise<SignError> {
@@ -61,6 +81,172 @@ async function rejection(promise: Promise<unknown>): Promise<SignError> {
 }
 
 describe('appendCertificate', () => {
+  it('prints the facts of the signing on one page', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const output = await appendCertificate(pdf, {
+      envelope: envelope({ recipients: [signer, approver] }),
+      document: document(),
+      events,
+      timeZone: 'Asia/Kolkata',
+      sender: { name: 'Meera Iyer', organization: 'Acme Pvt Ltd', email: 'meera@acme.example' },
+      recordUrl: RECORD_URL,
+      generatedAt: '2026-11-19T11:00:00.000Z',
+    });
+    expect(await pageCount(output)).toBe(2);
+    const size = (await PDFDocument.load(output)).getPage(1).getSize();
+    expect(size.width).toBeCloseTo(595.28);
+    expect(size.height).toBeCloseTo(841.89);
+
+    const text = (await certificateText(output, 1)).join('\n');
+    expect(text).toContain('Signing certificate');
+    expect(text).toContain('Offer letter for Shubh Kumar');
+    expect(text).toContain('Offer letter.pdf · 1 page');
+    expect(text).toContain('env_01J9Z6Q4');
+    expect(text).toContain('Completed');
+    expect(text).toContain('19 Nov 2026 15:45 GMT+5:30 (Asia/Kolkata)');
+    expect(text).toContain('2026-11-19 10:15:03 UTC');
+    expect(text).toContain('Meera Iyer, Acme Pvt Ltd');
+    expect(text).toContain('m****@acme.example');
+    expect(text).not.toContain('meera@acme.example');
+
+    expect(text).toContain('Shubh Kumar');
+    expect(text).toContain('s****@example.com');
+    expect(text).not.toContain('shubh@example.com');
+    expect(text).toContain('One-time code by email');
+    expect(text).toContain('18 Nov 2026 14:30 GMT+5:30');
+    expect(text).toContain('2026-11-18 09:00:05 UTC');
+    expect(text).toContain('Asha Rao');
+    expect(text).toContain('Approver');
+    expect(text).toContain('+91******3210');
+    expect(text).toContain('One-time code by SMS');
+
+    expect(text).toContain('aaaaaaaa ... aaaaaaaa');
+    expect(text).toContain('a'.repeat(64));
+    expect(text).toContain('Audit trail: 7 events, chain head');
+    expect(text).toContain('f'.repeat(64));
+    expect(text).toContain(RECORD_URL);
+    expect(text).toContain('Page 1 of 1  ·  Generated 2026-11-19 11:00:00 UTC');
+  });
+
+  it('leaves out network details and the list of events', async () => {
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope({ recipients: [signer, approver] }),
+      document: document(),
+      events,
+    });
+    const text = (await certificateText(output, 1)).join('\n');
+    for (const hidden of ['203.0.113', '198.51.100', 'Mozilla', 'Viewer/1.0', 'IP address']) {
+      expect(text).not.toContain(hidden);
+    }
+    expect(text).not.toContain('User agent');
+    expect(text).not.toContain('Envelope created');
+    expect(text).not.toContain('Document viewed');
+  });
+
+  it('fits six signers, the fingerprint and the code on one page', async () => {
+    const recipients = signers(6);
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope({ recipients }),
+      document: document(),
+      events: signedBy(recipients),
+      timeZone: 'Asia/Kolkata',
+      sender: { name: 'Meera Iyer', email: 'meera@acme.example' },
+      recordUrl: RECORD_URL,
+      note: 'Acme Pvt Ltd, CIN U72900KA2020PTC000000',
+    });
+    expect(await pageCount(output)).toBe(2);
+    const content = await pageContent(output, 1);
+    const baselines = [...content.matchAll(/[\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ ([\d.-]+) Tm/g)]
+      .map((m) => Number(m[1]))
+      .filter((y) => y > 40);
+    // Everything but the footer line sits above the bottom margin.
+    expect(Math.min(...baselines)).toBeGreaterThan(44 + 30);
+    const text = shownText(content);
+    expect(text).toContain('Signer number 5');
+    expect(text).toContain('Document fingerprint');
+    expect(text).toContain('Acme Pvt Ltd, CIN U72900KA2020PTC000000');
+  });
+
+  it('continues on further pages when there are many signers', async () => {
+    const recipients = signers(40);
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope({ recipients }),
+      document: document(),
+      events: signedBy(recipients),
+      recordUrl: RECORD_URL,
+    });
+    const pages = (await pageCount(output)) - 1;
+    expect(pages).toBeGreaterThan(1);
+    expect(pages).toBeLessThan(5);
+
+    const text = await certificateText(output, 1);
+    expect(text).toContain('Signing certificate (continued)');
+    expect(text.some((line) => line.startsWith(`Page ${pages} of ${pages}`))).toBe(true);
+    for (let index = 0; index < 40; index += 1) {
+      expect(text.filter((line) => line === `Signer number ${index}`)).toHaveLength(1);
+    }
+    // The table header repeats on every page; the fingerprint and the code appear once.
+    expect(text.filter((line) => line === 'Method')).toHaveLength(pages);
+    expect(text.filter((line) => line === 'Document fingerprint')).toHaveLength(1);
+    expect(qrPixels(await pageContent(output, 1))).not.toBeNull();
+    expect(qrPixels(await pageContent(output, 2))).toBeNull();
+    for (let page = 1; page <= pages; page += 1) {
+      const ys = [
+        ...(await pageContent(output, page)).matchAll(
+          /[\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ ([\d.-]+) Tm/g,
+        ),
+      ].map((m) => Number(m[1]));
+      expect(Math.min(...ys)).toBeGreaterThan(20);
+    }
+  });
+
+  it('draws a QR code that reads as the record link, and links the text', async () => {
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope(),
+      document: document(),
+      events,
+      recordUrl: RECORD_URL,
+    });
+    const pixels = qrPixels(await pageContent(output, 1));
+    expect(pixels).not.toBeNull();
+    const decoded = jsQR(pixels!.data, pixels!.width, pixels!.height);
+    expect(decoded?.data).toBe(RECORD_URL);
+
+    const page = (await PDFDocument.load(output)).getPage(1);
+    const annotations = page.node.lookup(PDFName.of('Annots'), PDFArray);
+    const link = annotations.lookup(0, PDFDict);
+    expect(link.lookup(PDFName.of('Subtype'))).toBe(PDFName.of('Link'));
+    const action = link.lookup(PDFName.of('A'), PDFDict);
+    expect(action.lookup(PDFName.of('URI'), PDFString).asString()).toBe(RECORD_URL);
+  });
+
+  it('has no code and no link without a record', async () => {
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope(),
+      document: document(),
+      events,
+    });
+    const content = await pageContent(output, 1);
+    expect(qrPixels(content)).toBeNull();
+    const text = shownText(content).join('\n');
+    expect(text).not.toContain('Public record');
+    expect(text).not.toContain('Scan');
+    const page = (await PDFDocument.load(output)).getPage(1);
+    expect(page.node.Annots()?.size() ?? 0).toBe(0);
+  });
+
+  it('refuses a record link that is not a URL', async () => {
+    const data: CertificateData = {
+      envelope: envelope(),
+      document: document(),
+      events,
+      recordUrl: 'r/abc',
+    };
+    const error = await rejection(appendCertificate(await makePdf([{ size: A4 }]), data));
+    expect(error.code).toBe('VALIDATION');
+    expect(error.details).toMatchObject({ field: 'recordUrl' });
+  });
+
   it("prints the sender's note at the end, on one line", async () => {
     const pdf = await makePdf([{ size: A4 }]);
     const output = await appendCertificate(pdf, {
@@ -73,94 +259,26 @@ describe('appendCertificate', () => {
     expect(text).toContain('Acme Pvt Ltd CIN U72900KA2020PTC000000 ?');
   });
 
-  it('names who shared a link or corrected someone, and marks a corrected copy', async () => {
-    const pdf = await makePdf([{ size: A4 }]);
-    const output = await appendCertificate(pdf, {
-      envelope: envelope({ recipients: [signer] }),
-      document: document(),
-      events: [
-        event(1, 'envelope.created', { data: { recalledFrom: 'env_old', by: 'Meera Iyer' } }),
-        event(2, 'envelope.sent'),
-        event(3, 'recipient.corrected', {
-          recipientId: 'r1',
-          data: { by: 'Meera Iyer', oldEmail: 'old@example.com', newEmail: 'new@example.com' },
-        }),
-        event(4, 'recipient.link_shared', { recipientId: 'r1', data: { by: 'Dev Admin' } }),
-        event(5, 'recipient.signed', { recipientId: 'r1' }),
-      ],
-    });
-    const text = (await certificateText(output, 1)).join('\n');
-    expect(text).toContain('Corrected copy created');
-    expect(text).toContain('Recipient corrected');
-    expect(text).toContain('Link shared manually');
-    expect(text).toContain('Dev Admin');
-    expect(text).toContain('Meera Iyer');
-    expect(text).not.toContain('old@example.com');
-  });
-
-  it('appends A4 pages after the document', async () => {
-    const pdf = await makePdf([{ size: A4 }, { size: [612, 792] }]);
-    const output = await appendCertificate(pdf, {
-      envelope: envelope({ recipients: [signer, approver] }),
-      document: document({ pageCount: 2 }),
-      events,
-    });
-    const doc = await PDFDocument.load(output);
-    expect(doc.getPageCount()).toBeGreaterThanOrEqual(3);
-    const size = doc.getPage(2).getSize();
-    expect(size.width).toBeCloseTo(595.28);
-    expect(size.height).toBeCloseTo(841.89);
-  });
-
-  it('records the envelope, both hashes, recipients and the audit chain', async () => {
-    const pdf = await makePdf([{ size: A4 }]);
-    const output = await appendCertificate(pdf, {
-      envelope: envelope({ recipients: [signer, approver] }),
-      document: document(),
-      events,
-      generatedAt: '2026-11-19T11:00:00.000Z',
-    });
-    const text = (await certificateText(output, 1)).join('\n');
-
-    expect(text).toContain('Signing certificate');
-    expect(text).toContain('env_01J9Z6Q4');
-    expect(text).toContain('Offer letter for Shubh Kumar');
-    expect(text).toContain('Offer letter.pdf');
-    expect(text).toContain('a'.repeat(64));
-    expect(text).toContain(sha256Hex(pdf));
-    expect(text).toContain('f'.repeat(64));
-
-    expect(text).toContain('Shubh Kumar · Signer');
-    expect(text).toContain('s****@example.com');
-    expect(text).not.toContain('shubh@example.com');
-    expect(text).toContain('Asha Rao · Approver');
-    expect(text).toContain('+91******3210');
-    expect(text).toContain('One-time code by SMS');
-
-    // The signing event's network details win over the earlier view.
-    expect(text).toContain('203.0.113.9');
-    expect(text).not.toContain('203.0.113.7');
-    expect(text).toContain('Mozilla/5.0 (Macintosh) Safari/605.1.15');
-    expect(text).toContain('2026-11-18 09:00:04 UTC');
-    expect(text).toContain('2026-11-18 09:00:05 UTC');
-
-    expect(text).toContain('Envelope created');
-    expect(text).toContain('Sender');
-    expect(text).toContain('System');
-    expect(text).toContain('Page 2 of 2  ·  Generated 2026-11-19 11:00:00 UTC');
-  });
-
-  it("adds the integrator's time zone next to UTC", async () => {
-    const pdf = await makePdf([{ size: A4 }]);
-    const output = await appendCertificate(pdf, {
+  it('says the file is sealed and nothing about PDF reader warnings', async () => {
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
       envelope: envelope(),
       document: document(),
       events,
-      timeZone: 'Asia/Kolkata',
     });
-    const text = (await certificateText(output, 1)).join('\n');
-    expect(text).toContain('2026-11-18 09:00:05 UTC / 2026-11-18 14:30:05 GMT+5:30 (Asia/Kolkata)');
-    expect(text).toContain('Time (UTC / Asia/Kolkata)');
+    const text = (await certificateText(output, 1)).join(' ');
+    expect(text).toContain('sealed with a digital signature');
+    expect(text).not.toMatch(/adobe|acrobat|unknown|trust/i);
+  });
+
+  it('shows the time in UTC alone without a time zone', async () => {
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope(),
+      document: document(),
+      events,
+    });
+    const text = await certificateText(output, 1);
+    expect(text).toContain('2026-11-19 10:15:03 UTC');
+    expect(text).toContain('Signed (UTC)');
   });
 
   it('shows declines with their reason', async () => {
@@ -172,57 +290,24 @@ describe('appendCertificate', () => {
     });
     const text = (await certificateText(output, 1)).join('\n');
     expect(text).toContain('Declined');
-    expect(text).toContain('Wrong joining date');
+    expect(text).toContain('Reason: Wrong joining date');
     expect(text).not.toContain('Not yet');
   });
 
-  it('flows many recipients and events over several pages', async () => {
-    const recipients: Recipient[] = Array.from({ length: 25 }, (_, index) =>
-      recipient({
-        id: `r${index}`,
-        name: `Signer number ${index}`,
-        email: `person${index}@example.com`,
-        order: index,
-      }),
-    );
-    const many: AuditEvent[] = Array.from({ length: 300 }, (_, index) =>
-      event(index + 1, 'recipient.reminded', { recipientId: `r${index % 25}` }),
-    );
-    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
-      envelope: envelope({ recipients }),
-      document: document(),
-      events: many,
-    });
-    const doc = await PDFDocument.load(output);
-    const pages = doc.getPageCount() - 1;
-    expect(pages).toBeGreaterThan(5);
-
-    const text = await certificateText(output, 1);
-    expect(text).toContain('Signing certificate (continued)');
-    expect(text.some((line) => line.startsWith(`Page ${pages} of ${pages}`))).toBe(true);
-    expect(text.filter((line) => line === 'Reminder sent')).toHaveLength(300);
-    expect(text).toContain('Signer number 24 · Signer');
-    // The table header repeats on every page it spans.
-    expect(text.filter((line) => line === 'Action').length).toBeGreaterThan(2);
-  });
-
   it('wraps long values instead of running off the page', async () => {
-    const userAgent = `Mozilla/5.0 ${'X'.repeat(400)}`;
     const output = await appendCertificate(await makePdf([{ size: A4 }]), {
-      envelope: envelope(),
-      document: document({ name: `Very long document name ${'word '.repeat(60)}.pdf` }),
-      events: [event(1, 'recipient.signed', { recipientId: 'r1', context: { userAgent } })],
+      envelope: envelope({ title: `Agreement ${'word '.repeat(80)}` }),
+      document: document({ name: `${'X'.repeat(400)}.pdf` }),
+      events,
+      recordUrl: RECORD_URL,
     });
     const content = await pageContent(output, 1);
     const xs = [...content.matchAll(/[\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ ([\d.-]+) [\d.-]+ Tm/g)].map(
       (m) => Number(m[1]),
     );
-    expect(Math.max(...xs)).toBeLessThan(595.28 - 48);
-    const pieces = shownText(content).filter(
-      (line) => /^X+$/.test(line) || line.startsWith('Mozilla'),
-    );
+    expect(Math.max(...xs)).toBeLessThan(595.28 - 44);
+    const pieces = shownText(content).filter((line) => /^X+/.test(line));
     expect(pieces.length).toBeGreaterThan(2);
-    expect(pieces.join('').replace('Mozilla/5.0', '')).toBe('X'.repeat(400));
   });
 
   it('asks for a custom font for names outside Latin script', async () => {
@@ -246,5 +331,38 @@ describe('appendCertificate', () => {
     expect((await rejection(appendCertificate(new Uint8Array([1, 2, 3]), data))).code).toBe(
       'DOCUMENT_INVALID',
     );
+  });
+});
+
+describe('certificatePdf', () => {
+  const data: CertificateData = {
+    envelope: envelope({ recipients: [signer, approver] }),
+    document: document(),
+    events,
+    recordUrl: RECORD_URL,
+  };
+
+  it('makes the certificate a one-page file of its own', async () => {
+    const output = await certificatePdf(data);
+    const doc = await PDFDocument.load(output);
+    expect(doc.getPageCount()).toBe(1);
+    expect(doc.getTitle()).toBe('Signing certificate: Offer letter for Shubh Kumar');
+    const text = (await certificateText(output, 0)).join(' ');
+    expect(text).toContain('Shubh Kumar');
+    expect(text).toContain('This certificate summarises a completed signing.');
+    expect(text).not.toContain('203.0.113');
+    const pixels = qrPixels(await pageContent(output, 0));
+    expect(jsQR(pixels!.data, pixels!.width, pixels!.height)?.data).toBe(RECORD_URL);
+  });
+
+  it('puts the certificates of several documents in one file', async () => {
+    const output = await certificatePdf([
+      data,
+      { ...data, document: document({ id: 'd2', name: 'Annexure.pdf', sha256: 'b'.repeat(64) }) },
+    ]);
+    expect(await pageCount(output)).toBe(2);
+    const second = shownText(await pageContent(output, 1)).join(' ');
+    expect(second).toContain('Annexure.pdf');
+    expect(second).toContain('b'.repeat(64));
   });
 });

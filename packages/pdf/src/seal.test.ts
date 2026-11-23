@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PDFDocument, PDFHexString } from 'pdf-lib';
@@ -20,6 +20,7 @@ import {
   recipient,
 } from './testing/fixtures';
 import { signAgainForTest } from './testing/signed';
+import { sealCertificate, verify } from './trust';
 import { parsePdfDate, verifySeal } from './verify';
 
 const signingTime = new Date('2026-11-19T10:20:30.000Z');
@@ -275,6 +276,8 @@ describe('seal and verifySeal', () => {
       envelope: envelope({ recipients: [signer] }),
       document: document(),
       events: [event(1, 'envelope.created'), event(2, 'recipient.signed', { recipientId: 'r1' })],
+      sender: { name: 'Meera Iyer' },
+      recordUrl: 'https://sign.example.com/r/Zk3vQ9xLm2Tn8RbYc4Wd7HsA',
     });
     const output = await seal(withCertificate, {
       p12: identity.p12,
@@ -284,6 +287,30 @@ describe('seal and verifySeal', () => {
     expect(result.valid).toBe(true);
     expect(result.coversWholeDocument).toBe(true);
     expect((await PDFDocument.load(output)).getPageCount()).toBe(2);
+
+    // The seal covers the certificate page too: a changed byte anywhere breaks it.
+    const trust = { fingerprints: [sealCertificate(identity).sha256] };
+    expect((await verify(output, { trust })).valid).toBe(true);
+    const [, firstLength] = byteRange(output) as [number, number, number, number];
+    for (const position of [100, firstLength - 200]) {
+      const changed = Uint8Array.from(output);
+      changed[position] = changed[position] === 0x30 ? 0x31 : 0x30;
+      expect(await verify(changed, { trust }), `byte ${position}`).toMatchObject({ valid: false });
+    }
+  });
+
+  it('still verifies a file sealed with the earlier, longer certificate pages', async () => {
+    const earlier = new Uint8Array(
+      readFileSync(new URL('./testing/sealed-before-compact-certificate.pdf', import.meta.url)),
+    );
+    const result = await verify(earlier, {
+      trust: {
+        fingerprints: ['3e6fc5c3ec339369b08011f807f99529a06bbed5f8a9a59e87d348b6c6e35836'],
+      },
+    });
+    expect(result).toMatchObject({ valid: true, trustedBy: 'certificate' });
+    expect(result.seal.coversWholeDocument).toBe(true);
+    expect((await PDFDocument.load(earlier)).getPageCount()).toBe(2);
   });
 
   it.skipIf(!hasOpenssl())('produces CMS that OpenSSL verifies against the signed bytes', () => {

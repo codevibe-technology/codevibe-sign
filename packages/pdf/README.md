@@ -158,24 +158,42 @@ checkbox value, or characters the font cannot draw), `RECIPIENT_NOT_FOUND`, `VAL
 
 ### `appendCertificate(pdfBytes, data, options?) → Promise<Uint8Array>`
 
-Appends one or more A4 pages titled "Signing certificate". `data` is
-`{ envelope, document, events, timeZone?, generatedAt?, note? }` using core's types. The pages
-show:
+Appends an A4 page titled "Signing certificate". `data` is
+`{ envelope, document, events, timeZone?, generatedAt?, sender?, recordUrl?, note? }` using
+core's types. The page shows:
 
-- envelope id, title, status and its key times;
-- document name, page count, the original SHA-256 (`document.sha256`) and the SHA-256 of
-  `pdfBytes`, the final signed content before the certificate and seal;
+- the envelope title, document name and page count, envelope id, status and when it was
+  completed;
+- `sender`, when given: `{ name, organization?, email? }`, the email masked;
 - each recipient: name, role, email or phone masked lightly (`s****@example.com`,
-  `+91******3210`), authentication method, status, IP address and user agent of their
-  decisive action, and when they viewed, signed or approved, or declined (with the reason);
-- the audit chain head and every event with its time, action and who did it;
+  `+91******3210`), how they proved who they are, and when they signed, approved or declined
+  (with the reason);
+- the document fingerprint: the SHA-256 of the original file (`document.sha256`), in short
+  and in full, and the head of the audit chain;
+- `recordUrl`, when given: a QR code and a link to a page that shows this signing's record,
+  such as the public record page of the web app;
 - `note`, when given: one line from the sender at the end, such as a company registration
   number. Characters the font cannot draw become `?`.
 
-Times are shown in UTC, followed by the given time zone. Long values wrap; tables continue
-on new pages with their header repeated.
+IP addresses, browser details and the list of audit events are not printed; `auditTrailPdf`
+makes the event list a file of its own. Times are shown in the given time zone with UTC
+under them, or in UTC alone. A usual envelope fits one page; with many recipients the table
+continues on further pages with its header repeated.
 
 `options`: `font` (as above) and `maxBytes`.
+
+### `certificatePdf(data, options?) → Promise<Uint8Array>`
+
+The same certificate as a PDF of its own, without the document: for someone who should see
+who signed and when, but not what was signed. `data` is one `CertificateData` or an array, to
+put the certificates of several documents in one file. `options`: `font`.
+
+### `auditTrailPdf(data, options?) → Promise<Uint8Array>`
+
+The audit trail as a PDF. `data` is `{ envelope, events, timeZone?, generatedAt?, recordUrl? }`.
+Every event is listed with its number, time, what happened and who did it, above the head of
+the hash chain. IP addresses and browser details are left out and an email address named in
+an event is masked. `options`: `font`.
 
 ### `seal(pdfBytes, options) → Promise<Uint8Array>`
 
