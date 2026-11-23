@@ -131,7 +131,9 @@ describe('Landing', () => {
       ['templates', 'bulk'],
     ] as const) {
       const step = document.getElementById(id)!;
-      expect(within(step).getByRole('heading', { level: 3 })).toBeInTheDocument();
+      // only the step on the stage is read out; the others wait their turn
+      expect(within(step).getByRole('heading', { level: 3, hidden: true })).toBeInTheDocument();
+      expect(step.getAttribute('aria-hidden')).toBe(id === 'send' ? null : 'true');
       // the still that stands in for the clip when motion is reduced
       expect(step.querySelector('img')).toHaveAttribute('src', `/home/${clip}.webp`);
       expect(step.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.webm`);

@@ -265,15 +265,12 @@ html [data-sonner-toaster][data-sonner-theme] {
   --info-text: var(--primary-text);
 }
 
-/* The home page's step-by-step story: the page snaps to each step, one per scroll or swipe,
-   and only near the steps (proximity), so the rest of the page scrolls freely. */
+/* The home page's step-by-step story: the stage stays pinned while the page scrolls through
+   one step's length per step, and the story's pager moves it one step per gesture. */
 @media (prefers-reduced-motion: no-preference) {
-  :root:has([data-story]) {
-    scroll-snap-type: y proximity;
-  }
-  .story-step {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
+  .story-track {
+    --story-step: 70svh;
+    height: calc(100svh - 4rem + (var(--story-steps, 1) - 1) * var(--story-step));
   }
 }
 

@@ -47,58 +47,126 @@ export function keyDirection(event: KeyboardEvent): 1 | -1 | null {
   return direction;
 }
 
+export type WheelVerdict = 'step' | 'hold';
+
 /**
- * Turns wheel, touch and key input into one step per gesture while the story is in view. A
- * gesture is everything until the input goes quiet for `quietMs`, so the long tail of a
- * trackpad flick cannot carry the page past the next step.
+ * Tells one wheel gesture from the next. A mouse notch is one event; a trackpad flick is a
+ * burst of small events followed by a long momentum tail. Either way the first event of a
+ * gesture may move the story one step, and the rest of that gesture is held. A new gesture
+ * starts after a quiet gap, on a change of direction, or when the deltas jump back up in the
+ * middle of a fading tail (a second flick before the first one has died away).
+ *
+ * After a step nothing moves for `cooldownMs`, however hard the wheel is spun, so a fast flick
+ * cannot skip a step. The cool-down is fixed: a long momentum tail does not stretch it.
+ */
+export function createWheelGate({
+  gapMs = 140,
+  cooldownMs = 550,
+}: { gapMs?: number; cooldownMs?: number } = {}) {
+  let lastAt = -Infinity;
+  let lastDirection = 0;
+  let recent: number[] = [];
+  let spent = false;
+  let lockedUntil = -Infinity;
+
+  return {
+    /** Classifies one wheel event: `step` means it may move the story, `hold` that it may not. */
+    wheel(time: number, deltaY: number): WheelVerdict {
+      const size = Math.abs(deltaY);
+      const direction = Math.sign(deltaY);
+      const fading = recent.length === 0 ? Infinity : Math.min(...recent);
+      const fresh =
+        time - lastAt > gapMs || direction !== lastDirection || (size >= 12 && size > fading * 2.5);
+      lastAt = time;
+      lastDirection = direction;
+      recent = fresh ? [size] : [...recent.slice(-2), size];
+      if (fresh) spent = false;
+      return time < lockedUntil || spent ? 'hold' : 'step';
+    },
+    /** Records that the event just classified moved the story. */
+    stepped(time: number) {
+      spent = true;
+      lockedUntil = time + cooldownMs;
+    },
+    /** True while the last step's cool-down runs. */
+    cooling(time: number) {
+      return time < lockedUntil;
+    },
+  };
+}
+
+export interface StoryPagerOptions {
+  /** The scroll positions of the steps, measured now. */
+  stops: () => number[];
+  /** Moves the page to the step at `index`, whose scroll position is `top`. */
+  move: (top: number, index: number) => void;
+  cooldownMs?: number;
+  gapMs?: number;
+}
+
+/**
+ * Turns wheel, touch and key input into exactly one step per gesture while the story is on
+ * screen: the step moves at once, on the first event of the gesture, and a short cool-down
+ * swallows the rest of it. Before the first step and after the last, a new gesture scrolls the
+ * page as usual.
  */
 export function attachStoryPager({
   stops,
-  quietMs = 220,
-  settleMs = 650,
-}: {
-  /** The scroll positions of the steps, measured now. */
-  stops: () => number[];
-  quietMs?: number;
-  settleMs?: number;
-}): () => void {
-  let busyUntil = 0;
+  move,
+  cooldownMs = 550,
+  gapMs = 140,
+}: StoryPagerOptions): () => void {
+  const gate = createWheelGate({ cooldownMs, gapMs });
   let touchStartY: number | null = null;
   let touchHandled = false;
 
+  const reach = () => window.innerHeight * 0.6;
+
   const go = (direction: 1 | -1): boolean => {
-    const target = nextStop(stops(), window.scrollY, direction, window.innerHeight * 0.6);
+    const all = stops();
+    const target = nextStop(all, window.scrollY, direction, reach());
     if (target === null) return false;
-    window.scrollTo({ top: target, behavior: 'smooth' });
-    busyUntil = performance.now() + settleMs;
+    move(target, all.indexOf(target));
     return true;
   };
 
   const claims = (direction: 1 | -1) =>
-    nextStop(stops(), window.scrollY, direction, window.innerHeight * 0.6) !== null;
+    nextStop(stops(), window.scrollY, direction, reach()) !== null;
+
+  /** Between the first and the last step, where a held gesture must not leak out. */
+  const onStory = () => {
+    const all = stops();
+    if (all.length === 0) return false;
+    const y = window.scrollY;
+    return y >= all[0]! - 2 && y <= all[all.length - 1]! + 2;
+  };
 
   const onWheel = (event: WheelEvent) => {
     if (event.ctrlKey || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
     if (event.deltaY === 0) return;
-    const direction = event.deltaY > 0 ? 1 : -1;
     const now = performance.now();
-    if (now < busyUntil) {
-      // Still the same gesture: hold the page where the last step put it.
-      event.preventDefault();
-      busyUntil = Math.max(busyUntil, now + quietMs);
+    if (gate.wheel(now, event.deltaY) === 'step') {
+      if (go(event.deltaY > 0 ? 1 : -1)) {
+        gate.stepped(now);
+        event.preventDefault();
+      }
       return;
     }
-    if (go(direction)) event.preventDefault();
+    if (gate.cooling(now) || onStory()) event.preventDefault();
   };
 
   const onKey = (event: KeyboardEvent) => {
     const direction = keyDirection(event);
     if (!direction) return;
-    if (performance.now() < busyUntil && claims(direction)) {
-      event.preventDefault();
+    const now = performance.now();
+    if (gate.cooling(now)) {
+      if (claims(direction)) event.preventDefault();
       return;
     }
-    if (go(direction)) event.preventDefault();
+    if (go(direction)) {
+      gate.stepped(now);
+      event.preventDefault();
+    }
   };
 
   const onTouchStart = (event: TouchEvent) => {
@@ -109,9 +177,10 @@ export function attachStoryPager({
   const onTouchMove = (event: TouchEvent) => {
     if (touchStartY === null || event.touches.length !== 1) return;
     const dy = touchStartY - event.touches[0]!.clientY;
-    if (Math.abs(dy) < 8) return;
+    if (Math.abs(dy) < 6) return;
     const direction = dy > 0 ? 1 : -1;
-    if (touchHandled || performance.now() < busyUntil) {
+    const now = performance.now();
+    if (touchHandled || gate.cooling(now)) {
       if (event.cancelable) event.preventDefault();
       return;
     }
@@ -120,8 +189,9 @@ export function attachStoryPager({
       return;
     }
     if (event.cancelable) event.preventDefault();
-    if (Math.abs(dy) >= 24) {
-      touchHandled = go(direction);
+    if (Math.abs(dy) >= 18 && go(direction)) {
+      touchHandled = true;
+      gate.stepped(now);
     }
   };
 
@@ -144,4 +214,27 @@ export function attachStoryPager({
     window.removeEventListener('touchend', onTouchEnd);
     window.removeEventListener('touchcancel', onTouchEnd);
   };
+}
+
+const easeOut = (t: number) => 1 - (1 - t) ** 3;
+
+/**
+ * Scrolls the window to `top` over `ms` with an ease-out curve, and returns a function that
+ * stops it. Driving the scroll here, rather than with `behavior: 'smooth'`, keeps a step the
+ * same length in every browser, so the cool-down can be set to match it.
+ */
+export function glideTo(top: number, ms = 420): () => void {
+  const from = window.scrollY;
+  const distance = top - from;
+  if (Math.abs(distance) < 1 || ms <= 0) {
+    window.scrollTo({ top, behavior: 'instant' });
+    return () => {};
+  }
+  const start = performance.now();
+  let frame = requestAnimationFrame(function tick(now) {
+    const t = Math.min(1, Math.max(0, (now - start) / ms));
+    window.scrollTo({ top: from + distance * easeOut(t), behavior: 'instant' });
+    if (t < 1) frame = requestAnimationFrame(tick);
+  });
+  return () => cancelAnimationFrame(frame);
 }
