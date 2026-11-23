@@ -24,7 +24,7 @@ export interface RequestOptions {
 }
 
 export interface Call {
-  method: 'GET' | 'POST' | 'PATCH';
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   path: string;
   query?: Record<string, string | undefined>;
   json?: unknown;
@@ -91,8 +91,9 @@ export class Transport {
     if (call.method === 'POST') {
       headers['idempotency-key'] = call.options?.idempotencyKey ?? randomKey();
     }
-    // The server replays a POST with the same key, so only PATCH is unsafe to repeat.
-    const repeatable = call.method !== 'PATCH';
+    // The server replays a POST with the same key. A PATCH may apply twice, and a DELETE
+    // that worked answers "not found" the second time, so neither is repeated.
+    const repeatable = call.method === 'GET' || call.method === 'POST';
     const url = this.url(call);
     const signal = call.options?.signal;
 

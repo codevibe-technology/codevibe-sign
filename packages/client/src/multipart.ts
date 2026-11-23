@@ -37,7 +37,7 @@ export async function encodeMultipart(
   return { bytes: concat(...parts), contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
-async function bytesOf(content: PdfContent): Promise<Uint8Array> {
+export async function bytesOf(content: PdfContent): Promise<Uint8Array> {
   if (content instanceof Uint8Array) return content;
   if (content instanceof ArrayBuffer) return new Uint8Array(content);
   return new Uint8Array(await content.arrayBuffer());

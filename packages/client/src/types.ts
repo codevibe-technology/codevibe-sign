@@ -121,6 +121,210 @@ export interface UpdateEnvelopeInput extends Partial<Omit<EnvelopeSettings, 'mes
   fields?: FieldSpec[];
 }
 
+/** A slot a person fills when an envelope is made from the template, such as Employee. */
+export interface TemplateRole {
+  id: Id;
+  /** Unique within the template, ignoring case. */
+  name: string;
+  type: RecipientRole;
+  auth: AuthMethod;
+}
+
+export interface TemplateDocument {
+  id: Id;
+  name: string;
+  /** Size of the PDF in bytes. */
+  size: number;
+  sha256: string;
+  pageCount: number;
+  /** Page sizes in PDF points, in page order. */
+  pages: { width: number; height: number }[];
+}
+
+export interface TemplateField {
+  id: Id;
+  documentId: Id;
+  /** The role whose person fills the field in. */
+  roleId: Id;
+  type: FieldType;
+  page: number;
+  rect: Rect;
+  required: boolean;
+  label?: string;
+}
+
+/** An envelope without the people: documents, roles, fields and settings to reuse. */
+export interface Template {
+  id: Id;
+  name: string;
+  description?: string;
+  /** Title of the envelopes made from the template. */
+  title: string;
+  message?: string;
+  routing: RoutingMode;
+  reminders: ReminderPolicy;
+  expiresInDays: number;
+  roles: TemplateRole[];
+  documents: TemplateDocument[];
+  fields: TemplateField[];
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
+export interface TemplateSummary {
+  id: Id;
+  name: string;
+  description: string | null;
+  roles: { name: string; type: RecipientRole }[];
+  documentCount: number;
+  pageCount: number;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
+export interface TemplateRoleSpec {
+  /** How fields refer to this role. Defaults to its position. */
+  key?: string;
+  /** On update, the id of an existing role to keep. */
+  id?: Id;
+  /** For example `Employee`. */
+  name: string;
+  type?: RecipientRole;
+  auth?: AuthMethod;
+}
+
+/** A field box in PDF points from the top-left corner of the page, for one role. */
+export interface TemplateFieldSpec extends Rect {
+  /** Key or id of the role. */
+  role: string;
+  /** Key or id of the document; leave out when there is one document. */
+  document?: string;
+  type?: FieldType;
+  /** Zero-based page index. */
+  page: number;
+  required?: boolean;
+  /** Text fields are prefilled by label. */
+  label?: string;
+}
+
+interface TemplateSettings {
+  name: string;
+  /** Title of the envelopes made from it. Defaults to the name. */
+  title?: string;
+  routing?: RoutingMode;
+  reminders?: ReminderPolicy;
+  expiresInDays?: number;
+}
+
+export interface CreateTemplateInput extends TemplateSettings {
+  description?: string;
+  message?: string;
+  documents: DocumentUpload[];
+  roles: TemplateRoleSpec[];
+  fields?: TemplateFieldSpec[];
+}
+
+export interface UpdateTemplateInput extends Partial<TemplateSettings> {
+  /** `null` removes the description. */
+  description?: string | null;
+  /** `null` removes the message. */
+  message?: string | null;
+  /** Replaces every role; give a role its `id` to keep it. */
+  roles?: TemplateRoleSpec[];
+  /** Replaces every field. */
+  fields?: TemplateFieldSpec[];
+}
+
+export interface TemplateListQuery {
+  /** Case-insensitive text anywhere in the name. */
+  q?: string;
+  /** Page size, 1 to 100. Default 25. */
+  limit?: number;
+  /** `nextCursor` of the previous page. */
+  cursor?: string;
+}
+
+export interface TemplateList {
+  /** Newest first. */
+  templates: TemplateSummary[];
+  /** Pass as `cursor` for the next page; null on the last one. */
+  nextCursor: string | null;
+}
+
+/** The person who takes a role in one envelope. */
+export interface RolePerson {
+  name: string;
+  email?: string;
+  /** International format, like `+919812345678`. */
+  phone?: string;
+  /** Replaces the role's way of signing in for this person. */
+  auth?: AuthMethod;
+}
+
+export interface EnvelopeFromTemplateInput {
+  /** One person for every role, keyed by role name or role id. */
+  roles: Record<string, RolePerson>;
+  /** Values for text fields, keyed by field label or field id. */
+  prefill?: Record<string, string>;
+  title?: string;
+  message?: string;
+  reminders?: ReminderPolicy;
+  expiresAt?: IsoDateTime | Date;
+  expiresInDays?: number;
+  metadata?: Record<string, string>;
+  /** Send right away instead of leaving a draft. */
+  send?: boolean;
+}
+
+/** Why a file is not a valid sealed document of the server. More values may be added. */
+export type VerificationFailure =
+  | 'not_sealed'
+  | 'multiple_signatures'
+  | 'signature_invalid'
+  | 'not_whole_document'
+  | 'untrusted_signer'
+  | 'unreadable'
+  | 'unknown_document';
+
+/** What the public verify routes answer for a PDF or its SHA-256. */
+export interface PublicVerification {
+  /** The file is exactly what the server sealed, unchanged since. */
+  valid: boolean;
+  /** The first check that failed; null when valid. */
+  reason: VerificationFailure | null;
+  sha256: string;
+  /** Each check in order: true passed, false failed, null not reached. */
+  checks: {
+    sealed: boolean | null;
+    singleSignature: boolean | null;
+    intact: boolean | null;
+    coversWholeDocument: boolean | null;
+    trustedCertificate: boolean | null;
+  };
+  signer: { commonName: string | null; organization: string | null } | null;
+  signedAt: IsoDateTime | null;
+  certificateSha256: string | null;
+  /** The envelope of a valid file, with contacts masked; null otherwise. */
+  envelope: {
+    id: Id;
+    title: string;
+    documentId: Id;
+    documentName: string;
+    sentAt: IsoDateTime | null;
+    completedAt: IsoDateTime | null;
+    recipients: {
+      name: string;
+      contact: string | null;
+      role: RecipientRole;
+      status: RecipientStatus;
+      auth: AuthMethod;
+      actedAt: IsoDateTime | null;
+    }[];
+    events: { seq: number; action: AuditAction; at: IsoDateTime; recipient: string | null }[];
+    chain: { valid: boolean; head: string | null; events: number };
+  } | null;
+}
+
 export interface RecipientCorrection {
   name?: string;
   email?: string;

@@ -44,6 +44,50 @@ const pdf = await sign.envelopes.downloadDocument(envelope.id, envelope.document
 Field boxes are in PDF points from the top-left corner of the page. Documents can be a
 `Uint8Array` (a Node `Buffer` is one), an `ArrayBuffer` or a `Blob`.
 
+## Templates
+
+Store the PDFs, roles and fields once, then make an envelope by saying who takes each role:
+
+```ts
+const template = await sign.templates.create({
+  name: 'Offer letter',
+  documents: [{ name: 'offer.pdf', content: pdfBytes }],
+  roles: [{ key: 'employee', name: 'Employee' }],
+  fields: [
+    { role: 'employee', type: 'signature', page: 0, x: 72, y: 640, width: 180, height: 48 },
+    {
+      role: 'employee',
+      type: 'text',
+      label: 'Employee code',
+      page: 0,
+      x: 72,
+      y: 600,
+      width: 180,
+      height: 20,
+    },
+  ],
+});
+
+const envelope = await sign.templates.createEnvelope(template.id, {
+  roles: { Employee: { name: 'Asha Rao', email: 'asha@example.com' } },
+  prefill: { 'Employee code': 'E-1042' },
+  send: true,
+});
+```
+
+## Verifying a sealed PDF
+
+The verify routes are public, so this needs no API key:
+
+```ts
+import { createVerifyClient } from '@codevibe_technology/sign-client';
+
+const verify = createVerifyClient({ baseUrl: 'https://sign.example.com' });
+const result = await verify.pdf(sealedBytes); // or verify.sha256(hex)
+if (result.valid) console.log(result.envelope?.title, result.signedAt);
+else console.log(result.reason); // for example not_whole_document
+```
+
 ## Signing
 
 In the browser, with the token from the signing link:
@@ -97,7 +141,7 @@ Every failure is a `SignApiError` with the server's `code` (such as `VALIDATION`
 Every POST carries an `Idempotency-Key`, generated unless you pass `idempotencyKey`, and the
 server answers a repeat with the first response. That makes POSTs and GETs safe to retry:
 they are retried on network errors, timeouts, 429 and 5xx, with exponential backoff and
-`Retry-After` respected. PATCH (`update`) is never retried.
+`Retry-After` respected. PATCH (`update`) and DELETE are never retried.
 
 ## API
 
@@ -113,6 +157,12 @@ they are retried on network errors, timeouts, 429 and 5xx, with exponential back
 | `envelopes.events(id)`                                                   | `{ events, chainValid }`       |
 | `envelopes.downloadDocument(id, documentId, { version? })`               | `Uint8Array`                   |
 | `envelopes.certificate(id)`                                              | `Certificate`                  |
+| `templates.list({ q?, limit?, cursor? })`                                | `{ templates, nextCursor }`    |
+| `templates.create(input)`, `get(id)`, `update(id, patch)`                | `Template`                     |
+| `templates.delete(id)`                                                   | `void`                         |
+| `templates.createEnvelope(id, { roles, prefill?, send? })`               | `Envelope`                     |
+| `verify.pdf(content)`, `verify.sha256(hash)`                             | `PublicVerification`           |
+| `createVerifyClient({ baseUrl, fetch? })`                                | `VerifyClient` (no API key)    |
 | `createSignerClient({ baseUrl, token, sessionToken?, fetch? })`          | `SignerClient`                 |
 | `session()`, `document(id)`                                              | `SigningSession`, `Uint8Array` |
 | `requestOtp()`, `verifyOtp(code)`                                        | `OtpSent`, `OtpSession`        |

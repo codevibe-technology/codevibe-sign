@@ -31,7 +31,7 @@ function append(pdf: Uint8Array, text: string): Uint8Array {
   return out;
 }
 
-const fakeEngine: PdfEngine = {
+export const fakeEngine: PdfEngine = {
   async inspectPdf(pdf) {
     const pages = Number(/pages=(\d+)/.exec(new TextDecoder().decode(pdf))?.[1] ?? 1);
     return {
