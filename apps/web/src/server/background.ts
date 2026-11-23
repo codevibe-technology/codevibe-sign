@@ -28,6 +28,7 @@ async function billingTick() {
     mailer: deps.mailer,
     operatorEmail: deps.config.operatorEmail,
     now: deps.now,
+    ...(deps.appUrl ? { appUrl: deps.appUrl } : {}),
   });
   await pruneRazorpayEvents(db());
 }

@@ -14,6 +14,7 @@ import {
   termPrice,
   type Term,
 } from '@/lib/billing/terms';
+import type { EmailDetail } from '@/lib/email-layout';
 import { isPlan, type Plan } from '@/lib/plans';
 import { randomId } from '../crypto';
 import { AppError } from '../errors';
@@ -21,6 +22,7 @@ import { recordAudit } from './audit';
 import { paymentsConfigured, type BillingConfig } from './config';
 import { BILLING_DETAILS_FIELD } from './credit-orders';
 import { getBillingDetails } from './details';
+import { appUrlOf, subscriptionEmail } from './emails';
 import {
   createOrder,
   type BillingDeps,
@@ -631,23 +633,20 @@ async function notify(
   deps: BillingDeps,
   accountId: string,
   kind: Notice,
-  message: { subject: string; lines: string[] },
+  message: { subject: string; heading: string; lines: string[]; details?: EmailDetail[] },
 ): Promise<void> {
   const { to } = await recipientsOf(sql, accountId);
-  const seller = deps.config.seller?.name ?? 'Codevibe Sign';
+  const seller = deps.config.seller;
+  const mail = subscriptionEmail(message, seller, appUrlOf(deps));
   for (const address of to) {
     await deps.mailer.send({
       to: address,
-      fromName: seller,
-      subject: message.subject,
-      text: ['Hello,', '', ...message.lines, '', seller].join('\n'),
+      fromName: seller?.name ?? 'Codevibe Sign',
+      ...mail,
       meta: { kind },
     });
   }
 }
-
-const planPage =
-  'Open Settings, then Plan and usage, in any of your workspaces to pay for the next term.';
 
 async function remind(sql: postgres.Sql, deps: BillingDeps, row: Row, now: Date): Promise<boolean> {
   const stage = reminderStage(daysBetween(now, row.period_end));
@@ -668,11 +667,15 @@ async function remind(sql: postgres.Sql, deps: BillingDeps, row: Row, now: Date)
   try {
     await notify(sql, deps, row.account_id, 'subscription_reminder', {
       subject: `Your Codevibe Sign Cloud term ends on ${formatTermDay(row.period_end)}`,
+      heading: `Your Cloud term ends in ${stage} ${stage === 1 ? 'day' : 'days'}`,
       lines: [
         `The Cloud term of your account ends on ${formatTermDay(row.period_end)}, in ${stage} ${stage === 1 ? 'day' : 'days'}.`,
-        `The next term is ${formatInr(total)} plus GST. ${planPage}`,
-        '',
+        `The next term is ${formatInr(total)} plus GST. Pay for it from Plan and usage to keep Cloud running without a break.`,
         `If it is not paid, your workspaces have ${deps.config.cloud.graceDays} more days on Cloud and then move to the Free plan. Nothing is deleted.`,
+      ],
+      details: [
+        { label: 'Term ends', value: formatTermDay(row.period_end) },
+        { label: 'Next term', value: `${formatInr(total)} plus GST` },
       ],
     });
   } catch (err) {
@@ -758,6 +761,7 @@ export async function runSubscriptionTick(
         result.ended += 1;
         await notify(sql, deps, row.account_id, 'subscription_ended', {
           subject: 'Your Codevibe Sign account is now on the Free plan',
+          heading: 'Your account is now on the Free plan',
           lines: [
             'The Cloud term ended and was not renewed, as you asked.',
             'Your documents, templates and members are all still there. The Free plan limits apply to anything new.',
@@ -783,10 +787,15 @@ export async function runSubscriptionTick(
       });
       await notify(sql, deps, row.account_id, 'subscription_grace', {
         subject: 'Your Codevibe Sign Cloud term has ended',
+        heading: 'Your Cloud term has ended',
         lines: [
           `The Cloud term ended on ${formatTermDay(row.period_end)} and the next one is not paid yet.`,
-          `Everything keeps working until ${formatTermDay(graceEnds)}. ${planPage}`,
+          `Everything keeps working until ${formatTermDay(graceEnds)}. Pay for the next term from Plan and usage before then.`,
           'After that your workspaces move to the Free plan. Nothing is deleted.',
+        ],
+        details: [
+          { label: 'Term ended', value: formatTermDay(row.period_end) },
+          { label: 'Cloud until', value: formatTermDay(graceEnds) },
         ],
       }).catch(report('grace notice'));
       continue;
@@ -809,6 +818,7 @@ export async function runSubscriptionTick(
         result.ended += 1;
         await notify(sql, deps, row.account_id, 'subscription_ended', {
           subject: 'Your Codevibe Sign account is now on the Free plan',
+          heading: 'Your account is now on the Free plan',
           lines: [
             'The Cloud term was not renewed, so your workspaces moved to the Free plan.',
             'Your documents, templates and members are all still there. The Free plan limits apply to anything new, and webhooks are paused.',

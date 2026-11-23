@@ -38,6 +38,7 @@ export function billingDeps(): BillingDeps {
     files,
     mailer,
     now: () => new Date(),
+    appUrl: env().APP_URL,
     invoice: invoiceRendering(config, env()),
   };
 }

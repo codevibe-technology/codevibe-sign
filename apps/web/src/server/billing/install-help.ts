@@ -2,10 +2,10 @@ import 'server-only';
 import type postgres from 'postgres';
 import type { BillingDetails } from '@/lib/billing/details';
 import type { InstallBooking } from '@/lib/billing/install-help';
-import { formatInr } from '@/lib/billing/money';
 import { randomId } from '../crypto';
 import { AppError } from '../errors';
 import { paymentsConfigured } from './config';
+import { appUrlOf, installBookingEmail } from './emails';
 import { billingLimiter } from './limits';
 import { createOrder, type BillingDeps, type CheckoutSession, type Fulfilment } from './orders';
 
@@ -128,23 +128,22 @@ export async function notifyInstallBookings(sql: postgres.Sql, deps: BillingDeps
       await deps.mailer.send({
         to,
         replyTo: row.email,
-        subject: `${row.mode === 'test' ? '[Test] ' : ''}Installation help booked by ${row.name}`,
-        text: [
-          `A Codevibe Sign installation was booked and paid (${formatInr(Number(row.total_paise))}, GST included).`,
-          ...(row.mode === 'test' ? ['This payment used test keys. No money was paid.'] : []),
-          '',
-          `Name: ${row.name}`,
-          `Company: ${row.company}`,
-          `Email: ${row.email}`,
-          `Phone: ${row.phone}`,
-          `Server: ${row.provider}`,
-          `Preferred time: ${row.preferred_time}`,
-          '',
-          'Server details:',
-          row.server_details,
-          '',
-          `Booking ${row.id}, order ${row.order_id}`,
-        ].join('\n'),
+        ...installBookingEmail(
+          {
+            id: row.id,
+            orderId: row.order_id,
+            name: row.name,
+            email: row.email,
+            phone: row.phone,
+            company: row.company,
+            provider: row.provider,
+            serverDetails: row.server_details,
+            preferredTime: row.preferred_time,
+            totalPaise: Number(row.total_paise),
+            test: row.mode === 'test',
+          },
+          appUrlOf(deps),
+        ),
         meta: { kind: 'install_help_booking' },
       });
       await sql`

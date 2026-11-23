@@ -39,6 +39,8 @@ export interface BillingDeps {
   files: FileStore;
   mailer: Mailer;
   now: () => Date;
+  /** The app's public URL, for the logo and links in billing emails. The local default when unset. */
+  appUrl?: string;
   /** Fonts, images and the seal for invoice files; without it invoices are plain and unsigned. */
   invoice?: InvoiceRendering | undefined;
 }

@@ -1,7 +1,6 @@
 import 'server-only';
 import type postgres from 'postgres';
-import { formatIstDate } from '@/lib/billing/invoice-series';
-import { formatInr } from '@/lib/billing/money';
+import { appUrlOf, invoiceEmail } from './emails';
 import { renderInvoicePdf, type InvoiceDocument } from './invoice-pdf';
 import { orderFromRow, type BillingDeps, type BillingOrder, type OrderRow } from './orders';
 
@@ -123,29 +122,6 @@ export async function invoicePdf(
 const MAX_ATTEMPTS = 8;
 const CLAIM_MINUTES = 5;
 
-function invoiceEmail(invoice: Invoice) {
-  const { order } = invoice;
-  const test = order.mode === 'test';
-  const what = test ? 'Test invoice' : 'Tax invoice';
-  const lines = order.lines.map((line) => `  ${line.description}`).join('\n');
-  return {
-    subject: `${what} ${invoice.number} from ${order.seller.name}`,
-    text: [
-      `Hello,`,
-      ``,
-      `Thank you for your payment. ${what} ${invoice.number} dated ${formatIstDate(invoice.issuedAt)} is attached.`,
-      ``,
-      lines,
-      ``,
-      `Total paid, GST included: ${formatInr(order.tax.totalPaise)}`,
-      ...(order.razorpayPaymentId ? [`Payment reference: ${order.razorpayPaymentId}`] : []),
-      ...(test ? [``, `This payment used test keys. No money was paid.`] : []),
-      ``,
-      order.seller.name,
-    ].join('\n'),
-  };
-}
-
 /**
  * Renders, stores and emails one invoice. Only one caller at a time works on an invoice, and
  * the email goes out once. Throws when a step fails; the invoice stays to be finished later.
@@ -171,7 +147,7 @@ export async function finishInvoice(
     await deps.mailer.send({
       to: invoice.order.buyer.email,
       fromName: invoice.order.seller.name,
-      ...invoiceEmail(invoice),
+      ...invoiceEmail(invoice, appUrlOf(deps)),
       attachments: [
         { filename: `${invoice.number}.pdf`, content: bytes, contentType: 'application/pdf' },
       ],

@@ -3,6 +3,7 @@ import type { Mailer } from '@codevibe_technology/sign-core';
 import type postgres from 'postgres';
 import { formatInr } from '@/lib/billing/money';
 import { randomId } from '../crypto';
+import { appUrlOf, operatorEmail } from './emails';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
@@ -70,21 +71,34 @@ interface NoticeRow {
   owner_email: string | null;
 }
 
-function body(row: NoticeRow): string {
+function noticeEmail(row: NoticeRow, appUrl: string) {
   const details = Object.entries(row.data)
     .filter(([, value]) => value !== null && value !== '')
-    .map(([key, value]) => `${key}: ${String(value)}`);
-  return [
-    `${SUBJECTS[row.kind]}.`,
-    ADVICE[row.kind],
-    ...(row.mode === 'test' ? ['This payment used test keys. No money moved.'] : []),
-    '',
-    ...(row.order_id ? [`Order: ${row.order_id} (${row.order_kind ?? 'unknown'})`] : []),
-    ...(row.total_paise ? [`Amount: ${formatInr(Number(row.total_paise))}, GST included`] : []),
-    ...(row.razorpay_payment_id ? [`Razorpay payment: ${row.razorpay_payment_id}`] : []),
-    ...(row.account_id ? [`Account: ${row.owner_email ?? 'no owner'} (${row.account_id})`] : []),
-    ...details,
-  ].join('\n');
+    .map(([label, value]) => ({ label, value: String(value) }));
+  return operatorEmail(
+    {
+      subject: SUBJECTS[row.kind],
+      advice: ADVICE[row.kind],
+      test: row.mode === 'test',
+      paymentId: row.razorpay_payment_id,
+      details: [
+        ...(row.order_id
+          ? [{ label: 'Order', value: `${row.order_id} (${row.order_kind ?? 'unknown'})` }]
+          : []),
+        ...(row.total_paise
+          ? [{ label: 'Amount', value: `${formatInr(Number(row.total_paise))}, GST included` }]
+          : []),
+        ...(row.razorpay_payment_id
+          ? [{ label: 'Razorpay payment', value: row.razorpay_payment_id }]
+          : []),
+        ...(row.account_id
+          ? [{ label: 'Account', value: `${row.owner_email ?? 'no owner'} (${row.account_id})` }]
+          : []),
+        ...details,
+      ],
+    },
+    appUrl,
+  );
 }
 
 /**
@@ -93,7 +107,7 @@ function body(row: NoticeRow): string {
  */
 export async function sendOperatorNotices(
   sql: postgres.Sql,
-  deps: { mailer: Mailer; operatorEmail: string | null; now: () => Date },
+  deps: { mailer: Mailer; operatorEmail: string | null; now: () => Date; appUrl?: string },
 ): Promise<number> {
   if (!deps.operatorEmail) return 0;
   const now = deps.now();
@@ -124,8 +138,7 @@ export async function sendOperatorNotices(
     try {
       await deps.mailer.send({
         to: deps.operatorEmail,
-        subject: `${row.mode === 'test' ? '[Test] ' : ''}${SUBJECTS[row.kind]}`,
-        text: body(row),
+        ...noticeEmail(row, appUrlOf(deps)),
         meta: {
           kind: 'operator_notice',
           ...(row.account_id ? { accountId: row.account_id } : {}),
