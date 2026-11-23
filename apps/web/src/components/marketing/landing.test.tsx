@@ -6,7 +6,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), refres
 vi.mock('@/lib/auth-client', () => ({ authClient: { signOut: vi.fn() } }));
 vi.mock('@/server/actions/personal', () => ({ updatePreferencesAction: vi.fn() }));
 
-import { FREE_PLAN_LIMITS, planFeatures } from '@/lib/plans';
+import { planFeatures } from '@/lib/plans';
 import type { PricingView } from '@/server/billing/pricing';
 
 const FEATURES = planFeatures({ mode: 'hosted', freeOverrides: {} });
@@ -27,33 +27,56 @@ const PRICING: PricingView = {
   operatorEmail: null,
   hostingOffers: [],
 };
+const HEADLINE = 'Get documents signed. Keep the proof.';
+const GITHUB = 'https://github.com/codevibe-technology/codevibe-sign';
 const { Landing } = await import('./landing');
 const { LegalPage, LegalSection } = await import('./legal-page');
 
+const section = (id: string) => document.getElementById(id)!;
+
 describe('Landing', () => {
-  it('leads with the promise and the two ways in', () => {
+  it('leads with one promise, Start free and Self-host', () => {
     render(<Landing features={FEATURES} pricing={PRICING} />);
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: HEADLINE })).toBeInTheDocument();
     const hero = screen.getByRole('heading', { level: 1 }).closest('section')!;
     expect(within(hero).getByRole('link', { name: /Start free/ })).toHaveAttribute(
       'href',
       '/sign-in',
     );
-    expect(within(hero).getByRole('link', { name: /^Self-host it/ })).toHaveAttribute(
-      'href',
-      'https://github.com/codevibe-technology/codevibe-sign',
-    );
-    expect(within(hero).getByRole('link', { name: 'Check it here' })).toHaveAttribute(
-      'href',
-      '/verify',
-    );
-    const footer = screen.getByRole('navigation', { name: 'Footer' });
-    expect(within(footer).getByRole('link', { name: 'Verify a PDF' })).toHaveAttribute(
-      'href',
-      '/verify',
-    );
+    expect(within(hero).getByRole('link', { name: /^Self-host/ })).toHaveAttribute('href', GITHUB);
+    expect(within(hero).getByText('Free plan, no card needed')).toBeInTheDocument();
+  });
+
+  it('frames the real app in the hero, poster first and nothing playing on its own', () => {
+    const { container } = render(<Landing features={FEATURES} pricing={PRICING} />);
+    const hero = screen.getByRole('heading', { level: 1 }).closest('section')!;
+    expect(within(hero).getByText('sign.codevibe.in')).toBeInTheDocument();
+    expect(within(hero).getByText('Sample data')).toBeInTheDocument();
+    const poster = hero.querySelector('img[src="/home/hero.webp"]')!;
+    expect(poster).toHaveAttribute('loading', 'eager');
+    expect(poster).toHaveAttribute('width', '1280');
+    expect(poster).toHaveAttribute('height', '800');
+    expect(within(hero).getByText(/The real app, with made-up people/)).toBeInTheDocument();
+    for (const video of container.querySelectorAll('video')) {
+      expect(video).not.toHaveAttribute('autoplay');
+      expect(['none', 'metadata']).toContain(video.getAttribute('preload'));
+    }
+  });
+
+  it('shows the trust strip under the hero', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const strip = screen.getByRole('region', { name: 'Why teams trust it' });
+    expect(
+      within(strip)
+        .getAllByRole('listitem')
+        .map((li) => li.querySelector('span > span')?.textContent),
+    ).toEqual([
+      'PAdES seal',
+      'Hash-chained trail',
+      'Aadhaar eSign',
+      'Open source',
+      'Made in India',
+    ]);
   });
 
   it('offers a signed-in visitor their dashboard instead of the ways in', () => {
@@ -76,39 +99,36 @@ describe('Landing', () => {
     // the hero, the Free plan and the closing call to action
     expect(toDashboard).toHaveLength(3);
     for (const link of toDashboard) expect(link).toHaveAttribute('href', '/dashboard');
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
-    ).toBeInTheDocument();
   });
 
-  it('shows the ways in to everyone else', () => {
+  it('shows the ways in to everyone else, also from the folded menu', () => {
     render(<Landing features={FEATURES} pricing={PRICING} viewer={null} />);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('link', { name: 'Sign in' })).toHaveAttribute(
-      'href',
-      '/sign-in',
-    );
+    const signIn = within(header).getAllByRole('link', { name: 'Sign in' });
+    expect(signIn).toHaveLength(2);
+    for (const link of signIn) expect(link).toHaveAttribute('href', '/sign-in');
     expect(within(header).getByRole('link', { name: 'Start free' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Dashboard' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull();
   });
 
-  it('has every section, reachable from the header', () => {
+  it('has every section, reachable from the header on the same page', () => {
     render(<Landing features={FEATURES} pricing={PRICING} />);
-    for (const id of ['features', 'developers', 'open-source', 'pricing', 'faq']) {
-      expect(document.getElementById(id)).not.toBeNull();
+    const ids = ['how-it-works', 'aadhaar', 'features', 'proof', 'developers', 'pricing', 'faq'];
+    for (const id of ids) expect(document.getElementById(id)).not.toBeNull();
+    for (const name of ['Site', 'Site menu']) {
+      const nav = screen.getByRole('navigation', { name });
+      expect(
+        within(nav)
+          .getAllByRole('link')
+          .map((a) => a.getAttribute('href')),
+      ).toEqual(expect.arrayContaining(['#how-it-works', '#aadhaar', '#pricing', '/docs']));
     }
-    const nav = screen.getByRole('navigation', { name: 'Site' });
-    expect(within(nav).getByRole('link', { name: 'How it works' })).toHaveAttribute(
-      'href',
-      '/#features',
-    );
-    expect(within(nav).getByRole('link', { name: 'Developers' })).toHaveAttribute(
-      'href',
-      '/#developers',
-    );
-    expect(within(nav).getByRole('link', { name: 'Pricing' })).toHaveAttribute('href', '/#pricing');
-    expect(within(nav).getByRole('link', { name: 'Docs' })).toHaveAttribute('href', '/docs');
+    expect(
+      within(screen.getByRole('navigation', { name: 'Site' })).getByRole('link', {
+        name: 'Aadhaar eSign',
+      }),
+    ).toHaveAttribute('href', '#aadhaar');
   });
 
   it('sends everyone else to sign-in from every call to action', () => {
@@ -120,109 +140,61 @@ describe('Landing', () => {
     expect(screen.queryByRole('link', { name: /Go to dashboard/ })).toBeNull();
   });
 
-  it('tells the six steps with a still and a description of each', () => {
-    const { container } = render(<Landing features={FEATURES} pricing={PRICING} />);
-    const story = document.getElementById('features')!;
+  it('explains how it works in three steps, each with a clip of the real app', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const how = section('how-it-works');
     expect(
-      within(story).getByRole('heading', {
+      within(how).getByRole('heading', {
         level: 2,
-        name: 'From PDF to sealed copy, on any device',
+        name: 'From PDF to sealed copy in three steps',
       }),
     ).toBeInTheDocument();
-    const steps = within(story).getByRole('list', { name: 'Steps' });
     expect(
-      within(steps)
-        .getAllByRole('button')
-        .map((b) => b.getAttribute('aria-label')),
+      within(how)
+        .getAllByRole('heading', { level: 3 })
+        .map((h) => h.textContent),
     ).toEqual([
-      'Step 1: Send',
-      'Step 2: Sign',
-      'Step 3: Seal',
-      'Step 4: Track',
-      'Step 5: Verify',
-      'Step 6: Scale',
+      'Upload a PDF and place the fields',
+      'People sign on any phone',
+      'Get a sealed PDF anyone can check',
     ]);
-    for (const [id, clip] of [
-      ['send', 'send'],
-      ['sign', 'sign-phone'],
-      ['seal', 'sealed'],
-      ['audit', 'audit'],
-      ['verify', 'verify'],
-      ['templates', 'bulk'],
-    ] as const) {
-      const step = document.getElementById(id)!;
-      // only the step on the stage is read out; the others wait their turn
-      expect(within(step).getByRole('heading', { level: 3, hidden: true })).toBeInTheDocument();
-      expect(step.getAttribute('aria-hidden')).toBe(id === 'send' ? null : 'true');
-      // the still that stands in for the clip when motion is reduced
-      expect(step.querySelector('img')).toHaveAttribute('src', `/home/${clip}.webp`);
-      expect(step.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.mp4`);
-      expect(document.getElementById(`${id}-text`)!.textContent!.length).toBeGreaterThan(40);
-    }
-    // only the first step's clip is on the pinned stage before anyone scrolls
-    const stage = within(story).getByRole('button', { name: /^Pause the clip: / });
-    expect(stage.getAttribute('aria-describedby')).toBe('send-text');
-    for (const video of container.querySelectorAll('video')) {
-      expect(video).not.toHaveAttribute('autoplay');
-      expect(['none', 'metadata']).toContain(video.getAttribute('preload'));
+    const clips = [...how.querySelectorAll('video source[type="video/mp4"]')].map((s) =>
+      s.getAttribute('src'),
+    );
+    expect(clips).toEqual(['/home/send.mp4', '/home/sign-phone.mp4', '/home/sealed.mp4']);
+    for (const [i, button] of within(how)
+      .getAllByRole('button', { name: /^Play the clip: / })
+      .entries()) {
+      expect(button).toHaveAttribute('aria-describedby', `step-${i + 1}-text`);
     }
   });
 
-  it('shows the audit trail as a real hash chain', () => {
+  it('gives Aadhaar eSign its own section with the prices it is given', () => {
     render(<Landing features={FEATURES} pricing={PRICING} />);
-    const proof = document.getElementById('proof')!;
-    const entries = [...proof.querySelectorAll('figure ol > li')];
-    expect(entries.map((li) => li.querySelector('code')?.textContent)).toEqual([
-      'envelope.sent',
-      'recipient.viewed',
-      'recipient.authenticated',
-      'recipient.signed',
-      'envelope.completed',
-    ]);
-    expect(within(proof).getByText(/made-up people/)).toBeInTheDocument();
-  });
-
-  it('shows the API with a working client call', () => {
-    render(<Landing features={FEATURES} pricing={PRICING} />);
-    const developers = document.getElementById('developers')!;
-    const code = within(developers).getByLabelText(
-      'Sending an envelope with the TypeScript client',
-    );
-    expect(code.textContent).toContain("from '@codevibe_technology/sign-client'");
-    expect(code.textContent).toContain('sign.envelopes.create(');
-  });
-
-  it('prices from the plan limits and the prices it is given', () => {
-    render(
-      <Landing
-        features={planFeatures({ mode: 'hosted', freeOverrides: { envelopesPerMonth: 20 } })}
-        pricing={PRICING}
-      />,
-    );
-    const pricing = document.getElementById('pricing')!;
-    expect(within(pricing).getByText('Envelopes sent: 20 envelopes a month')).toBeTruthy();
+    const aadhaar = section('aadhaar');
     expect(
-      within(pricing).getByText(
-        `Members: ${FREE_PLAN_LIMITS.members} members across your workspaces`,
-      ),
-    ).toBeTruthy();
-    expect(within(pricing).getByText('Webhooks: not included')).toBeTruthy();
-    expect(within(pricing).getByText('Envelopes sent: unlimited')).toBeTruthy();
-    expect(within(pricing).getByText('₹999')).toBeTruthy();
-    expect(within(pricing).getByText(/₹9,990 if you pay for a year, 2 months free/)).toBeTruthy();
-    expect(within(pricing).getByText(/More members are ₹99 each a month/)).toBeTruthy();
-    expect(within(pricing).getByText('Aadhaar eSign: ₹35 per eSign, prepaid')).toBeTruthy();
-    expect(within(pricing).getByText('Aadhaar eSign: ₹25 per eSign, prepaid')).toBeTruthy();
-    expect(
-      within(pricing).getByRole('link', { name: 'Have it installed for you' }),
-    ).toHaveAttribute('href', '/install-help');
-    expect(within(pricing).getByText(/do not include 18% GST/)).toBeTruthy();
-    expect(
-      within(pricing).getByText('No limits on envelopes, members or storage'),
+      within(aadhaar).getByRole('heading', {
+        level: 2,
+        name: 'Legally valid Aadhaar e-signatures, built in',
+      }),
     ).toBeInTheDocument();
+    expect(within(aadhaar).getByText('Aadhaar eSign, with Leegality')).toBeInTheDocument();
+    expect(within(aadhaar).getAllByRole('listitem').length).toBeGreaterThanOrEqual(3);
+    expect(within(aadhaar).getByText('They confirm with an Aadhaar OTP')).toBeInTheDocument();
+    const prices = within(aadhaar).getByText('Free plan').closest('dl')!;
+    expect(prices.textContent).toContain('₹35per eSign + GST');
+    expect(prices.textContent).toContain('₹25per eSign + GST');
+    expect(within(aadhaar).getByText('Prepaid credits that never expire')).toBeInTheDocument();
+    expect(
+      within(aadhaar).getByText('On Cloud, connect your own Leegality account instead'),
+    ).toBeInTheDocument();
+    expect(within(aadhaar).getByRole('link', { name: /How Aadhaar eSign works/ })).toHaveAttribute(
+      'href',
+      '/docs/guides/aadhaar-leegality',
+    );
   });
 
-  it('says a price is coming while none is set, and never how a price is made up', () => {
+  it('says an eSign price is coming while none is set, and never how a price is made up', () => {
     render(
       <Landing
         features={FEATURES}
@@ -234,21 +206,114 @@ describe('Landing', () => {
         }}
       />,
     );
-    const pricing = document.getElementById('pricing')!;
-    expect(within(pricing).getAllByText('Aadhaar eSign: price coming soon, prepaid')).toHaveLength(
-      2,
-    );
-    expect(within(pricing).getByText('Paying for Cloud opens shortly.')).toBeTruthy();
+    const prices = within(section('aadhaar')).getByText('Free plan').closest('dl')!;
+    expect(within(prices).getAllByText('Price coming soon')).toHaveLength(2);
+    expect(prices.textContent).not.toContain('GST');
+    expect(within(section('pricing')).getByText('Paying for Cloud opens shortly.')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/markup|at cost|provider cost|\+ ?₹10/i);
   });
 
-  it('answers the legal, data and limit questions', () => {
+  it('lists the features teams ask for, Billing admin and workspace transfer among them', () => {
     render(<Landing features={FEATURES} pricing={PRICING} />);
-    const faq = document.getElementById('faq')!;
+    const features = section('features');
+    expect(
+      within(features)
+        .getAllByRole('heading', { level: 3 })
+        .map((h) => h.textContent),
+    ).toEqual([
+      'Templates',
+      'Bulk send',
+      'Reminders',
+      'Signing order',
+      'Your brand',
+      'Workspaces',
+      'Roles and Billing admin',
+      'Workspace transfer',
+    ]);
+  });
+
+  it('shows the audit trail as a real hash chain and links to the verify page', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const proof = section('proof');
+    const entries = [...proof.querySelectorAll('figure ol > li')];
+    expect(entries.map((li) => li.querySelector('code')?.textContent)).toEqual([
+      'envelope.sent',
+      'recipient.viewed',
+      'recipient.authenticated',
+      'recipient.signed',
+      'envelope.completed',
+    ]);
+    expect(within(proof).getByText(/made-up people/)).toBeInTheDocument();
+    expect(within(proof).getByRole('link', { name: 'Check a signed PDF' })).toHaveAttribute(
+      'href',
+      '/verify',
+    );
+  });
+
+  it('shows the API with a working client call, and how to self-host', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const developers = section('developers');
+    const code = within(developers).getByLabelText(
+      'Sending an envelope with the TypeScript client',
+    );
+    expect(code.textContent).toContain("from '@codevibe_technology/sign-client'");
+    expect(code.textContent).toContain('sign.envelopes.create(');
+    for (const name of ['HTTP API', 'SDKs', 'Webhooks', 'Self-host']) {
+      expect(within(developers).getByText(name)).toBeInTheDocument();
+    }
+    expect(
+      within(developers).getByLabelText('Commands to self-host with Docker').textContent,
+    ).toContain('docker compose up -d');
+    expect(document.getElementById('open-source')).not.toBeNull();
+  });
+
+  it('prices the plans as cards from the prices it is given', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const pricing = section('pricing');
+    expect(within(pricing).getAllByRole('article')).toHaveLength(3);
+    expect(within(pricing).getByRole('article', { name: 'Cloud, recommended' })).toBeTruthy();
+    expect(within(pricing).getByText('₹999')).toBeTruthy();
+    expect(within(pricing).getByText('Pay for a year and save ₹1,998')).toBeTruthy();
+    expect(within(pricing).getByText('₹35 per eSign')).toBeTruthy();
+    expect(within(pricing).getByText('₹25 per eSign')).toBeTruthy();
+    expect(within(pricing).getByRole('link', { name: 'Book installation help' })).toHaveAttribute(
+      'href',
+      '/install-help',
+    );
+    expect(within(pricing).getByText(/₹1,999 \+ GST/)).toBeTruthy();
+    expect(within(pricing).getByText(/do not include 18% GST/)).toBeTruthy();
+  });
+
+  it('carries the hosting partner offer into the pricing', () => {
+    render(
+      <Landing
+        features={FEATURES}
+        pricing={{
+          ...PRICING,
+          hostingOffers: [
+            {
+              name: 'Hostinger VPS',
+              url: 'https://www.hostinger.com/vps',
+              note: 'Coupon CODEVIBE20: 20% off your first term',
+            },
+          ],
+        }}
+      />,
+    );
+    const pricing = section('pricing');
+    expect(
+      within(pricing).getByRole('link', { name: 'Hostinger VPS (opens in a new tab)' }),
+    ).toHaveAttribute('href', 'https://www.hostinger.com/vps');
+    expect(within(pricing).getByText('Coupon CODEVIBE20: 20% off your first term')).toBeTruthy();
+  });
+
+  it('answers the legal, Aadhaar, data and limit questions', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const faq = section('faq');
     expect(within(faq).getByText(/Information Technology Act, 2000/)).toBeTruthy();
     expect(within(faq).getByText('Is Aadhaar eSign available?')).toBeTruthy();
     expect(
-      within(faq).getByText(/₹35 per eSign on the Free plan\s+and ₹25 per eSign on Cloud/),
+      within(faq).getByText(/₹35 per eSign on the Free plan and\s+₹25 per eSign on Cloud/),
     ).toBeTruthy();
     expect(within(faq).getByText('How does paying for Cloud work?')).toBeTruthy();
     expect(within(faq).getByText('Where is my data kept?')).toBeTruthy();
@@ -264,89 +329,64 @@ describe('Landing', () => {
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       expect(link).toHaveAccessibleName(/\(opens in a new tab\)$/);
     }
+  });
+
+  it('links the footer by column to the product, developers, company and legal pages', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const footer = screen.getByRole('navigation', { name: 'Footer' });
     expect(
-      within(footer).getByRole('link', { name: 'Codevibe (opens in a new tab)' }),
-    ).toHaveAttribute('href', 'https://codevibe.in');
+      within(footer)
+        .getAllByRole('heading', { level: 2 })
+        .map((h) => h.textContent),
+    ).toEqual(['Product', 'Developers', 'Company', 'Legal']);
+    const hrefs = within(footer)
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual([
+      '/#how-it-works',
+      '/#aadhaar',
+      '/#pricing',
+      '/verify',
+      '/docs',
+      '/docs/http-api/',
+      '/docs/getting-started/docker',
+      GITHUB,
+      '/install-help',
+      '/docs/guides/aadhaar-leegality',
+      '/docs/security',
+      'https://codevibe.in',
+      '/terms',
+      '/privacy',
+    ]);
     for (const name of ['Docs', 'Verify a PDF', 'Terms', 'Privacy']) {
       expect(within(footer).getByRole('link', { name })).not.toHaveAttribute('target');
     }
   });
 
-  it('links the footer to docs, the verify page, GitHub, terms, privacy and Codevibe', () => {
-    render(<Landing features={FEATURES} pricing={PRICING} />);
-    const footer = screen.getByRole('navigation', { name: 'Footer' });
-    const hrefs = within(footer)
-      .getAllByRole('link')
-      .map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual([
-      '/docs',
-      '/verify',
-      'https://github.com/codevibe-technology/codevibe-sign',
-      '/terms',
-      '/privacy',
-      'https://codevibe.in',
-    ]);
-  });
-});
-
-describe('Landing in a colour option', () => {
-  it.each(['a', 'b', 'c'] as const)(
-    'option %s keeps the page and shows the plans as cards',
-    (option) => {
-      const { container } = render(
-        <Landing features={FEATURES} pricing={PRICING} option={option} />,
-      );
-      expect(container.firstElementChild).toHaveClass('home-skin', `home-${option}`);
-      expect(
-        screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
-      ).toBeInTheDocument();
-      const bands = [...container.querySelectorAll('[data-band]')].map((el) =>
-        el.getAttribute('data-band'),
-      );
-      expect(bands).toEqual([
-        'hero',
-        'proof',
-        'more',
-        'developers',
-        'open',
-        'pricing',
-        'faq',
-        'start',
-      ]);
-      const pricing = container.querySelector('#pricing') as HTMLElement;
-      expect(within(pricing).getAllByRole('article')).toHaveLength(3);
-      const site = screen.getByRole('navigation', { name: 'Site' });
-      expect(within(site).getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-        'href',
-        '#pricing',
-      );
-    },
-  );
-
-  it('leaves the home page itself as it is', () => {
+  it('keeps the public pages light whatever theme the app is in', () => {
     const { container } = render(<Landing features={FEATURES} pricing={PRICING} />);
-    expect(container.firstElementChild).not.toHaveClass('home-skin');
-    const site = screen.getByRole('navigation', { name: 'Site' });
-    expect(within(site).getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-      'href',
-      '/#pricing',
-    );
-    expect(screen.queryByRole('button', { name: 'See everything included' })).toBeNull();
+    expect(container.firstElementChild).toHaveClass('marketing');
   });
 });
 
 describe('LegalPage', () => {
-  it('shows the title, the date and the sections', () => {
-    render(
+  it('shows the title, the date and the sections in the site shell', () => {
+    const { container } = render(
       <LegalPage title="Privacy" updated="20 November 2026" intro={<p>Intro</p>}>
         <LegalSection title="What we store">
           <p>Names</p>
         </LegalSection>
       </LegalPage>,
     );
+    expect(container.firstElementChild).toHaveClass('marketing');
     expect(screen.getByRole('heading', { level: 1, name: 'Privacy' })).toBeInTheDocument();
     expect(screen.getByText('Last updated 20 November 2026')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'What we store' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Site' })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('navigation', { name: 'Site' })).getByRole('link', {
+        name: 'Pricing',
+      }),
+    ).toHaveAttribute('href', '/#pricing');
   });
 });

@@ -76,19 +76,19 @@ function PlanCard({
   children: ReactNode;
 }) {
   return (
-    <div className="plan-slot flex min-w-0">
+    <div className="flex min-w-0">
       <article
         aria-label={featured ? `${name}, recommended` : name}
         className={cn(
-          'plan-card paper relative flex w-full flex-col rounded-[8px] bg-surface p-6 text-ink ring-1 ring-line sm:p-7',
+          'relative flex w-full flex-col rounded-2xl bg-white p-6 text-ink ring-1 ring-line sm:p-7',
           featured &&
-            'plan-featured shadow-[0_24px_48px_-28px_rgb(13_27_42/0.55)] ring-2 ring-primary',
+            'bg-[linear-gradient(180deg,#F2F7FF,#FFFFFF_45%)] shadow-[0_28px_56px_-28px_rgb(27_106_224/0.55)] ring-2 ring-primary',
         )}
       >
         <div className="flex min-h-7 items-start justify-between gap-3">
           <h3 className="text-lg font-semibold">{name}</h3>
           {featured ? (
-            <span className="plan-flag rounded-[3px] bg-primary px-2 py-1 text-xs font-semibold text-primary-ink">
+            <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-ink">
               Recommended
             </span>
           ) : null}
@@ -114,7 +114,7 @@ function TermSwitch({
       aria-pressed={term === value}
       onClick={() => onChange(value)}
       className={cn(
-        'flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-[4px] px-3 text-sm font-semibold whitespace-nowrap',
+        'flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold whitespace-nowrap',
         term === value
           ? 'bg-primary text-primary-ink shadow-[0_1px_2px_rgb(13_27_42/0.18)]'
           : 'text-muted hover:text-ink',
@@ -127,7 +127,7 @@ function TermSwitch({
     <div
       role="group"
       aria-label="Pay for Cloud by the month or the year"
-      className="plan-toggle mt-4 flex gap-1 rounded-[6px] bg-surface-2 p-1"
+      className="mt-4 flex gap-1 rounded-full bg-surface-2 p-1"
     >
       {option('month', 'Monthly')}
       {option(
@@ -169,10 +169,7 @@ function Comparison({
     { key: 'selfHosted', name: 'Self-hosted' },
   ];
   return (
-    <div
-      id={id}
-      className="paper mt-6 overflow-hidden rounded-[8px] bg-surface text-ink ring-1 ring-line"
-    >
+    <div id={id} className="mt-6 overflow-hidden rounded-2xl bg-white text-ink ring-1 ring-line">
       <table className="w-full text-left text-sm">
         <caption className="sr-only">Everything in Free, Cloud and Self-hosted</caption>
         <thead className="hidden border-b border-line bg-surface-2 sm:table-header-group">
@@ -256,7 +253,7 @@ export function PricingPlans({
           <p className="mt-4 font-display text-4xl font-bold tracking-tight tabular-nums">₹0</p>
           <p className="mt-2 text-muted">For trying it out and for small teams. No card needed.</p>
           <Essentials rows={rows} column="free" pricing={pricing} />
-          <Button asChild variant="secondary" className="plan-cta mt-8 h-11 w-full">
+          <Button pill asChild variant="secondary" className="mt-8 h-11 w-full">
             <Link href={start.href}>{start.label}</Link>
           </Button>
         </PlanCard>
@@ -275,7 +272,7 @@ export function PricingPlans({
           <p className="mt-2 min-h-6 text-sm">
             {savingBadge ? (
               yearly ? (
-                <span className="rounded-[3px] bg-success-soft px-2 py-0.5 font-semibold text-success">
+                <span className="rounded-full bg-success-soft px-2.5 py-0.5 font-semibold text-success">
                   {savingBadge}
                 </span>
               ) : (
@@ -289,7 +286,7 @@ export function PricingPlans({
             Your account and every workspace in it, plus {pricing.gstPercent}% GST.
           </p>
           <Essentials rows={rows} column="cloud" pricing={pricing} />
-          <Button asChild className="plan-cta mt-8 h-11 w-full">
+          <Button pill asChild className="mt-8 h-11 w-full">
             <Link href={start.href}>
               {signedIn ? 'Upgrade in your workspace' : 'Start free, upgrade any time'}
             </Link>
@@ -305,12 +302,12 @@ export function PricingPlans({
           <p className="mt-4 font-display text-4xl font-bold tracking-tight">Free</p>
           <p className="mt-2 text-muted">On your own server, under the open-source licences.</p>
           <Essentials rows={rows} column="selfHosted" pricing={pricing} />
-          <Button asChild variant="secondary" className="plan-cta mt-8 h-11 w-full">
+          <Button pill asChild variant="secondary" className="mt-8 h-11 w-full">
             <ExternalLink href={GITHUB_URL} bare>
               Self-host it
             </ExternalLink>
           </Button>
-          <div className="plan-help mt-5 rounded-[6px] bg-primary-soft p-4">
+          <div className="mt-5 rounded-xl bg-primary-soft p-4">
             <p className="flex items-center gap-2 font-display font-semibold">
               <Wrench aria-hidden className="h-4 w-4 shrink-0 text-primary" />
               Need help installing?
@@ -319,14 +316,14 @@ export function PricingPlans({
               An experienced engineer installs it on your server within {INSTALL_HELP_HOURS} working
               hours for a flat {pricing.installHelp} + GST.
             </p>
-            <Button asChild className="mt-3 h-10 w-full">
+            <Button pill asChild className="mt-3 h-10 w-full">
               <Link href="/install-help">Book installation help</Link>
             </Button>
           </div>
         </PlanCard>
       </div>
 
-      <div className="plan-hosting mt-5 flex flex-col gap-3 rounded-[8px] border border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[#F6F8FC] px-5 py-4 ring-1 ring-line sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-start gap-2.5 font-semibold">
           <Server aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           Need a server? Get VPS hosting from our partners with an extra 20% discount.
@@ -368,6 +365,7 @@ export function PricingPlans({
 
       <div className="mt-8 flex justify-center">
         <Button
+          pill
           variant="secondary"
           aria-expanded={open}
           aria-controls={tableId}

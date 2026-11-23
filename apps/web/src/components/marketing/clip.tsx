@@ -119,11 +119,12 @@ export function Clip({
           stop(video, wanted);
         }
       },
-      { threshold: 0.35 },
+      // The clip in the first view starts as soon as it shows, often only its top edge.
+      { threshold: eager ? 0.1 : 0.35 },
     );
     observer.observe(video);
     return () => observer.disconnect();
-  }, [reduced, active, dropped]);
+  }, [reduced, active, dropped, eager]);
 
   useEffect(() => {
     const video = ref.current;

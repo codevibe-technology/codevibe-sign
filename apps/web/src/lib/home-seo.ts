@@ -31,6 +31,7 @@ export function softwareApplicationJsonLd(appUrl: string) {
       'Public verify page',
       'Templates and bulk send from CSV',
       'HTTP API and signed webhooks',
+      'Aadhaar eSign through Leegality',
     ],
     publisher: { '@type': 'Organization', name: 'Codevibe Technology', url: 'https://codevibe.in' },
   };

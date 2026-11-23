@@ -1,4 +1,26 @@
-import { ArrowRight, Check, Minus, Plus, ShieldCheck } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  ArrowRight,
+  BellRing,
+  Blocks,
+  Check,
+  CodeXml,
+  FileStack,
+  Fingerprint,
+  GitFork,
+  Hash,
+  LayoutGrid,
+  ListOrdered,
+  MapPin,
+  Palette,
+  Plus,
+  QrCode,
+  Server,
+  ShieldCheck,
+  Users,
+  UserCog,
+  Webhook,
+} from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -7,126 +29,200 @@ import { cn } from '@/lib/cn';
 import type { PlanFeature } from '@/lib/plans';
 import type { PricingView } from '@/server/billing/pricing';
 import { APP_HOME } from '@/lib/safe-next';
-import { Clip } from './clip';
+import { AadhaarSection } from './aadhaar-section';
+import { BrowserFrame } from './browser-frame';
+import { Clip, type ClipSpec } from './clip';
 import { CLIPS } from './clips';
 import { ExternalLink } from './external-link';
 import {
+  API_DOCS,
   CONTACT_EMAIL,
   DOCS_URL,
   EVIDENCE_GUIDE,
   GITHUB_URL,
   SELF_HOST_DOCS,
   VERIFY_URL,
+  WEBHOOKS_GUIDE,
 } from './links';
 import { PricingPlans } from './pricing-plans';
 import { reveal } from './reveal';
 import { RevealOnScroll } from './reveal-on-scroll';
 import { SAMPLE_TRAIL, shortHash } from './sample-trail';
-import { ScrollStory, type StoryStep } from './scroll-story';
 import { SiteFooter } from './site-footer';
 import { SiteHeader, type SiteViewer } from './site-header';
 import { SmoothAnchors } from './smooth-anchors';
 
-const STEPS: StoryStep[] = [
+/** The colour of each icon tile, from the brand blue and teal out to the recipient colours. */
+const TILES = {
+  blue: 'bg-[#E6EFFC] text-[#1860D0]',
+  teal: 'bg-[#DDF7F2] text-[#0E7466]',
+  violet: 'bg-[#F1E8FB] text-[#7A35B5]',
+  orange: 'bg-[#FDEDE3] text-[#B4471A]',
+  green: 'bg-[#E1F5EA] text-[#167347]',
+  pink: 'bg-[#FBE7EF] text-[#A62D60]',
+} as const;
+
+type Tile = keyof typeof TILES;
+
+function IconTile({ icon: Icon, tone }: { icon: typeof Check; tone: Tile }) {
+  return (
+    <span
+      aria-hidden
+      className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', TILES[tone])}
+    >
+      <Icon className="h-5 w-5" />
+    </span>
+  );
+}
+
+const TRUST: { icon: typeof Check; tone: Tile; title: string; text: string }[] = [
+  { icon: ShieldCheck, tone: 'blue', title: 'PAdES seal', text: 'Any later change shows' },
+  { icon: Hash, tone: 'teal', title: 'Hash-chained trail', text: 'Every step on the record' },
+  { icon: Fingerprint, tone: 'orange', title: 'Aadhaar eSign', text: 'Through Leegality' },
+  { icon: GitFork, tone: 'violet', title: 'Open source', text: 'Apache-2.0 and AGPL-3.0' },
+  { icon: MapPin, tone: 'green', title: 'Made in India', text: 'Our cloud or your server' },
+];
+
+const STEPS: {
+  title: string;
+  text: string;
+  points: string[];
+  clip: ClipSpec;
+  phone?: boolean;
+  tint: string;
+}[] = [
   {
-    id: 'send',
-    name: 'Send',
-    title: 'Send a document in a minute',
-    text: 'Upload a PDF, add who signs, drag signature and date boxes onto the page, and send. The draft saves as you go.',
+    title: 'Upload a PDF and place the fields',
+    text: 'Add who signs, approves or only gets a copy, drag signature and date boxes onto the page and send. The draft saves as you go.',
     points: [
-      'Signers, approvers and people who only get a copy',
-      'One after another, or everyone at once',
-      'Reminders and an expiry date for each envelope',
+      'In order, or everyone at once',
+      'Reminders and an expiry date',
+      'Fields on one page, every page or a few',
     ],
     clip: CLIPS.send,
+    tint: 'bg-[#EEF4FF]',
   },
   {
-    id: 'sign',
-    name: 'Sign',
-    title: 'Signing that works on any phone',
-    text: 'The signer opens the link from their email, types the one-time code we send them and signs with a finger. No account and no app.',
+    title: 'People sign on any phone',
+    text: 'The signer opens the link from their email, types the one-time code we send and signs with a finger. No account and no app.',
     points: [
       'A one-time code before the document opens',
       'Draw, type or upload a signature',
-      'Your logo and colour on the signing page',
+      'Your logo and colour on the page',
     ],
     clip: CLIPS.sign,
     phone: true,
+    tint: 'bg-[#E8FAF6]',
   },
   {
-    id: 'seal',
-    name: 'Seal',
-    title: 'A sealed PDF with its certificate',
-    text: 'When the last person signs, the PDF gets a PAdES seal and a one-page certificate: who signed, how and when, a SHA-256 fingerprint, and a QR code that opens the record.',
+    title: 'Get a sealed PDF anyone can check',
+    text: 'When the last person signs, the PDF gets a PAdES seal and a one-page certificate: who signed, how and when, and a QR code that opens the record.',
     points: [
-      'Any later change to the file breaks the seal',
-      'Times in UTC and in your workspace time zone',
       'Everyone gets the signed copy by email',
+      'Times in UTC and your workspace zone',
+      'Checked by anyone on the verify page',
     ],
     clip: CLIPS.sealed,
-  },
-  {
-    id: 'audit',
-    name: 'Track',
-    title: 'An audit trail nobody can quietly edit',
-    text: 'Every step, from draft to sealed, is recorded with a hash of the step before it. The envelope page checks the chain and shows the whole history live.',
-    points: [
-      'Opened, verified, signed: each with its time and IP address',
-      'A log of every email the workspace sent',
-      'The evidence record as JSON, for your own files',
-    ],
-    clip: CLIPS.audit,
-  },
-  {
-    id: 'verify',
-    name: 'Verify',
-    title: 'Anyone can check a signed PDF',
-    text: 'Drop a signed PDF on the public verify page. It shows whether the seal is intact, who signed and when, and whether the audit trail is complete.',
-    points: [
-      'A changed file is caught, down to a single byte',
-      'Checked in memory, not stored or logged',
-      'No account needed, so you can send the link to anyone',
-    ],
-    clip: CLIPS.verify,
-  },
-  {
-    id: 'templates',
-    name: 'Scale',
-    title: 'Templates and bulk send',
-    text: 'Keep the documents you send often with roles and fields in place. Then send one to a whole list from a CSV file: every row is checked before anything goes out.',
-    points: [
-      'Problems named by row and column',
-      'Skip the rows with problems, or fix them and upload again',
-      'Sending carries on in the background',
-    ],
-    clip: CLIPS.bulk,
+    tint: 'bg-[#F4EEFC]',
   },
 ];
 
-const MORE: { title: string; text: string }[] = [
+const FEATURES: { icon: typeof Check; tone: Tile; title: string; text: string }[] = [
   {
+    icon: FileStack,
+    tone: 'blue',
+    title: 'Templates',
+    text: 'Keep the documents you send often with their roles and fields in place.',
+  },
+  {
+    icon: Users,
+    tone: 'teal',
+    title: 'Bulk send',
+    text: 'Send one template to a whole list from a CSV file. Every row is checked first.',
+  },
+  {
+    icon: BellRing,
+    tone: 'orange',
+    title: 'Reminders',
+    text: 'Reminders go out on their own until the document is signed or expires.',
+  },
+  {
+    icon: ListOrdered,
+    tone: 'violet',
     title: 'Signing order',
-    text: 'One after another or all at once, with reminders that go out on their own.',
+    text: 'Signers, approvers and people who only get a copy, in order or all at once.',
   },
   {
-    title: 'Fix after sending',
-    text: 'Correct a mistyped email, resend a link, or recall the envelope to edit it.',
+    icon: Palette,
+    tone: 'pink',
+    title: 'Your brand',
+    text: 'Logo, colour and font on the signing page, and your own words in every email.',
   },
   {
-    title: 'Your brand and words',
-    text: 'Logo, colour and font on the signing page, and your own text in every email.',
+    icon: LayoutGrid,
+    tone: 'green',
+    title: 'Workspaces',
+    text: 'One for each team or client, each with its own members, brand and time zone.',
   },
   {
-    title: 'Time zones',
-    text: 'Each workspace picks its zone; every date on screen and on paper names it.',
+    icon: UserCog,
+    tone: 'blue',
+    title: 'Roles and Billing admin',
+    text: 'Admins and members, plus a Billing admin who pays and buys credits without running the team.',
   },
   {
-    title: 'Team workspaces',
-    text: 'Invite people by email and give each the role they need.',
+    icon: ArrowLeftRight,
+    tone: 'teal',
+    title: 'Workspace transfer',
+    text: 'Hand a workspace to another account with its documents, templates and members.',
+  },
+];
+
+const PROOF: { icon: typeof Check; tone: Tile; title: string; text: string }[] = [
+  {
+    icon: ShieldCheck,
+    tone: 'blue',
+    title: 'A PAdES seal on every PDF',
+    text: 'Any later change to the file, down to one byte, breaks the seal in every PDF reader.',
   },
   {
-    title: 'Email log',
-    text: 'See every message sent from the workspace, and to whom.',
+    icon: Hash,
+    tone: 'teal',
+    title: 'An audit trail nobody can quietly edit',
+    text: 'Each step carries a SHA-256 hash of the step before it, with its time and IP address.',
+  },
+  {
+    icon: QrCode,
+    tone: 'violet',
+    title: 'A certificate page with a QR code',
+    text: 'Who signed, how and when, and a code that opens the public record.',
+  },
+];
+
+const DEVELOPER_POINTS: { icon: typeof Check; tone: Tile; title: string; text: string }[] = [
+  {
+    icon: CodeXml,
+    tone: 'blue',
+    title: 'HTTP API',
+    text: 'Everything in the app, with OpenAPI 3.1, a Postman collection and idempotency keys.',
+  },
+  {
+    icon: Blocks,
+    tone: 'violet',
+    title: 'SDKs',
+    text: 'A typed client for Node, browsers and edge, and a React signing view for your own app.',
+  },
+  {
+    icon: Webhook,
+    tone: 'orange',
+    title: 'Webhooks',
+    text: 'Signed with HMAC-SHA256, retried until your endpoint answers.',
+  },
+  {
+    icon: Server,
+    tone: 'teal',
+    title: 'Self-host',
+    text: 'The same app on your server with Docker. Free, unlimited, and your documents stay there.',
   },
 ];
 
@@ -178,10 +274,11 @@ const faq = (pricing: PricingView): { q: string; a: ReactNode }[] => [
       <>
         <p>
           Yes. When you send a document you can ask a signer to sign with Aadhaar eSign: they
-          confirm with a one-time code from Aadhaar on the page of a licensed eSign provider, and
-          the signed file carries their Aadhaar-based digital signature as well as our seal. You pay
-          for each completed eSign with prepaid credits: {pricing.esignFree} on the Free plan and{' '}
-          {pricing.esignCloud} on Cloud, plus GST. An eSign that is not completed costs nothing.
+          confirm with a one-time code from Aadhaar on Leegality&rsquo;s page, and the signed file
+          carries their Aadhaar-based digital signature as well as our seal. You pay for each
+          completed eSign with prepaid credits: {pricing.esignFree} on the Free plan and{' '}
+          {pricing.esignCloud} on Cloud, plus GST. An eSign that is not completed costs nothing, and
+          credits do not expire.
         </p>
         <p className="mt-3">
           On Cloud you can also connect your own Leegality account, once for all your workspaces,
@@ -249,86 +346,78 @@ const faq = (pricing: PricingView): { q: string; a: ReactNode }[] => [
   },
 ];
 
-/** One line per row of the plan comparison, as a plan column lists them. */
-const planLines = (features: PlanFeature[], plan: 'free' | 'cloud'): string[] =>
-  features.map((row) => `${row.label}: ${row[plan].replace(/^./, (c) => c.toLowerCase())}`);
+/** A section's eyebrow pill, centred heading and one-line lead. */
+function SectionHead({
+  id,
+  eyebrow,
+  title,
+  lead,
+  tone = 'blue',
+}: {
+  id: string;
+  eyebrow: string;
+  title: ReactNode;
+  lead?: ReactNode;
+  tone?: Tile;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl text-center" {...reveal()}>
+      <p
+        className={cn('inline-flex rounded-full px-3 py-1 text-[13px] font-semibold', TILES[tone])}
+      >
+        {eyebrow}
+      </p>
+      <h2
+        id={id}
+        className="mt-4 text-[clamp(1.9rem,1.3rem+1.9vw,2.75rem)] leading-[1.1] font-bold"
+      >
+        {title}
+      </h2>
+      {lead ? <p className="mt-4 text-lg text-muted">{lead}</p> : null}
+    </div>
+  );
+}
 
-/** A sheet of paper: the frame for the app's own screens on this page. */
-function Sheet({ children, className }: { children: ReactNode; className?: string }) {
+/** A short line that floats over the hero screen, the way a notification would. */
+function Toast({
+  icon: Icon,
+  tone,
+  title,
+  text,
+  className,
+}: {
+  icon: typeof Check;
+  tone: Tile;
+  title: string;
+  text: string;
+  className?: string;
+}) {
   return (
     <div
+      aria-hidden
       className={cn(
-        'paper overflow-hidden rounded-[3px] bg-surface shadow-[0_1px_0_rgb(13_27_42/0.04),0_24px_48px_-24px_rgb(13_27_42/0.45)] ring-1 ring-line',
+        'enter absolute z-10 hidden items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_18px_40px_-16px_rgb(13_27_42/0.45)] ring-1 ring-line md:flex',
         className,
       )}
     >
-      {children}
+      <span className={cn('flex h-9 w-9 items-center justify-center rounded-full', TILES[tone])}>
+        <Icon className="h-4.5 w-4.5" />
+      </span>
+      <span className="text-sm leading-5">
+        <span className="block font-semibold text-ink">{title}</span>
+        <span className="block text-xs text-muted">{text}</span>
+      </span>
     </div>
   );
 }
 
-/**
- * A signature in the app's blue ink, written once across the edge of the sealed copy, the way
- * people sign across an envelope's flap so that opening it shows.
- */
-function InkSignature({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 240 90"
-      fill="none"
-      className={cn('ink-signature text-primary', className)}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path
-        pathLength={1}
-        className="ink-stroke"
-        stroke="currentColor"
-        strokeWidth={2.4}
-        d="M14 64 C18 42 22 22 31 17 C41 12 47 26 37 35 C31 41 22 43 28 46 C36 50 44 62 53 67 M59 58 C63 50 67 44 71 50 C73 54 72 62 75 60 C79 52 83 46 87 52 C89 56 88 62 92 60 C97 54 101 44 105 50 C107 54 105 60 111 58 C119 55 121 46 117 46 C111 46 111 58 121 60 C129 62 135 50 139 34 C141 26 141 22 139 30 C135 46 135 60 141 60 C147 60 151 48 157 48 C163 48 159 60 167 58 C175 56 177 48 181 50 C187 52 183 60 191 60 C197 60 201 54 206 51"
-      />
-      <path
-        pathLength={1}
-        className="ink-stroke ink-stroke-late"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        d="M22 77 C78 72 146 67 228 57"
-      />
-    </svg>
-  );
-}
-
-/** The slip a sealed copy carries: what the certificate page says, in brief. */
-function SealSlip() {
-  const last = SAMPLE_TRAIL.at(-1)!;
-  return (
-    <div
-      aria-hidden
-      className="relative bg-[#0D1B2A] px-4 py-3.5 font-mono text-[11px] leading-5 text-white/75 shadow-[0_16px_32px_-16px_rgb(13_27_42/0.6)] sm:px-5"
-    >
-      <p className="flex items-center justify-between gap-4 font-sans text-[13px] font-semibold text-white">
-        <span className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-accent" />
-          Seal intact
-        </span>
-        <span className="font-mono text-[11px] font-medium text-accent">PAdES</span>
-      </p>
-      <p className="mt-1.5">
-        SHA-256 <span className="text-white">{shortHash(last.hash)}</span>
-      </p>
-      <p>Signed 23 Nov 2026, {last.at.slice(0, 5)} IST</p>
-    </div>
-  );
-}
-
-function AuditSheet() {
+function AuditCard() {
   return (
     <figure className="min-w-0">
-      <Sheet>
-        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-[0_24px_56px_-28px_rgb(13_27_42/0.35)] ring-1 ring-line">
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
           <p className="truncate text-sm font-semibold">Design services agreement</p>
-          <p className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-success">
+          <p className="flex shrink-0 items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success">
             <Check aria-hidden className="h-3.5 w-3.5" />
             Chain intact
           </p>
@@ -342,7 +431,7 @@ function AuditSheet() {
               <time className="pt-[1.1rem] font-mono text-[11px] text-muted tabular-nums sm:text-xs">
                 {entry.at}
               </time>
-              <div className="relative min-w-0 py-3.5 pl-5">
+              <div className="relative min-w-0 py-3 pl-5">
                 <span
                   aria-hidden
                   className={cn(
@@ -353,14 +442,14 @@ function AuditSheet() {
                 />
                 <span
                   aria-hidden
-                  className="absolute top-[1.1rem] -left-[3px] h-[7px] w-[7px] rotate-45 bg-ink"
+                  className="absolute top-[1.05rem] -left-[4px] h-[9px] w-[9px] rounded-full bg-primary ring-2 ring-white"
                 />
                 <p className="flex flex-wrap items-baseline gap-x-2">
                   <span className="font-semibold">{entry.title}</span>
                   <code className="font-mono text-[11px] text-muted">{entry.action}</code>
                 </p>
                 <p className="mt-0.5 text-sm text-muted">{entry.detail}</p>
-                <p className="mt-1.5 truncate font-mono text-[11px] leading-4 text-muted">
+                <p className="mt-1 truncate font-mono text-[11px] leading-4 text-muted">
                   <span className="text-ink">{shortHash(entry.hash)}</span>
                   {entry.prev ? (
                     <> &nbsp;covers {shortHash(entry.prev)}</>
@@ -372,14 +461,7 @@ function AuditSheet() {
             </li>
           ))}
         </ol>
-        <div className="border-t border-dashed border-line-strong bg-surface-2/60 px-5 py-3.5 text-sm">
-          <span className="font-semibold">And at any time later,</span>{' '}
-          <span className="text-muted">
-            anyone can drop the PDF on the verify page and see the seal intact and the trail
-            complete.
-          </span>
-        </div>
-      </Sheet>
+      </div>
       <figcaption className="mt-3 text-sm text-muted">
         An example trail with made-up people. The hashes are real SHA-256 hashes of it.
       </figcaption>
@@ -387,489 +469,373 @@ function AuditSheet() {
   );
 }
 
-/** A line for something the plan does not have, which gets a dash instead of a tick. */
-const absent = (line: string) => line.endsWith(': not included');
-
-function PlanColumn({
-  name,
-  price,
-  per,
-  note,
-  lines,
-  action,
-  first,
-}: {
-  name: string;
-  price: string;
-  /** What the price is for, after it: `a month`. */
-  per?: string;
-  note: string;
-  lines: string[];
-  action: ReactNode;
-  first?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col p-6 transition-colors duration-200 ease-out sm:p-8',
-        first ? 'bg-surface' : 'hover:bg-surface/60',
-      )}
-    >
-      <h3 className="text-lg font-semibold">{name}</h3>
-      <p className="mt-3 font-display text-4xl font-bold tracking-tight">
-        {price}
-        {per ? (
-          <span className="ml-2 font-sans text-base font-normal text-muted">{per}</span>
-        ) : null}
-      </p>
-      <p className="mt-2 text-muted">{note}</p>
-      <ul className="mt-6 flex-1 space-y-2.5 border-t border-line pt-5 text-sm">
-        {lines.map((line) => (
-          <li key={line} className={cn('flex gap-2', absent(line) && 'text-muted')}>
-            {absent(line) ? (
-              <Minus aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-            ) : (
-              <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-            )}
-            {line}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-8">{action}</div>
-    </div>
-  );
-}
-
-/** A colour option for the home page, previewed at `/preview/home-<option>`; see home-skins.css. */
-export type HomeOption = 'a' | 'b' | 'c';
-
-export const HOME_OPTIONS: readonly HomeOption[] = ['a', 'b', 'c'];
-
 /** The public home page of the hosted cloud. A signed-in visitor gets their dashboard instead of "Start free". */
 export function Landing({
   features,
   pricing,
   viewer = null,
-  option,
 }: {
   /** The plan comparison, from `planFeatures`. */
   features: PlanFeature[];
   /** Every price on the page, as text made on the server. */
   pricing: PricingView;
   viewer?: SiteViewer | null;
-  /** Shows the page in one of the colour options, with the plans as cards. */
-  option?: HomeOption;
 }) {
   const rows = pricedFeatures(features, pricing);
   const start = viewer
     ? { href: APP_HOME, label: 'Go to dashboard' }
     : { href: '/sign-in', label: 'Start free' };
   return (
-    <div
-      className={cn(
-        'marketing flex min-h-dvh flex-col bg-canvas',
-        option && `home-skin home-${option}`,
-      )}
-    >
+    <div className="marketing flex min-h-dvh flex-col bg-white text-ink">
       <SmoothAnchors />
       <RevealOnScroll />
-      <SiteHeader viewer={viewer} samePage={option !== undefined} />
+      <SiteHeader viewer={viewer} samePage />
       <main id="main" className="flex-1">
         <section
           aria-labelledby="hero-title"
-          data-band="hero"
-          className="overflow-hidden px-4 pt-8 pb-14 sm:px-6 sm:pt-12 sm:pb-16 lg:flex lg:min-h-[calc(100svh-4rem)] lg:items-center lg:py-10"
+          className="relative overflow-hidden bg-[radial-gradient(60rem_32rem_at_15%_-10%,#DCE9FF_0%,transparent_60%),radial-gradient(50rem_30rem_at_90%_10%,#D5F6F0_0%,transparent_60%),linear-gradient(#F7FAFF,#FFFFFF_70%)] px-4 pt-12 pb-16 sm:px-6 sm:pt-16 lg:px-8"
         >
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-            <div>
-              <h1
-                id="hero-title"
-                className="enter text-[clamp(2.4rem,1.2rem+3.2vw,3.4rem)] leading-[1.02] font-bold tracking-[-0.03em]"
-              >
-                Get it signed. <br />
-                <span className="text-primary">Keep the proof.</span>
-              </h1>
-              <p className="enter mt-5 max-w-[34rem] text-muted sm:text-lg [--enter-order:1]">
-                Upload a PDF, place the fields and send. People sign on any phone or laptop, and you
-                get back a sealed PDF with a certificate page that anyone can check, no account
-                needed.
-              </p>
-              <div className="enter mt-7 flex flex-col gap-3 sm:flex-row [--enter-order:2]">
-                <Button asChild className="h-12 px-6 text-base">
-                  <Link href={start.href}>
-                    {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild variant="secondary" className="h-12 px-6 text-base">
-                  <ExternalLink href={GITHUB_URL} bare>
-                    Self-host it
-                  </ExternalLink>
-                </Button>
-              </div>
-              <div className="enter [--enter-order:3]">
-                <p className="mt-5 text-sm text-muted">
-                  Start on the Free plan, no card needed. Or self-host it, free and unlimited.
-                </p>
-                <p className="mt-1 text-sm text-muted">
-                  Received a signed PDF?{' '}
-                  <Link
-                    href={VERIFY_URL}
-                    className="font-semibold text-primary underline underline-offset-2 hover:no-underline"
-                  >
-                    Check it here
-                  </Link>
-                  .
-                </p>
-              </div>
+          <div className="mx-auto max-w-4xl text-center">
+            <ul
+              aria-label="What it does"
+              className="enter flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-medium text-ink"
+            >
+              {[
+                ['PDF e-signatures', 'bg-primary'],
+                ['Aadhaar eSign', 'bg-[#E07A1F]'],
+                ['API and webhooks', 'bg-[#8A3FC2]'],
+                ['Self-host', 'bg-[#12A08A]'],
+              ].map(([label, dot]) => (
+                <li key={label} className="flex items-center gap-2">
+                  <span aria-hidden className={cn('h-2 w-2 rounded-full', dot)} />
+                  {label}
+                </li>
+              ))}
+            </ul>
+            <h1
+              id="hero-title"
+              className="enter mt-6 text-[clamp(2.4rem,1.3rem+3.6vw,4.1rem)] leading-[1.04] font-bold [--enter-order:1]"
+            >
+              Get documents signed. <span className="block text-primary">Keep the proof.</span>
+            </h1>
+            <p className="enter mx-auto mt-5 max-w-2xl text-lg text-muted sm:text-xl sm:leading-8 [--enter-order:2]">
+              Send a PDF, people sign on any phone, and you get back a sealed PDF with a certificate
+              anyone can check. Add Aadhaar eSign when a law asks for it.
+            </p>
+            <div className="enter mt-8 flex flex-col justify-center gap-3 sm:flex-row [--enter-order:3]">
+              <Button pill asChild className="h-12 px-7 text-base">
+                <Link href={start.href}>
+                  {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button pill asChild variant="secondary" className="h-12 px-7 text-base">
+                <ExternalLink href={GITHUB_URL} bare>
+                  <Server aria-hidden className="h-4 w-4" />
+                  Self-host
+                </ExternalLink>
+              </Button>
             </div>
-            <figure className="min-w-0">
-              <div className="relative pr-2 pb-2 sm:pr-3">
-                <div
-                  aria-hidden
-                  className="paper absolute inset-0 top-3 left-3 rotate-[1.4deg] rounded-[3px] bg-surface ring-1 ring-line"
-                />
-                <div
-                  aria-hidden
-                  className="paper absolute inset-0 top-1.5 left-1.5 rotate-[0.6deg] rounded-[3px] bg-surface ring-1 ring-line"
-                />
-                <Sheet className="relative">
-                  <Clip clip={CLIPS.hero} describedBy="hero-clip-text" eager />
-                </Sheet>
-              </div>
-              <div className="relative -mt-8 flex items-end pl-4 sm:-mt-10 sm:pl-8">
-                <InkSignature className="pointer-events-none absolute -top-9 left-[34%] z-20 w-[36%] max-w-[13rem] sm:left-[45%] sm:w-[32%] sm:-top-11" />
-                <div className="enter relative z-10 w-[min(18rem,72%)] [--enter-order:4]">
-                  <SealSlip />
-                </div>
-              </div>
-              <figcaption id="hero-clip-text" className="mt-3 text-sm text-muted">
-                The real app, with made-up people: fields placed on a PDF, the sealed copy, and the
-                public seal check.
-              </figcaption>
-            </figure>
+            <ul className="enter mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-muted [--enter-order:4]">
+              {['Free plan, no card needed', 'Prices in ₹ with a GST invoice', 'Open source'].map(
+                (line) => (
+                  <li key={line} className="flex items-center gap-1.5">
+                    <Check aria-hidden className="h-4 w-4 text-success" />
+                    {line}
+                  </li>
+                ),
+              )}
+            </ul>
           </div>
+
+          <figure className="enter relative mx-auto mt-14 max-w-6xl [--enter-order:5]">
+            <Toast
+              icon={Check}
+              tone="green"
+              title="Rohan Mehta signed"
+              text="10:42 IST · on a phone"
+              className="bottom-40 -left-6 lg:-left-12"
+            />
+            <Toast
+              icon={ShieldCheck}
+              tone="blue"
+              title="Seal intact"
+              text="PAdES · SHA-256 f6d3…5b1c"
+              className="-right-6 bottom-16 lg:-right-12"
+            />
+            <BrowserFrame address="sign.codevibe.in">
+              <Clip clip={CLIPS.hero} describedBy="hero-clip-text" eager />
+            </BrowserFrame>
+            <figcaption id="hero-clip-text" className="mt-4 text-center text-sm text-muted">
+              The real app, with made-up people: fields placed on a PDF, the sealed copy and the
+              public seal check.
+            </figcaption>
+          </figure>
+        </section>
+
+        <section
+          aria-label="Why teams trust it"
+          className="border-y border-line bg-white px-4 sm:px-6 lg:px-8"
+        >
+          <ul className="mx-auto grid max-w-7xl grid-cols-1 gap-x-6 gap-y-5 py-8 sm:grid-cols-2 lg:grid-cols-5">
+            {TRUST.map((item) => (
+              <li key={item.title} className="flex items-center gap-3">
+                <IconTile icon={item.icon} tone={item.tone} />
+                <span>
+                  <span className="block font-display font-semibold">{item.title}</span>
+                  <span className="block text-sm text-muted">{item.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section
+          id="how-it-works"
+          aria-labelledby="how-title"
+          className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+        >
+          <SectionHead
+            id="how-title"
+            eyebrow="How it works"
+            title="From PDF to sealed copy in three steps"
+            lead="Each clip is the real app, recorded with made-up people and companies."
+          />
+          <ol className="mx-auto mt-16 max-w-6xl space-y-20 sm:space-y-24">
+            {STEPS.map((step, i) => (
+              <li
+                key={step.title}
+                className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16"
+              >
+                <div className={cn(i % 2 === 1 && 'lg:order-2')} {...reveal()}>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary font-display text-lg font-bold text-white">
+                    {i + 1}
+                  </span>
+                  <h3 className="mt-5 text-2xl font-bold sm:text-3xl">{step.title}</h3>
+                  <p id={`step-${i + 1}-text`} className="mt-3 text-lg text-muted">
+                    {step.text}
+                  </p>
+                  <ul className="mt-6 space-y-2.5">
+                    {step.points.map((point) => (
+                      <li key={point} className="flex gap-2.5">
+                        <Check aria-hidden className="mt-1 h-4 w-4 shrink-0 text-success" />
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div
+                  className={cn(
+                    'min-w-0 rounded-3xl p-4 sm:p-8',
+                    step.tint,
+                    i % 2 === 1 && 'lg:order-1',
+                  )}
+                  {...reveal(1)}
+                >
+                  {step.phone ? (
+                    <div className="mx-auto w-[min(15rem,62%)] overflow-hidden rounded-[2rem] bg-white p-2 shadow-[0_24px_48px_-24px_rgb(13_27_42/0.45)] ring-1 ring-line">
+                      <Clip
+                        clip={step.clip}
+                        describedBy={`step-${i + 1}-text`}
+                        className="overflow-hidden rounded-[1.5rem]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-xl bg-white shadow-[0_24px_48px_-24px_rgb(13_27_42/0.45)] ring-1 ring-line">
+                      <Clip clip={step.clip} describedBy={`step-${i + 1}-text`} />
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <AadhaarSection pricing={pricing} />
+
+        <section
+          id="features"
+          aria-labelledby="features-title"
+          className="scroll-mt-20 bg-[#F6F8FC] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+        >
+          <SectionHead
+            id="features-title"
+            eyebrow="For teams"
+            tone="violet"
+            title="Everything a team needs to send at scale"
+            lead="The parts you notice on the second day, when real people start signing."
+          />
+          <ul className="mx-auto mt-14 grid max-w-7xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map((item, i) => (
+              <li
+                key={item.title}
+                className="rounded-2xl bg-white p-6 ring-1 ring-line transition-shadow duration-200 hover:shadow-[0_18px_40px_-24px_rgb(13_27_42/0.35)]"
+                {...reveal(i % 4)}
+              >
+                <IconTile icon={item.icon} tone={item.tone} />
+                <h3 className="mt-5 text-lg font-bold">{item.title}</h3>
+                <p className="mt-1.5 text-muted">{item.text}</p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section
           id="proof"
           aria-labelledby="proof-title"
-          data-band="proof"
-          className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
+          className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
         >
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div className="lg:pt-4" {...reveal()}>
-              <h2 id="proof-title" className="text-3xl font-bold sm:text-4xl">
-                Every step goes on the record
+          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-20">
+            <div {...reveal()}>
+              <p
+                className={cn(
+                  'inline-flex rounded-full px-3 py-1 text-[13px] font-semibold',
+                  TILES.teal,
+                )}
+              >
+                Proof built in
+              </p>
+              <h2
+                id="proof-title"
+                className="mt-4 text-[clamp(1.9rem,1.3rem+1.9vw,2.75rem)] leading-[1.1] font-bold"
+              >
+                Every signature comes with its evidence
               </h2>
               <p className="mt-4 text-lg text-muted">
-                Each entry in an envelope&rsquo;s audit trail carries a SHA-256 hash of the entry
-                before it. Change or remove one and the chain stops adding up.
+                The signer sees the document only after typing a one-time code from their email.
+                Every step after that goes on a record you can show anyone.
               </p>
-              <p className="mt-4 text-muted">
-                The signer only sees the document after typing a one-time code from their email.
-                When the last person signs, the PDF is sealed and gets a certificate page: who
-                signed, how and when, with a QR code that opens the full record.
-              </p>
-              <ul className="mt-8 space-y-3 border-t border-line pt-6 text-sm font-semibold">
-                <li>
-                  <Link
-                    href={VERIFY_URL}
-                    className="text-primary underline-offset-2 hover:underline"
-                  >
-                    Check a signed PDF on the verify page
-                  </Link>
-                </li>
-                <li>
-                  <a
-                    href={EVIDENCE_GUIDE}
-                    className="text-primary underline-offset-2 hover:underline"
-                  >
-                    Read how the certificate serves as evidence
-                  </a>
-                </li>
+              <ul className="mt-8 space-y-6">
+                {PROOF.map((item) => (
+                  <li key={item.title} className="flex gap-4">
+                    <IconTile icon={item.icon} tone={item.tone} />
+                    <span>
+                      <span className="block font-display text-lg font-semibold">{item.title}</span>
+                      <span className="mt-0.5 block text-muted">{item.text}</span>
+                    </span>
+                  </li>
+                ))}
               </ul>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button pill asChild variant="secondary" className="h-11 px-5">
+                  <Link href={VERIFY_URL}>Check a signed PDF</Link>
+                </Button>
+                <a
+                  href={EVIDENCE_GUIDE}
+                  className="inline-flex h-11 items-center gap-1.5 px-2 text-sm font-semibold text-primary hover:underline"
+                >
+                  How the certificate serves as evidence
+                  <ArrowRight aria-hidden className="h-4 w-4" />
+                </a>
+              </div>
             </div>
             <div className="min-w-0" {...reveal(1)}>
-              <AuditSheet />
+              <AuditCard />
             </div>
-          </div>
-        </section>
-
-        <ScrollStory
-          id="features"
-          title="From PDF to sealed copy, on any device"
-          intro="Each clip is the real app, recorded with made-up people and companies."
-          steps={STEPS}
-        />
-
-        <section
-          aria-labelledby="more-title"
-          data-band="more"
-          className="px-4 py-20 sm:px-6 sm:py-24"
-        >
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div {...reveal()}>
-              <h2 id="more-title" className="text-3xl font-bold sm:text-4xl">
-                Also in the box
-              </h2>
-              <p className="mt-3 text-lg text-muted">
-                The parts you notice on the second day, when real people start signing.
-              </p>
-            </div>
-            <dl className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
-              {MORE.map((item, i) => (
-                <div key={item.title} className="border-t border-line py-5" {...reveal(i % 2)}>
-                  <dt className="font-semibold">{item.title}</dt>
-                  <dd className="mt-1 text-muted">{item.text}</dd>
-                </div>
-              ))}
-            </dl>
           </div>
         </section>
 
         <section
           id="developers"
           aria-labelledby="developers-title"
-          data-band="developers"
-          className="scroll-mt-16 bg-[#0D1B2A] px-4 py-20 text-white sm:px-6 sm:py-28"
+          className="scroll-mt-20 bg-[linear-gradient(180deg,#F2F6FF,#EEFBF8)] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
         >
-          <div className="mx-auto max-w-6xl">
-            <h2
-              id="developers-title"
-              className="max-w-2xl text-3xl font-bold sm:text-4xl"
+          <SectionHead
+            id="developers-title"
+            eyebrow="For developers"
+            tone="orange"
+            title="An API for everything in the app"
+            lead="Make an API key for each system, send envelopes from your backend, and get a signed webhook when something happens."
+          />
+          <div className="mx-auto mt-14 grid max-w-7xl grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+            <div
+              className="min-w-0 overflow-hidden rounded-2xl bg-[#0D1B2A] shadow-[0_24px_56px_-28px_rgb(13_27_42/0.6)]"
               {...reveal()}
             >
-              An API for everything in the app
-            </h2>
-            <p className="mt-4 max-w-2xl text-lg text-white/80" {...reveal()}>
-              Make an API key for each system, send envelopes from your backend, and get a signed
-              webhook when something happens.
-            </p>
-            <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-2">
-              <div className="min-w-0" {...reveal(1)}>
-                <div className="overflow-hidden rounded-[3px] ring-1 ring-white/12">
-                  <p className="border-b border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-xs text-white/70">
-                    send-agreement.ts
-                  </p>
-                  <pre
-                    tabIndex={0}
-                    aria-label="Sending an envelope with the TypeScript client"
-                    className="overflow-x-auto bg-black/25 p-5 font-mono text-[13px] leading-6 text-white/90"
-                  >
-                    <code>{API_SNIPPET}</code>
-                  </pre>
-                </div>
-                <ul className="mt-6 grid gap-3 text-white/85 sm:grid-cols-2">
-                  {[
-                    'OpenAPI 3.1 and a Postman collection',
-                    'Webhooks signed with HMAC-SHA256',
-                    'Idempotency keys: a retry never sends twice',
-                    'Typed client for Node, browsers and edge',
-                  ].map((point) => (
-                    <li key={point} className="flex gap-2.5 text-sm">
-                      <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
-                  <a
-                    className="text-accent underline-offset-2 hover:underline"
-                    href={`${DOCS_URL}/http-api/`}
-                  >
-                    Read the API docs
-                  </a>
-                  <a
-                    className="text-accent underline-offset-2 hover:underline"
-                    href={`${DOCS_URL}/guides/webhooks`}
-                  >
-                    Verify webhooks
-                  </a>
-                </div>
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-2.5">
+                <span aria-hidden className="flex gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-white/25" />
+                </span>
+                <span className="font-mono text-xs text-white/75">send-agreement.ts</span>
               </div>
-              <figure className="min-w-0" {...reveal(2)}>
-                <Sheet className="ring-white/10">
-                  <Clip clip={CLIPS.api} describedBy="api-clip-text" />
-                </Sheet>
-                <figcaption id="api-clip-text" className="mt-3 text-sm text-white/70">
-                  Creating an API key for a billing system, then a webhook endpoint for the events
-                  it needs.
-                </figcaption>
-              </figure>
+              <pre
+                tabIndex={0}
+                aria-label="Sending an envelope with the TypeScript client"
+                className="overflow-x-auto p-5 font-mono text-[13px] leading-6 text-white/90"
+              >
+                <code>{API_SNIPPET}</code>
+              </pre>
+            </div>
+            <div className="grid content-start gap-4" {...reveal(1)}>
+              {DEVELOPER_POINTS.map((item) => (
+                <div
+                  key={item.title}
+                  className="flex gap-4 rounded-2xl bg-white p-5 ring-1 ring-line"
+                >
+                  <IconTile icon={item.icon} tone={item.tone} />
+                  <span>
+                    <span className="block font-display font-semibold">{item.title}</span>
+                    <span className="mt-0.5 block text-sm text-muted">{item.text}</span>
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
-        </section>
-
-        <section
-          id="open-source"
-          aria-labelledby="open-source-title"
-          data-band="open"
-          className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
-        >
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div {...reveal()}>
-              <h2 id="open-source-title" className="text-3xl font-bold sm:text-4xl">
-                Read the code. Run it yourself.
-              </h2>
-              <p className="mt-4 text-lg text-muted">
-                The cloud runs the same code you can download. Nothing is held back for a paid
-                edition.
+          <div
+            id="open-source"
+            className="mx-auto mt-8 grid max-w-7xl scroll-mt-20 grid-cols-1 items-center gap-6 rounded-2xl bg-white p-6 ring-1 ring-line sm:p-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,6fr)]"
+            {...reveal()}
+          >
+            <div>
+              <h3 className="text-xl font-bold">Open source. Run it yourself.</h3>
+              <p className="mt-2 text-muted">
+                The cloud runs the same code you can download, nothing held back. Libraries under
+                Apache-2.0; the server and app under AGPL-3.0.
               </p>
-              <div className="mt-8 grid grid-cols-1 gap-6 border-t border-line pt-6 sm:grid-cols-2">
-                <div>
-                  <h3 className="font-semibold">Libraries under Apache-2.0</h3>
-                  <p className="mt-1 text-sm text-muted">
-                    The signing rules, PDF sealing, the React signing view and the API client. Use
-                    them in any product, open or closed.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="font-semibold">Server and app under AGPL-3.0</h3>
-                  <p className="mt-1 text-sm text-muted">
-                    Run them, change them and keep them. If you offer a changed version to others
-                    over a network, share your changes.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="min-w-0 self-end" {...reveal(1)}>
-              <div className="overflow-hidden rounded-[3px] bg-[#0D1B2A] text-white">
-                <div className="border-b border-white/10 px-5 py-3">
-                  <h3 className="font-semibold">Self-host with Docker</h3>
-                  <p className="mt-0.5 text-sm text-white/75">
-                    One container for the app, one for PostgreSQL. Your documents never leave your
-                    server, and there are no limits.
-                  </p>
-                </div>
-                <pre
-                  tabIndex={0}
-                  aria-label="Commands to self-host with Docker"
-                  className="overflow-x-auto p-5 font-mono text-[13px] leading-6 text-white/90"
-                >
-                  <code>{`git clone ${GITHUB_URL}.git
-cd codevibe-sign/deploy
-cp .env.example .env    # set your domain and secrets
-docker compose up -d`}</code>
-                </pre>
-              </div>
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
-                <a
-                  className="text-primary underline-offset-2 hover:underline"
-                  href={SELF_HOST_DOCS}
-                >
-                  Read the self-hosting guide
+                <a className="text-primary hover:underline" href={API_DOCS}>
+                  Read the API docs
                 </a>
-                <ExternalLink
-                  className="text-primary underline-offset-2 hover:underline"
-                  href={GITHUB_URL}
-                >
+                <a className="text-primary hover:underline" href={WEBHOOKS_GUIDE}>
+                  Verify webhooks
+                </a>
+                <a className="text-primary hover:underline" href={SELF_HOST_DOCS}>
+                  Self-hosting guide
+                </a>
+                <ExternalLink className="text-primary hover:underline" href={GITHUB_URL}>
                   View on GitHub
                 </ExternalLink>
               </div>
             </div>
+            <pre
+              tabIndex={0}
+              aria-label="Commands to self-host with Docker"
+              className="overflow-x-auto rounded-xl bg-[#0D1B2A] p-5 font-mono text-[13px] leading-6 text-white/90"
+            >
+              <code>{`git clone ${GITHUB_URL}.git
+cd codevibe-sign/deploy
+cp .env.example .env    # your domain and secrets
+docker compose up -d`}</code>
+            </pre>
           </div>
         </section>
 
         <section
           id="pricing"
           aria-labelledby="pricing-title"
-          data-band="pricing"
-          className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
+          className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
         >
-          <div className="mx-auto max-w-6xl">
-            <div {...reveal()}>
-              <h2 id="pricing-title" className="max-w-2xl text-3xl font-bold sm:text-4xl">
-                Start free. <span className="whitespace-nowrap">Self-host</span> for nothing.
-              </h2>
-              <p className="mt-4 max-w-2xl text-lg text-muted">
-                Every plan seals the same way and keeps the same audit trail. The limits are the
-                only difference.
-              </p>
-            </div>
-            {option ? (
-              <div {...reveal(1)} className="mt-12">
-                <PricingPlans
-                  rows={rows}
-                  pricing={pricing}
-                  start={start}
-                  signedIn={viewer !== null}
-                />
-              </div>
-            ) : (
-              <div
-                {...reveal(1)}
-                className="mt-12 grid grid-cols-1 divide-y divide-line rounded-[3px] bg-canvas ring-1 ring-line lg:grid-cols-3 lg:divide-x lg:divide-y-0"
-              >
-                <PlanColumn
-                  name="Free"
-                  price="₹0"
-                  note="One cloud workspace for trying it out and for small teams."
-                  lines={planLines(rows, 'free')}
-                  action={
-                    <>
-                      <Button asChild className="h-11 w-full">
-                        <Link href={start.href}>{start.label}</Link>
-                      </Button>
-                      <p className="mt-2 text-center text-[13px] text-muted">No card needed.</p>
-                    </>
-                  }
-                  first
-                />
-                <PlanColumn
-                  name="Cloud"
-                  price={pricing.cloudMonth}
-                  per="a month"
-                  note={`Unlimited workspaces under one subscription, with ${pricing.includedMembers} members across them. ${pricing.cloudYear} if you pay for a year${pricing.yearSaving ? `, ${pricing.yearSaving}` : ''}. More members are ${pricing.extraMember} each a month.`}
-                  lines={planLines(rows, 'cloud')}
-                  action={
-                    <>
-                      <Button asChild variant="secondary" className="h-11 w-full">
-                        <Link href={start.href}>
-                          {viewer ? 'Upgrade in your workspace' : 'Start free, upgrade any time'}
-                        </Link>
-                      </Button>
-                      <p className="mt-2 text-center text-[13px] text-muted">
-                        {pricing.paymentsOpen
-                          ? 'Pay by the month or the year. Cancel any time.'
-                          : 'Paying for Cloud opens shortly.'}
-                      </p>
-                    </>
-                  }
-                />
-                <PlanColumn
-                  name="Self-hosted"
-                  price="Free"
-                  note="On your own server, under the open-source licences."
-                  lines={[
-                    'No limits on envelopes, members or storage',
-                    'Every feature, including the API and webhooks',
-                    'Your documents stay on your server',
-                    'Your own domain and brand',
-                    'Aadhaar eSign with your own eSign provider account',
-                    'Help from the community on GitHub',
-                  ]}
-                  action={
-                    <>
-                      <Button asChild variant="secondary" className="h-11 w-full">
-                        <ExternalLink href={GITHUB_URL} bare>
-                          Self-host it
-                        </ExternalLink>
-                      </Button>
-                      <p className="mt-2 text-center text-[13px] text-muted">
-                        <Link
-                          className="font-semibold text-primary hover:underline"
-                          href="/install-help"
-                        >
-                          Have it installed for you
-                        </Link>
-                        , {pricing.installHelp} plus GST
-                      </p>
-                    </>
-                  }
-                />
-              </div>
-            )}
-            <p {...reveal(2)} className="mt-6 text-sm text-muted">
+          <SectionHead
+            id="pricing-title"
+            eyebrow="Pricing"
+            tone="green"
+            title="Simple pricing, in rupees"
+            lead="Every plan seals the same way and keeps the same audit trail. The limits are the only difference."
+          />
+          <div className="mx-auto mt-14 max-w-6xl" {...reveal(1)}>
+            <PricingPlans rows={rows} pricing={pricing} start={start} signedIn={viewer !== null} />
+            <p className="mt-6 text-center text-sm text-muted">
               Prices are in Indian rupees and do not include {pricing.gstPercent}% GST. Every
               payment gets a GST tax invoice. Aadhaar eSign is paid per completed eSign with prepaid
               credits.
@@ -880,15 +846,14 @@ docker compose up -d`}</code>
         <section
           id="faq"
           aria-labelledby="faq-title"
-          data-band="faq"
-          className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
+          className="scroll-mt-20 bg-[#F6F8FC] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
         >
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div {...reveal()}>
-              <h2 id="faq-title" className="text-3xl font-bold sm:text-4xl">
-                Good to know
-              </h2>
-              <p className="mt-4 text-muted">
+          <SectionHead
+            id="faq-title"
+            eyebrow="FAQ"
+            title="Questions people ask"
+            lead={
+              <>
                 Something else on your mind? Write to{' '}
                 <a
                   className="font-semibold text-primary hover:underline"
@@ -897,60 +862,54 @@ docker compose up -d`}</code>
                   {CONTACT_EMAIL}
                 </a>
                 .
-              </p>
-            </div>
-            <div className="divide-y divide-line border-y border-line" {...reveal(1)}>
-              {faq(pricing).map((item) => (
-                <details key={item.q} className="group py-5 [&_a]:font-semibold [&_a]:text-primary">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-6 text-lg font-semibold [&::-webkit-details-marker]:hidden">
-                    {item.q}
-                    <Plus
-                      aria-hidden
-                      className="mt-1 h-5 w-5 shrink-0 text-muted transition-transform duration-200 group-open:rotate-45"
-                    />
-                  </summary>
-                  <div className="mt-3 max-w-[65ch] text-muted">{item.a}</div>
-                </details>
-              ))}
-            </div>
+              </>
+            }
+          />
+          <div className="mx-auto mt-12 max-w-3xl space-y-3" {...reveal(1)}>
+            {faq(pricing).map((item) => (
+              <details
+                key={item.q}
+                className="group rounded-2xl bg-white px-6 ring-1 ring-line open:shadow-[0_12px_32px_-20px_rgb(13_27_42/0.35)] [&_a]:font-semibold [&_a]:text-primary"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 font-display text-lg font-semibold [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <span
+                    aria-hidden
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary transition-transform duration-200 group-open:rotate-45"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </span>
+                </summary>
+                <div className="max-w-[65ch] pb-6 text-muted">{item.a}</div>
+              </details>
+            ))}
           </div>
         </section>
 
-        <section
-          aria-labelledby="start-title"
-          data-band="start"
-          className="px-4 pb-24 sm:px-6 sm:pb-32"
-        >
+        <section aria-labelledby="start-title" className="px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
           <div
-            className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-10 border-t-2 border-ink pt-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]"
+            className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-[radial-gradient(40rem_20rem_at_10%_0%,#DCE9FF,transparent_70%),radial-gradient(40rem_20rem_at_95%_100%,#CDF4EC,transparent_70%),#F4F8FF] px-6 py-14 text-center ring-1 ring-[#D6E2F5] sm:px-12 sm:py-20"
             {...reveal()}
           >
-            <div>
-              <h2 id="start-title" className="text-4xl font-bold sm:text-5xl">
-                Send your first document today
-              </h2>
-              <p className="mt-4 max-w-xl text-lg text-muted">
-                A Free plan workspace takes a minute to set up. Or run the same app on your own
-                server, free and unlimited.
-              </p>
-            </div>
-            <div>
-              <div className="relative rounded-[3px] border border-dashed border-primary bg-primary-soft/60 p-3">
-                <span className="absolute -top-2.5 left-3 bg-canvas px-1.5 font-mono text-[11px] font-medium text-primary">
-                  Signature *
-                </span>
-                <Button asChild className="h-12 w-full text-base">
-                  <Link href={start.href}>
-                    {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-4 text-sm">
-                <span className="text-muted">The field is yours to fill.</span>
-                <a href={DOCS_URL} className="font-semibold text-primary hover:underline">
-                  Read the docs
-                </a>
-              </div>
+            <h2
+              id="start-title"
+              className="mx-auto max-w-2xl text-[clamp(2rem,1.4rem+2.2vw,3.2rem)] leading-[1.08] font-bold"
+            >
+              Send your first document today
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-muted">
+              A Free plan workspace takes a minute to set up. Or run the same app on your own
+              server, free and unlimited.
+            </p>
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button pill asChild className="h-12 px-7 text-base">
+                <Link href={start.href}>
+                  {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button pill asChild variant="secondary" className="h-12 px-7 text-base">
+                <a href={DOCS_URL}>Read the docs</a>
+              </Button>
             </div>
           </div>
         </section>
