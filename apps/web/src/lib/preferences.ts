@@ -1,4 +1,6 @@
 export const THEMES = ['system', 'light', 'dark'] as const;
+/** What people see until they pick a theme themselves: light, whatever their device prefers. */
+export const DEFAULT_THEME = 'light' satisfies (typeof THEMES)[number];
 export type Theme = (typeof THEMES)[number];
 
 export interface Preferences {

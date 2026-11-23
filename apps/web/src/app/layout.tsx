@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import { metadataBase } from '@/lib/metadata-base';
-import { THEME_COOKIE, isTheme } from '@/lib/preferences';
+import { DEFAULT_THEME, THEME_COOKIE, isTheme } from '@/lib/preferences';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -39,7 +39,8 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const saved = (await cookies()).get(THEME_COOKIE)?.value;
-  const theme = isTheme(saved) ? saved : 'system';
+  // Light unless the visitor chose otherwise; the server sets it, so the first paint is light.
+  const theme = isTheme(saved) ? saved : DEFAULT_THEME;
   return (
     <html
       lang="en"

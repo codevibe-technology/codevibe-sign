@@ -16,6 +16,7 @@ import { createApiKey, listApiKeys, resolveApiKey, revokeApiKey } from '@/server
 import { authOptions } from '@/server/auth/config';
 import {
   getBrand,
+  workspaceLogoUrls,
   getSigningBrand,
   readLogo,
   removeLogo,
@@ -395,8 +396,17 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       );
       expect(await readLogo(sql, files, a.id)).toEqual({ bytes: png, type: 'image/png' });
       expect(await readLogo(sql, files, b.id)).toBeNull();
+      // The switcher asks for many workspaces at once; only those with a logo answer, and a
+      // new upload changes the address, so a cached image is never stale.
+      const first = await workspaceLogoUrls(sql, [a.id, b.id]);
+      expect([...first]).toEqual([[a.id, (await getBrand(sql, a.id)).logoUrl]]);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await setLogo(sql, files, a.id, png);
+      expect((await workspaceLogoUrls(sql, [a.id])).get(a.id)).not.toBe(first.get(a.id));
+      expect(await workspaceLogoUrls(sql, [])).toEqual(new Map());
       await removeLogo(sql, files, a.id);
       expect((await getBrand(sql, a.id)).logoUrl).toBeNull();
+      expect(await workspaceLogoUrls(sql, [a.id, b.id])).toEqual(new Map());
     });
 
     it('saves email settings and template overrides', async () => {
@@ -479,7 +489,7 @@ describe.skipIf(!url)('against PostgreSQL', () => {
 
     it('keeps personal preferences per person', async () => {
       expect(await getPreferences(sql, users.zoe.id)).toEqual({
-        theme: 'system',
+        theme: 'light',
         timezone: null,
         locale: 'en',
       });
@@ -494,7 +504,15 @@ describe.skipIf(!url)('against PostgreSQL', () => {
         'VALIDATION',
       );
       await rejectsWith(updatePreferences(sql, users.zoe.id, { theme: 'neon' }), 'VALIDATION');
-      expect((await getPreferences(sql, users.mia.id)).theme).toBe('system');
+      // Light is only the default: saving something else keeps it, and a choice outlives it.
+      expect((await getPreferences(sql, users.mia.id)).theme).toBe('light');
+      expect((await updatePreferences(sql, users.mia.id, { timezone: 'Asia/Kolkata' })).theme).toBe(
+        'light',
+      );
+      expect((await updatePreferences(sql, users.mia.id, { theme: 'system' })).theme).toBe(
+        'system',
+      );
+      expect((await getPreferences(sql, users.zoe.id)).theme).toBe('dark');
       expect((await updatePreferences(sql, users.zoe.id, { timezone: '' })).timezone).toBeNull();
     });
 

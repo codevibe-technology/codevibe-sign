@@ -75,7 +75,8 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
   },
   cleanUrls: false,
   lastUpdated: false,
-  appearance: true,
+  // Light until the reader picks dark with the switch; their pick is remembered.
+  appearance: { initialValue: 'light' },
 
   sitemap: {
     hostname: DOCS_URL,

@@ -1,6 +1,6 @@
 import 'server-only';
 import type postgres from 'postgres';
-import { isTheme, isTimeZone, type Preferences } from '@/lib/preferences';
+import { DEFAULT_THEME, isTheme, isTimeZone, type Preferences } from '@/lib/preferences';
 import { AppError } from './errors';
 
 export async function getPreferences(sql: postgres.Sql, userId: string): Promise<Preferences> {
@@ -9,7 +9,7 @@ export async function getPreferences(sql: postgres.Sql, userId: string): Promise
   >`
     select theme, timezone, locale from app_user_preferences where user_id = ${userId}`;
   return {
-    theme: row?.theme ?? 'system',
+    theme: row?.theme ?? DEFAULT_THEME,
     timezone: row?.timezone ?? null,
     locale: row?.locale ?? 'en',
   };
@@ -29,7 +29,7 @@ export async function updatePreferences(
   }
   await sql`
     insert into app_user_preferences (user_id, theme, timezone)
-    values (${userId}, ${patch.theme ?? 'system'}, ${patch.timezone || null})
+    values (${userId}, ${patch.theme ?? DEFAULT_THEME}, ${patch.timezone || null})
     on conflict (user_id) do update set
       theme = ${patch.theme === undefined ? sql`app_user_preferences.theme` : sql`excluded.theme`},
       timezone = ${patch.timezone === undefined ? sql`app_user_preferences.timezone` : sql`excluded.timezone`},
