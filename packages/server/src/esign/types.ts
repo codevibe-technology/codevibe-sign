@@ -144,6 +144,13 @@ export interface EsignOptions {
    */
   provider(workspaceId: string): Promise<EsignProvider | null>;
   /**
+   * The provider account a request that already started signs with, when that can differ from
+   * what `provider` answers now: the workspace changed accounts or lost the right to one
+   * since. Asked after `onStart`, and for every callback, status check and download of the
+   * request. Without it `provider` is asked.
+   */
+  providerForSession?(input: EsignHookInput): Promise<EsignProvider | null>;
+  /**
    * Why this workspace cannot start an eSign now, or null. Asked when an envelope with an
    * Aadhaar signer is sent and again when the signer starts.
    */

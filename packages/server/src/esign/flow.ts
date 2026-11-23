@@ -321,7 +321,15 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
       signed.recipients,
       { documentId: document.id, ...(timeZone ? { timeZone } : {}) },
     );
-    created = await provider.createRequest({
+    // The account `onStart` settled on is the one that signs, even if the workspace's
+    // choice changed between the first look and the hold.
+    const account = await sessionProvider(rt, session);
+    if (!account || account.name !== provider.name) {
+      throw new SignError('PROVIDER_ERROR', 'The eSign provider changed while starting', {
+        reason: 'not_configured',
+      });
+    }
+    created = await account.createRequest({
       envelopeId: envelope.id,
       reference: session.id,
       recipient: {
@@ -425,8 +433,24 @@ const CLOSED = new Set([
   'ENVELOPE_NOT_FOUND',
 ]);
 
+/** The provider account a request runs on: the one it started with, when the host can tell. */
+export async function sessionProvider(
+  rt: Runtime,
+  session: Pick<EsignSession, 'id' | 'workspaceId' | 'envelopeId' | 'recipientId'>,
+): Promise<EsignProvider | null> {
+  const esign = rt.esign;
+  if (!esign) return null;
+  if (!esign.providerForSession) return esign.provider(session.workspaceId);
+  return esign.providerForSession({
+    workspaceId: session.workspaceId,
+    envelopeId: session.envelopeId,
+    recipientId: session.recipientId,
+    ref: session.id,
+  });
+}
+
 async function providerOf(rt: Runtime, session: EsignSession): Promise<EsignProvider> {
-  const provider = await rt.esign?.provider(session.workspaceId);
+  const provider = await sessionProvider(rt, session);
   if (!provider || provider.name !== session.provider) {
     throw new SignError('PROVIDER_ERROR', 'The eSign provider of this workspace is not set up', {
       reason: 'not_configured',

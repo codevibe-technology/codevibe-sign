@@ -560,6 +560,51 @@ describe('the provider reports back', () => {
     expect((await h.call('POST', WEBHOOK, { body: mine.webhook(ref, 'signed') })).status).toBe(200);
     expect(hooks).toEqual(['start', 'signed']);
   });
+
+  it('keeps a started request on the account it began with when the workspace changes', async () => {
+    const first = fakeEsignProvider({ secret: 'first' });
+    const second = fakeEsignProvider({ secret: 'second' });
+    let current: FakeEsignProvider | null = first;
+    const started = new Map<string, FakeEsignProvider>();
+    const { h, hooks } = setup({
+      esign: {
+        provider: async () => current,
+        onStart: async ({ ref }) => {
+          hooks.push('start');
+          started.set(ref, first);
+        },
+        providerForSession: async ({ ref }) => started.get(ref) ?? null,
+      },
+    });
+    const { envelope, token, start } = await readyForRavi(h);
+    expect((await start()).status).toBe(200);
+    const ref = first.requests[0]!.ref;
+    // The workspace moves to another account, then loses eSign altogether.
+    current = second;
+    first.finish(ref);
+    expect((await h.call('POST', WEBHOOK, { body: second.webhook(ref, 'signed') })).status).toBe(
+      401,
+    );
+    current = null;
+    const polled = await h.call('GET', `/v1/sign/${token}/esign`);
+    expect(polled.json.status).toBe('signed');
+    expect(second.requests).toHaveLength(0);
+    expect((await statusOf(h, envelope.id)).status).toBe('completed');
+    expect(hooks).toEqual(['start', 'signed']);
+  });
+
+  it('starts nothing when the account settled on at the hold is not the one first seen', async () => {
+    const first = fakeEsignProvider({ name: 'leegality' });
+    const { h, hooks } = setup({
+      provider: first,
+      esign: { providerForSession: async () => null },
+    });
+    const { start } = await readyForRavi(h);
+    const answer = await start();
+    expect(answer.status).toBe(502);
+    expect(first.requests).toHaveLength(0);
+    expect(hooks).toEqual(['start', 'failed']);
+  });
 });
 
 describe('time and the envelope around an eSign', () => {

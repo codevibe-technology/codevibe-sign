@@ -2,7 +2,7 @@ import { leegalityWebhookRef } from '@codevibe_technology/sign-aadhaar';
 import { SignError } from '@codevibe_technology/sign-core';
 import { Hono } from 'hono';
 import { HttpError } from '../errors';
-import { applyEsignEvent } from '../esign/flow';
+import { applyEsignEvent, sessionProvider } from '../esign/flow';
 import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import type { Runtime } from '../runtime/context';
@@ -40,7 +40,7 @@ export function esignWebhookRoutes(rt: Runtime) {
       rt.esign.webhookRef?.(name, raw) ?? (name === 'leegality' ? leegalityWebhookRef(raw) : null);
     const session = ref ? await store.findByRef(name, ref) : null;
     if (!session) throw unknown();
-    const provider = await rt.esign.provider(session.workspaceId);
+    const provider = await sessionProvider(rt, session);
     if (!provider || provider.name !== name) throw unknown();
 
     let event;
