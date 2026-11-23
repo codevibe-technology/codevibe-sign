@@ -319,7 +319,7 @@ export const formatDay = (iso: string, timeZone?: string) =>
 export const SORTS = [
   { key: 'newest', label: 'Newest first' },
   { key: 'oldest', label: 'Oldest first' },
-  { key: 'title', label: 'Title A–Z' },
+  { key: 'title', label: 'Title A to Z' },
   { key: 'status', label: 'Status' },
 ] as const;
 export type SortKey = (typeof SORTS)[number]['key'];
