@@ -126,5 +126,6 @@ pnpm build
 
 ## Next
 
+- Use the app: [Start here](/start-here).
 - Learn the model in [Envelopes](/concepts/envelopes).
-- Walk through [sending your first envelope](/guides/first-envelope).
+- Walk through [sending your first envelope](/guides/first-envelope) in code.

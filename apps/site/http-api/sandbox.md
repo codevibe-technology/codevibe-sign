@@ -121,3 +121,7 @@ await listen(app, { port });
 
 Do the same in your own deployment only for origins you control, and never for pages that
 would hold a sender API key.
+
+## Next
+
+[API reference](/http-api/reference)

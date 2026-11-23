@@ -60,3 +60,7 @@ every runtime.
 
 Rejected actions throw a `SignError` with a stable `code`, such as `NOT_YOUR_TURN`,
 `ENVELOPE_EXPIRED` or `REQUIRED_FIELDS_MISSING`.
+
+## Next
+
+[Recipients](/concepts/recipients)

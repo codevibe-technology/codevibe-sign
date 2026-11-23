@@ -79,3 +79,7 @@ send. Everyone signs the revised envelope again.
 
 Events record who acted as `data.by`: the `actorName` of the caller's `Principal` when your
 `authenticate` sets one (for example the signed-in user's name), otherwise the API key id.
+
+## Next
+
+[Fields across pages and tags](/guides/field-tags)

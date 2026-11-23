@@ -39,3 +39,7 @@ off.
 
 Any signer can decline, with a reason. The sender can void the envelope. Both end it for
 everyone, and recipients who were already invited are told it was cancelled.
+
+## Next
+
+[Fields and coordinates](/concepts/fields)

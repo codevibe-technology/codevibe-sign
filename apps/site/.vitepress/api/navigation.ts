@@ -81,6 +81,9 @@ export function searchStart(): SearchStart {
   });
   return {
     popular: [
+      { text: 'Start here', link: '/start-here', hint: 'Docs' },
+      { text: 'Send a document from the app', link: '/app/send', hint: 'Use the app' },
+      { text: 'Team and roles', link: '/admin/team-and-roles', hint: 'Administer' },
       { text: 'Quickstart: your first envelope', link: '/http-api/quickstart', hint: 'HTTP API' },
       { text: 'Send your first envelope', link: '/guides/first-envelope', hint: 'Guide' },
       { text: 'Authentication and API keys', link: '/http-api/authentication', hint: 'HTTP API' },

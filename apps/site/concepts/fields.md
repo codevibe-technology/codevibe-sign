@@ -45,3 +45,7 @@ When a recipient submits, each value is checked against its field type. Signatur
 images may be raw base64 or a `data:image/png;base64,` URL, and are re-encoded before they are
 drawn. A recipient can only fill their own fields (`FIELD_NOT_YOURS`), and every required field
 must be filled (`REQUIRED_FIELDS_MISSING`).
+
+## Next
+
+[Audit chain](/concepts/audit-chain)

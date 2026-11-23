@@ -96,3 +96,8 @@ setInterval(() => void sign.tick(), 60_000);
 If you want your own storage, mail and HTTP layer, use `@codevibe_technology/sign-core` directly. Every
 step is a pure function that returns the new envelope, the audit events and the effects to
 perform. See [Send your first envelope](/guides/first-envelope).
+
+## Next
+
+- [HTTP API quickstart](/http-api/quickstart)
+- [Concepts](/concepts/envelopes)

@@ -130,3 +130,7 @@ To turn a `.p12` file into the base64 value: `base64 -i seal.p12 | tr -d '\n'`.
   closes its database connections on `SIGTERM` and `SIGINT`, so rolling restarts are safe.
 - Behind a reverse proxy, set `TRUST_PROXY=true` so rate limits and the audit log see the
   client's address rather than the proxy's.
+
+## Next
+
+[Operate an install](/self-host/operate)

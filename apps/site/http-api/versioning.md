@@ -99,3 +99,7 @@ A server you run yourself changes only when you upgrade it. The same rules apply
 packages: a release that breaks the HTTP API is a new major version of
 `@codevibe_technology/sign-server`, and its own `GET /v1/openapi.json` always describes
 exactly what that server answers.
+
+## Next
+
+[API changelog](/http-api/changelog)

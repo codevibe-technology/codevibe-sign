@@ -78,3 +78,7 @@ within 10 working days. Fixes are released with a security note in the changelog
 credit to you if you want it.
 
 Until 1.0, only the latest minor release receives security fixes.
+
+## Next
+
+[Legal](/legal)

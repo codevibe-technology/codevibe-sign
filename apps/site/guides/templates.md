@@ -108,3 +108,7 @@ PDFs of a template cannot be changed: create a new template for a new version of
   [Plans and pricing](/guides/pricing).
 
 The [templates reference](/http-api/reference/templates) lists every field and error.
+
+## Next
+
+[Webhooks](/guides/webhooks)

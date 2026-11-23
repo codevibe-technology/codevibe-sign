@@ -89,3 +89,8 @@ particular document.
 
 What it does not provide is a legal opinion on whether a particular document, signed a
 particular way, will be enforceable in a particular case.
+
+## Next
+
+- [How the seal works in PDF readers](/guides/seal-in-pdf-readers)
+- [Electronic evidence (section 63 BSA)](/guides/section-63-certificate)

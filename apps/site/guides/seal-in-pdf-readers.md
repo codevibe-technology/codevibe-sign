@@ -112,3 +112,7 @@ code on each certificate page opens the record on your own host. To have readers
 seal as trusted without anyone adding the certificate, seal with a document-signing
 certificate from a certificate authority on the readers' lists; see
 [Sealing](/concepts/sealing).
+
+## Next
+
+[Electronic evidence (section 63 BSA)](/guides/section-63-certificate)

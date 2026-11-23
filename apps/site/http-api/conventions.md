@@ -73,3 +73,8 @@ optional fields and new error codes may appear, so ignore fields you do not know
 error `code`. [Versioning and deprecation](/http-api/versioning) lists exactly what counts as
 a breaking change and the notice you get; [the changelog](/http-api/changelog) records every
 change.
+
+## Next
+
+- [Errors](/http-api/errors)
+- [Versioning and deprecation](/http-api/versioning)

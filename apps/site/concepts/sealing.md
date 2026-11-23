@@ -55,3 +55,7 @@ Anyone with the sealed PDF can check it without contacting your server:
 - call `verify()` from `@codevibe_technology/sign-pdf`, which checks the seal offline.
 
 See [Verify a sealed PDF](/guides/verify-pdf).
+
+## Next
+
+[OTP and signing links](/concepts/otp-and-links)

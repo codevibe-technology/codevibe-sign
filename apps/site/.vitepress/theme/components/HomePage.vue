@@ -22,6 +22,45 @@ const steps = [
   },
 ];
 
+/** Where each kind of reader starts; the same groups as the sidebar. */
+const paths = [
+  {
+    title: 'Start here',
+    text: 'What it is, the ways to run it, and your first hour from account to sealed PDF.',
+    link: '/start-here',
+  },
+  {
+    title: 'Use the app',
+    text: 'Send a document, sign one, verify the result, templates and bulk send.',
+    link: '/app/send',
+  },
+  {
+    title: 'Administer a workspace',
+    text: 'Team and roles, workspace addresses, transfers, brand, API keys, webhooks and Aadhaar eSign.',
+    link: '/admin/team-and-roles',
+  },
+  {
+    title: 'Billing and plans',
+    text: 'Free and Cloud plans, eSign credits, invoices and installation help.',
+    link: '/guides/pricing',
+  },
+  {
+    title: 'Developers and API',
+    text: 'The HTTP API, its reference, webhooks, the React signing view and the packages.',
+    link: '/http-api',
+  },
+  {
+    title: 'Self-host and operate',
+    text: 'Run it with Docker, every setting, backups and upgrades.',
+    link: '/getting-started/docker',
+  },
+  {
+    title: 'Trust and legal',
+    text: 'Security, the law in India, the seal in PDF readers and evidence in court.',
+    link: '/security',
+  },
+];
+
 const features = [
   {
     title: 'Signing order',
@@ -106,7 +145,7 @@ const faqs = [
             the service with Docker.
           </p>
           <div class="actions">
-            <a class="btn btn-primary" :href="withBase('/getting-started')">Get started</a>
+            <a class="btn btn-primary" :href="withBase('/start-here')">Start here</a>
             <a class="btn btn-ghost" :href="GITHUB_URL" target="_blank" rel="noopener">
               View on GitHub
             </a>
@@ -118,7 +157,21 @@ const faqs = [
       </div>
     </section>
 
-    <section class="section" aria-labelledby="how">
+    <section class="section" aria-labelledby="paths">
+      <div class="wrap">
+        <h2 id="paths">Find your way</h2>
+        <p class="section-lead">The docs are grouped by who is reading. Pick the one that fits.</p>
+        <ul class="features paths">
+          <li v-for="p in paths" :key="p.title" class="card">
+            <a class="path-link" :href="withBase(p.link)">
+              <h3>{{ p.title }}</h3>
+              <p>{{ p.text }}</p>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </section>
+    <section class="section alt" aria-labelledby="how">
       <div class="wrap">
         <h2 id="how">How it works</h2>
         <p class="section-lead">Four steps, from the first invitation to a file you can prove.</p>
@@ -132,7 +185,7 @@ const faqs = [
       </div>
     </section>
 
-    <section class="section alt" aria-labelledby="features">
+    <section class="section" aria-labelledby="features">
       <div class="wrap">
         <h2 id="features">What you get</h2>
         <p class="section-lead">
@@ -147,7 +200,7 @@ const faqs = [
       </div>
     </section>
 
-    <section class="section" aria-labelledby="code">
+    <section class="section alt" aria-labelledby="code">
       <div class="wrap code-grid">
         <div>
           <h2 id="code">Embed it in your backend</h2>
@@ -234,10 +287,10 @@ const faqs = [
       <div class="wrap cta-inner">
         <h2 id="start">Read the docs, then try it</h2>
         <p class="section-lead">
-          Start with the concepts, or go straight to sending your first envelope.
+          Start with the first hour in the app, or go straight to the concepts.
         </p>
         <div class="actions center">
-          <a class="btn btn-primary" :href="withBase('/getting-started')">Get started</a>
+          <a class="btn btn-primary" :href="withBase('/start-here')">Start here</a>
           <a class="btn btn-ghost" :href="withBase('/concepts/envelopes')">Learn the concepts</a>
         </div>
       </div>
@@ -442,6 +495,18 @@ summary:focus-visible {
 
 .features .card:nth-child(4n + 4) {
   border-top-color: var(--cv-warm);
+}
+
+.path-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.path-link:hover h3,
+.path-link:focus-visible h3 {
+  color: var(--cv-blue);
+  text-decoration: underline;
 }
 
 .num {

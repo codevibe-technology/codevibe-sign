@@ -114,3 +114,8 @@ stamp paper or as an affidavit, depending on the court.
   and [LiveLaw](https://www.livelaw.in/top-stories/supreme-court-rejects-challenge-to-s634-bsa-mandating-hash-value-disclosure-for-electronic-evidence-535950).
 
 This is not legal advice.
+
+## Next
+
+- [Security](/security)
+- [Legal](/legal)

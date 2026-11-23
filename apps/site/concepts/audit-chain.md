@@ -53,3 +53,7 @@ certificate page.
 A database row can be edited. A chain makes editing visible: change any event and its hash no
 longer matches, and neither does any event after it. Because the head is also printed inside
 the sealed PDF, the log and the file vouch for each other.
+
+## Next
+
+[Sealing and verification](/concepts/sealing)

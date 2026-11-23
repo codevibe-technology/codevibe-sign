@@ -53,3 +53,7 @@ pending → notified → viewed → signed | approved | declined
 - **viewed**: opened the document.
 - **signed**, **approved**: done.
 - **declined**: refused, with a reason. This stops the envelope for everyone.
+
+## Next
+
+[Routing](/concepts/routing)

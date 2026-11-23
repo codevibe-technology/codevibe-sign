@@ -78,3 +78,7 @@ be able to check it without an account. It only ever answers what the certificat
 the sealed file already prints, with contacts masked; it stores nothing; and it is limited to
 30 checks per client address in 10 minutes and to files of 20 MB. Sending an API key to these
 routes changes nothing.
+
+## Next
+
+[Pagination and retries](/http-api/conventions)

@@ -232,3 +232,8 @@ const sealed = await fetch(`${SIGN_URL}/v1/envelopes/${envelope.id}/documents/${
 Leave out `send: true` to create a draft, change it with `PATCH /v1/envelopes/:id` and send it
 with `POST /v1/envelopes/:id/send`. The full list of routes is in the
 [server reference](/api/server#sending).
+
+## Next
+
+- [Templates over the API](/guides/templates)
+- [HTTP API quickstart](/http-api/quickstart)

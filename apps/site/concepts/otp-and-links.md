@@ -74,3 +74,8 @@ Saving the returned state on every call is what makes the attempt limit work. Sa
 the stored state has not changed since you read it (the server compares a version number), or
 two guesses sent at the same moment would both count as the first. After a code is accepted,
 call `markAuthenticated` so the check is recorded in the audit log.
+
+## Next
+
+- [Send your first envelope in code](/guides/first-envelope)
+- [Packages](/api)

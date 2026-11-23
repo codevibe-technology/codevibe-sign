@@ -165,3 +165,8 @@ if (check.valid) {
 
 If both the seal and the chain check out, the file is the one that was sealed and the recorded
 history is the one that produced it.
+
+## Next
+
+- [Invite your team](/admin/team-and-roles)
+- [Electronic evidence (section 63 BSA)](/guides/section-63-certificate)

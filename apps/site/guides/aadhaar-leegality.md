@@ -250,3 +250,8 @@ The full list of options is in the [API reference](/api/aadhaar).
 Leegality is the only provider today. eMudhra is planned as the second one. Both sit behind the
 `EsignProvider` interface (`createRequest`, `parseWebhook`, `fetchSignedDocument`), so you can
 add another provider yourself. Pull requests are welcome.
+
+## Next
+
+- [Aadhaar eSign settings](/admin/aadhaar-esign)
+- [Credits and billing](/guides/credits-and-billing)

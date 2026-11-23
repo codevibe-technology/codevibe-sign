@@ -155,3 +155,8 @@ export function verify(secret: string, header: string, rawBody: string): boolean
 - Answer quickly and do slow work in the background.
 - Use the envelope's `metadata` to link events back to your own records, such as an employee
   id.
+
+## Next
+
+- [Add the React signing view](/guides/react-signing-view)
+- [Manage endpoints in the app](/admin/api-keys-and-webhooks#webhooks)

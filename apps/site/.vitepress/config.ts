@@ -63,6 +63,118 @@ const signServer = process.env.SIGN_SERVER;
 /** The faces every page sets first, fetched with the page instead of after its CSS. */
 const preloadedFonts = ['space-grotesk-latin', 'jetbrains-mono-latin'];
 
+// Which nav tab is lit for a page; every page of the sidebar below falls under exactly one.
+const USE_THE_APP = '^/(app/|guides/(verify-pdf|fix-after-sending|field-tags)$)';
+const BILLING = '^/(billing/|guides/(pricing|credits-and-billing)$)';
+const DEVELOPERS =
+  '^/(http-api|api|concepts/|guides/(first-envelope|templates|webhooks|react-signing-view|aadhaar-leegality)$|getting-started$)';
+const SELF_HOST = '^/(self-host/|getting-started/)';
+const TRUST =
+  '^/(security|legal|changelog|contributing|guides/(seal-in-pdf-readers|section-63-certificate))$';
+
+/** One sidebar for every page outside the API reference, grouped by who reads it. */
+const docsSidebar: DefaultTheme.SidebarItem[] = [
+  {
+    text: 'Start here',
+    items: [
+      { text: 'Start here', link: '/start-here' },
+      { text: 'Your account and sign-in', link: '/app/account' },
+    ],
+  },
+  {
+    text: 'Use the app',
+    items: [
+      { text: 'Send a document', link: '/app/send' },
+      { text: 'Sign a document', link: '/app/sign' },
+      { text: 'Verify a sealed PDF', link: '/guides/verify-pdf' },
+      { text: 'Templates in the app', link: '/app/templates' },
+      { text: 'Bulk send', link: '/app/bulk-send' },
+      { text: 'Fix an envelope after sending', link: '/guides/fix-after-sending' },
+      { text: 'Fields across pages and tags', link: '/guides/field-tags' },
+    ],
+  },
+  {
+    text: 'Administer a workspace',
+    items: [
+      { text: 'Team and roles', link: '/admin/team-and-roles' },
+      { text: 'Workspaces and addresses', link: '/admin/workspaces' },
+      { text: 'Transfer a workspace', link: '/admin/transfer-workspace' },
+      { text: 'Brand and white-label', link: '/admin/brand' },
+      { text: 'API keys and webhooks', link: '/admin/api-keys-and-webhooks' },
+      { text: 'Email log', link: '/admin/email-log' },
+      { text: 'Aadhaar eSign settings', link: '/admin/aadhaar-esign' },
+    ],
+  },
+  {
+    text: 'Billing and plans',
+    items: [
+      { text: 'Plans and pricing', link: '/guides/pricing' },
+      { text: 'Credits and billing', link: '/guides/credits-and-billing' },
+      { text: 'Invoices and credit notes', link: '/billing/invoices' },
+      { text: 'Installation help and hosting', link: '/billing/install-help' },
+    ],
+  },
+  {
+    text: 'Developers and API',
+    items: [
+      { text: 'HTTP API', link: '/http-api' },
+      { text: 'API quickstart', link: '/http-api/quickstart' },
+      { text: 'API reference', link: '/http-api/reference' },
+      { text: 'Install the packages', link: '/getting-started' },
+      { text: 'Send your first envelope in code', link: '/guides/first-envelope' },
+      { text: 'Templates over the API', link: '/guides/templates' },
+      { text: 'Webhooks', link: '/guides/webhooks' },
+      { text: 'Add the React signing view', link: '/guides/react-signing-view' },
+      { text: 'Aadhaar eSign with Leegality', link: '/guides/aadhaar-leegality' },
+      {
+        text: 'Concepts',
+        collapsed: true,
+        items: [
+          { text: 'Envelopes', link: '/concepts/envelopes' },
+          { text: 'Recipients', link: '/concepts/recipients' },
+          { text: 'Routing', link: '/concepts/routing' },
+          { text: 'Fields and coordinates', link: '/concepts/fields' },
+          { text: 'Audit chain', link: '/concepts/audit-chain' },
+          { text: 'Sealing and verification', link: '/concepts/sealing' },
+          { text: 'OTP and signing links', link: '/concepts/otp-and-links' },
+        ],
+      },
+      {
+        text: 'Packages',
+        collapsed: true,
+        items: [
+          { text: 'Overview', link: '/api' },
+          { text: 'sign-core', link: '/api/core' },
+          { text: 'sign-pdf', link: '/api/pdf' },
+          { text: 'sign-server', link: '/api/server' },
+          { text: 'sign-react', link: '/api/react' },
+          { text: 'sign-aadhaar', link: '/api/aadhaar' },
+        ],
+      },
+    ],
+  },
+  {
+    text: 'Self-host and operate',
+    items: [
+      { text: 'Self-host with Docker', link: '/getting-started/docker' },
+      { text: 'Operate an install', link: '/self-host/operate' },
+      { text: 'Embed in Node', link: '/getting-started/node' },
+      { text: 'Run a local sandbox', link: '/http-api/sandbox' },
+    ],
+  },
+  {
+    text: 'Trust and legal',
+    items: [
+      { text: 'Security', link: '/security' },
+      { text: 'Legal', link: '/legal' },
+      { text: 'How the seal works in PDF readers', link: '/guides/seal-in-pdf-readers' },
+      { text: 'Electronic evidence (s.63 BSA)', link: '/guides/section-63-certificate' },
+      { text: 'Changelog', link: '/changelog' },
+      { text: 'Contributing', link: '/contributing' },
+    ],
+  },
+];
+
 export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: SearchStart }>({
   base: BASE,
   lang: 'en',
@@ -160,18 +272,31 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
     siteTitle: false,
 
     nav: [
-      { text: 'Get started', link: '/getting-started', activeMatch: '^/getting-started(/|$)' },
-      { text: 'Concepts', link: '/concepts/envelopes', activeMatch: '^/concepts/' },
-      { text: 'Guides', link: '/guides/first-envelope', activeMatch: '^/guides/' },
-      { text: 'API reference', link: '/http-api/reference', activeMatch: '^/http-api(/|$)' },
-      { text: 'Packages', link: '/api', activeMatch: '^/api(/|$)' },
+      { text: 'Start here', link: '/start-here', activeMatch: '^/start-here' },
+      { text: 'Use the app', link: '/app/send', activeMatch: USE_THE_APP },
+      { text: 'Administer', link: '/admin/team-and-roles', activeMatch: '^/admin/' },
+      { text: 'Billing', link: '/guides/pricing', activeMatch: BILLING },
       {
-        text: 'More',
+        text: 'Developers',
+        activeMatch: DEVELOPERS,
+        items: [
+          { text: 'HTTP API', link: '/http-api' },
+          { text: 'API reference', link: '/http-api/reference' },
+          { text: 'Packages', link: '/api' },
+          { text: 'Concepts', link: '/concepts/envelopes' },
+        ],
+      },
+      { text: 'Self-host', link: '/getting-started/docker', activeMatch: SELF_HOST },
+      {
+        text: 'Trust',
+        activeMatch: TRUST,
         items: [
           { text: 'Security', link: '/security' },
           { text: 'Legal', link: '/legal' },
-          { text: 'Contributing', link: '/contributing' },
+          { text: 'The seal in PDF readers', link: '/guides/seal-in-pdf-readers' },
+          { text: 'Electronic evidence (s.63 BSA)', link: '/guides/section-63-certificate' },
           { text: 'Changelog', link: '/changelog' },
+          { text: 'Contributing', link: '/contributing' },
           { text: 'Codevibe', link: CODEVIBE_URL, target: '_blank', rel: 'noopener noreferrer' },
         ],
       },
@@ -183,74 +308,7 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
 
     sidebar: {
       '/http-api/': apiSidebar(),
-      '/': [
-        {
-          text: 'Getting started',
-          items: [
-            { text: 'Install', link: '/getting-started' },
-            { text: 'Self-host with Docker', link: '/getting-started/docker' },
-            { text: 'Embed in Node', link: '/getting-started/node' },
-          ],
-        },
-        {
-          text: 'Concepts',
-          items: [
-            { text: 'Envelopes', link: '/concepts/envelopes' },
-            { text: 'Recipients', link: '/concepts/recipients' },
-            { text: 'Routing', link: '/concepts/routing' },
-            { text: 'Fields and coordinates', link: '/concepts/fields' },
-            { text: 'Audit chain', link: '/concepts/audit-chain' },
-            { text: 'Sealing and verification', link: '/concepts/sealing' },
-            { text: 'OTP and signing links', link: '/concepts/otp-and-links' },
-          ],
-        },
-        {
-          text: 'Guides',
-          items: [
-            { text: 'Send your first envelope', link: '/guides/first-envelope' },
-            { text: 'Add the React signing view', link: '/guides/react-signing-view' },
-            { text: 'Reuse a document with templates', link: '/guides/templates' },
-            { text: 'Verify a sealed PDF', link: '/guides/verify-pdf' },
-            { text: 'How the seal works in PDF readers', link: '/guides/seal-in-pdf-readers' },
-            { text: 'Electronic evidence (s.63 BSA)', link: '/guides/section-63-certificate' },
-            { text: 'Aadhaar eSign with Leegality', link: '/guides/aadhaar-leegality' },
-            { text: 'Webhooks', link: '/guides/webhooks' },
-            { text: 'Fix an envelope after sending', link: '/guides/fix-after-sending' },
-            { text: 'Fields across pages and tags', link: '/guides/field-tags' },
-            { text: 'Plans and pricing', link: '/guides/pricing' },
-            { text: 'Credits and billing', link: '/guides/credits-and-billing' },
-          ],
-        },
-        {
-          text: 'HTTP API',
-          items: [
-            { text: 'Overview', link: '/http-api' },
-            { text: 'Quickstart', link: '/http-api/quickstart' },
-            { text: 'API reference', link: '/http-api/reference' },
-            { text: 'Run a local sandbox', link: '/http-api/sandbox' },
-          ],
-        },
-        {
-          text: 'Packages',
-          items: [
-            { text: 'Overview', link: '/api' },
-            { text: 'sign-core', link: '/api/core' },
-            { text: 'sign-pdf', link: '/api/pdf' },
-            { text: 'sign-server', link: '/api/server' },
-            { text: 'sign-react', link: '/api/react' },
-            { text: 'sign-aadhaar', link: '/api/aadhaar' },
-          ],
-        },
-        {
-          text: 'Project',
-          items: [
-            { text: 'Security', link: '/security' },
-            { text: 'Legal', link: '/legal' },
-            { text: 'Contributing', link: '/contributing' },
-            { text: 'Changelog', link: '/changelog' },
-          ],
-        },
-      ],
+      '/': docsSidebar,
     },
 
     socialLinks: [

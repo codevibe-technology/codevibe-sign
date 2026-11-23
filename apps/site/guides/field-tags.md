@@ -60,3 +60,8 @@ The signer presses **Start** and is taken to each field in turn. On a signature 
 same button reads **Sign**; the signature is adopted once, and every other box of theirs
 then takes one tap, still one box at a time. **Fill all my initials** fills every initials
 box once the initials are adopted. When nothing is left, the button becomes **Finish**.
+
+## Next
+
+- [Templates in the app](/app/templates)
+- [Team and roles](/admin/team-and-roles)

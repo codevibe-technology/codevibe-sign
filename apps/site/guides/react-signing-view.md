@@ -155,3 +155,7 @@ server to your site and route `/sign/*` to the server too: links in invitation e
 `createSignerClient({ baseUrl, token: 'link' })` or `GET /v1/sign/link`, so no token appears
 in its URL. When you embed the server in Node, you can instead pass `signingUrl` to build
 links of your own shape.
+
+## Next
+
+[Aadhaar eSign with Leegality](/guides/aadhaar-leegality)
