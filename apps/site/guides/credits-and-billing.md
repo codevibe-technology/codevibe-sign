@@ -63,23 +63,8 @@ A Cloud account that connects its own Leegality account uses no credits; see
 
 Every payment, whether for credits, a Cloud term, extra members or installation help, produces
 a GST tax invoice as a PDF. It is emailed to your billing email and listed under
-**Settings, Billing**, where it can be downloaded again at any time.
-
-- **Seller:** Codevibe Technology Private Limited, with its GSTIN and registered address.
-- **Place of supply:** the state in your billing details.
-- **Tax:** GST at 18% on top of the price. A buyer in the seller's state (Haryana) is charged
-  CGST 9% and SGST 9%; a buyer in any other state is charged IGST 18%.
-- **Number:** `CV-` followed by the financial year and a running number, for example
-  `CV-2026270001` for the first invoice of 2026-27. Numbers run without gaps.
-- **Line items** name what was bought, how many and the price of each, for example
-  "Aadhaar eSign credits × 50" with the price of one eSign.
-
-The invoice shows the amount paid, the payment method and the payment reference.
-
-### Test mode
-
-While the app shows "Test mode", payments use test keys and no money moves. Documents made in
-test mode are numbered separately (`T-...`) and say they are not tax documents.
+**Settings, Billing**. What it contains, how it is numbered, who can see it and what happens
+on a refund are in [Invoices and credit notes](/billing/invoices).
 
 ## Cloud plan payments
 
@@ -89,22 +74,17 @@ Paying for the Cloud plan and for extra members works the same way and is descri
 ## Billing admins
 
 The account owner can make someone a **Billing admin** under **Settings, Team**. A billing admin
-sees the plan, usage and invoices, downloads invoice PDFs, buys eSign credits and renews or
-upgrades the plan. They send their own documents like a member, but cannot manage the team, API
-keys, webhooks or workspace settings. Admins who are not billing admins do not see invoices; a
-direct link to an invoice PDF answers them with 403.
+sees the plan, usage and invoices, buys eSign credits and renews or upgrades the plan, without
+managing the team or settings. See [Team and roles](/admin/team-and-roles#billing-admin).
 
 ## Transferring a workspace
 
 The account owner can move a workspace to someone else's account from **Settings, Workspace,
-Transfer ownership**. The new owner must already be in the workspace or invited to it, and their
-plan must have room for one more workspace (the Free plan holds one). They get an email and a
-notice in the app, and confirm with their password, or a fresh sign-in if they have none.
+Transfer ownership**. Invoices already issued, eSign credits and the subscription stay with the
+account that paid for them; documents, templates, members, API keys and webhooks move. See
+[Transfer a workspace](/admin/transfer-workspace).
 
-- Documents, templates, members, API keys and webhooks move with the workspace. Its address
-  does not change.
-- Invoices already issued, eSign credits and the subscription stay with the account that paid
-  for them. Billing admins become members.
-- The previous owner stays on as an admin unless they chose to leave.
-- An offer can be cancelled until it is accepted, and expires after 7 days. Every step is listed
-  under **Ownership history** on the same page.
+## Next
+
+- [Invoices and credit notes](/billing/invoices)
+- [Aadhaar eSign settings](/admin/aadhaar-esign)

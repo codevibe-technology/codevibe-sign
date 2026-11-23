@@ -1,3 +1,8 @@
+---
+title: Plans and pricing
+description: The Free, Cloud and self-hosted ways to run Codevibe Sign, their limits, what counts towards the Free plan's 10 envelopes a month, Cloud prices, renewals and cancelling.
+---
+
 # Plans and pricing
 
 Codevibe Sign runs in three ways. Every one of them seals documents the same way and keeps the
@@ -32,7 +37,16 @@ A workspace on [sign.codevibe.in](https://sign.codevibe.in) at no charge, with n
 When a limit is reached, the app says which one and how much of it is used. Nothing already
 sent is affected: people can still sign and every sealed copy stays downloadable.
 
-- The envelope count starts again on the 1st of each month (UTC).
+- **10 envelopes a month.** An envelope is one signing request, however many PDFs and
+  signers it has. It counts once, when it is sent: from the app, from a template, in a bulk
+  send or over the API. Drafts do not count, and neither does the sample envelope on the
+  dashboard. Voiding an envelope later does not give its place back, and a recalled or revised
+  envelope counts again when it is sent again.
+- The count is for your account, across all its workspaces, and starts again on the 1st of
+  each month (UTC). The **Plan and usage** page shows how many are left and the day it starts
+  again.
+- A bulk send with more rows than you have envelopes left this month is refused before
+  anything is sent.
 - The API request count starts again on the 1st of each month in India time. Every request made
   with an API key counts, including one that ends in an error. Past the count the API answers
   `429` with the code `PLAN_LIMIT`, a `Retry-After` header and the time the count starts again.
@@ -50,8 +64,8 @@ cover all of them.
 - Being invited into someone else's workspace is always possible. It takes a place on their
   account, not on yours.
 - You, the account owner, can change the plan, pay, see invoices and set up Aadhaar eSign.
-  You can also make someone a Billing admin, who can do the same billing tasks without
-  managing the team or settings. Admins of your workspaces can see the plan and usage, but
+  You can also make someone a [Billing admin](/admin/team-and-roles#billing-admin), who can
+  do the same billing tasks without managing the team or settings. Admins of your workspaces can see the plan and usage, but
   not invoices.
 - A workspace stays on the account of the person who created it, and they stay an owner of it.
 
@@ -136,12 +150,14 @@ issued in Codevibe's name by a self-hosted install.
 
 If you would rather not set it up yourself, an experienced engineer installs Codevibe Sign on
 your server within 4 working hours of getting access: Rs 1,999 plus GST, paid online, with a
-GST tax invoice. Book it at
-[sign.codevibe.in/install-help](https://sign.codevibe.in/install-help). The booking form asks
-about the server and a time that suits you. It never asks for a password or a key; access is
-arranged with you safely after booking.
+GST tax invoice. See [Installation help and hosting](/billing/install-help).
 
 ### A server to run it on
 
 Need a server? Our VPS hosting partners give an extra 20% discount through our links, listed
 on the [pricing section](https://sign.codevibe.in/#pricing) and the installation help page.
+
+## Next
+
+- [Credits and billing](/guides/credits-and-billing)
+- [Invoices and credit notes](/billing/invoices)
