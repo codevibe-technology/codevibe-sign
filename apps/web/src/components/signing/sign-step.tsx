@@ -5,7 +5,8 @@ import { SigningView, type SigningViewLabels } from '@codevibe_technology/sign-r
 import { useMemo } from 'react';
 import { usePdfjs } from '@/components/pdf/use-pdfjs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { linkDocumentUrl, type SignerView } from '@/lib/signing';
+import { zoneLabel } from '@/lib/preferences';
+import { linkDocumentUrl, signingDay, type SignerView } from '@/lib/signing';
 
 /** The documents with the signer's own fields, a next-field button and a required counter. */
 export function SignStep({
@@ -23,9 +24,15 @@ export function SignStep({
     [view.documents],
   );
   const approver = view.recipient.role === 'approver';
-  const labels: Partial<SigningViewLabels> = approver
-    ? { finish: 'Approve', declineTitle: 'Decline to approve' }
-    : { finish: 'Finish and sign' };
+  // The document gets the date of signing in the workspace's zone, whatever zone the signer
+  // is in, so the field shows that date rather than the browser's.
+  const labels: Partial<SigningViewLabels> = {
+    formatDate: () => signingDay(new Date(), view.timeZone),
+    ...(approver
+      ? { finish: 'Approve', declineTitle: 'Decline to approve' }
+      : { finish: 'Finish and sign' }),
+  };
+  const hasDate = view.fields.some((f) => f.type === 'date_signed');
   const fieldCount = view.fields.length;
 
   return (
@@ -42,6 +49,11 @@ export function SignStep({
               : `Fill in the ${fieldCount} highlighted fields. "Next field" takes you to each one.`}
         </p>
       </div>
+      {hasDate ? (
+        <p className="text-sm text-muted" data-testid="signing-zone">
+          The date of signing is recorded in {zoneLabel(view.timeZone)}.
+        </p>
+      ) : null}
       {view.envelope.changeNote ? (
         <p
           className="rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"

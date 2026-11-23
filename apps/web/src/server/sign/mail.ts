@@ -27,7 +27,7 @@ export function createWorkspaceMail(deps: WorkspaceMailDeps) {
     };
     const overrides = brand.emailOverrides;
     const templates: MailTemplates = {
-      invite: ({ envelope, recipient, link }) =>
+      invite: ({ envelope, recipient, link, timeZone }) =>
         renderMail(
           'invite',
           {
@@ -37,12 +37,13 @@ export function createWorkspaceMail(deps: WorkspaceMailDeps) {
             message: envelope.message ?? null,
             changeNote: envelope.changeNote ?? null,
             expiresAt: envelope.expiresAt ?? null,
+            ...(timeZone ? { timeZone } : {}),
             link,
           },
           look,
           overrides.invite,
         ),
-      reminder: ({ envelope, recipient, link }) =>
+      reminder: ({ envelope, recipient, link, timeZone }) =>
         renderMail(
           'reminder',
           {
@@ -52,6 +53,7 @@ export function createWorkspaceMail(deps: WorkspaceMailDeps) {
             message: envelope.message ?? null,
             changeNote: envelope.changeNote ?? null,
             expiresAt: envelope.expiresAt ?? null,
+            ...(timeZone ? { timeZone } : {}),
             link,
           },
           look,

@@ -37,7 +37,7 @@ describe('renderMail', () => {
     expect(mail.subject).toBe('Please sign "Offer letter"');
     expect(mail.text).toContain('Acme HR has asked you to sign "Offer letter".');
     expect(mail.text).toContain('Please sign by Friday');
-    expect(mail.text).toContain('The request expires on 2026-12-31.');
+    expect(mail.text).toContain('The request expires on 31 Dec 2026, 00:00 UTC.');
     expect(mail.text).toContain('Review and sign: https://sign.example.com/api/sign/');
     expect(mail.html).toContain('background:#0F766E');
     expect(mail.text).toContain('Secured by Codevibe Sign');
@@ -49,9 +49,21 @@ describe('renderMail', () => {
       intro: 'Hi again.\n\nPlease {{action}} before {{expires_on}}.',
     });
     expect(mail.subject).toBe('Acme HR: Offer letter needs you');
-    expect(mail.text).toContain('Please approve before 2026-12-31.');
+    expect(mail.text).toContain('Please approve before 31 Dec 2026, 00:00 UTC.');
     expect(mail.text).toContain('Review and approve:');
     expect(mail.html).toContain('<p style="margin:0 0 12px">Hi again.</p>');
+  });
+
+  it('writes the expiry in the workspace time zone and names the zone', () => {
+    const input = { ...sampleInput('invite'), expiresAt: '2026-12-31T18:29:00.000Z' };
+    const expiry = (timeZone?: string) =>
+      /expires on (.+)\.\n/.exec(
+        renderMail('invite', { ...input, ...(timeZone ? { timeZone } : {}) }, brand).text,
+      )?.[1];
+    expect(expiry()).toBe('31 Dec 2026, 18:29 UTC');
+    expect(expiry('Asia/Kolkata')).toBe('31 Dec 2026, 23:59 GMT+5:30');
+    expect(expiry('America/New_York')).toBe('31 Dec 2026, 13:29 GMT-5');
+    expect(expiry('Pacific/Auckland')).toBe('1 Jan 2027, 07:29 GMT+13');
   });
 
   it('falls back to the default for blank overrides', () => {

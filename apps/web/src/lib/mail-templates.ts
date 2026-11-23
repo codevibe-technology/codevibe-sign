@@ -1,4 +1,5 @@
 import { DEFAULT_BRAND_COLOR, isHexColor, textOn } from './brand';
+import { formatDateTime } from './envelopes';
 
 /**
  * The emails recipients get about an envelope, in a workspace's brand. Pure, so the settings
@@ -28,7 +29,7 @@ export const MAIL_VARIABLES = {
   document_title: 'Title of the envelope',
   company: 'Your sender name, or the workspace name',
   action: '"sign" or "approve"',
-  expires_on: 'Date the request expires, or empty',
+  expires_on: 'When the request expires, in the workspace time zone, or empty',
   status: 'Why it was cancelled: "was declined", "has expired" or "was withdrawn"',
 } as const;
 export type MailVariable = keyof typeof MAIL_VARIABLES;
@@ -104,6 +105,8 @@ export interface MailInput {
   /** A revised envelope: what changed since the declined version. */
   changeNote?: string | null;
   expiresAt?: string | null;
+  /** IANA zone the expiry is written in, with the zone named. UTC when absent. */
+  timeZone?: string;
   /** Invitations and reminders: the personal signing link. */
   link?: string;
   /** Completed: the sealed files are attached. */
@@ -136,7 +139,7 @@ export function renderMail(
     document_title: input.title,
     company: brand.company,
     action,
-    expires_on: input.expiresAt ? input.expiresAt.slice(0, 10) : '',
+    expires_on: input.expiresAt ? formatDateTime(input.expiresAt, input.timeZone ?? 'UTC') : '',
     status: statusText(input.envelopeStatus),
   };
   const pick = (part: keyof MailOverride) =>
