@@ -513,7 +513,9 @@ func main() {
           "provider": "leegality",
           "status": "pending",
           "signerName": "string",
-          "signedAt": "2026-03-02T09:14:31.000Z"
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "ref": "string",
+          "sandbox": true
         }
       }
     ],

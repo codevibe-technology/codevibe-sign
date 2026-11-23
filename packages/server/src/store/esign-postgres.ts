@@ -16,6 +16,8 @@ interface SessionData {
   context?: AuditContext;
   signerName?: string;
   signature?: EsignSignature;
+  sandbox?: boolean;
+  tokenHash?: string;
 }
 
 interface Row {
@@ -50,6 +52,8 @@ function toSession(row: Row): EsignSession {
     status: row.status,
     values: row.data.values,
     ...(row.data.context ? { context: row.data.context } : {}),
+    ...(row.data.sandbox ? { sandbox: true } : {}),
+    ...(row.data.tokenHash ? { tokenHash: row.data.tokenHash } : {}),
     ...(row.data.signerName ? { signerName: row.data.signerName } : {}),
     ...(row.data.signature ? { signature: row.data.signature } : {}),
     ...(row.unsettled ? { unsettled: row.unsettled } : {}),
@@ -70,6 +74,8 @@ export function postgresEsignSessions(sql: Sql): EsignSessionStore {
       const data: SessionData = {
         values: session.values,
         ...(session.context ? { context: session.context } : {}),
+        ...(session.sandbox ? { sandbox: true } : {}),
+        ...(session.tokenHash ? { tokenHash: session.tokenHash } : {}),
       };
       try {
         await sql`insert into sign_esign_sessions
@@ -113,9 +119,15 @@ export function postgresEsignSessions(sql: Sql): EsignSessionStore {
         order by created_at desc, id desc limit 1`;
       return rows[0] ? toSession(rows[0]) : null;
     },
+    async list(envelopeId, recipientId) {
+      const rows = await sql<Row[]>`select * from sign_esign_sessions
+        where envelope_id = ${envelopeId} and recipient_id = ${recipientId}
+        order by created_at desc, id desc`;
+      return rows.map(toSession);
+    },
     async open(envelopeId) {
       const rows = await sql<Row[]>`select * from sign_esign_sessions
-        where envelope_id = ${envelopeId} and status in ('starting', 'pending')`;
+        where envelope_id = ${envelopeId} and status in ('starting', 'pending', 'superseded')`;
       return rows.map(toSession);
     },
     async transition(id, from, to, at, patch = {}) {
@@ -123,21 +135,27 @@ export function postgresEsignSessions(sql: Sql): EsignSessionStore {
         ...(patch.signerName !== undefined ? { signerName: patch.signerName } : {}),
         ...(patch.signature !== undefined ? { signature: patch.signature } : {}),
       };
-      const rows = await sql`update sign_esign_sessions
-        set status = ${to}, updated_at = ${at}, data = data || ${json(merge)},
-          unsettled = ${
-            patch.unsettled === undefined ? sql`unsettled` : sql`${patch.unsettled}::text`
-          }
-        where id = ${id} and status in ${sql([...from])}
-        returning id`;
-      return rows.length > 0;
+      try {
+        const rows = await sql`update sign_esign_sessions
+          set status = ${to}, updated_at = ${at}, data = data || ${json(merge)},
+            unsettled = ${
+              patch.unsettled === undefined ? sql`unsettled` : sql`${patch.unsettled}::text`
+            }
+          where id = ${id} and status in ${sql([...from])}
+          returning id`;
+        return rows.length > 0;
+      } catch (err) {
+        // Back to `pending` while another session of the recipient is open.
+        if (isUniqueViolation(err)) return false;
+        throw err;
+      }
     },
     async settle(id) {
       await sql`update sign_esign_sessions set unsettled = null where id = ${id}`;
     },
     async due(now, limit) {
       const rows = await sql<Row[]>`select * from sign_esign_sessions
-        where (status in ('starting', 'pending') and expires_at <= ${now})
+        where (status in ('starting', 'pending', 'superseded') and expires_at <= ${now})
           or unsettled is not null
         order by updated_at limit ${limit}`;
       return rows.map(toSession);

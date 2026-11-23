@@ -9,7 +9,7 @@ import {
   type TransitionResult,
 } from '@codevibe_technology/sign-core';
 import { VersionConflictError } from '../errors';
-import { closeSessions } from '../esign/settle';
+import { cancelSessions, closeSessions } from '../esign/settle';
 import type { Job } from '../store/types';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { Runtime } from './context';
@@ -116,6 +116,11 @@ async function afterCommit(
       if (hasActed(recipient) && !(previous && hasActed(previous))) revoke.add(recipient.id);
     }
     for (const recipientId of revoke) await rt.store.revokeTokens(after.id, recipientId, now);
+    for (const event of events) {
+      if (event.action === 'recipient.corrected' && event.recipientId) {
+        await cancelSessions(rt, after.id, event.recipientId);
+      }
+    }
   }
   await dispatchJobs(rt, jobs);
 }

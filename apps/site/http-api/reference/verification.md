@@ -53,7 +53,7 @@ The first check that failed; `null` when valid. `unreadable`: the file could not
 be read as a PDF. `unknown_document`: no sealed document has this SHA-256. More
 values may be added.
 
-<p class="api-field__meta">One of <code>not_sealed</code> <code>multiple_signatures</code> <code>signature_invalid</code> <code>earlier_signature_invalid</code> <code>not_whole_document</code> <code>untrusted_signer</code> <code>unreadable</code> <code>unknown_document</code> <code>null</code></p>
+<p class="api-field__meta">One of <code>not_sealed</code> <code>multiple_signatures</code> <code>signature_invalid</code> <code>earlier_signature_invalid</code> <code>content_between_signatures</code> <code>not_whole_document</code> <code>untrusted_signer</code> <code>unreadable</code> <code>unknown_document</code> <code>null</code></p>
 
 </div>
 <div class="api-field">
@@ -291,6 +291,12 @@ Present for a recipient who signed, or is to sign, with Aadhaar eSign.
 <p class="api-field__head"><code class="api-field__name">provider</code> <span class="api-field__type">string</span></p>
 
 The eSign provider, for example `leegality`.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">sandbox</code> <span class="api-field__type">boolean</span></p>
+
+The provider's test environment was used; for testing only.
 
 </div>
 

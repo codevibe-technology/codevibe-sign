@@ -1,6 +1,7 @@
 import type { EsignSession, EsignSessionStore } from '../esign/types';
 
 const OPEN = new Set(['starting', 'pending']);
+const HELD = new Set(['starting', 'pending', 'superseded']);
 
 export function memoryEsignSessions(): EsignSessionStore {
   const rows = new Map<string, EsignSession>();
@@ -53,14 +54,30 @@ export function memoryEsignSessions(): EsignSessionStore {
         .sort(newestFirst)[0];
       return row ? copy(row) : null;
     },
+    async list(envelopeId, recipientId) {
+      return [...rows.values()]
+        .filter((r) => r.envelopeId === envelopeId && r.recipientId === recipientId)
+        .sort(newestFirst)
+        .map(copy);
+    },
     async open(envelopeId) {
       return [...rows.values()]
-        .filter((r) => r.envelopeId === envelopeId && OPEN.has(r.status))
+        .filter((r) => r.envelopeId === envelopeId && HELD.has(r.status))
         .map(copy);
     },
     async transition(id, from, to, at, patch = {}) {
       const row = rows.get(id);
       if (!row || !from.includes(row.status)) return false;
+      const clash =
+        OPEN.has(to) &&
+        [...rows.values()].some(
+          (other) =>
+            other.id !== id &&
+            other.envelopeId === row.envelopeId &&
+            other.recipientId === row.recipientId &&
+            OPEN.has(other.status),
+        );
+      if (clash) return false;
       row.status = to;
       row.updatedAt = new Date(at);
       if (patch.signerName !== undefined) row.signerName = patch.signerName;
@@ -77,7 +94,7 @@ export function memoryEsignSessions(): EsignSessionStore {
       return [...rows.values()]
         .filter(
           (r) =>
-            (OPEN.has(r.status) && r.expiresAt.getTime() <= now.getTime()) ||
+            (HELD.has(r.status) && r.expiresAt.getTime() <= now.getTime()) ||
             r.unsettled !== undefined,
         )
         .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime())

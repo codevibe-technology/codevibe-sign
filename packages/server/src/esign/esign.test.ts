@@ -808,3 +808,197 @@ describe('sealing after an eSign', () => {
     expect(res.status).toBe(409);
   });
 });
+
+describe('starting again, replaced recipients and the provider file', () => {
+  const note = { recipient: 'ravi', type: 'text', page: 1, x: 300, y: 500, width: 180, height: 24 };
+  const withNote = { fields: [signature('asha', 72), signature('ravi', 300), note] };
+
+  function raviValues(envelope: Api, text: string) {
+    const recipient = envelope.recipients.find((r) => r.email === 'ravi@example.com')!;
+    return (envelope.fields as (Api['fields'][number] & { type: string })[])
+      .filter((f) => f.recipientId === recipient.id)
+      .map((f) => ({ fieldId: f.id, value: f.type === 'text' ? text : PNG }));
+  }
+  const startWith = (h: Harness, token: string, envelope: Api, text: string) =>
+    h.call('POST', `/v1/sign/${token}/esign`, {
+      body: { consent: true, values: raviValues(envelope, text) },
+    });
+
+  it('keeps what the first request reserved when the signer starts again', async () => {
+    const { h, provider, hooks } = setup();
+    const { envelope, token } = await readyForRavi(h, withNote);
+    const first = await startWith(h, token, envelope, 'one');
+    const second = await startWith(h, token, envelope, 'two');
+    expect(second.status).toBe(200);
+    expect(second.json.signUrl).not.toBe(first.json.signUrl);
+    expect(second.json.resumed).toBeUndefined();
+    expect(provider.requests).toHaveLength(2);
+    expect(hooks).toEqual(['start', 'start']);
+
+    // The first request is still good at the provider, and the signer uses it.
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
+    expect(hooks).toEqual(['start', 'start', 'signed']);
+    const done = await statusOf(h, envelope.id);
+    expect(done.status).toBe('completed');
+    const status = await h.call('GET', `/v1/sign/${token}/esign`);
+    expect(status.json.status).toBe('signed');
+
+    h.advance(25 * HOUR);
+    await h.server.tick();
+    expect(hooks).toEqual(['start', 'start', 'signed', 'expired']);
+  });
+
+  it('gives back a replaced request only when it runs out', async () => {
+    const { h, hooks } = setup();
+    const { envelope, token } = await readyForRavi(h, withNote);
+    await startWith(h, token, envelope, 'one');
+    await startWith(h, token, envelope, 'two');
+    await h.server.tick();
+    expect(hooks).toEqual(['start', 'start']);
+    h.advance(25 * HOUR);
+    await h.server.tick();
+    expect(hooks.filter((x) => x === 'expired')).toHaveLength(2);
+  });
+
+  it('goes back to the open request when a second one cannot be reserved', async () => {
+    let allowed = 1;
+    const { h, provider, hooks } = setup({
+      esign: {
+        onStart: async () => {
+          if (allowed === 0) {
+            throw new SignError('ESIGN_UNAVAILABLE', 'Not available right now', {
+              reason: 'no_credits',
+            });
+          }
+          allowed -= 1;
+        },
+      },
+    });
+    const { envelope, token } = await readyForRavi(h, withNote);
+    const first = await startWith(h, token, envelope, 'one');
+    const second = await startWith(h, token, envelope, 'two');
+    expect(second.status).toBe(200);
+    expect(second.json).toEqual({ ...first.json, resumed: true });
+    expect(provider.requests).toHaveLength(1);
+    expect(hooks).toEqual([]);
+    const status = await h.call('GET', `/v1/sign/${token}/esign`);
+    expect(status.json).toMatchObject({ status: 'pending', signUrl: first.json.signUrl });
+
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
+    expect(hooks).toEqual(['signed']);
+    expect((await statusOf(h, envelope.id)).status).toBe('completed');
+  });
+
+  it('never applies the signature of a recipient who was replaced', async () => {
+    const { h, provider, hooks } = setup();
+    const { envelope, token, start } = await readyForRavi(h);
+    await start();
+    const ravi = envelope.recipients.find((r) => r.email === 'ravi@example.com')!;
+    const corrected = await h.call('PATCH', `/v1/envelopes/${envelope.id}/recipients/${ravi.id}`, {
+      body: { email: 'ravi.k@example.com', name: 'Ravi K.' },
+    });
+    expect(corrected.status).toBe(200);
+    expect(hooks).toEqual(['start', 'failed']);
+
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    const body = provider.webhook(ref, 'signed');
+    expect((await h.call('POST', WEBHOOK, { body })).status).toBe(200);
+    await h.call('POST', WEBHOOK, { body });
+    // The provider did the work, so the hook hears of it once; nothing is signed.
+    expect(hooks).toEqual(['start', 'failed', 'signed']);
+    const after = await statusOf(h, envelope.id);
+    expect(after.status).toBe('in_progress');
+    expect(after.recipients[1]!.status).not.toBe('signed');
+    expect((await h.call('GET', `/v1/sign/${token}/esign`)).status).toBe(401);
+
+    // The right person signs; the first person's link still learns nothing.
+    const fresh = h.tokenFor('ravi.k@example.com');
+    const again = await h.call('POST', `/v1/sign/${fresh}/esign`, {
+      body: { consent: true, values: valuesOf(envelope, 'ravi@example.com') },
+    });
+    expect(again.status).toBe(200);
+    const next = provider.requests[1]!.ref;
+    provider.finish(next);
+    await h.call('POST', WEBHOOK, { body: provider.webhook(next, 'signed') });
+    expect((await statusOf(h, envelope.id)).status).toBe('completed');
+    const old = await h.call('GET', `/v1/sign/${token}/esign`);
+    expect(old.status).toBe(401);
+    expect(old.res.headers.get('x-sign-receipt')).toBeNull();
+    const own = await h.call('GET', `/v1/sign/${fresh}/esign`);
+    expect(own.json.status).toBe('signed');
+    expect(own.res.headers.get('x-sign-receipt')).toBeTruthy();
+  });
+
+  const signatureInfo = (overrides: Record<string, unknown> = {}) => ({
+    valid: true,
+    coversWholeDocument: true,
+    coveredBytes: 10,
+    signer: { commonName: 'RAVI KUMAR' },
+    issuer: { commonName: 'Test ESP CA' },
+    certificateSha256: 'ab'.repeat(32),
+    ...overrides,
+  });
+
+  it.each([
+    ['is not signed', []],
+    ['has content after its signature', [signatureInfo({ coversWholeDocument: false })]],
+    ['carries a signature that does not verify', [signatureInfo({ valid: false })]],
+  ])('refuses a provider file that %s', async (_name, signatures) => {
+    const { h, provider, hooks } = setup({
+      server: { pdf: fakePdfEngine({ verifySignatures: async () => signatures }) },
+    });
+    const { envelope, start } = await readyForRavi(h);
+    await start();
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    const hook = await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
+    expect(hook.status).toBe(200);
+    expect(hooks).toEqual(['start', 'failed']);
+    const after = await statusOf(h, envelope.id);
+    expect(after.status).toBe('in_progress');
+    expect(after.recipients[1]!.status).not.toBe('signed');
+    expect(await actions(h, envelope.id)).toContain('recipient.esign_failed');
+    await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
+    expect(hooks).toEqual(['start', 'failed']);
+  });
+
+  it('accepts a signature it cannot read only when the install says so, and notes it', async () => {
+    const { h, provider } = setup({
+      esign: { acceptUnreadableSignatures: true },
+      server: {
+        pdf: fakePdfEngine({ verifySignatures: async () => [signatureInfo({ valid: false })] }),
+      },
+    });
+    const { envelope, start } = await readyForRavi(h);
+    await start();
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
+    expect((await statusOf(h, envelope.id)).status).toBe('completed');
+    const events = (await h.call('GET', `/v1/envelopes/${envelope.id}/events`)).json.events as {
+      action: string;
+      data?: Record<string, unknown>;
+    }[];
+    expect(events.filter((e) => e.action === 'recipient.signed').at(-1)!.data).toMatchObject({
+      signature: 'unverified',
+    });
+  });
+
+  it('marks a signature made in the provider test environment', async () => {
+    const provider = Object.assign(fakeEsignProvider(), { environment: 'sandbox' as const });
+    const { h } = setup({ provider });
+    const { envelope, start } = await readyForRavi(h);
+    await start();
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
+    const done = await statusOf(h, envelope.id);
+    expect(done.recipients[1]!.esign).toMatchObject({ status: 'signed', sandbox: true });
+    expect(typeof done.recipients[1]!.esign!.ref).toBe('string');
+  });
+});

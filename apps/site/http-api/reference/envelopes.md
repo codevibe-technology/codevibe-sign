@@ -260,6 +260,18 @@ The signer's name as the provider reported it.
 <p class="api-field__head"><code class="api-field__name">signedAt</code> <span class="api-field__type">string (date-time)</span></p>
 
 </div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">ref</code> <span class="api-field__type">string</span></p>
+
+The server's reference for the eSign request that was signed.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">sandbox</code> <span class="api-field__type">boolean</span></p>
+
+The provider's test environment was used. Such a signature is for testing and has no legal effect.
+
+</div>
 
 </div>
 
@@ -2181,7 +2193,9 @@ func main() {
         "provider": "leegality",
         "status": "pending",
         "signerName": "string",
-        "signedAt": "2026-03-02T09:14:31.000Z"
+        "signedAt": "2026-03-02T09:14:31.000Z",
+        "ref": "string",
+        "sandbox": true
       }
     }
   ],
@@ -2417,7 +2431,9 @@ func main() {
         "provider": "leegality",
         "status": "pending",
         "signerName": "string",
-        "signedAt": "2026-03-02T09:14:31.000Z"
+        "signedAt": "2026-03-02T09:14:31.000Z",
+        "ref": "string",
+        "sandbox": true
       }
     }
   ],
@@ -2681,7 +2697,9 @@ func main() {
         "provider": "leegality",
         "status": "pending",
         "signerName": "string",
-        "signedAt": "2026-03-02T09:14:31.000Z"
+        "signedAt": "2026-03-02T09:14:31.000Z",
+        "ref": "string",
+        "sandbox": true
       }
     }
   ],
@@ -2925,7 +2943,9 @@ func main() {
           "provider": "leegality",
           "status": "pending",
           "signerName": "string",
-          "signedAt": "2026-03-02T09:14:31.000Z"
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "ref": "string",
+          "sandbox": true
         }
       }
     ],
@@ -3006,7 +3026,9 @@ func main() {
           "provider": "leegality",
           "status": "pending",
           "signerName": "string",
-          "signedAt": "2026-03-02T09:14:31.000Z"
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "ref": "string",
+          "sandbox": true
         }
       }
     ],
@@ -3219,7 +3241,9 @@ func main() {
           "provider": "leegality",
           "status": "pending",
           "signerName": "string",
-          "signedAt": "2026-03-02T09:14:31.000Z"
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "ref": "string",
+          "sandbox": true
         }
       }
     ],
@@ -3300,7 +3324,9 @@ func main() {
           "provider": "leegality",
           "status": "pending",
           "signerName": "string",
-          "signedAt": "2026-03-02T09:14:31.000Z"
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "ref": "string",
+          "sandbox": true
         }
       }
     ],

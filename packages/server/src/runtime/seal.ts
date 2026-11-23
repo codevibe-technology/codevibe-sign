@@ -81,10 +81,16 @@ export async function runSeal(
       trust: rt.sealTrust,
       ...(earlier ? { allowEarlierSignatures: true } : {}),
     });
-    // A provider's signature in a form this server cannot read is not a reason to withhold
-    // the file: it came from the provider as it is, and the seal over it is checked.
+    // Only an install that chose to accept provider signatures it cannot read seals over
+    // one; the seal itself is always checked.
     if (check.valid) return false;
-    if (earlier && check.reason === 'earlier_signature_invalid') return true;
+    if (
+      earlier &&
+      check.reason === 'earlier_signature_invalid' &&
+      rt.esign?.acceptUnreadableSignatures
+    ) {
+      return true;
+    }
     throw new SignError('SEAL_FAILED', `The sealed file for ${documentId} did not verify`, {
       reason: check.reason,
     });
@@ -102,7 +108,10 @@ export async function runSeal(
       ...(note ? { note } : {}),
       ...(timeZone ? { timeZone } : {}),
     };
-    const esigned = await rt.files.get(esignedFileKey(envelope.id, document.id));
+    const ref = envelope.recipients.find((r) => r.esign?.status === 'signed')?.esign?.ref;
+    const esigned =
+      (ref ? await rt.files.get(esignedFileKey(envelope.id, document.id, ref)) : null) ??
+      (await rt.files.get(esignedFileKey(envelope.id, document.id)));
     if (esigned) {
       sealed.push(
         await sealEsigned(rt, envelope.id, document.id, esigned, certificate, {

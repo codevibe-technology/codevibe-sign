@@ -3,12 +3,19 @@ import type { AuditContext, FieldValue, Id } from '@codevibe_technology/sign-cor
 
 /**
  * `starting`: the provider has not answered yet. `pending`: the signer is at the provider.
- * The rest are final, except that a session that expired or failed still turns `signed`
- * when the provider later reports the signature.
+ * `superseded`: the signer started again with other values, but the provider could still
+ * sign this request, so what `onStart` reserved for it is kept until it runs out.
+ * `cancelled`: the recipient was replaced; a signature on it is never applied, and
+ * `orphaned` records that the provider reported one all the same.
+ * The rest are final, except that a session that was superseded, expired or failed still
+ * turns `signed` when the provider later reports the signature.
  */
 export type EsignSessionStatus =
   | 'starting'
   | 'pending'
+  | 'superseded'
+  | 'cancelled'
+  | 'orphaned'
   | 'signed'
   | 'declined'
   | 'expired'
@@ -40,6 +47,10 @@ export interface EsignSession {
   documentId: Id;
   /** The provider's `name`. */
   provider: string;
+  /** The provider's test environment was used. */
+  sandbox?: boolean;
+  /** Hash of the signing link that started the session. */
+  tokenHash?: string;
   /** The provider's id for the request; null until it answers. */
   providerRef: string | null;
   signUrl: string | null;
@@ -83,7 +94,9 @@ export interface EsignSessionStore {
   findByRef(provider: string, providerRef: string): Promise<EsignSession | null>;
   /** The recipient's newest session, whatever its status. */
   latest(envelopeId: Id, recipientId: Id): Promise<EsignSession | null>;
-  /** The `starting` and `pending` sessions of an envelope. */
+  /** Every session of a recipient, newest first. */
+  list(envelopeId: Id, recipientId: Id): Promise<EsignSession[]>;
+  /** The `starting`, `pending` and `superseded` sessions of an envelope. */
   open(envelopeId: Id): Promise<EsignSession[]>;
   /**
    * Sets the status only if it is still one of `from`, and reports whether it did. Every
@@ -98,7 +111,10 @@ export interface EsignSessionStore {
   ): Promise<boolean>;
   /** Clears `unsettled` once `onEnd` has heard the outcome. */
   settle(id: Id): Promise<void>;
-  /** Open sessions past `expiresAt`, and ended ones `onEnd` has not heard about, oldest first. */
+  /**
+   * Sessions that are `starting`, `pending` or `superseded` past `expiresAt`, and ended ones
+   * `onEnd` has not heard about, oldest first.
+   */
   due(now: Date, limit: number): Promise<EsignSession[]>;
 }
 
@@ -141,7 +157,8 @@ export interface EsignOptions {
   /**
    * Called when a session ends. A failure is retried by `tick()`, so make it idempotent on
    * `ref` and `outcome`. `signed` can follow `expired` or `failed` for the same `ref`, when
-   * the provider reports a signature after the server stopped waiting.
+   * the provider reports a signature after the server stopped waiting; it also arrives for a
+   * request whose recipient was replaced meanwhile, which the provider signed all the same.
    */
   onEnd?(input: EsignHookInput & { outcome: EsignOutcome }): Promise<void>;
   /**
@@ -149,6 +166,15 @@ export interface EsignOptions {
    * provider other than Leegality that has no `webhookRef` of its own on a shared instance.
    */
   webhookRef?(provider: string, rawBody: string): string | null;
-  /** How long the server waits for a started eSign. Default 24 hours. */
+  /**
+   * How long the server waits for a started eSign, and keeps what `onStart` reserved for it.
+   * Set it at least as long as the provider keeps its signing page open. Default 24 hours.
+   */
   sessionTtlMs?: number;
+  /**
+   * Accept a provider file whose signature this server cannot read, and seal over it with
+   * that noted. By default such a file fails the eSign. The file must always end with the
+   * provider's signature.
+   */
+  acceptUnreadableSignatures?: boolean;
 }

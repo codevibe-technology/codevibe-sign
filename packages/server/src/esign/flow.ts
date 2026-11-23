@@ -22,11 +22,15 @@ import { enforce } from '../http/rate-limit';
 import type { Runtime } from '../runtime/context';
 import { mutate } from '../runtime/mutate';
 import { timeZoneFor } from '../runtime/time-zone';
-import { OPEN_STATUSES, endSession, settle } from './settle';
+import { HELD_STATUSES, OPEN_STATUSES, endSession, settle } from './settle';
 import type { EsignSession, EsignSignature, EsignUnavailable } from './types';
 
-export const esignedFileKey = (envelopeId: Id, documentId: Id) =>
-  `envelopes/${envelopeId}/documents/${documentId}/esigned.pdf`;
+/**
+ * Where the file an eSign provider signed is kept. Each request has its own file, named by
+ * `ref` (the recipient's `esign.ref`), so two requests of one signer never share one.
+ */
+export const esignedFileKey = (envelopeId: Id, documentId: Id, ref?: string) =>
+  `envelopes/${envelopeId}/documents/${documentId}/esigned${ref ? `-${ref}` : ''}.pdf`;
 
 const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 /** A session whose provider call never came back is given up after this long. */
@@ -150,6 +154,18 @@ export interface StartEsignInput {
   workspaceId: string;
   values: FieldValue[];
   context: AuditContext;
+  /** Hash of the signing link the request came in on. */
+  tokenHash?: string;
+}
+
+export interface StartedEsign {
+  signUrl: string;
+  expiresAt: string;
+  /**
+   * An earlier request of the signer is still open and a new one could not be started, so
+   * this is the earlier one, with the values it was started with.
+   */
+  resumed?: true;
 }
 
 /**
@@ -157,10 +173,7 @@ export interface StartEsignInput {
  * provider to sign that file and answers the provider's signing page. Asking again while the
  * first request is open answers the same page; nothing is reserved or requested twice.
  */
-export async function startEsign(
-  rt: Runtime,
-  input: StartEsignInput,
-): Promise<{ signUrl: string; expiresAt: string }> {
+export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<StartedEsign> {
   const { envelope, recipient, workspaceId, context } = input;
   if (recipient.auth !== 'aadhaar') {
     throw validation('This recipient does not sign with Aadhaar eSign');
@@ -188,6 +201,7 @@ export async function startEsign(
   if (!store || !esign) return refuse(NOT_CONFIGURED);
 
   const current = await store.latest(envelope.id, recipient.id);
+  let replaced: EsignSession | undefined;
   if (current && OPEN_STATUSES.includes(current.status)) {
     const live = current.expiresAt.getTime() > now.getTime();
     if (current.status === 'starting' && live) {
@@ -200,8 +214,20 @@ export async function startEsign(
     if (current.status === 'pending' && live && unchanged && current.signUrl) {
       return { signUrl: current.signUrl, expiresAt: current.expiresAt.toISOString() };
     }
-    await endSession(rt, current, OPEN_STATUSES, 'failed');
+    if (current.status === 'pending' && live && current.signUrl) replaced = current;
+    else
+      await endSession(
+        rt,
+        current,
+        OPEN_STATUSES,
+        current.status === 'pending' ? 'expired' : 'failed',
+      );
   }
+  /** Falls back to the request still open at the provider when a new one is refused. */
+  const resume = (): StartedEsign | null =>
+    replaced?.signUrl
+      ? { signUrl: replaced.signUrl, expiresAt: replaced.expiresAt.toISOString(), resumed: true }
+      : null;
 
   await enforce(
     rt.limiter,
@@ -211,9 +237,9 @@ export async function startEsign(
     now,
   );
   const blocked = await esign.available?.(workspaceId);
-  if (blocked) return refuse(blocked);
+  if (blocked) return resume() ?? refuse(blocked);
   const provider = await esign.provider(workspaceId);
-  if (!provider) return refuse(NOT_CONFIGURED);
+  if (!provider) return resume() ?? refuse(NOT_CONFIGURED);
 
   const document = envelope.documents[0];
   const original = document ? await rt.files.get(document.fileKey) : null;
@@ -228,6 +254,8 @@ export async function startEsign(
     recipientId: recipient.id,
     documentId: document.id,
     provider: provider.name,
+    ...(provider.environment === 'sandbox' ? { sandbox: true } : {}),
+    ...(input.tokenHash ? { tokenHash: input.tokenHash } : {}),
     providerRef: null,
     signUrl: null,
     status: 'starting',
@@ -237,7 +265,18 @@ export async function startEsign(
     updatedAt: now,
     expiresAt: new Date(now.getTime() + STARTING_TTL_MS),
   };
+  // The provider can still sign the earlier request, so what was reserved for it stays
+  // reserved until that request runs out; the new one reserves for itself.
+  if (replaced && !(await store.transition(replaced.id, ['pending'], 'superseded', now))) {
+    replaced = undefined;
+  }
+  const restore = async (): Promise<StartedEsign | null> => {
+    if (!replaced) return null;
+    const back = await store.transition(replaced.id, ['superseded'], 'pending', rt.clock.now());
+    return back ? resume() : null;
+  };
   if (!(await store.insert(session))) {
+    await restore();
     throw new HttpError('CONFLICT', 'Aadhaar eSign is already starting. Try again in a moment.');
   }
   const hook = {
@@ -252,6 +291,8 @@ export async function startEsign(
   } catch (err) {
     // Nothing was reserved, so there is nothing for `onEnd` to give back.
     await store.transition(session.id, ['starting'], 'failed', rt.clock.now());
+    const earlier = await restore();
+    if (earlier) return earlier;
     const refused = err instanceof SignError && err.code === 'ESIGN_UNAVAILABLE';
     const reason =
       refused && typeof err.details?.reason === 'string' ? err.details.reason : 'refused';
@@ -309,6 +350,8 @@ export async function startEsign(
       reason,
       error: err instanceof SignError ? err.code : 'Error',
     });
+    const earlier = await restore();
+    if (earlier) return earlier;
     if (err instanceof SignError && err.code === 'RATE_LIMITED') throw err;
     if (err instanceof SignError && err.code === 'DOCUMENT_TOO_LARGE') {
       throw new SignError(
@@ -325,6 +368,7 @@ export async function startEsign(
   const expiresAt = new Date(Math.min(at.getTime() + ttl, envelopeEnd));
   if (!(await store.activate(session.id, { ...created, expiresAt, at }))) {
     await endSession(rt, session, ['starting'], 'failed');
+    await restore();
     throw new SignError('PROVIDER_ERROR', START_FAILED, { reason: 'provider_error' });
   }
   await record(rt, envelope.id, (current) =>
@@ -342,23 +386,31 @@ export async function startEsign(
   return { signUrl: created.signUrl, expiresAt: expiresAt.toISOString() };
 }
 
-/** What the server can tell about the file the provider signed. */
+const invalidFile = (message: string) =>
+  new SignError('PROVIDER_ERROR', message, { reason: 'provider_file_invalid' });
+
+/**
+ * Checks the file the provider signed and reads its signature. The file must end with a
+ * signature that covers all of it, so nothing sits after what the signer signed, and every
+ * signature must match its bytes unless `acceptUnreadableSignatures` is set.
+ */
 async function inspect(rt: Runtime, bytes: Uint8Array): Promise<EsignSignature | undefined> {
   if (!Buffer.from(bytes.subarray(0, 1024)).toString('latin1').includes('%PDF-')) {
-    throw new SignError('PROVIDER_ERROR', 'The eSign provider returned a file that is not a PDF', {
-      reason: 'unsigned_file',
-    });
+    throw invalidFile('The eSign provider returned a file that is not a PDF');
   }
   if (!rt.pdf.verifySignatures) return undefined;
   const signatures = await rt.pdf.verifySignatures(bytes);
   const last = signatures.at(-1);
-  if (!last) {
-    throw new SignError('PROVIDER_ERROR', 'The file from the eSign provider is not signed', {
-      reason: 'unsigned_file',
-    });
+  if (!last) throw invalidFile('The file from the eSign provider is not signed');
+  if (!last.coversWholeDocument) {
+    throw invalidFile('The file from the eSign provider has content after its signature');
+  }
+  const intact = signatures.every((s) => s.valid);
+  if (!intact && !rt.esign?.acceptUnreadableSignatures) {
+    throw invalidFile('The signature on the file from the eSign provider did not verify');
   }
   return {
-    intact: signatures.every((s) => s.valid),
+    intact,
     ...(last.signer?.commonName ? { signerCommonName: last.signer.commonName } : {}),
     ...(last.issuer?.commonName ? { issuerCommonName: last.issuer.commonName } : {}),
     ...(last.certificateSha256 ? { certificateSha256: last.certificateSha256 } : {}),
@@ -394,11 +446,36 @@ export async function completeSigned(
   session: EsignSession,
   result: { bytes?: Uint8Array; signerName?: string } = {},
 ): Promise<void> {
-  if (session.status === 'signed' || !session.providerRef) return;
+  if (session.status === 'signed' || session.status === 'orphaned' || !session.providerRef) return;
+  if (session.status === 'cancelled') {
+    // The recipient was replaced after this request went out. The provider did the work,
+    // so `onEnd` hears of it, but the signature is not the new recipient's.
+    if (await endSession(rt, session, ['cancelled'], 'signed', {}, 'orphaned')) {
+      rt.logger.warn('esign finished for a recipient who was replaced', {
+        envelope: session.envelopeId,
+        session: session.id,
+      });
+    }
+    return;
+  }
   const bytes =
     result.bytes ??
     (await (await providerOf(rt, session)).fetchSignedDocument(session.providerRef));
-  const signature = await inspect(rt, bytes);
+  let signature: EsignSignature | undefined;
+  try {
+    signature = await inspect(rt, bytes);
+  } catch (err) {
+    if (!(err instanceof SignError && err.details?.reason === 'provider_file_invalid')) throw err;
+    rt.logger.error('the file from the eSign provider was refused', {
+      envelope: session.envelopeId,
+      session: session.id,
+      error: err.message,
+    });
+    if (await endSession(rt, session, ['pending', 'superseded'], 'failed')) {
+      await recordFailure(rt, { ...session, provider: session.provider }, 'provider_file_invalid');
+    }
+    return;
+  }
   const signedAt = rt.clock.now().toISOString();
   const signerName = result.signerName ?? signature?.signerCommonName;
 
@@ -411,8 +488,9 @@ export async function completeSigned(
     isActive(stored.envelope) &&
     !isExpiredAt(stored.envelope, rt.clock.now());
   if (open) {
+    // Under the session's own name: the recipient's `esign.ref` says which request won.
     await rt.files.put(
-      esignedFileKey(session.envelopeId, session.documentId),
+      esignedFileKey(session.envelopeId, session.documentId, session.id),
       bytes,
       'application/pdf',
     );
@@ -429,10 +507,12 @@ export async function completeSigned(
               method: 'aadhaar_esign',
               provider: session.provider,
               providerRef: session.providerRef ?? '',
+              ...(session.sandbox ? { sandbox: true } : {}),
               ...(signerName ? { signerName } : {}),
               ...(signature?.certificateSha256
                 ? { certificateSha256: signature.certificateSha256 }
                 : {}),
+              ...(signature && !signature.intact ? { signature: 'unverified' } : {}),
             },
           },
           { clock: rt.clock },
@@ -448,6 +528,8 @@ export async function completeSigned(
               provider: session.provider,
               status: 'signed',
               signedAt,
+              ref: session.id,
+              ...(session.sandbox ? { sandbox: true } : {}),
               ...(signerName ? { signerName } : {}),
             },
           ),
@@ -462,7 +544,7 @@ export async function completeSigned(
       session: session.id,
     });
   }
-  await endSession(rt, session, ['pending', 'expired', 'failed'], 'signed', {
+  await endSession(rt, session, ['pending', 'superseded', 'expired', 'failed'], 'signed', {
     ...(signerName ? { signerName } : {}),
     ...(signature ? { signature } : {}),
   });
@@ -478,6 +560,11 @@ export async function applyEsignEvent(
     await completeSigned(rt, session, {
       ...(event.signerName ? { signerName: event.signerName } : {}),
     });
+    return;
+  }
+  if (session.status === 'superseded') {
+    // The signer has since started another request; this one only gives back its hold.
+    await endSession(rt, session, ['superseded'], event.status);
     return;
   }
   if (!(await endSession(rt, session, OPEN_STATUSES, event.status))) return;
@@ -520,7 +607,9 @@ export async function checkPending(
   session: EsignSession,
   options: { force?: boolean } = {},
 ): Promise<'signed' | 'pending'> {
-  if (session.status !== 'pending' || !session.providerRef) return 'pending';
+  if (!['pending', 'superseded'].includes(session.status) || !session.providerRef) {
+    return 'pending';
+  }
   if (!options.force) {
     const hit = await rt.limiter.hit(
       `esign-check:${session.id}`,
@@ -553,7 +642,7 @@ export async function tickEsign(rt: Runtime, limit = 50): Promise<void> {
   if (!store || !rt.esign) return;
   for (const session of await store.due(rt.clock.now(), limit)) {
     try {
-      if (session.unsettled && !OPEN_STATUSES.includes(session.status)) {
+      if (session.unsettled && !HELD_STATUSES.includes(session.status)) {
         await settle(rt, session, session.unsettled);
         continue;
       }
@@ -564,6 +653,10 @@ export async function tickEsign(rt: Runtime, limit = 50): Promise<void> {
         continue;
       }
       if ((await checkPending(rt, session, { force: true })) === 'signed') continue;
+      if (session.status === 'superseded') {
+        await endSession(rt, session, ['superseded'], 'expired');
+        continue;
+      }
       if (await endSession(rt, session, ['pending'], 'expired')) {
         await recordFailure(rt, { ...session, provider: session.provider }, 'expired', 'expired');
       }

@@ -267,16 +267,32 @@ export function signerRoutes(rt: Runtime) {
     await enforce(rt.limiter, `token:${tokenHash}`, rt.limits.signerRequestsPerMinute, 60_000, now);
     const token = await rt.store.findToken(tokenHash);
     if (!token || token.expiresAt.getTime() <= now.getTime()) throw tokenInvalid();
-    const session = (await rt.store.esign?.latest(token.envelopeId, token.recipientId)) ?? null;
+    const sessions = (await rt.store.esign?.list(token.envelopeId, token.recipientId)) ?? [];
+    // A signature made on a request the signer later replaced still signs the envelope.
+    let session =
+      sessions.find((s) => s.status === 'signed') ??
+      sessions.find((s) => s.status === 'pending' || s.status === 'starting') ??
+      sessions.find((s) => s.status !== 'superseded' && s.status !== 'orphaned') ??
+      null;
     if (!session) {
       if (token.revokedAt) throw tokenInvalid();
       return c.json({ status: 'none', signUrl: null, expiresAt: null });
     }
-    let status = session.status === 'starting' ? 'pending' : session.status;
     if (session.status === 'pending' && (await checkPending(rt, session)) === 'signed') {
-      status = 'signed';
+      session = (await rt.store.esign?.get(session.id)) ?? session;
     }
-    if (token.revokedAt && status !== 'signed') throw tokenInvalid();
+    const status =
+      session.status === 'starting'
+        ? 'pending'
+        : session.status === 'cancelled'
+          ? 'failed'
+          : session.status;
+    // A link that stopped working answers only when it is the one that started the request
+    // that was signed. A person the sender has since replaced learns nothing and gets no
+    // receipt.
+    if (token.revokedAt && (status !== 'signed' || session.tokenHash !== tokenHash)) {
+      throw tokenInvalid();
+    }
     if (status === 'signed' && now.getTime() - session.updatedAt.getTime() < RECEIPT_TTL_MS) {
       giveReceipt(c, session.envelopeId, session.recipientId);
     }
@@ -289,7 +305,7 @@ export function signerRoutes(rt: Runtime) {
   });
 
   app.post('/:token/esign', async (c) => {
-    const { envelope, recipient, workspaceId } = await resolveForAction(c);
+    const { envelope, recipient, workspaceId, tokenHash } = await resolveForAction(c);
     const body = parseJsonObject(await readJson(c));
     if (body.consent !== true) {
       throw validation('consent must be true: the signer agrees to sign electronically', {
@@ -301,6 +317,7 @@ export function signerRoutes(rt: Runtime) {
         envelope,
         recipient,
         workspaceId,
+        tokenHash,
         values: parseValues(body.values),
         context: context(c),
       }),

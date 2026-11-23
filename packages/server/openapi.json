@@ -1674,6 +1674,10 @@
                       "type": "string",
                       "format": "date-time",
                       "description": "When the server stops waiting for this attempt."
+                    },
+                    "resumed": {
+                      "type": "boolean",
+                      "description": "An earlier attempt is still open at the provider and a new one could not be started, so this is the earlier one, with the values it was started with."
                     }
                   }
                 },
@@ -2696,7 +2700,15 @@
                 "type": "string",
                 "description": "The signer's name as the provider reported it."
               },
-              "signedAt": { "$ref": "#/components/schemas/Timestamp" }
+              "signedAt": { "$ref": "#/components/schemas/Timestamp" },
+              "ref": {
+                "type": "string",
+                "description": "The server's reference for the eSign request that was signed."
+              },
+              "sandbox": {
+                "type": "boolean",
+                "description": "The provider's test environment was used. Such a signature is for testing and has no legal effect."
+              }
             }
           }
         }
@@ -2937,6 +2949,7 @@
               "not_sealed",
               "signature_invalid",
               "earlier_signature_invalid",
+              "content_between_signatures",
               "not_whole_document",
               "multiple_signatures",
               "untrusted_signer",
@@ -3851,6 +3864,10 @@
                     "provider": {
                       "type": "string",
                       "description": "The eSign provider, for example `leegality`."
+                    },
+                    "sandbox": {
+                      "type": "boolean",
+                      "description": "The provider's test environment was used; for testing only."
                     }
                   }
                 }
@@ -3916,6 +3933,7 @@
               "multiple_signatures",
               "signature_invalid",
               "earlier_signature_invalid",
+              "content_between_signatures",
               "not_whole_document",
               "untrusted_signer",
               "unreadable",

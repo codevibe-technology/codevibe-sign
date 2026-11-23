@@ -1859,6 +1859,12 @@ paths:
                     type: string
                     format: date-time
                     description: When the server stops waiting for this attempt.
+                  resumed:
+                    type: boolean
+                    description: >-
+                      An earlier attempt is still open at the provider and a new one could
+                      not be started, so this is the earlier one, with the values it was
+                      started with.
               example:
                 signUrl: https://sandbox.leegality.com/sign/2c0c9c1e-7f0a-4a55-9a53-0f0d5b8e6a11
                 expiresAt: '2026-03-03T09:10:00.000Z'
@@ -2880,6 +2886,14 @@ components:
               description: The signer's name as the provider reported it.
             signedAt:
               $ref: '#/components/schemas/Timestamp'
+            ref:
+              type: string
+              description: The server's reference for the eSign request that was signed.
+            sandbox:
+              type: boolean
+              description: >-
+                The provider's test environment was used. Such a signature is for testing and
+                has no legal effect.
     EsignStatus:
       type: string
       enum: [pending, signed, declined, expired, failed]
@@ -3157,6 +3171,7 @@ components:
               not_sealed,
               signature_invalid,
               earlier_signature_invalid,
+              content_between_signatures,
               not_whole_document,
               multiple_signatures,
               untrusted_signer,
@@ -4138,6 +4153,9 @@ components:
                   provider:
                     type: string
                     description: The eSign provider, for example `leegality`.
+                  sandbox:
+                    type: boolean
+                    description: The provider's test environment was used; for testing only.
         events:
           type: array
           items:
@@ -4196,6 +4214,7 @@ components:
               multiple_signatures,
               signature_invalid,
               earlier_signature_invalid,
+              content_between_signatures,
               not_whole_document,
               untrusted_signer,
               unreadable,

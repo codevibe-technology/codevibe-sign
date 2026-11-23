@@ -136,4 +136,12 @@ create index sign_esign_sessions_unsettled_idx
   on sign_esign_sessions (updated_at) where unsettled is not null;
 `,
   },
+  {
+    name: '0006_esign_superseded',
+    sql: `
+drop index sign_esign_sessions_due_idx;
+create index sign_esign_sessions_due_idx
+  on sign_esign_sessions (expires_at) where status in ('starting', 'pending', 'superseded');
+`,
+  },
 ];

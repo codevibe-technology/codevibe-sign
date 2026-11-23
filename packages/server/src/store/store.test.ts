@@ -473,6 +473,29 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       expect((await sessions.latest(envelope.id, recipientId))?.id).toBe(second);
       expect(await sessions.activate(second, activation)).toBe(false);
       expect(await sessions.latest(envelope.id, 'nobody')).toBeNull();
+
+      // A replaced request leaves room for a new one, stays listed until it runs out, and
+      // cannot come back while the new one is open.
+      const third = `${envelope.id}-s3`;
+      const other = { ...activation, providerRef: `${ref}-2` };
+      expect(await sessions.activate(second, other)).toBe(true);
+      expect(await sessions.transition(second, ['pending'], 'superseded', later)).toBe(true);
+      expect(
+        await sessions.insert({ ...session(third, 2000), sandbox: true, tokenHash: 'abc' }),
+      ).toBe(true);
+      expect(await sessions.get(third)).toMatchObject({ sandbox: true, tokenHash: 'abc' });
+      expect((await sessions.open(envelope.id)).map((s) => s.id).sort()).toEqual([second, third]);
+      expect(await sessions.transition(second, ['superseded'], 'pending', later)).toBe(false);
+      expect((await sessions.list(envelope.id, recipientId)).map((s) => s.id)).toEqual([
+        third,
+        second,
+        first,
+      ]);
+      expect(await sessions.due(new Date(T0.getTime() + 3_600_000), 10)).toContainEqual(
+        expect.objectContaining({ id: second, status: 'superseded' }),
+      );
+      expect(await sessions.transition(third, ['starting'], 'failed', later)).toBe(true);
+      expect(await sessions.transition(second, ['superseded'], 'pending', later)).toBe(true);
     });
   });
 }
@@ -496,6 +519,7 @@ describe.skipIf(!url)('postgresStore', () => {
       '0003_workspaces',
       '0004_templates_and_sealed_lookup',
       '0005_esign_sessions',
+      '0006_esign_superseded',
     ]);
     expect(await migrate(sql)).toEqual([]);
   });

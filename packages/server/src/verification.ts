@@ -19,6 +19,7 @@ export type VerificationFailure =
   | 'multiple_signatures'
   | 'signature_invalid'
   | 'earlier_signature_invalid'
+  | 'content_between_signatures'
   | 'not_whole_document'
   | 'untrusted_signer'
   | 'unreadable'
@@ -47,7 +48,7 @@ export interface VerifiedRecipient {
   auth: AuthMethod;
   actedAt: string | null;
   /** The eSign provider an Aadhaar signer signed through, for example `leegality`. */
-  esign?: { provider: string };
+  esign?: { provider: string; sandbox?: boolean };
 }
 
 /** The envelope a valid sealed file belongs to: what its certificate page already prints. */
@@ -111,6 +112,7 @@ const FAILED_CHECK: Partial<Record<VerificationFailure, keyof SealChecks>> = {
   multiple_signatures: 'singleSignature',
   signature_invalid: 'intact',
   earlier_signature_invalid: 'intact',
+  content_between_signatures: 'intact',
   not_whole_document: 'coversWholeDocument',
   untrusted_signer: 'trustedCertificate',
 };
@@ -214,7 +216,9 @@ async function envelopeOf(rt: Runtime, sha256: string): Promise<VerifiedEnvelope
       status: r.status,
       auth: r.auth,
       actedAt: r.actedAt ?? null,
-      ...(r.esign ? { esign: { provider: r.esign.provider } } : {}),
+      ...(r.esign
+        ? { esign: { provider: r.esign.provider, ...(r.esign.sandbox ? { sandbox: true } : {}) } }
+        : {}),
     })),
     events: events.map((e) => ({
       seq: e.seq,

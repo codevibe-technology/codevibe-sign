@@ -1,8 +1,10 @@
-import { isFinal, type Envelope } from '@codevibe_technology/sign-core';
+import { isFinal, type Envelope, type Id } from '@codevibe_technology/sign-core';
 import type { Runtime } from '../runtime/context';
 import type { EsignOutcome, EsignSession, EsignSessionPatch, EsignSessionStatus } from './types';
 
 export const OPEN_STATUSES: readonly EsignSessionStatus[] = ['starting', 'pending'];
+/** Sessions whose reservation is still held: the open ones and those a restart replaced. */
+export const HELD_STATUSES: readonly EsignSessionStatus[] = ['starting', 'pending', 'superseded'];
 
 /**
  * Tells `onEnd` how a session ended and clears the note that it still has to. A failure
@@ -44,10 +46,11 @@ export async function endSession(
   from: readonly EsignSessionStatus[],
   outcome: EsignOutcome,
   patch: EsignSessionPatch = {},
+  status: EsignSessionStatus = outcome,
 ): Promise<boolean> {
   const store = rt.store.esign;
   if (!store) return false;
-  const ended = await store.transition(session.id, from, outcome, rt.clock.now(), {
+  const ended = await store.transition(session.id, from, status, rt.clock.now(), {
     ...patch,
     unsettled: outcome,
   });
@@ -71,6 +74,19 @@ export async function closeSessions(rt: Runtime, envelope: Envelope): Promise<vo
         : recipient?.status === 'declined'
           ? 'declined'
           : 'failed';
-    await endSession(rt, session, OPEN_STATUSES, outcome);
+    await endSession(rt, session, HELD_STATUSES, outcome);
+  }
+}
+
+/**
+ * Ends every session of a recipient who was replaced by someone else. A signature the first
+ * person still makes at the provider is then never applied to the envelope.
+ */
+export async function cancelSessions(rt: Runtime, envelopeId: Id, recipientId: Id): Promise<void> {
+  const store = rt.store.esign;
+  if (!store) return;
+  for (const session of await store.open(envelopeId)) {
+    if (session.recipientId !== recipientId) continue;
+    await endSession(rt, session, HELD_STATUSES, 'failed', {}, 'cancelled');
   }
 }
