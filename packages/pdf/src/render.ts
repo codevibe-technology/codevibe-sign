@@ -36,17 +36,10 @@ export interface RenderOptions {
    * without it.
    */
   signatureCaption?: boolean;
-  /**
-   * The eSign provider an Aadhaar eSign box names, for example "Leegality". Without one the
-   * box says only that the signature is an Aadhaar eSign.
-   */
-  esignProvider?: string;
 }
 
 const INK = rgb(0.08, 0.09, 0.13);
 const CAPTION_INK = rgb(0.35, 0.38, 0.44);
-const AADHAAR_INK = rgb(0.11, 0.42, 0.88);
-const AADHAAR_GROUND = rgb(0.96, 0.975, 1);
 const CAPTION_MIN_BOX_HEIGHT = 20;
 const CAPTION_MAX_SIZE = 7;
 const CAPTION_MIN_SIZE = 3;
@@ -167,77 +160,6 @@ function drawCaption(
 function captionText(recipient: Recipient, timeZone: string | undefined): string {
   const when = recipient.actedAt ? formatSigningTime(recipient.actedAt, timeZone) : undefined;
   return [recipient.name.trim(), when].filter(Boolean).join(', ');
-}
-
-/**
- * Marks the place of an Aadhaar eSign: a framed box with "Aadhaar eSign", the signer's name
- * and the provider. It is drawn on the file sent to the provider, so it is part of what the
- * signer signs; the digital signature itself is the provider's and is not drawn here.
- */
-function drawAadhaarBox(
-  page: PDFPage,
-  frame: BoxFrame,
-  recipient: Recipient,
-  provider: string | undefined,
-  fonts: FontSet,
-): void {
-  const border = Math.max(0.5, Math.min(frame.width, frame.height) * 0.02);
-  const corner = (fx: number, fy: number) => frame.at(frame.width * fx, frame.height * fy);
-  // An opaque ground, like a drawn signature, so the box reads clearly over page text.
-  const bottomLeft = corner(0, 0);
-  page.drawRectangle({
-    x: bottomLeft.x,
-    y: bottomLeft.y,
-    width: frame.width,
-    height: frame.height,
-    rotate: degrees(frame.rotate),
-    color: AADHAAR_GROUND,
-  });
-  const edge = (from: [number, number], to: [number, number]) =>
-    page.drawLine({
-      start: corner(...from),
-      end: corner(...to),
-      thickness: border,
-      color: AADHAAR_INK,
-    });
-  edge([0, 0], [1, 0]);
-  edge([1, 0], [1, 1]);
-  edge([1, 1], [0, 1]);
-  edge([0, 1], [0, 0]);
-
-  const padding = Math.min(4, frame.height * 0.08);
-  const width = frame.width - padding * 2;
-  const via = provider?.trim()
-    ? `Signed with Aadhaar OTP via ${provider.trim()}`
-    : 'Signed with Aadhaar OTP';
-  const lines: { text: string; font: Face; share: number; color: typeof INK }[] = [
-    { text: 'Aadhaar eSign', font: fonts.bold, share: 0.28, color: AADHAAR_INK },
-    { text: recipient.name.trim(), font: fonts.regular, share: 0.4, color: INK },
-    { text: via, font: fonts.regular, share: 0.32, color: CAPTION_INK },
-  ];
-  let top = frame.height - padding;
-  const room = frame.height - padding * 2;
-  for (const line of lines) {
-    const height = room * line.share;
-    const fitted = fitText(line.text, line.font, width, height, {
-      minSize: CAPTION_MIN_SIZE,
-      maxSize: 14,
-    });
-    const text = fitted.lines[0];
-    top -= height;
-    if (!text) continue;
-    const descent =
-      line.font.heightAtSize(fitted.size) -
-      line.font.heightAtSize(fitted.size, { descender: false });
-    const origin = frame.at(padding, top + (height - fitted.size * LINE_HEIGHT) / 2 + descent);
-    line.font.draw(page, text, {
-      x: origin.x,
-      y: origin.y,
-      size: fitted.size,
-      color: line.color,
-      rotate: frame.rotate,
-    });
-  }
 }
 
 function drawCheckbox(page: PDFPage, frame: BoxFrame, checked: boolean): void {
@@ -402,11 +324,9 @@ export async function renderFields(
         drawCheckbox(page, frame, value === 'true');
         break;
       }
-      case 'aadhaar': {
-        fonts ??= await embedFonts(doc, options.font);
-        drawAadhaarBox(page, frame, recipient, options.esignProvider, fonts);
+      case 'aadhaar':
+        // An envelope sent while the box existed: the eSign provider places the signature.
         break;
-      }
       case 'text':
       case 'name':
       case 'date_signed': {
