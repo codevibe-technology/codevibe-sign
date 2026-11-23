@@ -36,7 +36,7 @@ export function LegalPage({
 export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-3 leading-7 text-ink [&_a]:font-semibold [&_a]:text-primary [&_a:hover]:underline [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1.5">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h2 className="text-xl font-bold">{title}</h2>
       {children}
     </section>
   );

@@ -141,6 +141,8 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Lead paragraphs read as on codevibe.in: 18px on a 1.65 line. */
+  --text-lg--line-height: 1.65;
   /* Codevibe corners are sharp: 4px controls, 8px cards. */
   --radius-sm: 3px;
   --radius-md: 4px;
@@ -158,14 +160,22 @@
   body {
     @apply min-h-dvh bg-canvas font-sans text-[15px] leading-6 text-ink;
   }
+  /* Headings follow codevibe.in: Space Grotesk, bold, tracked tighter the larger they are. */
   h1,
   h2,
   h3 {
-    @apply font-display tracking-tight;
+    @apply font-display;
+    font-weight: 700;
     text-wrap: balance;
   }
   h1 {
+    letter-spacing: -0.03em;
+  }
+  h2 {
     letter-spacing: -0.025em;
+  }
+  h3 {
+    letter-spacing: -0.02em;
   }
   :focus-visible {
     outline: 2px solid var(--primary);
@@ -203,12 +213,12 @@
   --cvs-radius-sm: 4px;
 }
 
-/* Small mono label, the Codevibe eyebrow. */
+/* Small mono label, the Codevibe eyebrow: 11px JetBrains Mono, tracked 0.2em, as on codevibe.in. */
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 400;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
 }

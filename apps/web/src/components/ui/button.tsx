@@ -38,7 +38,7 @@ export function Button({
   return (
     <Component
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-md font-semibold tracking-[-0.005em] whitespace-nowrap transition-[color,background-color,border-color,box-shadow,translate] duration-200 ease-out not-disabled:active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex shrink-0 items-center justify-center rounded-md font-display font-semibold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,translate] duration-200 ease-out not-disabled:active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
         variants[variant],
         sizes[size],
         className,
