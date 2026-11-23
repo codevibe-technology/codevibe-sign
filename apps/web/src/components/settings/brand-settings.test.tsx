@@ -16,7 +16,12 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const { EmailBrandForm } = await import('./email-brand-form');
 const { SigningBrandForm } = await import('./signing-brand-form');
 
-const look = { brandColor: '#0F766E', logoUrl: null, showBadge: true };
+const look = {
+  brandColor: '#0F766E',
+  logoUrl: null,
+  showBadge: true,
+  appUrl: 'https://sign.example.com',
+};
 const emailForm = (overrides = {}) => (
   <EmailBrandForm
     workspace={{ id: 'ws_1', name: 'Acme' }}
@@ -34,7 +39,9 @@ beforeEach(() => {
 describe('EmailBrandForm', () => {
   it('previews the default invitation in a sandboxed frame', () => {
     render(emailForm());
-    expect(screen.getByTestId('preview-subject')).toHaveTextContent('Please sign "Offer letter"');
+    expect(screen.getByTestId('preview-subject')).toHaveTextContent(
+      'Acme asked you to sign "Offer letter"',
+    );
     expect(screen.getByTestId('preview-from')).toHaveTextContent('Acme');
     expect(iframe().getAttribute('sandbox')).toBe('');
     expect(iframe().getAttribute('srcdoc')).toContain('Acme has asked you to sign');

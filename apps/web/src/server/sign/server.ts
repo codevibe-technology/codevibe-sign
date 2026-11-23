@@ -1,12 +1,7 @@
 import 'server-only';
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import {
-  createSignServer,
-  mailOtpSender,
-  postgresStore,
-  type SignServer,
-} from '@codevibe_technology/sign-server';
+import { createSignServer, postgresStore, type SignServer } from '@codevibe_technology/sign-server';
 import { resolveApiKey } from '../api-keys';
 import { defaultCertificateNote } from '@/lib/brand';
 import { getBrand } from '../brand';
@@ -24,7 +19,8 @@ import { planSettings } from '../plans';
 import { certificateSender, ensurePublicRecord, recordUrl } from '../public-records';
 import { isSampleEnvelope } from '../sample-envelope';
 import { getTemplate } from '../templates';
-import { createWorkspaceMail } from './mail';
+import { createOtpSender, createWorkspaceMail, type WorkspaceMailDeps } from './mail';
+import { mailOrg } from '../mail-identity';
 import { createPlanGate } from './plan-gate';
 import { appTemplateStore } from './templates';
 import { createAuthenticate } from './principal';
@@ -35,7 +31,7 @@ export const SIGN_BASE_PATH = '/api';
 
 /**
  * Whether this install can send one-time codes by text message. Codes go out by email only
- * (`mailOtpSender`), so the signing page tells SMS recipients to ask for an email instead.
+ * (`createOtpSender`), so the signing page tells SMS recipients to ask for an email instead.
  */
 export const SMS_CODES = false;
 
@@ -77,10 +73,19 @@ function build(): SignServer {
   const sql = db();
   const { files, mailer } = appRuntime();
   const store = postgresStore(sql);
+  const mailDeps: WorkspaceMailDeps = {
+    appUrl: config.APP_URL,
+    org: mailOrg(),
+    brand: (workspaceId) => getBrand(sql, workspaceId),
+    workspaceName: async (workspaceId) =>
+      (await sql<{ name: string }[]>`select name from app_workspaces where id = ${workspaceId}`)[0]
+        ?.name ?? null,
+  };
   const declineMail = {
     sql,
     mailer,
     appUrl: config.APP_URL,
+    org: mailDeps.org ?? null,
     load: async (id: string) => (await store.load(id))?.envelope ?? null,
   };
   return createSignServer({
@@ -88,7 +93,7 @@ function build(): SignServer {
     templateStore: appTemplateStore(sql, files),
     files,
     mailer,
-    otp: mailOtpSender(mailer),
+    otp: createOtpSender(mailer, mailDeps),
     sealer: {
       p12: readFileSync(config.SEAL_P12_PATH),
       passphrase: config.SEAL_PASSPHRASE,
@@ -113,14 +118,7 @@ function build(): SignServer {
       );
       await publishChange(sql, change);
     },
-    workspaceMail: createWorkspaceMail({
-      appUrl: config.APP_URL,
-      brand: (workspaceId) => getBrand(sql, workspaceId),
-      workspaceName: async (workspaceId) =>
-        (
-          await sql<{ name: string }[]>`select name from app_workspaces where id = ${workspaceId}`
-        )[0]?.name ?? null,
-    }),
+    workspaceMail: createWorkspaceMail(mailDeps),
     certificateNote: async (workspaceId) =>
       (await getBrand(sql, workspaceId)).certificateFooter ??
       defaultCertificateNote(new URL(config.APP_URL).host),

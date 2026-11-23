@@ -126,7 +126,13 @@ describe('declineLine', () => {
 });
 
 describe('mail for revisions', () => {
-  const brand = { company: 'Acme', brandColor: '#0F766E', logoUrl: null, showBadge: false };
+  const brand = {
+    company: 'Acme',
+    brandColor: '#0F766E',
+    logoUrl: null,
+    showBadge: false,
+    appUrl: 'https://sign.example.com',
+  };
 
   it('puts what changed in the invitation and reminder', () => {
     for (const kind of ['invite', 'reminder'] as const) {
@@ -148,6 +154,7 @@ describe('mail for revisions', () => {
       role: 'approver',
       reason: 'The <notice> period is wrong',
       url: 'https://sign.example.com/dashboard/acme/envelopes/env_1',
+      appUrl: 'https://sign.example.com',
     });
     expect(mail.subject).toBe('Declined: Offer letter');
     expect(mail.text).toContain('Satyam Patel (approver) declined “Offer letter”.');

@@ -13,6 +13,7 @@ const brand: MailBrand = {
   brandColor: '#0F766E',
   logoUrl: null,
   showBadge: true,
+  appUrl: 'https://sign.example.com',
 };
 
 describe('mail variables', () => {
@@ -34,13 +35,13 @@ describe('mail variables', () => {
 describe('renderMail', () => {
   it('uses the defaults when nothing is overridden', () => {
     const mail = renderMail('invite', sampleInput('invite'), brand);
-    expect(mail.subject).toBe('Please sign "Offer letter"');
+    expect(mail.subject).toBe('Acme HR asked you to sign "Offer letter"');
     expect(mail.text).toContain('Acme HR has asked you to sign "Offer letter".');
     expect(mail.text).toContain('Please sign by Friday');
-    expect(mail.text).toContain('The request expires on 31 Dec 2026, 00:00 UTC.');
+    expect(mail.text).toContain('Expires: 31 Dec 2026, 00:00 UTC');
     expect(mail.text).toContain('Review and sign: https://sign.example.com/api/sign/');
     expect(mail.html).toContain('background:#0F766E');
-    expect(mail.text).toContain('Secured by Codevibe Sign');
+    expect(mail.text).toContain('Sent with Codevibe Sign');
   });
 
   it('applies the subject and intro overrides with variables', () => {
@@ -51,13 +52,13 @@ describe('renderMail', () => {
     expect(mail.subject).toBe('Acme HR: Offer letter needs you');
     expect(mail.text).toContain('Please approve before 31 Dec 2026, 00:00 UTC.');
     expect(mail.text).toContain('Review and approve:');
-    expect(mail.html).toContain('<p style="margin:0 0 12px">Hi again.</p>');
+    expect(mail.html).toMatch(/<p [^>]*>Hi again\.<\/p>/);
   });
 
   it('writes the expiry in the workspace time zone and names the zone', () => {
     const input = { ...sampleInput('invite'), expiresAt: '2026-12-31T18:29:00.000Z' };
     const expiry = (timeZone?: string) =>
-      /expires on (.+)\.\n/.exec(
+      /Expires: (.+)/.exec(
         renderMail('invite', { ...input, ...(timeZone ? { timeZone } : {}) }, brand).text,
       )?.[1];
     expect(expiry()).toBe('31 Dec 2026, 18:29 UTC');

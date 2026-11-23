@@ -38,7 +38,7 @@ export function EmailBrandForm({
 }: {
   workspace: { id: string; name: string };
   values: EmailBrandValues;
-  look: { brandColor: string; logoUrl: string | null; showBadge: boolean };
+  look: { brandColor: string; logoUrl: string | null; showBadge: boolean; appUrl: string };
 }) {
   const [senderName, setSenderName] = useState(values.senderName);
   const [replyTo, setReplyTo] = useState(values.replyTo);
@@ -58,7 +58,13 @@ export function EmailBrandForm({
       renderMail(
         kind,
         sampleInput(kind),
-        { company, brandColor: look.brandColor, logoUrl: look.logoUrl, showBadge: look.showBadge },
+        {
+          company,
+          brandColor: look.brandColor,
+          logoUrl: look.logoUrl,
+          showBadge: look.showBadge,
+          appUrl: look.appUrl,
+        },
         overrides[kind],
       ),
     [kind, company, look, overrides],

@@ -42,8 +42,9 @@ export default async function BrandSettings({ params }: { params: Promise<{ slug
         }}
         look={{
           brandColor: brand.brandColor,
-          logoUrl: brand.logoUrl,
+          logoUrl: brand.logoUrl ? `${appUrl}${brand.logoUrl}` : null,
           showBadge: brand.showBadge,
+          appUrl,
         }}
       />
       <SigningBrandForm

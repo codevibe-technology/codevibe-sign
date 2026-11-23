@@ -9,6 +9,7 @@ export interface DeclineMailDeps {
   sql: Sql;
   mailer: Mailer;
   appUrl: string;
+  org?: string | null;
   load: (envelopeId: string) => Promise<Envelope | null>;
 }
 
@@ -38,6 +39,8 @@ export async function mailSenderOnDecline(
     declinedBy: decliner.name,
     role: decliner.role,
     reason: decliner.declineReason ?? null,
+    appUrl: deps.appUrl,
+    org: deps.org ?? null,
     url: `${deps.appUrl}/dashboard/${sender.slug}/envelopes/${encodeURIComponent(envelope.id)}`,
   });
   await deps.mailer.send({
