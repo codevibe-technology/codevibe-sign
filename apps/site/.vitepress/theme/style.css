@@ -11,7 +11,8 @@
   --vp-font-family-heading: 'Space Grotesk', var(--vp-font-family-base);
   --vp-font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --vp-c-brand-1: var(--cv-blue);
+  /* Links sit on tinted rows and code chips too; the darker blue keeps them above 4.5:1. */
+  --vp-c-brand-1: var(--cv-blue-dark);
   --vp-c-brand-2: var(--cv-blue-dark);
   --vp-c-brand-3: var(--cv-blue);
   --vp-c-brand-soft: rgba(27, 106, 224, 0.12);
@@ -103,4 +104,9 @@
 
 :root:not(.dark) .vp-doc div[class*='language-'] {
   border: 1px solid var(--vp-c-divider);
+}
+
+/* github-light's orange reads at 3.5:1 on white; a deeper orange keeps code at 4.5:1. */
+html:not(.dark) .vp-code span[style*='--shiki-light:#E36209'] {
+  color: #b35000;
 }
