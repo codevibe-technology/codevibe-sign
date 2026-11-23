@@ -9,11 +9,10 @@ Aadhaar eSign through an eSign provider you hold an account with. It defines a s
 `EsignProvider` interface and ships an adapter for [Leegality](https://www.leegality.com). For a
 walkthrough, see [Aadhaar eSign with Leegality](/guides/aadhaar-leegality).
 
-::: warning Standalone library
-This package is not yet wired into the Codevibe Sign server or the web app. Neither of them
-calls it, and sending an envelope with `auth: 'aadhaar'` does not start an Aadhaar eSign for
-you. Today you call the provider from your own backend and store the signed file yourself.
-:::
+The Codevibe Sign server and the web app run it for you: a recipient with `auth: 'aadhaar'`
+is sent to the provider, the callback is verified, the signed file is kept and sealed, and the
+audit trail records it. You can also call the provider from your own backend and store the
+signed file yourself.
 
 ```sh
 pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
@@ -21,13 +20,24 @@ pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 
 Node 22 or later. The package uses `fetch` and `node:crypto`.
 
-| Export                    | What it is                                                                                                      |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`. Implement it to add a provider.                         |
-| `EsignRequest`            | `envelopeId`, `recipient`, `documentBytes`, `documentName`, `signaturePositions`, `callbackUrl`, `redirectUrl`. |
-| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                              |
-| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                           |
-| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                     |
+| Export                    | What it is                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `webhookRef` and `checkCredentials`. Implement it to add a provider. |
+| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `signaturePositions`, `callbackUrl`, `redirectUrl`.                |
+| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                          |
+| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                       |
+| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                 |
+| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                  |
+
+`reference` is your own id for one request, sent to Leegality as the `irn`; it defaults to
+`envelopeId`. Give each attempt its own when a signer can start again.
+
+`webhookRef(rawBody)` reads the provider reference from a callback without checking anything.
+A server that holds several provider accounts uses it to find whose credentials must verify
+the callback; never act on it before `parseWebhook` has accepted the same body.
+
+`checkCredentials()` makes one read-only call and resolves when the provider accepts the
+credentials; any other answer throws `SignError('PROVIDER_ERROR')`.
 
 `parseWebhook` throws `SignError('WEBHOOK_INVALID')` for any body it cannot verify, and returns
 `null` for a verified callback that does not change the signer's status (such as a reviewer
@@ -82,3 +92,8 @@ by configuration rather than guessed:
 - **Response `status` on success**: the published sample shows `status: 0` beside a success
   message, so a returned `documentId` is treated as success.
 - **Webhook versions** other than 2.5 are not documented in the API reference.
+
+## Providers
+
+Leegality is the only adapter today. eMudhra is planned as the second provider, behind the
+same `EsignProvider` interface.

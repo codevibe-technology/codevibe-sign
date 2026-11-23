@@ -34,6 +34,21 @@ Microsoft 365 mailbox, through Microsoft Graph with an app registration instead 
 
 The runbook's "Microsoft 365 (Graph)" section walks through the app registration.
 
+### Aadhaar eSign and payments when you self-host
+
+A self-hosted install is free and has no limits, no plans and no billing pages.
+
+- **Aadhaar eSign** uses your own Leegality account. Each workspace can enter one under
+  Settings, Aadhaar eSign, or you set one for the whole install with `LEEGALITY_API_KEY`,
+  `LEEGALITY_PRIVATE_SALT`, `LEEGALITY_WORKFLOW_ID` and `LEEGALITY_BASE_URL`. Leegality bills
+  you directly; there are no credits. See
+  [Aadhaar eSign with Leegality](/guides/aadhaar-leegality).
+- **Invoices are never issued in Codevibe's name.** The seller on an invoice is whoever your
+  own `INVOICE_SELLER_*` settings name, and nothing is built in.
+- **Selling from your own install** is possible: set `PLAN_MODE=hosted`, your Razorpay keys and
+  your seller details. Section 12 of the runbook lists every setting and how to go from test
+  keys to live ones.
+
 ## The HTTP API on its own
 
 `apps/server` builds a Docker image of the standalone service. It reads all of its

@@ -14,7 +14,7 @@ parts you need.
 | [`@codevibe_technology/sign-pdf`](/api/pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
 | [`@codevibe_technology/sign-server`](/api/server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
 | [`@codevibe_technology/sign-react`](/api/react)     | Signature pad, signing view and field placement components.                         | Ready to try |
-| [`@codevibe_technology/sign-aadhaar`](/api/aadhaar) | Aadhaar eSign through a licensed eSign provider, with your own account.             | Ready to try |
+| [`@codevibe_technology/sign-aadhaar`](/api/aadhaar) | Aadhaar eSign through a licensed eSign provider; the server runs it for you.        | Ready to try |
 
 For the HTTP API itself, with every route, schema and error code, see the
 [HTTP API reference](/http-api), which you can try against your own server.

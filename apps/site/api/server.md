@@ -179,6 +179,26 @@ the `cvsign_session` cookie or the `X-Sign-Session` header. Each new code replac
 previous one; after 10 codes for one envelope, `POST /otp` answers `OTP_LOCKED` with
 `details.reason: 'too_many_codes'` and the sender has to send the envelope again.
 
+## Aadhaar eSign
+
+Pass `esign` to let a recipient with `auth: 'aadhaar'` sign through an eSign provider. Without
+it, an envelope with such a recipient cannot be sent (`ESIGN_UNAVAILABLE`).
+
+| Option                   | What it does                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `provider(workspaceId)`  | The `EsignProvider` a workspace signs with, or null: your own account, or one built from the workspace's credentials.                |
+| `available(workspaceId)` | Why the workspace cannot eSign now (`{ reason, message, signerMessage? }`), or null. Asked at send and again when the signer starts. |
+| `onStart(input)`         | Called before the provider, for example to reserve a credit. Throw `SignError('ESIGN_UNAVAILABLE', message, { reason })` to refuse.  |
+| `onEnd(input)`           | Called once per outcome (`signed`, `declined`, `expired`, `failed`) with the same `ref`. Retried by `tick()` until it returns.       |
+| `sessionTtlMs`           | How long the server waits for a started eSign. Default 24 hours, never past the envelope's expiry.                                   |
+
+The signing page posts the signer's values to `POST /v1/sign/:token/esign` and sends them to
+the `signUrl` it answers. The provider reports to `POST /v1/esign/webhooks/<provider>`; the
+page can also poll `GET /v1/sign/:token/esign`. The seal is added after the provider's
+signature without rewriting its file, and the signing certificate is a separate sealed PDF
+(`?version=certificate`). See [Aadhaar eSign with Leegality](/guides/aadhaar-leegality) for the
+flow and its rules.
+
 ## Errors
 
 Every error is JSON: `{ "error": { "code", "message", "details"? } }`. Codes are the

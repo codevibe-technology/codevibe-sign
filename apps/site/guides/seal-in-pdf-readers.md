@@ -93,7 +93,9 @@ organisation.
 ## Aadhaar eSign files on Windows
 
 PDFs signed with Aadhaar eSign carry the signer's own signature from a licensed eSign Service
-Provider. Those certificates chain to the Controller of Certifying Authorities (CCA) India
+Provider, and the Codevibe Sign seal after it. A reader lists two signatures. The first covers
+the file as the signer saw it; the reader notes that a signature was added later, which is the
+seal and not a change to the document. Those certificates chain to the Controller of Certifying Authorities (CCA) India
 root, which is in the Windows certificate store. To have Acrobat use that store:
 
 1. Open **Edit > Preferences > Signatures**.

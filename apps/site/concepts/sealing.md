@@ -28,6 +28,15 @@ Who agreed, and when, is proven by the certificate page and the audit trail behi
 For a signature tied to the signer's own identity under Indian law, use
 [Aadhaar eSign](/guides/aadhaar-leegality).
 
+### After an Aadhaar eSign
+
+A file signed with Aadhaar eSign already carries the signer's own digital signature, and
+nothing but another signature may be added to it. So the server does not draw on that file or
+add a page to it. It adds the seal after the Aadhaar signature as an incremental update, which
+leaves every signed byte in place, and issues the signing certificate as a separate sealed
+PDF. Verification then reports both signatures. If the provider's file forbids further
+signatures, it is kept exactly as it came and recognised by its SHA-256.
+
 ## Your sealing certificate
 
 You need a certificate and private key as a PKCS#12 (`.p12`) file.

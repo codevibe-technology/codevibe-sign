@@ -63,7 +63,7 @@ does not depend on it. See
 | Start the server inside your existing Node app                  | [Embed in Node](/getting-started/node)                                |
 | Use the signing rules only, with your own storage and transport | [`@codevibe_technology/sign-core`](/api/core)                         |
 | Show the signing screen inside your React app                   | [`@codevibe_technology/sign-react`](/api/react)                       |
-| Add Aadhaar eSign for statutory signatures in India             | [`@codevibe_technology/sign-aadhaar`](/api/aadhaar)                   |
+| Add Aadhaar eSign for statutory signatures in India             | [Aadhaar eSign with Leegality](/guides/aadhaar-leegality)             |
 
 ## Install the packages
 

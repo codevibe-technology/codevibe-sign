@@ -37,8 +37,9 @@ authenticates with Aadhaar, and a licensed eSign Service Provider issues a short
 certificate and signs the document hash with it.
 
 Use Aadhaar eSign, or a Digital Signature Certificate (DSC), where a law asks for a document to
-be "signed" in that statutory sense. Codevibe Sign supports it through
-[`@codevibe_technology/sign-aadhaar`](/api/aadhaar), with your own provider account.
+be "signed" in that statutory sense. Codevibe Sign has it built in, through Leegality: see
+[Aadhaar eSign with Leegality](/guides/aadhaar-leegality). The signer confirms with an Aadhaar
+OTP on the provider's page, and Codevibe Sign never receives the Aadhaar number.
 
 ### Documents that cannot be signed electronically
 
