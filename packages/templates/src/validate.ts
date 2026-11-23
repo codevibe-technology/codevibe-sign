@@ -154,18 +154,32 @@ function roleIssues(
   fields.forEach((field, i) =>
     issues.push(...fieldIssues(field, documents, `${path}.fields.${i}`)),
   );
-  // An Aadhaar eSign role signs in its Aadhaar eSign box; an older template's signature field
-  // stands in for the box when the envelope is sent.
-  const signs = (f: TemplateField) =>
-    f.required !== false &&
-    (f.type === 'signature' || (role.auth === 'aadhaar' && f.type === 'aadhaar'));
-  if (type === 'signer' && !fields.some(signs)) {
+  if (role.auth === 'aadhaar') {
+    // The eSign provider places the signature, so such a role has no fields. The signature,
+    // initials and box fields older templates gave it are dropped when the envelope is sent.
+    fields.forEach((field, i) => {
+      if (field.type === 'signature' || field.type === 'initials' || field.type === 'aadhaar') {
+        return;
+      }
+      issues.push({
+        path: `${path}.fields.${i}`,
+        message: `${role.name || 'This role'} signs with Aadhaar eSign and fills in nothing; remove this ${field.type.replace('_', ' ')} field or give it to a role that signs before them`,
+      });
+    });
+    return issues;
+  }
+  fields.forEach((field, i) => {
+    if (field.type === 'aadhaar') {
+      issues.push({
+        path: `${path}.fields.${i}`,
+        message: 'Only a role that signs with Aadhaar eSign can have an Aadhaar eSign box',
+      });
+    }
+  });
+  if (type === 'signer' && !fields.some((f) => f.required !== false && f.type === 'signature')) {
     issues.push({
       path: `${path}.fields`,
-      message:
-        role.auth === 'aadhaar'
-          ? `Place the Aadhaar eSign box for ${role.name || 'this role'}`
-          : `Place at least one required signature field for ${role.name || 'this role'}`,
+      message: `Place at least one required signature field for ${role.name || 'this role'}`,
     });
   }
   return issues;

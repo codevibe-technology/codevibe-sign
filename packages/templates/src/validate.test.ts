@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe_technology/sign-core';
 import { assertValidTemplate, validateTemplate } from './validate';
 import { offerTemplate } from './test/fixtures';
-import type { Template } from './types';
+import type { Template, TemplateField } from './types';
 
 const paths = (template: Template) => validateTemplate(template).map((i) => i.path);
 
@@ -27,17 +27,36 @@ describe('validateTemplate', () => {
     expect(paths(edit((t) => (t.roles = [{ name: 'Legal', type: 'viewer' }])))).toEqual(['roles']);
   });
 
-  it('takes the Aadhaar eSign box as the signature of an Aadhaar eSign role only', () => {
-    const boxed = (auth: 'aadhaar' | 'email_otp') =>
+  it('needs no field for an Aadhaar eSign role, and keeps older signature fields usable', () => {
+    const aadhaar = (fields: TemplateField[]) =>
       edit((t) => {
         const role = t.roles[0]!;
-        role.auth = auth;
-        role.fields = (role.fields ?? []).map((f) =>
-          f.type === 'signature' ? { ...f, type: 'aadhaar' } : f,
-        );
+        role.auth = 'aadhaar';
+        role.fields = fields;
       });
-    expect(validateTemplate(boxed('aadhaar'))).toEqual([]);
-    expect(validateTemplate(boxed('email_otp')).map((i) => i.path)).toEqual(['roles.0.fields']);
+    const at = (type: TemplateField['type']): TemplateField => {
+      const { document, page, rect } = offerTemplate().roles[0]!.fields![0]!;
+      return { document, page, rect, type };
+    };
+    expect(validateTemplate(aadhaar([]))).toEqual([]);
+    expect(validateTemplate(aadhaar([at('signature'), at('aadhaar')]))).toEqual([]);
+    expect(validateTemplate(aadhaar([at('text')]))).toEqual([
+      {
+        path: 'roles.0.fields.0',
+        message: expect.stringMatching(/signs with Aadhaar eSign and fills in nothing/),
+      },
+    ]);
+  });
+
+  it('refuses an Aadhaar eSign box for a role that does not use Aadhaar eSign', () => {
+    const boxed = edit((t) => {
+      const role = t.roles[0]!;
+      const { document, page, rect } = role.fields![0]!;
+      role.fields = [...(role.fields ?? []), { document, page, rect, type: 'aadhaar' }];
+    });
+    expect(validateTemplate(boxed).map((i) => i.path)).toEqual([
+      `roles.0.fields.${boxed.roles[0]!.fields!.length - 1}`,
+    ]);
   });
 
   it('checks routing, reminders and expiry', () => {
