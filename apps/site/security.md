@@ -70,7 +70,7 @@ follows.
 
 ## Reporting a vulnerability
 
-Email **security@codevibe.in**. Please do not open a public issue, pull request or discussion.
+Email **security@codevibe.in**, also listed in `/.well-known/security.txt` on sign.codevibe.in. Please do not open a public issue, pull request or discussion.
 
 Include what you found, the affected package and version, steps to reproduce and the impact you
 expect. You can expect an acknowledgement within 3 working days and an assessment and a plan

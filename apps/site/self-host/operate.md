@@ -52,12 +52,13 @@ A setting that is set but malformed is named in the logs and in `/api/health`.
 
 ### Email and sign-in
 
-| Variable                                           | What it is                                                                                                                       |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `MAIL_TRANSPORT`                                   | An SMTP URL such as `smtps://user:password@smtp.example.com:465`, or `graph` for Microsoft 365. Nothing is sent until it is set. |
-| `MAIL_FROM`                                        | The sender people see, for example `Your Company <no-reply@example.com>`.                                                        |
-| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` | The Microsoft 365 app registration, with `MAIL_TRANSPORT=graph`.                                                                 |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`         | Optional **Continue with Google**. Redirect URI: `https://<SIGN_HOST>/api/auth/callback/google`.                                 |
+| Variable                                           | What it is                                                                                                                                                                                           |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MAIL_TRANSPORT`                                   | An SMTP URL such as `smtps://user:password@smtp.example.com:465`, or `graph` for Microsoft 365. Nothing is sent until it is set.                                                                     |
+| `MAIL_FROM`                                        | The sender people see, for example `Your Company <no-reply@example.com>`.                                                                                                                            |
+| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` | The Microsoft 365 app registration, with `MAIL_TRANSPORT=graph`.                                                                                                                                     |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`         | Optional **Continue with Google**. Redirect URI: `https://<SIGN_HOST>/api/auth/callback/google`.                                                                                                     |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`       | Optional Cloudflare Turnstile bot check on sign-in, forgot password, the invitation password step and installation help booking. Off while both are empty. Use a **Managed** widget for `SIGN_HOST`. |
 
 ### How the install behaves
 

@@ -28,6 +28,9 @@ choose a password under **Create account and join**.
 
 You stay signed in for 30 days on each device.
 
+Some installs check that a person rather than a script is signing in. Most people never see
+it; when the check is unsure it shows a box to tick above the button.
+
 ## Forgot your password
 
 1. On the sign-in page choose **Forgot password?**, then **Email me a reset link**.
