@@ -102,7 +102,11 @@ describe('an Aadhaar eSign with real files', () => {
       earlierSignatures: [{ valid: true, signerCommonName: 'RAVI KUMAR' }],
       envelope: { id, documentId: docId },
     });
-    expect(open.json.envelope.recipients[0]).toMatchObject({ auth: 'aadhaar', status: 'signed' });
+    expect(open.json.envelope.recipients[0]).toMatchObject({
+      auth: 'aadhaar',
+      status: 'signed',
+      esign: { provider: 'leegality' },
+    });
 
     const tampered = new Uint8Array(sealed);
     tampered[400] = tampered[400]! ^ 1;

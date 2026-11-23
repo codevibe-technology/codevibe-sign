@@ -46,6 +46,8 @@ export interface VerifiedRecipient {
   status: RecipientStatus;
   auth: AuthMethod;
   actedAt: string | null;
+  /** The eSign provider an Aadhaar signer signed through, for example `leegality`. */
+  esign?: { provider: string };
 }
 
 /** The envelope a valid sealed file belongs to: what its certificate page already prints. */
@@ -212,6 +214,7 @@ async function envelopeOf(rt: Runtime, sha256: string): Promise<VerifiedEnvelope
       status: r.status,
       auth: r.auth,
       actedAt: r.actedAt ?? null,
+      ...(r.esign ? { esign: { provider: r.esign.provider } } : {}),
     })),
     events: events.map((e) => ({
       seq: e.seq,

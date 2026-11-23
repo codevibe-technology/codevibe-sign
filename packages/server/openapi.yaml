@@ -4129,6 +4129,15 @@ components:
               actedAt:
                 type: [string, 'null']
                 format: date-time
+              esign:
+                type: object
+                additionalProperties: false
+                required: [provider]
+                description: Present for a recipient who signed, or is to sign, with Aadhaar eSign.
+                properties:
+                  provider:
+                    type: string
+                    description: The eSign provider, for example `leegality`.
         events:
           type: array
           items:

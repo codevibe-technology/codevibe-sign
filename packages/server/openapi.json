@@ -3841,7 +3841,19 @@
                 "role": { "$ref": "#/components/schemas/RecipientRole" },
                 "status": { "$ref": "#/components/schemas/RecipientStatus" },
                 "auth": { "$ref": "#/components/schemas/AuthMethod" },
-                "actedAt": { "type": ["string", "null"], "format": "date-time" }
+                "actedAt": { "type": ["string", "null"], "format": "date-time" },
+                "esign": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["provider"],
+                  "description": "Present for a recipient who signed, or is to sign, with Aadhaar eSign.",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "description": "The eSign provider, for example `leegality`."
+                    }
+                  }
+                }
               }
             }
           },
