@@ -4,8 +4,9 @@ import { UserMenu } from '@/components/shell/user-menu';
 import { Button } from '@/components/ui/button';
 import { APP_HOME } from '@/lib/safe-next';
 import { DOCS_URL } from './links';
+import { type SectionLink, SectionLinks } from './section-links';
 
-const SECTIONS = [
+const SECTIONS: SectionLink[] = [
   { label: 'How it works', href: '/#features' },
   { label: 'Developers', href: '/#developers' },
   { label: 'Open source', href: '/#open-source' },
@@ -29,15 +30,7 @@ export function SiteHeader({ viewer = null }: { viewer?: SiteViewer | null }) {
           <Wordmark />
         </Link>
         <nav aria-label="Site" className="ml-6 hidden items-center gap-1 md:flex">
-          {SECTIONS.map((s) => (
-            <a
-              key={s.href}
-              href={s.href}
-              className="rounded-md px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
-            >
-              {s.label}
-            </a>
-          ))}
+          <SectionLinks links={SECTIONS} />
           <a
             href={DOCS_URL}
             className="rounded-md px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
