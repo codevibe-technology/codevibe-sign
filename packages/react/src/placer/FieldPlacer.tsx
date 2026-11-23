@@ -1,38 +1,58 @@
 import {
+  useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type RefObject,
 } from 'react';
-import type { Field, FieldType, Recipient } from '@codevibe_technology/sign-core';
-import { clientToPoints, pointsToPixels, type PageSize } from '../geometry';
+import type { Field, FieldType, Rect, Recipient } from '@codevibe_technology/sign-core';
+import { clampRect, clientToPoints, pointsToPixels, roundRect, type PageSize } from '../geometry';
 import { defaultFieldTypeLabels, mergeLabels, recipientColorIndex } from '../labels';
 import type { LoadPdfOptions } from '../pdf/pdfjs';
 import type { TextItem, ViewerDocument } from '../pdf/types';
 import { usePdfSources } from '../pdf/usePdfSources';
 import {
   DocumentPages,
-  ZoomControls,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  clampZoom,
   defaultViewerLabels,
   useElementWidth,
+  viewerScale,
   type PageContext,
   type ViewerLabels,
 } from '../viewer/DocumentPages';
-import { choiceForPages, formatPageList, pagesForChoice, type RepeatChoice } from './multipage';
+import { PageImage } from '../viewer/PageImage';
+import { alignRect, pasteCopies, resizeFromCorner, type Corner, type Guide } from './align';
+import { Icon, fieldIcon, type IconName } from './icons';
+import {
+  formatPageList,
+  pagesForChoice,
+  signatureOnLastPage,
+  type RepeatChoice,
+} from './multipage';
 import { fieldsOverText } from './overlap';
 import { defaultFieldSizes, isArrowKey, type Size } from './placement';
+import {
+  FieldsSummary,
+  Inspector,
+  MultiInspector,
+  RecipientSwitcher,
+  type TrayPreset,
+} from './PlacerPanels';
 import { fieldsFromTags, findTags, type FieldTag } from './tags';
-import { newFieldId, useFieldPlacement, type FieldPlacementState } from './useFieldPlacement';
+import { newFieldId, useFieldPlacement } from './useFieldPlacement';
 
 export interface FieldPlacerLabels extends ViewerLabels {
   fieldTypes: Record<FieldType, string>;
   palette: string;
   paletteHint: string;
+  /** Heads the recipient switcher: whose fields the tray adds. */
   recipient: string;
   noRecipients: string;
   field: (type: string, recipient: string, page: number) => string;
@@ -65,14 +85,55 @@ export interface FieldPlacerLabels extends ViewerLabels {
   selectHint: string;
   overText: string;
   overTextNote: (count: number) => string;
+  /** Headings of the field tray's groups. */
+  trayGroups: { signature: string; details: string; inputs: string };
+  /** Text fields the tray offers ready-labelled. */
+  trayPresets: Record<TrayPreset, string>;
+  tools: string;
+  undo: string;
+  redo: string;
+  copy: string;
+  paste: string;
+  duplicate: string;
+  deleteSelected: string;
+  zoom: string;
+  fitPage: string;
+  pages: string;
+  goToPage: (page: number, fields: number) => string;
+  properties: string;
+  summary: string;
+  summaryCounts: (required: number, optional: number) => string;
+  noSignature: string;
+  addSignatureFor: (name: string) => string;
+  showField: string;
+  fieldLabel: string;
+  fieldLabelHint: string;
+  size: string;
+  width: string;
+  height: string;
+  onPage: (page: number, recipient: string) => string;
+  selectedCount: (count: number) => string;
+  assignAll: string;
+  mixed: string;
+  alignLeft: string;
+  alignTop: string;
+  sameSize: string;
+  deleteCount: (count: number) => string;
+  shortcuts: string;
+  shortcutList: [keys: string, action: string][];
+  preview: string;
+  previewing: (name: string) => string;
+  stopPreview: string;
+  previewSign: string;
+  previewInitial: string;
 }
 
 export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   ...defaultViewerLabels,
   fieldTypes: defaultFieldTypeLabels,
   palette: 'Fields',
-  paletteHint: 'Drag a field onto a page, or press Enter to add it to the page in view.',
-  recipient: 'Signers',
+  paletteHint: 'Drag a field onto a page, or click it to add it to the page in view.',
+  recipient: 'Add fields for',
   noRecipients: 'Add a recipient to start placing fields.',
   field: (type, recipient, page) => `${type} for ${recipient}, page ${page}`,
   keyboardHint:
@@ -116,14 +177,88 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
       : `Placed ${placed}; ${unmatched} ${unmatched === 1 ? 'tag names' : 'tags name'} a recipient number nobody has.`,
   fieldCount: (count) =>
     count === 0 ? 'No fields' : `${count} ${count === 1 ? 'field' : 'fields'}`,
-  selectHint:
-    'Pick a signer, then drag a field onto the page. Click a placed field to change it here.',
+  selectHint: 'Click a field on the page to change who fills it, whether it is required and more.',
   overText: 'Over text',
   overTextNote: (count) =>
     count === 1
       ? 'A signature or initials field covers page text. The drawn signature will hide it; move the field to a blank space if you can.'
       : `${count} signature or initials fields cover page text. The drawn signatures will hide it; move them to blank space if you can.`,
+  trayGroups: { signature: 'Signature', details: 'Signer details', inputs: 'Inputs' },
+  trayPresets: { email: 'Email', company: 'Company', title: 'Title' },
+  tools: 'Editing tools',
+  undo: 'Undo',
+  redo: 'Redo',
+  copy: 'Copy',
+  paste: 'Paste',
+  duplicate: 'Duplicate',
+  deleteSelected: 'Delete selected',
+  zoom: 'Zoom',
+  fitPage: 'Fit page',
+  pages: 'Pages',
+  goToPage: (page, fields) =>
+    `Page ${page}${fields > 0 ? `, ${fields} ${fields === 1 ? 'field' : 'fields'}` : ''}`,
+  properties: 'Field properties',
+  summary: 'Fields summary',
+  summaryCounts: (required, optional) => {
+    if (required + optional === 0) return 'No fields yet';
+    const parts = [`${required} required ${required === 1 ? 'field' : 'fields'}`];
+    if (optional > 0) parts.push(`${optional} optional`);
+    return parts.join(' · ');
+  },
+  noSignature: 'No signature field yet.',
+  addSignatureFor: (name) => `Add a signature for ${name}`,
+  showField: 'Show it',
+  fieldLabel: 'Label',
+  fieldLabelHint: 'The name the signer sees on this field.',
+  size: 'Size (points)',
+  width: 'Width',
+  height: 'Height',
+  onPage: (page, recipient) => `Page ${page} · ${recipient}`,
+  selectedCount: (count) => `${count} fields selected`,
+  assignAll: 'Assign all to',
+  mixed: 'Several people',
+  alignLeft: 'Align left edges',
+  alignTop: 'Align top edges',
+  sameSize: 'Make the same size',
+  deleteCount: (count) => `Delete ${count} fields`,
+  shortcuts: 'Keyboard shortcuts',
+  shortcutList: [
+    ['Arrows', 'Move 1 point (Shift: 10)'],
+    ['Alt + arrows', 'Resize'],
+    ['Shift + click', 'Select several'],
+    ['Ctrl/⌘ + C, V', 'Copy and paste'],
+    ['Ctrl/⌘ + D', 'Duplicate'],
+    ['Ctrl/⌘ + Z', 'Undo (Shift: redo)'],
+    ['Delete', 'Remove'],
+  ],
+  preview: 'Preview as signer',
+  previewing: (name) => `Previewing what ${name} sees`,
+  stopPreview: 'Back to editing',
+  previewSign: 'Sign',
+  previewInitial: 'Initial',
 };
+
+interface TrayItem {
+  type: FieldType;
+  preset?: TrayPreset;
+}
+
+const TRAY: { group: keyof FieldPlacerLabels['trayGroups']; items: TrayItem[] }[] = [
+  {
+    group: 'signature',
+    items: [{ type: 'signature' }, { type: 'initials' }, { type: 'date_signed' }],
+  },
+  {
+    group: 'details',
+    items: [
+      { type: 'name' },
+      { type: 'text', preset: 'email' },
+      { type: 'text', preset: 'company' },
+      { type: 'text', preset: 'title' },
+    ],
+  },
+  { group: 'inputs', items: [{ type: 'text' }, { type: 'checkbox' }] },
+];
 
 const FIELD_TYPES: FieldType[] = [
   'signature',
@@ -133,6 +268,15 @@ const FIELD_TYPES: FieldType[] = [
   'text',
   'checkbox',
 ];
+
+const PRESET_SIZE: Record<TrayPreset, Size> = {
+  email: { width: 180, height: 22 },
+  company: { width: 160, height: 22 },
+  title: { width: 140, height: 22 },
+};
+
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const HISTORY_LIMIT = 100;
 
 export interface FieldPlacerProps {
   documents: ViewerDocument[];
@@ -148,21 +292,30 @@ export interface FieldPlacerProps {
   pdf?: LoadPdfOptions;
   labels?: Partial<FieldPlacerLabels>;
   className?: string;
+  /**
+   * Shows the pages as the chosen recipient will see them, with nothing to edit. Leave both
+   * this and `onPreviewingChange` out and the placer offers its own Preview button.
+   */
+  previewing?: boolean;
+  onPreviewingChange?: (previewing: boolean) => void;
 }
 
 interface Drag {
   pointerId: number;
-  fieldId: string;
   kind: 'move' | 'resize';
+  corner: Corner;
+  fieldId: string;
   startX: number;
   startY: number;
-  rect: Field['rect'];
+  /** Where each field being moved started, in points. */
+  rects: Map<string, Rect>;
   scale: number;
+  gesture: string;
 }
 
 interface PaletteDrag {
   pointerId: number;
-  type: FieldType;
+  item: TrayItem;
   startX: number;
   startY: number;
   x: number;
@@ -183,6 +336,15 @@ function pageElementAt(x: number, y: number): HTMLElement | null {
   return null;
 }
 
+const typing = (target: EventTarget) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
+const cssEscape = (value: string) =>
+  typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(value)
+    : value.replace(/["\\]/g, '\\$&');
+
 export function FieldPlacer({
   documents,
   recipients,
@@ -196,6 +358,8 @@ export function FieldPlacer({
   pdf,
   labels: labelOverrides,
   className,
+  previewing: previewingProp,
+  onPreviewingChange,
 }: FieldPlacerProps) {
   const labels = mergeLabels(defaultFieldPlacerLabels, labelOverrides);
   const states = usePdfSources(documents, pdf);
@@ -206,26 +370,96 @@ export function FieldPlacer({
   }, [documents, states]);
 
   const signers = useMemo(() => recipients.filter((r) => r.role !== 'viewer'), [recipients]);
+
+  // Undo and redo: the fields before each change. A drag or a run of key presses is one step.
+  const past = useRef<Field[][]>([]);
+  const future = useRef<Field[][]>([]);
+  const latest = useRef<Field[]>(fields ?? defaultFields ?? []);
+  const gesture = useRef<string | null>(null);
+  const lastStep = useRef<{ gesture: string | null; at: number }>({ gesture: null, at: 0 });
+  const restoring = useRef(false);
+  const [, setHistoryVersion] = useState(0);
+
+  const record = (next: Field[]) => {
+    if (!restoring.current) {
+      const now = Date.now();
+      const same =
+        gesture.current !== null &&
+        lastStep.current.gesture === gesture.current &&
+        now - lastStep.current.at < 1500;
+      if (!same) {
+        past.current.push(latest.current);
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+        future.current = [];
+        setHistoryVersion((v) => v + 1);
+      }
+      lastStep.current = { gesture: gesture.current, at: now };
+    }
+    latest.current = next;
+    onChange?.(next);
+  };
+
   const placement = useFieldPlacement({
     fields,
     defaultFields,
-    onChange,
+    onChange: record,
     pageSizes,
     recipients: signers,
     fieldSizes,
     snapThreshold,
     createId,
   });
+  latest.current = placement.fields;
+  const makeId = createId ?? newFieldId;
 
   const id = useId();
   const scroller = useRef<HTMLDivElement>(null);
   const width = useElementWidth(scroller);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<Drag | null>(null);
+  const [guides, setGuides] = useState<{ key: string; guides: Guide[] } | null>(null);
   const [paletteDrag, setPaletteDrag] = useState<PaletteDrag | null>(null);
   const paletteDragWasMove = useRef(false);
+  const clipboard = useRef<Field[]>([]);
+  const [extra, setExtra] = useState<string[]>([]);
+  const [ownPreview, setOwnPreview] = useState(false);
+  const previewing = previewingProp ?? ownPreview;
+  const setPreviewing = onPreviewingChange ?? setOwnPreview;
+  const [inView, setInView] = useState<{ documentId: string; page: number } | null>(null);
 
   const recipientName = (rid: string) => signers.find((r) => r.id === rid)?.name ?? '';
+  const presetOf = (field: Field): TrayPreset | undefined =>
+    field.type === 'text'
+      ? (Object.keys(labels.trayPresets) as TrayPreset[]).find(
+          (key) => labels.trayPresets[key] === field.label,
+        )
+      : undefined;
+
+  const primary = placement.selectedId;
+  const fieldIds = useMemo(() => new Set(placement.fields.map((f) => f.id)), [placement.fields]);
+  const selectedIds = useMemo(
+    () => (primary ? [primary, ...extra.filter((x) => x !== primary && fieldIds.has(x))] : []),
+    [primary, extra, fieldIds],
+  );
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const selectOnly = (fieldId: string | null) => {
+    setExtra([]);
+    placement.select(fieldId);
+  };
+
+  const toggleSelected = (fieldId: string) => {
+    if (!primary) return placement.select(fieldId);
+    if (fieldId === primary) {
+      const [next, ...rest] = selectedIds.slice(1);
+      setExtra(rest);
+      placement.select(next ?? null);
+      return;
+    }
+    setExtra((list) =>
+      list.includes(fieldId) ? list.filter((x) => x !== fieldId) : [...list, fieldId],
+    );
+  };
 
   // Page numbers being typed for one field; until applied, the field's pages stay as they are.
   const [typedPages, setTypedPages] = useState<{ fieldId: string; text: string } | null>(null);
@@ -279,13 +513,14 @@ export function FieldPlacer({
         documentId,
         recipients: ordered,
         pageSizes: pageSizes[documentId] ?? [],
-        createId: createId ?? newFieldId,
+        createId: makeId,
         ...(fieldSizes ? { sizes: fieldSizes } : {}),
       });
       placed += result.fields.length;
       unmatched += result.unmatched.length;
       return result.fields;
     });
+    gesture.current = null;
     placement.addFields(added);
     setTagsUsed(true);
     setNotice({ text: labels.tagsPlaced(placed, unmatched), error: unmatched > 0 });
@@ -299,27 +534,17 @@ export function FieldPlacer({
       setRepeatNotice({ fieldId: field.id, text: pages.error, error: true });
       return;
     }
+    gesture.current = null;
     const { added, removed } = placement.setFieldPages(field.id, pages.pages);
     setTypedPages(null);
     setRepeatNotice({ fieldId: field.id, text: labels.repeatChanged(added, removed) });
-  };
-
-  const chooseRepeat = (field: Field, choice: RepeatChoice) => {
-    if (choice !== 'custom') {
-      showOnPages(field, choice);
-      return;
-    }
-    setRepeatNotice(null);
-    setTypedPages({ fieldId: field.id, text: formatPageList(placement.pagesOf(field.id)) });
-    // The box appears with this render; move to it so the numbers can be typed at once.
-    setTimeout(() => pagesInput.current?.select(), 0);
   };
 
   /**
    * The page that fills most of the viewer, with the middle of the part of it on screen in
    * page points, so a field added by a click or Enter lands where the sender is looking.
    */
-  const pageInView = (): {
+  const pageInView = useCallback((): {
     documentId: string;
     page: number;
     center?: { x: number; y: number };
@@ -339,7 +564,7 @@ export function FieldPlacer({
     if (!best) return null;
     const documentId = best.el.dataset.cvsDocument ?? '';
     const page = Number(best.el.dataset.cvsPage);
-    const size = placement.pageSize(documentId, page);
+    const size = pageSizes[documentId]?.[page];
     if (!view || !size || best.visible <= 0 || best.box.width <= 0) return { documentId, page };
     const scale = best.box.width / size.width;
     const top = Math.max(best.box.top, view.top);
@@ -352,24 +577,76 @@ export function FieldPlacer({
       scale,
       center: clientToPoints((left + right) / 2, (top + bottom) / 2, best.box, scale),
     };
+  }, [pageSizes]);
+
+  // Which page is in view, for the page rail and the page count in the toolbar.
+  const frame = useRef(0);
+  const trackPage = useCallback(() => {
+    if (typeof requestAnimationFrame === 'undefined') return;
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const found = pageInView();
+      if (!found) return;
+      setInView((prev) =>
+        prev && prev.documentId === found.documentId && prev.page === found.page
+          ? prev
+          : { documentId: found.documentId, page: found.page },
+      );
+    });
+  }, [pageInView]);
+  useEffect(() => {
+    trackPage();
+    return () => {
+      if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(frame.current);
+    };
+  }, [trackPage, states]);
+
+  const sizeOf = (item: TrayItem): Size =>
+    item.preset
+      ? PRESET_SIZE[item.preset]
+      : (fieldSizes?.[item.type] ?? defaultFieldSizes[item.type]);
+
+  const addItem = (
+    item: TrayItem,
+    documentId: string,
+    page: number,
+    center?: { x: number; y: number },
+    avoidOverlap?: boolean,
+  ) => {
+    gesture.current = null;
+    const added = placement.addField(item.type, documentId, page, center, {
+      ...(avoidOverlap ? { avoidOverlap } : {}),
+      ...(item.preset ? { label: labels.trayPresets[item.preset] } : {}),
+    });
+    if (added && item.preset) {
+      const size = PRESET_SIZE[item.preset];
+      gesture.current = `add-${added.id}`;
+      lastStep.current = { gesture: gesture.current, at: Date.now() };
+      placement.setFieldRect(added.id, {
+        ...added.rect,
+        x: added.rect.x + added.rect.width / 2 - size.width / 2,
+        width: size.width,
+        height: size.height,
+      });
+      gesture.current = null;
+    }
+    setExtra([]);
   };
 
-  const addToPageInView = (type: FieldType) => {
+  const addToPageInView = (item: TrayItem) => {
     const target = pageInView();
     if (!target) return;
-    placement.addField(type, target.documentId, target.page, target.center, {
-      avoidOverlap: true,
-    });
+    addItem(item, target.documentId, target.page, target.center, true);
   };
 
-  const onPalettePointerDown = (e: ReactPointerEvent<HTMLButtonElement>, type: FieldType) => {
+  const onPalettePointerDown = (e: ReactPointerEvent<HTMLButtonElement>, item: TrayItem) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    const size = fieldSizes?.[type] ?? defaultFieldSizes[type];
+    const size = sizeOf(item);
     const scale = pageInView()?.scale ?? 1;
     setPaletteDrag({
       pointerId: e.pointerId,
-      type,
+      item,
       startX: e.clientX,
       startY: e.clientY,
       x: e.clientX,
@@ -396,16 +673,11 @@ export function FieldPlacer({
     const pageEl = pageElementAt(e.clientX, e.clientY);
     const documentId = pageEl?.dataset.cvsDocument;
     const pageIndex = Number(pageEl?.dataset.cvsPage);
-    const size = documentId ? placement.pageSize(documentId, pageIndex) : undefined;
+    const size = documentId ? pageSizes[documentId]?.[pageIndex] : undefined;
     if (!pageEl || !documentId || !size) return;
     const box = pageEl.getBoundingClientRect();
     const scale = box.width / size.width;
-    placement.addField(
-      d.type,
-      documentId,
-      pageIndex,
-      clientToPoints(e.clientX, e.clientY, box, scale),
-    );
+    addItem(d.item, documentId, pageIndex, clientToPoints(e.clientX, e.clientY, box, scale));
   };
 
   const startDrag = (
@@ -413,145 +685,474 @@ export function FieldPlacer({
     field: Field,
     kind: Drag['kind'],
     scale: number,
+    corner: Corner = 'se',
   ) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.stopPropagation();
+    if (kind === 'move' && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+      toggleSelected(field.id);
+      return;
+    }
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    placement.select(field.id);
+    const moving = kind === 'move' && selectedSet.has(field.id) ? selectedIds : [field.id];
+    if (!selectedSet.has(field.id)) selectOnly(field.id);
+    const rects = new Map<string, Rect>();
+    for (const f of placement.fields) if (moving.includes(f.id)) rects.set(f.id, f.rect);
     drag.current = {
       pointerId: e.pointerId,
-      fieldId: field.id,
       kind,
+      corner,
+      fieldId: field.id,
       startX: e.clientX,
       startY: e.clientY,
-      rect: field.rect,
+      rects,
       scale,
+      gesture: `drag-${e.pointerId}-${Date.now()}`,
     };
   };
 
   const onDragMove = (e: ReactPointerEvent<HTMLElement>) => {
     const d = drag.current;
     if (!d || d.pointerId !== e.pointerId) return;
+    const field = placement.fields.find((f) => f.id === d.fieldId);
+    const start = d.rects.get(d.fieldId);
+    const page = field && pageSizes[field.documentId]?.[field.page];
+    if (!field || !start || !page) return;
+    gesture.current = d.gesture;
     const dx = (e.clientX - d.startX) / d.scale;
     const dy = (e.clientY - d.startY) / d.scale;
-    if (d.kind === 'move') {
-      placement.moveField(d.fieldId, { ...d.rect, x: d.rect.x + dx, y: d.rect.y + dy });
-    } else {
-      placement.resizeField(d.fieldId, d.rect.width + dx, d.rect.height + dy);
+    if (d.kind === 'resize') {
+      placement.setFieldRect(
+        d.fieldId,
+        resizeFromCorner(start, d.corner, dx, dy, page, placement.minSize),
+      );
+      gesture.current = null;
+      return;
     }
+    const neighbours = placement.fields
+      .filter((f) => !d.rects.has(f.id) && f.documentId === field.documentId)
+      .filter((f) => f.page === field.page)
+      .map((f) => f.rect);
+    const aligned = alignRect(
+      { ...start, x: start.x + dx, y: start.y + dy },
+      neighbours,
+      page,
+      placement.snapThreshold,
+    );
+    setGuides({ key: `${field.documentId}:${field.page}`, guides: aligned.guides });
+    if (d.rects.size === 1) {
+      placement.moveField(d.fieldId, aligned.rect);
+    } else {
+      const shiftX = aligned.rect.x - start.x;
+      const shiftY = aligned.rect.y - start.y;
+      placement.setFields(
+        placement.fields.map((f) => {
+          const from = d.rects.get(f.id);
+          const size = from && pageSizes[f.documentId]?.[f.page];
+          if (!from || !size) return f;
+          return {
+            ...f,
+            rect: roundRect(clampRect({ ...from, x: from.x + shiftX, y: from.y + shiftY }, size)),
+          };
+        }),
+      );
+    }
+    gesture.current = null;
   };
 
   const endDrag = (e: ReactPointerEvent<HTMLElement>) => {
-    if (drag.current?.pointerId === e.pointerId) drag.current = null;
+    if (drag.current?.pointerId === e.pointerId) {
+      drag.current = null;
+      setGuides(null);
+    }
+  };
+
+  const restore = (to: Field[]) => {
+    restoring.current = true;
+    placement.setFields(to);
+    restoring.current = false;
+    lastStep.current = { gesture: null, at: 0 };
+    setHistoryVersion((v) => v + 1);
+  };
+
+  const undo = () => {
+    const before = past.current.pop();
+    if (!before) return;
+    future.current.push(latest.current);
+    restore(before);
+  };
+
+  const redo = () => {
+    const after = future.current.pop();
+    if (!after) return;
+    past.current.push(latest.current);
+    restore(after);
+  };
+
+  const selectedFields = placement.fields.filter((f) => selectedSet.has(f.id));
+
+  const copy = () => {
+    if (selectedFields.length > 0) {
+      clipboard.current = selectedFields;
+      setHistoryVersion((v) => v + 1);
+    }
+  };
+
+  const pasteFields = (from: Field[]) => {
+    if (from.length === 0) return;
+    gesture.current = null;
+    const copies = pasteCopies(from, (doc, page) => pageSizes[doc]?.[page], makeId);
+    placement.addFields(copies);
+    clipboard.current = copies;
+    const [first, ...rest] = copies;
+    setExtra(rest.map((f) => f.id));
+    placement.select(first?.id ?? null);
+  };
+
+  const removeSelected = () => {
+    if (selectedIds.length === 0) return;
+    gesture.current = null;
+    placement.setFields(placement.fields.filter((f) => !selectedSet.has(f.id)));
+    selectOnly(null);
+  };
+
+  const patchSelected = (change: (f: Field) => Field) => {
+    gesture.current = null;
+    placement.setFields(placement.fields.map((f) => (selectedSet.has(f.id) ? change(f) : f)));
   };
 
   const onFieldKey = (e: KeyboardEvent<HTMLElement>, field: Field) => {
     if (isArrowKey(e.key)) {
       e.preventDefault();
-      placement.nudgeField(field.id, e.key, { large: e.shiftKey, resize: e.altKey });
+      e.stopPropagation();
+      const ids = selectedSet.has(field.id) ? selectedIds : [field.id];
+      gesture.current = `nudge-${ids.join(',')}-${e.altKey ? 'size' : 'move'}`;
+      for (const fieldId of ids) {
+        placement.nudgeField(fieldId, e.key, { large: e.shiftKey, resize: e.altKey });
+      }
+      gesture.current = null;
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      placement.removeField(field.id);
+      e.stopPropagation();
+      if (selectedIds.length > 1 && selectedSet.has(field.id)) removeSelected();
+      else {
+        gesture.current = null;
+        placement.removeField(field.id);
+        setExtra([]);
+      }
     } else if (e.key === 'Escape') {
-      placement.select(null);
+      selectOnly(null);
       e.currentTarget.blur();
+    } else if ((e.key === 'Enter' || e.key === ' ') && e.shiftKey) {
+      e.preventDefault();
+      toggleSelected(field.id);
     }
   };
 
-  const renderOverlay = ({ documentId, pageIndex, scale }: PageContext) =>
+  const onRootKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (previewing || typing(e.target)) return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const key = e.key.toLowerCase();
+    if (key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    } else if (key === 'y') {
+      e.preventDefault();
+      redo();
+    } else if (key === 'c' && selectedFields.length > 0) {
+      e.preventDefault();
+      copy();
+    } else if (key === 'v' && clipboard.current.length > 0) {
+      e.preventDefault();
+      pasteFields(clipboard.current);
+    } else if (key === 'd' && selectedFields.length > 0) {
+      e.preventDefault();
+      pasteFields(selectedFields);
+    }
+  };
+
+  // Zooming keeps the middle of what is on screen where it was.
+  const allPages = useMemo(
+    () => documents.flatMap((d) => states[d.id]?.source?.pages ?? []),
+    [documents, states],
+  );
+  const scale = viewerScale(allPages, width, zoom, 960);
+  const lastZoom = useRef({ zoom, scale });
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const before = lastZoom.current;
+    lastZoom.current = { zoom, scale };
+    if (!el || before.zoom === zoom || before.scale <= 0) return;
+    const ratio = scale / before.scale;
+    el.scrollTop = (el.scrollTop + el.clientHeight / 2) * ratio - el.clientHeight / 2;
+    el.scrollLeft = (el.scrollLeft + el.clientWidth / 2) * ratio - el.clientWidth / 2;
+  }, [zoom, scale]);
+
+  const fitPage = () => {
+    const el = scroller.current;
+    const tallest = Math.max(1, ...allPages.map((p) => p.height));
+    const atOne = viewerScale(allPages, width, 1, 960);
+    if (!el || el.clientHeight <= 0) return;
+    setZoom(clampZoom((el.clientHeight - 40) / (tallest * atOne)));
+  };
+
+  const goToPage = (documentId: string, page: number) => {
+    const el = scroller.current?.querySelector<HTMLElement>(
+      `[data-cvs-document="${cssEscape(documentId)}"][data-cvs-page="${page}"]`,
+    );
+    el?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    setInView({ documentId, page });
+  };
+
+  const addSignatureFor = (recipient: Recipient) => {
+    gesture.current = null;
+    const added = Object.entries(pageSizes).flatMap(([documentId, pages]) =>
+      pages.length > 0
+        ? signatureOnLastPage({
+            documentId,
+            recipientId: recipient.id,
+            pages,
+            createId: makeId,
+            ...(fieldSizes ? { sizes: fieldSizes } : {}),
+          })
+        : [],
+    );
+    placement.addFields(added);
+    placement.setRecipientId(recipient.id);
+    const first = added[0];
+    if (first) {
+      selectOnly(first.id);
+      goToPage(first.documentId, first.page);
+    }
+  };
+
+  const showField = (field: Field) => {
+    selectOnly(field.id);
+    goToPage(field.documentId, field.page);
+  };
+
+  const previewRecipient = signers.find((r) => r.id === placement.recipientId) ?? null;
+
+  const renderPreview = ({ documentId, pageIndex, scale: s }: PageContext) =>
     placement.fields
-      .filter((f) => f.documentId === documentId && f.page === pageIndex)
+      .filter(
+        (f) =>
+          f.documentId === documentId &&
+          f.page === pageIndex &&
+          f.recipientId === previewRecipient?.id,
+      )
       .map((field) => {
-        const box = pointsToPixels(field.rect, scale);
-        const selected = placement.selectedId === field.id;
-        const color = recipientColorIndex(signers, field.recipientId);
+        const box = pointsToPixels(field.rect, s);
+        const text =
+          field.type === 'signature'
+            ? labels.previewSign
+            : field.type === 'initials'
+              ? labels.previewInitial
+              : field.type === 'checkbox'
+                ? ''
+                : field.label || labels.fieldTypes[field.type];
         return (
-          <div
+          <span
             key={field.id}
-            className="cvs-placed"
+            className="cvs-preview-field"
             data-type={field.type}
-            data-selected={selected || undefined}
-            data-over-text={overText.has(field.id) || undefined}
-            data-cvs-color={color}
-            role="button"
-            tabIndex={0}
-            aria-pressed={selected}
-            aria-label={[
-              labels.field(
-                labels.fieldTypes[field.type],
-                recipientName(field.recipientId),
-                field.page + 1,
-              ),
-              overText.has(field.id) ? labels.overText : '',
-            ]
-              .filter(Boolean)
-              .join(', ')}
-            aria-describedby={`${id}-keys`}
+            data-required={field.required || undefined}
             style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-            onPointerDown={(e) => startDrag(e, field, 'move', scale)}
-            onPointerMove={onDragMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            onFocus={() => placement.select(field.id)}
-            onKeyDown={(e) => onFieldKey(e, field)}
           >
-            <span className="cvs-placed-label">
-              {field.label || labels.fieldTypes[field.type]}
-              {field.required && <span aria-hidden="true"> *</span>}
-              {placement.groupOf(field.id).length > 1 && (
-                <span className="cvs-placed-badge">
-                  {labels.groupBadge(placement.groupOf(field.id).length)}
-                </span>
-              )}
-              {overText.has(field.id) && (
-                <span className="cvs-placed-badge cvs-placed-warning">{labels.overText}</span>
-              )}
-            </span>
-            <span
-              className="cvs-placed-resize"
-              aria-hidden="true"
-              title={labels.resize}
-              onPointerDown={(e) => startDrag(e, field, 'resize', scale)}
-              onPointerMove={onDragMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-            />
-          </div>
+            {text}
+          </span>
         );
       });
 
-  const selected = placement.selected;
+  const renderOverlay = (ctx: PageContext) => {
+    if (previewing) return renderPreview(ctx);
+    const { documentId, pageIndex, scale: s } = ctx;
+    const onPage = placement.fields.filter(
+      (f) => f.documentId === documentId && f.page === pageIndex,
+    );
+    const lines = guides?.key === `${documentId}:${pageIndex}` ? guides.guides : [];
+    return (
+      <>
+        {lines.map((g) => (
+          <span
+            key={`${g.axis}-${g.at}`}
+            className="cvs-guide-line"
+            data-axis={g.axis}
+            aria-hidden="true"
+            style={g.axis === 'x' ? { left: g.at * s } : { top: g.at * s }}
+          />
+        ))}
+        {onPage.map((field) => {
+          const box = pointsToPixels(field.rect, s);
+          const selected = selectedSet.has(field.id);
+          const single = selected && selectedIds.length === 1;
+          const color = recipientColorIndex(signers, field.recipientId);
+          const group = placement.groupOf(field.id).length;
+          const compact = box.width < 64 || box.height < 18;
+          return (
+            <div
+              key={field.id}
+              className="cvs-placed"
+              data-type={field.type}
+              data-selected={selected || undefined}
+              data-compact={compact || undefined}
+              data-over-text={overText.has(field.id) || undefined}
+              data-cvs-color={color}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selected}
+              aria-label={[
+                labels.field(
+                  field.label || labels.fieldTypes[field.type],
+                  recipientName(field.recipientId),
+                  field.page + 1,
+                ),
+                overText.has(field.id) ? labels.overText : '',
+              ]
+                .filter(Boolean)
+                .join(', ')}
+              aria-describedby={`${id}-keys`}
+              style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
+              onPointerDown={(e) => startDrag(e, field, 'move', s)}
+              onPointerMove={onDragMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onFocus={() => {
+                if (!selectedSet.has(field.id)) selectOnly(field.id);
+              }}
+              onKeyDown={(e) => onFieldKey(e, field)}
+            >
+              <span className="cvs-placed-label">
+                <Icon name={fieldIcon(field.type, presetOf(field))} className="cvs-placed-icon" />
+                {!compact && (
+                  <span className="cvs-placed-text">
+                    {field.label || labels.fieldTypes[field.type]}
+                  </span>
+                )}
+                {group > 1 && <span className="cvs-placed-badge">{labels.groupBadge(group)}</span>}
+                {overText.has(field.id) && (
+                  <span className="cvs-placed-badge cvs-placed-warning">{labels.overText}</span>
+                )}
+              </span>
+              {field.required && (
+                <span className="cvs-placed-required" aria-hidden="true">
+                  *
+                </span>
+              )}
+              {single &&
+                (['se', 'nw', 'ne', 'sw'] as const).map((corner) => (
+                  <span
+                    key={corner}
+                    className={`cvs-placed-handle${corner === 'se' ? ' cvs-placed-resize' : ''}`}
+                    data-corner={corner}
+                    aria-hidden="true"
+                    title={labels.resize}
+                    onPointerDown={(e) => startDrag(e, field, 'resize', s, corner)}
+                    onPointerMove={onDragMove}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                  />
+                ))}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
+  const selected = selectedIds.length === 1 ? placement.selected : null;
+  const activeColor = recipientColorIndex(signers, placement.recipientId ?? '');
+  const noSigners = signers.length === 0;
+  const zoomPercent = Math.round(zoom * 100);
+  const zoomChoices = ZOOM_STEPS.includes(zoom)
+    ? ZOOM_STEPS
+    : [...ZOOM_STEPS, zoom].sort((a, b) => a - b);
+  const docInView = documents.find((d) => d.id === inView?.documentId) ?? documents[0];
+  const docPageCount = docInView ? (pageSizes[docInView.id]?.length ?? 0) : 0;
+
+  const toolButton = (name: IconName, label: string, onClick: () => void, disabled = false) => (
+    <button
+      type="button"
+      className="cvs-tool"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled || previewing}
+    >
+      <Icon name={name} />
+    </button>
+  );
 
   return (
-    <div className={['cvs-root', 'cvs-placer', className].filter(Boolean).join(' ')}>
+    <div
+      className={['cvs-root', 'cvs-placer', className].filter(Boolean).join(' ')}
+      data-previewing={previewing || undefined}
+      onKeyDown={onRootKey}
+    >
       <aside className="cvs-placer-panel cvs-placer-tools" aria-label={labels.palette}>
+        {noSigners ? (
+          <p className="cvs-hint cvs-side-empty">{labels.noRecipients}</p>
+        ) : (
+          <RecipientSwitcher
+            placement={placement}
+            recipients={signers}
+            label={labels.recipient}
+            countLabel={labels.fieldCount}
+          />
+        )}
+
         <h3 className="cvs-panel-title" id={`${id}-palette`}>
           {labels.palette}
         </h3>
-        <div className="cvs-palette" role="group" aria-labelledby={`${id}-palette`}>
-          {fieldTypes.map((type) => (
-            <button
-              key={type}
-              type="button"
-              className="cvs-palette-item"
-              data-type={type}
-              data-cvs-color={recipientColorIndex(signers, placement.recipientId ?? '')}
-              disabled={signers.length === 0}
-              aria-describedby={`${id}-palette-hint`}
-              onPointerDown={(e) => onPalettePointerDown(e, type)}
-              onPointerMove={onPalettePointerMove}
-              onPointerUp={onPalettePointerUp}
-              onPointerCancel={() => setPaletteDrag(null)}
-              onClick={() => {
-                // A click that ended a drag has already placed the field.
-                if (!paletteDragWasMove.current) addToPageInView(type);
-                paletteDragWasMove.current = false;
-              }}
-            >
-              <FieldTypeIcon type={type} />
-              <span className="cvs-palette-label">{labels.fieldTypes[type]}</span>
-            </button>
-          ))}
+        <div className="cvs-tray" role="group" aria-labelledby={`${id}-palette`}>
+          {TRAY.map(({ group, items }) => {
+            const shown = items.filter((item) => fieldTypes.includes(item.type));
+            if (shown.length === 0) return null;
+            return (
+              <div key={group} className="cvs-tray-group">
+                <p className="cvs-tray-title" id={`${id}-tray-${group}`}>
+                  {labels.trayGroups[group]}
+                </p>
+                <div className="cvs-palette" role="group" aria-labelledby={`${id}-tray-${group}`}>
+                  {shown.map((item) => {
+                    const label = item.preset
+                      ? labels.trayPresets[item.preset]
+                      : labels.fieldTypes[item.type];
+                    return (
+                      <button
+                        key={item.preset ?? item.type}
+                        type="button"
+                        className="cvs-palette-item"
+                        data-type={item.type}
+                        data-cvs-color={activeColor}
+                        disabled={noSigners || previewing}
+                        aria-describedby={`${id}-palette-hint`}
+                        onPointerDown={(e) => onPalettePointerDown(e, item)}
+                        onPointerMove={onPalettePointerMove}
+                        onPointerUp={onPalettePointerUp}
+                        onPointerCancel={() => setPaletteDrag(null)}
+                        onClick={() => {
+                          // A click that ended a drag has already placed the field.
+                          if (!paletteDragWasMove.current) addToPageInView(item);
+                          paletteDragWasMove.current = false;
+                        }}
+                      >
+                        <span className="cvs-palette-chip">
+                          <Icon
+                            name={fieldIcon(item.type, item.preset)}
+                            className="cvs-palette-icon"
+                          />
+                        </span>
+                        <span className="cvs-palette-label">{label}</span>
+                        <Icon name="grip" className="cvs-palette-grip" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
         <p className="cvs-hint" id={`${id}-palette-hint`}>
           {labels.paletteHint}
@@ -562,24 +1163,32 @@ export function FieldPlacer({
           <button
             type="button"
             className="cvs-button cvs-button--quiet"
-            disabled={signers.length === 0}
-            onClick={() => placement.addInitialsEveryPage()}
+            disabled={noSigners || previewing}
+            onClick={() => {
+              gesture.current = null;
+              placement.addInitialsEveryPage();
+            }}
           >
+            <Icon name="initials" />
             {labels.initialsEveryPage}
           </button>
           <button
             type="button"
             className="cvs-button cvs-button--quiet"
-            disabled={signers.length === 0}
-            onClick={() => placement.addSignatureLastPage()}
+            disabled={noSigners || previewing}
+            onClick={() => {
+              gesture.current = null;
+              placement.addSignatureLastPage();
+            }}
           >
+            <Icon name="signature" />
             {labels.signatureLastPage}
           </button>
           {tagCount > 0 && !tagsUsed && (
             <button
               type="button"
               className="cvs-button cvs-button--primary"
-              disabled={signers.length === 0}
+              disabled={noSigners || previewing}
               onClick={placeFromTags}
             >
               {labels.placeFromTags(tagCount)}
@@ -592,133 +1201,256 @@ export function FieldPlacer({
       </aside>
 
       <div className="cvs-viewer">
-        <div className="cvs-viewer-bar">
-          <ZoomControls zoom={zoom} onZoom={setZoom} labels={labels} />
+        <div className="cvs-placer-toolbar" role="toolbar" aria-label={labels.tools}>
+          <div className="cvs-toolset">
+            {toolButton('undo', labels.undo, undo, past.current.length === 0)}
+            {toolButton('redo', labels.redo, redo, future.current.length === 0)}
+          </div>
+          <span className="cvs-tool-divider" aria-hidden="true" />
+          <div className="cvs-toolset cvs-toolset--edit">
+            {toolButton('copy', labels.copy, copy, selectedFields.length === 0)}
+            {toolButton(
+              'paste',
+              labels.paste,
+              () => pasteFields(clipboard.current),
+              clipboard.current.length === 0,
+            )}
+            {toolButton(
+              'duplicate',
+              labels.duplicate,
+              () => pasteFields(selectedFields),
+              selectedFields.length === 0,
+            )}
+            {toolButton('trash', labels.deleteSelected, removeSelected, selectedIds.length === 0)}
+          </div>
+          <span className="cvs-spacer" />
+          {docPageCount > 0 && (
+            <span className="cvs-page-count">
+              {labels.page((inView?.page ?? 0) + 1, docPageCount)}
+            </span>
+          )}
+          <div className="cvs-zoom" role="group" aria-label={labels.zoomLevel(zoomPercent)}>
+            <button
+              type="button"
+              className="cvs-tool"
+              onClick={() => setZoom(clampZoom(zoom - 0.25))}
+              disabled={zoom <= MIN_ZOOM}
+              aria-label={labels.zoomOut}
+              title={labels.zoomOut}
+            >
+              <Icon name="minus" />
+            </button>
+            <select
+              className="cvs-zoom-select"
+              aria-label={labels.zoom}
+              value={String(zoom)}
+              onChange={(e) => {
+                if (e.target.value === 'page') fitPage();
+                else setZoom(clampZoom(Number(e.target.value)));
+              }}
+            >
+              {zoomChoices.map((z) => (
+                <option key={z} value={String(z)}>
+                  {z === 1 ? labels.fitWidth : `${Math.round(z * 100)}%`}
+                </option>
+              ))}
+              <option value="page">{labels.fitPage}</option>
+            </select>
+            <button
+              type="button"
+              className="cvs-tool"
+              onClick={() => setZoom(clampZoom(zoom + 0.25))}
+              disabled={zoom >= MAX_ZOOM}
+              aria-label={labels.zoomIn}
+              title={labels.zoomIn}
+            >
+              <Icon name="plus" />
+            </button>
+          </div>
+          {previewingProp === undefined && onPreviewingChange === undefined && !noSigners && (
+            <button
+              type="button"
+              className="cvs-button cvs-button--quiet cvs-preview-toggle"
+              aria-pressed={previewing}
+              onClick={() => setPreviewing(!previewing)}
+            >
+              <Icon name="eye" />
+              {previewing ? labels.stopPreview : labels.preview}
+            </button>
+          )}
         </div>
-        <div
-          ref={scroller}
-          className="cvs-scroller"
-          tabIndex={0}
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) placement.select(null);
-          }}
-        >
-          <DocumentPages
-            documents={documents}
-            states={states}
-            containerWidth={width}
-            zoom={zoom}
-            labels={labels}
-            renderOverlay={renderOverlay}
-          />
+        {previewing && previewRecipient && (
+          <p className="cvs-preview-banner" role="status" data-cvs-color={activeColor}>
+            <Icon name="eye" />
+            {labels.previewing(previewRecipient.name)}
+          </p>
+        )}
+        <div className="cvs-canvas">
+          <nav className="cvs-thumbs" aria-label={labels.pages}>
+            {documents.map((doc) => {
+              const source = states[doc.id]?.source;
+              if (!source) return null;
+              return (
+                <ol key={doc.id} className="cvs-thumb-list">
+                  {source.pages.map((page, index) => {
+                    const count = placement.fields.filter(
+                      (f) => f.documentId === doc.id && f.page === index,
+                    ).length;
+                    const current = inView?.documentId === doc.id && inView.page === index;
+                    const thumbScale = 76 / page.width;
+                    return (
+                      <li key={index}>
+                        <button
+                          type="button"
+                          className="cvs-thumb"
+                          aria-current={current ? 'page' : undefined}
+                          aria-label={labels.goToPage(index + 1, count)}
+                          onClick={() => goToPage(doc.id, index)}
+                        >
+                          <span
+                            className="cvs-thumb-sheet"
+                            style={{ width: 76, height: page.height * thumbScale }}
+                          >
+                            <PageImage
+                              source={source}
+                              pageIndex={index}
+                              scale={thumbScale}
+                              loadingLabel=""
+                              errorLabel=""
+                            />
+                            {count > 0 && (
+                              <span className="cvs-thumb-count" aria-hidden="true">
+                                {count}
+                              </span>
+                            )}
+                          </span>
+                          <span className="cvs-thumb-number" aria-hidden="true">
+                            {index + 1}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              );
+            })}
+          </nav>
+          <div
+            ref={scroller}
+            className="cvs-scroller"
+            tabIndex={0}
+            data-dragging={guides ? true : undefined}
+            onScroll={trackPage}
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) selectOnly(null);
+            }}
+          >
+            <DocumentPages
+              documents={documents}
+              states={states}
+              containerWidth={width}
+              zoom={zoom}
+              labels={labels}
+              renderOverlay={renderOverlay}
+            />
+          </div>
         </div>
       </div>
 
-      <aside className="cvs-placer-panel cvs-placer-side" aria-label={labels.recipient}>
-        {signers.length === 0 ? (
-          <p className="cvs-hint">{labels.noRecipients}</p>
-        ) : (
-          <RecipientPicker
-            placement={placement}
-            recipients={signers}
-            label={labels.recipient}
-            countLabel={labels.fieldCount}
-          />
-        )}
-
+      <aside className="cvs-placer-panel cvs-placer-side" aria-label={labels.properties}>
         {overText.size > 0 && (
           <p className="cvs-warning" role="status">
             {labels.overTextNote(overText.size)}
           </p>
         )}
-
-        {selected ? (
-          <div className="cvs-inspector" role="group" aria-label={labels.selectedField}>
-            <h3 className="cvs-panel-title">{labels.selectedField}</h3>
-            <label className="cvs-label" htmlFor={`${id}-assign`}>
-              {labels.assignedTo}
-            </label>
-            <select
-              id={`${id}-assign`}
-              className="cvs-input"
-              value={selected.recipientId}
-              onChange={(e) => placement.updateField(selected.id, { recipientId: e.target.value })}
-            >
-              {signers.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            <label className="cvs-check">
-              <input
-                type="checkbox"
-                checked={selected.required}
-                onChange={(e) => placement.updateField(selected.id, { required: e.target.checked })}
-              />
-              {labels.required}
-            </label>
-            <RepeatControl
-              id={id}
-              labels={labels}
-              pageCount={pageSizes[selected.documentId]?.length ?? 0}
-              page={selected.page}
-              pages={placement.pagesOf(selected.id)}
-              typed={typedPages?.fieldId === selected.id ? typedPages.text : null}
-              notice={repeatNotice?.fieldId === selected.id ? repeatNotice : null}
-              inputRef={pagesInput}
-              onChoose={(choice) => chooseRepeat(selected, choice)}
-              onType={(text) => setTypedPages({ fieldId: selected.id, text })}
-              onApply={(text) => showOnPages(selected, 'custom', text)}
-            />
-            <div className="cvs-inspector-actions">
-              {placement.groupOf(selected.id).length > 1 ? (
-                <>
-                  <button
-                    type="button"
-                    className="cvs-button"
-                    onClick={() => placement.applyToGroup(selected.id)}
-                  >
-                    {labels.applyToGroup(placement.groupOf(selected.id).length)}
-                  </button>
-                  <button
-                    type="button"
-                    className="cvs-button cvs-button--danger-quiet"
-                    onClick={() => placement.removeField(selected.id)}
-                  >
-                    {labels.deleteThis}
-                  </button>
-                  <button
-                    type="button"
-                    className="cvs-button cvs-button--danger-quiet"
-                    onClick={() => placement.removeGroup(selected.id)}
-                  >
-                    {labels.deleteGroup(placement.groupOf(selected.id).length)}
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="cvs-button cvs-button--danger-quiet"
-                  onClick={() => placement.removeField(selected.id)}
-                >
-                  {labels.deleteField}
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          signers.length > 0 && <p className="cvs-hint cvs-side-empty">{labels.selectHint}</p>
+        {previewing ? null : selectedIds.length > 1 ? (
+          <MultiInspector
+            labels={labels}
+            fields={selectedFields}
+            recipients={signers}
+            onAssign={(recipientId) => patchSelected((f) => ({ ...f, recipientId }))}
+            onRequired={(required) => patchSelected((f) => ({ ...f, required }))}
+            onAlign={(how) => {
+              const lead = selectedFields.find((f) => f.id === primary) ?? selectedFields[0];
+              if (!lead) return;
+              patchSelected((f) => {
+                const size = pageSizes[f.documentId]?.[f.page];
+                if (!size) return f;
+                const rect =
+                  how === 'left'
+                    ? { ...f.rect, x: lead.rect.x }
+                    : how === 'top'
+                      ? { ...f.rect, y: lead.rect.y }
+                      : { ...f.rect, width: lead.rect.width, height: lead.rect.height };
+                return { ...f, rect: roundRect(clampRect(rect, size)) };
+              });
+            }}
+            onDelete={removeSelected}
+          />
+        ) : selected ? (
+          <Inspector
+            id={id}
+            labels={labels}
+            field={selected}
+            recipients={signers}
+            color={recipientColorIndex(signers, selected.recipientId)}
+            icon={fieldIcon(selected.type, presetOf(selected))}
+            pageCount={pageSizes[selected.documentId]?.length ?? 0}
+            placement={placement}
+            typedPages={typedPages?.fieldId === selected.id ? typedPages.text : null}
+            repeatNotice={repeatNotice?.fieldId === selected.id ? repeatNotice : null}
+            pagesInput={pagesInput}
+            onChooseRepeat={(choice) => {
+              if (choice !== 'custom') {
+                showOnPages(selected, choice);
+                return;
+              }
+              setRepeatNotice(null);
+              setTypedPages({
+                fieldId: selected.id,
+                text: formatPageList(placement.pagesOf(selected.id)),
+              });
+              // The box appears with this render; move to it so the numbers can be typed at once.
+              setTimeout(() => pagesInput.current?.select(), 0);
+            }}
+            onTypePages={(text) => setTypedPages({ fieldId: selected.id, text })}
+            onApplyPages={(text) => showOnPages(selected, 'custom', text)}
+            onEdit={(key) => {
+              gesture.current = key;
+            }}
+          />
+        ) : noSigners ? null : (
+          <FieldsSummary
+            labels={labels}
+            recipients={signers}
+            fields={placement.fields}
+            onAddSignature={addSignatureFor}
+            onShow={showField}
+          />
         )}
-        <p className="cvs-hint cvs-keys" id={`${id}-keys`}>
-          {labels.keyboardHint}
-        </p>
+        <details className="cvs-shortcuts">
+          <summary>
+            <Icon name="keyboard" />
+            {labels.shortcuts}
+          </summary>
+          <p className="cvs-hint cvs-keys" id={`${id}-keys`}>
+            {labels.keyboardHint}
+          </p>
+          <dl className="cvs-shortcut-list">
+            {labels.shortcutList.map(([keys, action]) => (
+              <div key={keys}>
+                <dt>{keys}</dt>
+                <dd>{action}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </aside>
 
       {paletteDrag?.moved && (
         <div
           className="cvs-drag-ghost"
-          data-cvs-color={recipientColorIndex(signers, placement.recipientId ?? '')}
+          data-cvs-color={activeColor}
           aria-hidden="true"
           style={
             {
@@ -729,176 +1461,14 @@ export function FieldPlacer({
             } as CSSProperties
           }
         >
-          {labels.fieldTypes[paletteDrag.type]}
+          <Icon name={fieldIcon(paletteDrag.item.type, paletteDrag.item.preset)} />
+          <span>
+            {paletteDrag.item.preset
+              ? labels.trayPresets[paletteDrag.item.preset]
+              : labels.fieldTypes[paletteDrag.item.type]}
+          </span>
         </div>
       )}
-    </div>
-  );
-}
-
-const ICON_PATHS: Record<FieldType, string> = {
-  signature:
-    'M3 17c3-5 5.2-7.5 6.6-7.5 2.1 0 .3 6.6 2.4 6.6 1.6 0 3-3 4.6-3 1.2 0 1.2 1.9 2.6 1.9M3 21h18',
-  initials: 'M5 18V6l5 12V6M14 6h5M16.5 6v12M14 18h5',
-  date_signed: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3',
-  name: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.4-4 4.4-6 8-6s6.6 2 8 6',
-  text: 'M5 6V4h14v2M12 4v16M9 20h6',
-  checkbox: 'M4 4h16v16H4zM8 12l3 3 5-6',
-};
-
-function FieldTypeIcon({ type }: { type: FieldType }) {
-  return (
-    <svg
-      className="cvs-palette-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={ICON_PATHS[type]} />
-    </svg>
-  );
-}
-
-interface RepeatControlProps {
-  id: string;
-  labels: FieldPlacerLabels;
-  pageCount: number;
-  /** The selected field's own page, zero-based. */
-  page: number;
-  /** Pages the field and its copies are on now, zero-based. */
-  pages: number[];
-  /** Page numbers being typed, or null when the box is closed. */
-  typed: string | null;
-  notice: { text: string; error?: boolean } | null;
-  inputRef: RefObject<HTMLInputElement | null>;
-  onChoose: (choice: RepeatChoice) => void;
-  onType: (text: string) => void;
-  onApply: (text: string) => void;
-}
-
-/**
- * Which pages the selected field shows on. The list always reads what is true now: "This page
- * only" for a lone field, "All pages" once it is on every page, "Specific pages" with the
- * numbers otherwise. Picking a choice applies it; typed numbers apply on Enter or Apply.
- */
-function RepeatControl({
-  id,
-  labels,
-  pageCount,
-  page,
-  pages,
-  typed,
-  notice,
-  inputRef,
-  onChoose,
-  onType,
-  onApply,
-}: RepeatControlProps) {
-  if (pageCount < 2) return null;
-  const current = choiceForPages(pages, pageCount);
-  const choice: RepeatChoice = typed !== null ? 'custom' : current;
-  const text = typed ?? formatPageList(pages);
-  return (
-    <div className="cvs-repeat">
-      <label className="cvs-label" htmlFor={`${id}-repeat`}>
-        {labels.repeatOn}
-      </label>
-      <select
-        id={`${id}-repeat`}
-        className="cvs-input"
-        value={choice}
-        onChange={(e) => onChoose(e.target.value as RepeatChoice)}
-      >
-        {(['this', 'all', 'custom'] as const).map((value) => (
-          <option key={value} value={value}>
-            {labels.repeatChoices[value]}
-          </option>
-        ))}
-      </select>
-      {choice === 'custom' && (
-        <>
-          <div className="cvs-row">
-            <input
-              ref={inputRef}
-              className="cvs-input"
-              inputMode="numeric"
-              aria-label={labels.pagesLabel}
-              aria-describedby={`${id}-repeat-hint`}
-              aria-invalid={notice?.error || undefined}
-              placeholder={labels.pagesPlaceholder}
-              value={text}
-              onChange={(e) => onType(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                onApply(text);
-              }}
-            />
-            <button type="button" className="cvs-button" onClick={() => onApply(text)}>
-              {labels.applyRepeat}
-            </button>
-          </div>
-          <p className="cvs-hint" id={`${id}-repeat-hint`}>
-            {labels.pagesHint(page + 1)}
-          </p>
-        </>
-      )}
-      <p className={notice?.error ? 'cvs-error' : 'cvs-hint'} role="status">
-        {notice?.text}
-      </p>
-    </div>
-  );
-}
-
-function RecipientPicker({
-  placement,
-  recipients,
-  label,
-  countLabel,
-}: {
-  placement: FieldPlacementState;
-  recipients: Recipient[];
-  label: string;
-  countLabel: (count: number) => string;
-}) {
-  const id = useId();
-  return (
-    <div className="cvs-recipients" role="radiogroup" aria-labelledby={id}>
-      <h3 className="cvs-panel-title" id={id}>
-        {label}
-      </h3>
-      {recipients.map((r, index) => {
-        const count = placement.fields.filter((f) => f.recipientId === r.id).length;
-        return (
-          <div
-            key={r.id}
-            className="cvs-recipient"
-            data-cvs-color={index % 6}
-            data-active={placement.recipientId === r.id || undefined}
-          >
-            <label className="cvs-recipient-main">
-              <input
-                type="radio"
-                name={id}
-                checked={placement.recipientId === r.id}
-                onChange={() => placement.setRecipientId(r.id)}
-              />
-              <span className="cvs-recipient-dot" aria-hidden="true" />
-              <span className="cvs-recipient-name">{r.name}</span>
-            </label>
-            <span
-              className="cvs-recipient-count"
-              data-empty={(count === 0 && r.role === 'signer') || undefined}
-            >
-              {countLabel(count)}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }

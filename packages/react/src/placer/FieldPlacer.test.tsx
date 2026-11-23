@@ -370,3 +370,112 @@ describe('FieldPlacer on many pages', () => {
     expect(screen.queryByText(/covers page text/)).toBeNull();
   });
 });
+
+describe('FieldPlacer editing tools', () => {
+  it('offers Email, Company and Title as labelled text fields', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Email' }));
+    expect(last()[0]).toMatchObject({ type: 'text', label: 'Email' });
+    expect(last()[0]!.rect.width).toBe(180);
+    expect(screen.getByRole('button', { name: 'Email for Asha Rao, page 1' })).toBeInTheDocument();
+  });
+
+  it('undoes and redoes a change, a whole drag as one step', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    const placed = screen.getByRole('button', { name: /^Text for Asha Rao/ });
+    fireEvent.pointerDown(placed, { pointerId: 1, clientX: 0, clientY: 0, button: 0 });
+    fireEvent.pointerMove(placed, { pointerId: 1, clientX: 40, clientY: 0 });
+    fireEvent.pointerMove(placed, { pointerId: 1, clientX: 80, clientY: 0 });
+    fireEvent.pointerUp(placed, { pointerId: 1, clientX: 80, clientY: 0 });
+    const moved = last()[0]!.rect.x;
+    expect(moved).toBeGreaterThan(226);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(last()[0]!.rect.x).toBe(226);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(last()).toEqual([]);
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(last()[0]!.rect.x).toBe(moved);
+  });
+
+  it('undoes with Ctrl+Z and redoes with Ctrl+Shift+Z', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    const root = document.querySelector('.cvs-placer')!;
+    fireEvent.keyDown(root, { key: 'z', ctrlKey: true });
+    expect(last()).toEqual([]);
+    fireEvent.keyDown(root, { key: 'z', ctrlKey: true, shiftKey: true });
+    expect(last()).toHaveLength(1);
+  });
+
+  it('copies and pastes the selected field a little lower and to the right', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    const placed = screen.getByRole('button', { name: /^Signature for Asha Rao/ });
+    fireEvent.keyDown(placed, { key: 'c', ctrlKey: true });
+    fireEvent.keyDown(placed, { key: 'v', ctrlKey: true });
+    const [first, copy] = last();
+    expect(copy).toMatchObject({ type: 'signature', recipientId: 'r1', page: 0 });
+    expect(copy!.id).not.toBe(first!.id);
+    expect(copy!.rect).toMatchObject({ x: first!.rect.x + 12, y: first!.rect.y + 12 });
+  });
+
+  it('selects several fields with Shift and changes them together', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Date signed' }));
+    const signature = screen.getByRole('button', { name: /^Signature for Asha Rao/ });
+    fireEvent.pointerDown(signature, { pointerId: 4, button: 0, shiftKey: true });
+    const group = screen.getByRole('group', { name: '2 fields selected' });
+    fireEvent.change(within(group).getByLabelText('Assign all to'), { target: { value: 'r2' } });
+    expect(last().every((f) => f.recipientId === 'r2')).toBe(true);
+    fireEvent.click(within(group).getByRole('button', { name: 'Align left edges' }));
+    expect(new Set(last().map((f) => f.rect.x)).size).toBe(1);
+    fireEvent.click(within(group).getByRole('button', { name: 'Delete 2 fields' }));
+    expect(last()).toEqual([]);
+  });
+
+  it('resizes from the top-left corner and keeps the bottom-right in place', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    const handle = document.querySelector('.cvs-placed-handle[data-corner="nw"]')!;
+    fireEvent.pointerDown(handle, { pointerId: 5, clientX: 0, clientY: 0, button: 0 });
+    fireEvent.pointerMove(handle, { pointerId: 5, clientX: -20 * scale, clientY: -10 * scale });
+    expect(last()[0]!.rect).toEqual({ x: 196, y: 359, width: 200, height: 64 });
+  });
+
+  it('summarises each signer and adds a missing signature', () => {
+    const { last } = setup();
+    const summary = screen.getByRole('region', { name: 'Fields summary' });
+    expect(within(summary).getAllByText('No signature field yet.')).toHaveLength(2);
+    fireEvent.click(
+      within(summary).getByRole('button', { name: 'Add a signature for Vikram Shah' }),
+    );
+    expect(last()).toEqual([
+      expect.objectContaining({ type: 'signature', recipientId: 'r2', page: 1 }),
+    ]);
+  });
+
+  it('previews the chosen signer’s fields as they will see them, with editing off', () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview as signer' }));
+    expect(screen.getByText('Previewing what Asha Rao sees')).toHaveAttribute('role', 'status');
+    expect(document.querySelector('.cvs-preview-field')).toHaveTextContent('Sign');
+    expect(screen.queryByRole('button', { name: /^Signature for Asha Rao/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Text' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to editing' }));
+    expect(screen.getByRole('button', { name: /^Signature for Asha Rao/ })).toBeInTheDocument();
+  });
+
+  it('lists the pages with their field counts', () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    const pages = screen.getByRole('navigation', { name: 'Pages' });
+    expect(within(pages).getByRole('button', { name: 'Page 1, 1 field' })).toBeInTheDocument();
+    expect(within(pages).getByRole('button', { name: 'Page 2' })).toBeInTheDocument();
+  });
+});
