@@ -19,11 +19,11 @@ export interface EsignRequest {
   documentBytes: Uint8Array;
   documentName: string;
   /**
-   * Where the signer's Aadhaar eSign box sits. A provider whose API takes a position per
-   * request places the signature there; one that takes it from its own configuration, such
-   * as Leegality's v3.0 API, ignores it.
+   * Where to place the signature, for a provider whose API takes a position per request.
+   * Leegality's v3.0 API takes it from the workflow and ignores this; the server sends none,
+   * so the signature goes where the provider's own configuration says.
    */
-  signaturePositions: SignaturePosition[];
+  signaturePositions?: SignaturePosition[];
   /** Where the provider should send status callbacks. */
   callbackUrl: string;
   /** Where the signer lands after signing or declining. */
@@ -61,6 +61,11 @@ export interface EsignProvider {
   parseWebhook(headers: WebhookHeaders, rawBody: string | Uint8Array): Promise<EsignEvent | null>;
   /** The signed PDF. Throws `SignError('INVALID_STATE')` until every signer has signed. */
   fetchSignedDocument(providerRef: string): Promise<Uint8Array>;
+  /**
+   * The provider's own audit trail of a completed request, as a PDF, kept as evidence next
+   * to the signed file. Throws `SignError('INVALID_STATE')` until every signer has signed.
+   */
+  fetchAuditTrail?(providerRef: string): Promise<Uint8Array>;
   /**
    * The provider reference a webhook body names, read without verifying anything, or null.
    * A server that holds several provider accounts uses it to find whose credentials must

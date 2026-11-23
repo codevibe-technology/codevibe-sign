@@ -76,7 +76,8 @@ Node 22 or later. The package uses `fetch` and `node:crypto`.
 3. The provider calls your webhook. `parseWebhook` verifies it and returns
    `{ providerRef, status }`, where `status` is `signed`, `declined`, `expired` or `failed`.
 4. When the status is `signed`, `fetchSignedDocument(providerRef)` returns the signed PDF. Store it
-   and record the event in the envelope's audit trail.
+   and record the event in the envelope's audit trail. `fetchAuditTrail(providerRef)` returns
+   the provider's own audit trail PDF, to keep as evidence next to it.
 
 The signed PDF carries the provider's digital signature. Do not draw on it or add pages to it
 afterwards: any change other than another signature breaks that signature. To seal it, use
@@ -107,7 +108,6 @@ const { providerRef, signUrl } = await esign.createRequest({
   recipient: { name: 'Asha Rao', email: 'asha@example.com' },
   documentBytes: pdf,
   documentName: 'Appointment letter.pdf',
-  signaturePositions: [{ page: 0, rect: { x: 72, y: 640, width: 160, height: 48 } }],
   callbackUrl: 'https://sign.example.com/hooks/leegality',
   redirectUrl: 'https://sign.example.com/done',
 });
@@ -116,19 +116,20 @@ const { providerRef, signUrl } = await esign.createRequest({
 const event = await esign.parseWebhook(request.headers, rawBody);
 if (event?.status === 'signed') {
   const signed = await esign.fetchSignedDocument(event.providerRef);
+  const providerAuditTrail = await esign.fetchAuditTrail?.(event.providerRef);
 }
 ```
 
 ## API
 
-| Export                    | What it is                                                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `webhookRef` and `checkCredentials`. Implement it to add a provider. |
-| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `signaturePositions`, `callbackUrl`, `redirectUrl`.                |
-| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                          |
-| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                       |
-| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                 |
-| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                  |
+| Export                    | What it is                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `fetchAuditTrail`, `webhookRef` and `checkCredentials`. Implement it to add a provider. |
+| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `callbackUrl`, `redirectUrl`, optional `signaturePositions`.                          |
+| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                                             |
+| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                                          |
+| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                                    |
+| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                                     |
 
 `reference` is your own id for one request, sent to Leegality as the `irn`; it defaults to
 `envelopeId`. Give each attempt its own when a signer can start again.
@@ -186,7 +187,8 @@ by configuration rather than guessed:
 
 - **Signature positions, callback URL and redirect URL** are not fields of the Create eSigning
   request API. They come from the workflow (see above), so `signaturePositions`, `callbackUrl`
-  and `redirectUrl` are not sent.
+  and `redirectUrl` are not sent. Without coordinates in the workflow, Leegality puts the
+  signature at the bottom left of every page.
 - **Choosing Aadhaar per request** is not documented; the workflow decides the eSign type.
 - **Webhook authenticity**: the documented `mac` is HMAC-SHA1 of the `documentId` only, keyed by
   the Private Salt. The rest of the body is not covered, and no timestamp or replay protection

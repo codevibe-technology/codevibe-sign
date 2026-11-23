@@ -305,7 +305,32 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     return event;
   }
 
-  async function fetchSignedDocument(providerRef: string): Promise<Uint8Array> {
+  /** Reads a PDF download, refusing anything else and anything over the size limit. */
+  async function readPdf(res: Response, what: string): Promise<Uint8Array> {
+    const bytes = await readLimited(res, maxSignedBytes);
+    if (!bytes) {
+      throw new SignError('DOCUMENT_TOO_LARGE', `${what} from Leegality is too large`, {
+        limit: maxSignedBytes,
+      });
+    }
+    if (!isPdf(bytes)) {
+      throw new SignError('DOCUMENT_INVALID', 'Leegality returned a file that is not a PDF', {
+        provider: PROVIDER,
+      });
+    }
+    return bytes;
+  }
+
+  /**
+   * One file of a completed document. The endpoint answers with the PDF itself, or with JSON
+   * that holds a short-lived download link (`data.file`), which is then fetched without the
+   * auth token.
+   */
+  async function download(
+    providerRef: string,
+    type: 'DOCUMENT' | 'AUDIT_TRAIL',
+    what: string,
+  ): Promise<Uint8Array> {
     required(providerRef, 'providerRef');
     const status = await transactionStatus(providerRef);
     // Leegality documents `auditTrail` as present only once every required invitee has signed.
@@ -318,29 +343,29 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
 
     const url =
       `${baseUrl}/v3.1/document/fetchDocument?documentId=${encodeURIComponent(providerRef)}` +
-      '&documentDownloadType=DOCUMENT';
-    return request(
+      `&documentDownloadType=${type}`;
+    const link = await request(
       url,
       { method: 'GET', headers: { 'X-Auth-Token': authToken } },
       http,
-      async (res) => {
-        const type = res.headers.get('content-type') ?? '';
-        if (type.includes('json')) throw envelopeError(await readEnvelope(res));
-        const bytes = await readLimited(res, maxSignedBytes);
-        if (!bytes) {
-          throw new SignError('DOCUMENT_TOO_LARGE', 'Signed document from Leegality is too large', {
-            limit: maxSignedBytes,
-          });
-        }
-        if (!isPdf(bytes)) {
-          throw new SignError('DOCUMENT_INVALID', 'Leegality returned a file that is not a PDF', {
-            provider: PROVIDER,
-          });
-        }
-        return bytes;
+      async (res): Promise<Uint8Array | string> => {
+        const contentType = res.headers.get('content-type') ?? '';
+        if (!contentType.includes('json')) return readPdf(res, what);
+        const envelope = await readEnvelope<{ file?: unknown }>(res);
+        const file = envelope.data?.file;
+        if (envelope.status === 1 && typeof file === 'string' && isHttpsUrl(file)) return file;
+        throw envelopeError(envelope);
       },
     );
+    if (typeof link !== 'string') return link;
+    return request(link, { method: 'GET' }, http, (res) => readPdf(res, what));
   }
+
+  const fetchSignedDocument = (providerRef: string) =>
+    download(providerRef, 'DOCUMENT', 'Signed document');
+
+  const fetchAuditTrail = (providerRef: string) =>
+    download(providerRef, 'AUDIT_TRAIL', 'The audit trail');
 
   /**
    * Asks for the status of a document id that cannot exist. Leegality answers "no document
@@ -366,6 +391,7 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     createRequest,
     parseWebhook,
     fetchSignedDocument,
+    fetchAuditTrail,
     webhookRef: peekDocumentId,
     checkCredentials,
   };

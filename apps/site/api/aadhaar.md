@@ -20,14 +20,14 @@ pnpm add @codevibe_technology/sign-aadhaar @codevibe_technology/sign-core
 
 Node 22 or later. The package uses `fetch` and `node:crypto`.
 
-| Export                    | What it is                                                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `webhookRef` and `checkCredentials`. Implement it to add a provider. |
-| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `signaturePositions`, `callbackUrl`, `redirectUrl`.                |
-| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                          |
-| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                       |
-| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                 |
-| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                  |
+| Export                    | What it is                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `fetchAuditTrail`, `webhookRef` and `checkCredentials`. Implement it to add a provider. |
+| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `callbackUrl`, `redirectUrl`, optional `signaturePositions`.                          |
+| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                                             |
+| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                                          |
+| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                                    |
+| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                                     |
 
 `reference` is your own id for one request, sent to Leegality as the `irn`; it defaults to
 `envelopeId`. Give each attempt its own when a signer can start again.
@@ -78,7 +78,8 @@ by configuration rather than guessed:
 
 - **Signature positions, callback URL and redirect URL** are not fields of the Create eSigning
   request API. They come from the workflow (see above), so `signaturePositions`, `callbackUrl`
-  and `redirectUrl` are not sent.
+  and `redirectUrl` are not sent. Without coordinates in the workflow, Leegality puts the
+  signature at the bottom left of every page.
 - **Choosing Aadhaar per request** is not documented; the workflow decides the eSign type.
 - **Webhook authenticity**: the documented `mac` is HMAC-SHA1 of the `documentId` only, keyed by
   the Private Salt. The rest of the body is not covered, and no timestamp or replay protection

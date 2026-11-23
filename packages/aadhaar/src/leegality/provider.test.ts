@@ -622,6 +622,60 @@ describe('fetchSignedDocument', () => {
   });
 });
 
+describe('fetchAuditTrail', () => {
+  const trailPdf = new TextEncoder().encode('%PDF-1.7\naudit trail\n');
+  const complete = { auditTrail: 'https://cdn/a' };
+
+  it('downloads the audit trail of a completed document', async () => {
+    const { provider, fetch } = setup((url) =>
+      url.includes('/v3.2/sign/request')
+        ? statusResponse({ signed: true }, complete)
+        : new Response(trailPdf, { headers: { 'content-type': 'application/pdf' } }),
+    );
+    await expect(provider.fetchAuditTrail!('DOC123')).resolves.toEqual(trailPdf);
+    expect(fetch.mock.calls[1]![0]).toBe(
+      'https://sandbox.leegality.com/api/v3.1/document/fetchDocument?documentId=DOC123&documentDownloadType=AUDIT_TRAIL',
+    );
+  });
+
+  it('follows a download link answered as JSON, without the auth token', async () => {
+    const { provider, fetch } = setup((url) => {
+      if (url.includes('/v3.2/sign/request')) return statusResponse({ signed: true }, complete);
+      if (url.includes('fetchDocument')) {
+        return json({ status: 1, messages: [], data: { file: 'https://cdn.leegality.com/t/1' } });
+      }
+      return new Response(trailPdf, { headers: { 'content-type': 'application/pdf' } });
+    });
+    await expect(provider.fetchAuditTrail!('DOC123')).resolves.toEqual(trailPdf);
+    expect(fetch.mock.calls[2]![0]).toBe('https://cdn.leegality.com/t/1');
+    expect(JSON.stringify(fetch.mock.calls[2]![1] ?? {})).not.toContain(TOKEN);
+  });
+
+  it('refuses a link that is not https and a file that is not a PDF', async () => {
+    const plainLink = setup((url) =>
+      url.includes('/v3.2/sign/request')
+        ? statusResponse({ signed: true }, complete)
+        : json({ status: 1, messages: [], data: { file: 'http://cdn/x' } }),
+    );
+    expect((await caught(plainLink.provider.fetchAuditTrail!('DOC123'))).code).toBe(
+      'PROVIDER_ERROR',
+    );
+    const notPdf = setup((url) =>
+      url.includes('/v3.2/sign/request')
+        ? statusResponse({ signed: true }, complete)
+        : new Response('<html>', { headers: { 'content-type': 'text/html' } }),
+    );
+    expect((await caught(notPdf.provider.fetchAuditTrail!('DOC123'))).code).toBe(
+      'DOCUMENT_INVALID',
+    );
+  });
+
+  it('refuses before the document is complete', async () => {
+    const { provider } = setup(() => statusResponse({ signed: false }, {}));
+    expect((await caught(provider.fetchAuditTrail!('DOC123'))).code).toBe('INVALID_STATE');
+  });
+});
+
 describe('webhookRef', () => {
   it('reads the document id without checking the mac', () => {
     const { provider } = setup(() => json({}));
