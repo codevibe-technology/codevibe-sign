@@ -327,6 +327,8 @@ export function SendFlow({
   const current = STEPS[index]!;
   const nextStep = STEPS[index + 1];
   const intro = STEP_INTRO[step];
+  const headline =
+    state.settings.title || (state.envelopeId ? 'Untitled envelope' : 'Send a document');
 
   return (
     <div
@@ -353,9 +355,12 @@ export function SendFlow({
         >
           <FileSignature className="h-[18px] w-[18px]" />
         </span>
-        <div className="min-w-0 flex-1 lg:max-w-[340px] lg:flex-none">
-          <h1 className="truncate font-display text-[15px] leading-tight font-bold tracking-tight text-ink sm:text-base">
-            {state.settings.title || (state.envelopeId ? 'Untitled envelope' : 'Send a document')}
+        <div className="min-w-0 flex-1 min-[1720px]:max-w-[340px] min-[1720px]:flex-none">
+          <h1
+            className="truncate font-display text-[15px] leading-tight font-bold tracking-tight text-ink sm:text-base"
+            title={headline}
+          >
+            {headline}
           </h1>
           <SaveIndicator
             state={save}
@@ -364,7 +369,8 @@ export function SendFlow({
           />
         </div>
         <StepTrail current={step} reached={reached} onSelect={go} />
-        <div className="ml-auto hidden items-center gap-2 lg:flex">
+        <CompactTrail current={step} reached={reached} onSelect={go} />
+        <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
           {step === 'fields' && state.recipients.some((r) => r.role !== 'viewer') ? (
             <Button
               type="button"
@@ -378,7 +384,7 @@ export function SendFlow({
             </Button>
           ) : null}
         </div>
-        <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:static lg:z-auto lg:ml-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+        <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:static lg:z-auto lg:ml-0 lg:shrink-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
           <Button
             type="button"
             variant="secondary"
@@ -607,7 +613,7 @@ function StepTrail({
   return (
     <nav
       aria-label="Steps"
-      className="hidden min-w-0 flex-1 justify-center lg:flex"
+      className="hidden min-w-0 flex-1 justify-center min-[1720px]:flex"
       data-tour="send-steps"
     >
       <ol className="flex items-center gap-1">
@@ -654,6 +660,62 @@ function StepTrail({
           );
         })}
       </ol>
+    </nav>
+  );
+}
+
+/**
+ * The trail where the full one does not fit beside the title and the buttons: a dot per step
+ * (reached ones can be revisited) and the current step by name.
+ */
+function CompactTrail({
+  current,
+  reached,
+  onSelect,
+}: {
+  current: StepKey;
+  reached: number;
+  onSelect: (step: StepKey) => void;
+}) {
+  const index = STEPS.findIndex((s) => s.key === current);
+  return (
+    <nav
+      aria-label="Steps"
+      className="hidden shrink-0 items-center gap-3 rounded-full bg-surface-2 py-1.5 pr-3.5 pl-2 lg:max-[1719px]:flex"
+      data-tour="send-steps"
+    >
+      <ol className="flex items-center gap-1">
+        {STEPS.map((s, i) => {
+          const done = i < index;
+          const active = i === index;
+          return (
+            <li key={s.key}>
+              <button
+                type="button"
+                disabled={i > reached || active}
+                onClick={() => onSelect(s.key)}
+                aria-current={active ? 'step' : undefined}
+                aria-label={s.label}
+                title={s.label}
+                className={cn(
+                  'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors disabled:cursor-default',
+                  active && 'bg-primary text-primary-ink',
+                  done && 'bg-success text-white hover:opacity-90',
+                  !active && !done && 'border border-line-strong bg-surface text-muted',
+                )}
+              >
+                {done ? <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-[13px] font-semibold whitespace-nowrap text-ink">
+        <span className="text-muted">
+          Step {index + 1} of {STEPS.length} ·{' '}
+        </span>
+        {STEPS[index]!.label}
+      </p>
     </nav>
   );
 }
