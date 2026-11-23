@@ -3,9 +3,11 @@ import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { billingConfig } from './config';
 import { fulfilCredits } from './credit-orders';
+import { fulfilInstallHelp } from './install-help';
 import { invoiceRendering } from './invoice-assets';
 import { registerFulfilment, type BillingDeps } from './orders';
 import { createRazorpay } from './razorpay';
+import { fulfilSeats, fulfilSubscription } from './subscriptions';
 
 /**
  * Settings, payment client, files and mail for the billing code, built from the environment on
@@ -14,6 +16,9 @@ import { createRazorpay } from './razorpay';
  */
 export function billingDeps(): BillingDeps {
   registerFulfilment('esign_credits', fulfilCredits);
+  registerFulfilment('cloud_subscription', fulfilSubscription);
+  registerFulfilment('extra_seats', fulfilSeats);
+  registerFulfilment('install_help', fulfilInstallHelp);
   const config = billingConfig();
   const { files, mailer } = appRuntime();
   return {

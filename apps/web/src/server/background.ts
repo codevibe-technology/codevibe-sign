@@ -1,17 +1,25 @@
 import { db } from './db';
 import { env } from './env';
 import { migrateAll } from './migrate';
+import { notifyInstallBookings } from './billing/install-help';
 import { finishPendingInvoices } from './billing/invoices';
 import { pruneRazorpayEvents } from './billing/orders';
 import { billingDeps } from './billing/runtime';
+import { runSubscriptionTick } from './billing/subscriptions';
 import { resumeBulkSends } from './bulk-worker';
 import { pruneMailLog } from './mail-log';
 import { signServer } from './sign/server';
 import { pruneDeliveries } from './webhooks';
 
-/** Sends invoices whose file or email failed earlier and forgets old payment notifications. */
+/**
+ * Sends invoices whose file or email failed earlier, moves Cloud subscriptions along with the
+ * clock, tells the operator about paid bookings and forgets old payment notifications.
+ */
 async function billingTick() {
-  await finishPendingInvoices(db(), billingDeps());
+  const deps = billingDeps();
+  await finishPendingInvoices(db(), deps);
+  await runSubscriptionTick(db(), deps);
+  await notifyInstallBookings(db(), deps);
   await pruneRazorpayEvents(db());
 }
 
