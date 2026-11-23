@@ -48,7 +48,14 @@ export async function setAccountPlanByName(
       where a.id = ${found.id} for update of a`;
     const from = account!.plan;
     // A plan set here is the operator's: billing no longer renews, changes or ends it.
-    await setAccountPlan(tx, found.id, { plan: to, source: 'operator' });
+    // Any paid term stops with it, extra members included, so nothing is sold against a term
+    // that no longer decides the plan.
+    await setAccountPlan(tx, found.id, { plan: to, source: 'operator', extraSeats: 0 });
+    await tx`
+      update app_subscriptions
+      set status = 'ended', grace_ends_at = null, seats = 0, renewal_seats = 0,
+          cancel_at_period_end = false, updated_at = now()
+      where account_id = ${found.id} and status <> 'ended'`;
     await tx`insert into app_plan_changes (id, account_id, from_plan, to_plan, changed_by)
       values (${randomId('plan')}, ${found.id}, ${from}, ${to}, ${input.changedBy})`;
     const workspaces = await tx<{ slug: string }[]>`

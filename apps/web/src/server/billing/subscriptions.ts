@@ -315,7 +315,8 @@ export async function createSeatsOrder(
     getSubscription(sql, input.accountId),
   ]);
   if (operatorManaged(plan)) throw new AppError('CONFLICT', MANAGED_MESSAGE);
-  if (!subscription || subscription.status !== 'active') {
+  const paidCloud = plan.plan === 'cloud' && plan.source === 'billing';
+  if (!paidCloud || !subscription || subscription.status !== 'active') {
     throw new AppError(
       'CONFLICT',
       subscription?.status === 'grace'

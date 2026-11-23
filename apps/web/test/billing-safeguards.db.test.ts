@@ -669,6 +669,34 @@ describe.skipIf(!url)('billing safeguards against PostgreSQL', () => {
     });
   });
 
+  describe('a plan the operator moves to Free during a paid term', () => {
+    it('ends the term with it, so no extra members can be sold against it', async () => {
+      const ws = await workspace();
+      await subscribe(ws);
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'free', changedBy: 'ops' });
+      expect((await getSubscription(sql, ws.accountId))!.status).toBe('ended');
+      const [account] = await sql<{ extra_seats: number }[]>`
+        select extra_seats from app_accounts where id = ${ws.accountId}`;
+      expect(account!.extra_seats).toBe(0);
+      const refused = await appError(
+        createSeatsOrder(sql, deps, { accountId: ws.accountId, userId: ws.owner.id, add: 1 }),
+      );
+      expect(refused.code).toBe('CONFLICT');
+    });
+
+    it('sells no extra members while a term runs but the plan is not the paid Cloud', async () => {
+      const ws = await workspace();
+      await subscribe(ws);
+      // The plan and the term fall out of step some other way.
+      await sql`update app_accounts set plan = 'free', plan_source = 'operator'
+        where id = ${ws.accountId}`;
+      const refused = await appError(
+        createSeatsOrder(sql, deps, { accountId: ws.accountId, userId: ws.owner.id, add: 1 }),
+      );
+      expect(refused.message).toContain('Upgrade to Cloud first');
+    });
+  });
+
   describe('a booking and its order', () => {
     it('cannot be paid when the booking is missing', async () => {
       const { checkout } = await createOrder(sql, deps, {

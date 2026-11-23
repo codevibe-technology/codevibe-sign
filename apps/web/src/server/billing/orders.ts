@@ -281,7 +281,7 @@ export async function createOrder(
     .createOrder({
       amountPaise: tax.totalPaise,
       receipt: id,
-      notes: { kind: input.kind, ...(input.accountId ? { workspace: input.accountId } : {}) },
+      notes: { kind: input.kind, ...(input.accountId ? { account: input.accountId } : {}) },
     })
     .catch(providerFailure);
 
