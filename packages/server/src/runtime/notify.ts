@@ -10,9 +10,20 @@ import {
 import { issueCopyClaim } from '../http/session';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { CopyDownload, MailTemplates } from '../templates';
-import { auditTrailFile, auditTrailName } from './audit-trail';
+import {
+  auditTrailFile,
+  auditTrailName,
+  certificateName,
+  certificateWithAuditTrailName,
+  providerAuditTrailFile,
+} from './audit-trail';
 import type { Runtime } from './context';
-import { certificateFileKey, sealedFileKey, separateCertificates } from './seal';
+import {
+  certificateFileKey,
+  certificatesWithAuditTrail,
+  sealedFileKey,
+  separateCertificates,
+} from './seal';
 import { timeZoneFor } from './time-zone';
 
 export interface NotifyPayload {
@@ -76,16 +87,23 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
   };
 
   if (payload.reason === 'completed_copy') {
-    const certificates = separateCertificates(await rt.store.listEvents(envelope.id));
-    const trail = await auditTrailFile(rt, envelope, workspaceId).catch((err: unknown) => {
-      rt.logger.warn('audit trail was not drawn for the completed copy', {
-        envelope: envelope.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return null;
-    });
-    const auditTrail = trail !== null;
-    const attachments = await sealedAttachments(rt, envelope, certificates, trail);
+    const events = await rt.store.listEvents(envelope.id);
+    const certificates = separateCertificates(events);
+    const withTrail = certificatesWithAuditTrail(events);
+    // A document signed with Aadhaar eSign has the audit trail in its certificate file.
+    const ownTrail = !envelope.documents.some((d) => withTrail.has(d.id));
+    const trail = ownTrail
+      ? await auditTrailFile(rt, envelope, workspaceId).catch((err: unknown) => {
+          rt.logger.warn('audit trail was not drawn for the completed copy', {
+            envelope: envelope.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        })
+      : null;
+    const auditTrail = trail !== null || !ownTrail;
+    const files = { certificates, withTrail };
+    const attachments = await sealedAttachments(rt, envelope, files, trail);
     if (attachments) {
       try {
         const mail = templates.completed({
@@ -93,6 +111,7 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
           recipient,
           attached: true,
           auditTrail,
+          ...(ownTrail ? {} : { esign: true }),
           downloads: [],
         });
         await rt.mailer.send({ ...base, ...mail, attachments });
@@ -105,10 +124,17 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
         });
       }
     }
-    const downloads = copyDownloads(rt, envelope, recipient, certificates, auditTrail);
+    const downloads = copyDownloads(rt, envelope, recipient, files, trail !== null);
     await rt.mailer.send({
       ...base,
-      ...templates.completed({ envelope, recipient, attached: false, auditTrail, downloads }),
+      ...templates.completed({
+        envelope,
+        recipient,
+        attached: false,
+        auditTrail,
+        ...(ownTrail ? {} : { esign: true }),
+        downloads,
+      }),
     });
     return;
   }
@@ -127,6 +153,16 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
   });
 }
 
+interface CopyFiles {
+  /** Documents whose certificate is a file of its own. */
+  certificates: ReadonlySet<string>;
+  /** Of those, the ones whose certificate file holds the audit trail too. */
+  withTrail: ReadonlySet<string>;
+}
+
+const certificateFile = (envelope: Envelope, documentName: string, files: CopyFiles, id: string) =>
+  files.withTrail.has(id) ? certificateWithAuditTrailName(envelope) : certificateName(documentName);
+
 /**
  * One personal download link per file, for a completed copy sent without attachments: each
  * document, its separate certificate, and the audit trail once for the envelope.
@@ -135,38 +171,45 @@ function copyDownloads(
   rt: Runtime,
   envelope: Envelope,
   recipient: Recipient,
-  certificates: ReadonlySet<string>,
+  files: CopyFiles,
   auditTrail: boolean,
 ): CopyDownload[] {
   const claim = issueCopyClaim(rt.sessionSecret, envelope.id, recipient.id, rt.clock.now());
   const urlOf = (documentId: string) =>
     `${rt.publicUrl}${rt.basePath}/v1/sign/copy/${encodeURIComponent(documentId)}?c=${claim}`;
-  const files = envelope.documents.flatMap((document) => {
+  const links = envelope.documents.flatMap((document) => {
     const url = urlOf(document.id);
     return [
       { name: document.name, url },
-      ...(certificates.has(document.id)
-        ? [{ name: certificateName(document.name), url: `${url}&file=certificate` }]
+      ...(files.certificates.has(document.id)
+        ? [
+            {
+              name: certificateFile(envelope, document.name, files, document.id),
+              url: `${url}&file=certificate`,
+            },
+          ]
         : []),
     ];
   });
   const first = envelope.documents[0];
   return auditTrail && first
-    ? [...files, { name: auditTrailName(envelope), url: `${urlOf(first.id)}&file=audit-trail` }]
-    : files;
+    ? [...links, { name: auditTrailName(envelope), url: `${urlOf(first.id)}&file=audit-trail` }]
+    : links;
 }
 
-const certificateName = (documentName: string) =>
-  `${documentName.replace(/\.pdf$/i, '')} (signing certificate).pdf`;
+/** The provider's audit trail goes with the attachments only when it is this small. */
+const PROVIDER_TRAIL_ATTACH_BYTES = 2 * 1024 * 1024;
 
 /**
  * The sealed files to attach, with the audit trail after them, or null to send links instead:
- * when one is missing or cannot be read, or together they are over `maxAttachmentBytes`.
+ * when one is missing or cannot be read, or together they are over `maxAttachmentBytes`. The
+ * eSign provider's own audit trail is added when it is small and still fits; it is not one of
+ * the links otherwise, and stays on the envelope page.
  */
 async function sealedAttachments(
   rt: Runtime,
   envelope: Envelope,
-  certificates: ReadonlySet<string>,
+  files: CopyFiles,
   trail: Uint8Array | null,
 ) {
   const attachments = [];
@@ -181,21 +224,21 @@ async function sealedAttachments(
       return null;
     });
   for (const document of envelope.documents) {
-    const files = [
+    const parts = [
       {
         key: sealedFileKey(envelope.id, document.id),
         filename: /\.pdf$/i.test(document.name) ? document.name : `${document.name}.pdf`,
       },
-      ...(certificates.has(document.id)
+      ...(files.certificates.has(document.id)
         ? [
             {
               key: certificateFileKey(envelope.id, document.id),
-              filename: certificateName(document.name),
+              filename: certificateFile(envelope, document.name, files, document.id),
             },
           ]
         : []),
     ];
-    for (const file of files) {
+    for (const file of parts) {
       const content = await read(file.key, document.id);
       if (!content) return null;
       total += content.byteLength;
@@ -209,6 +252,18 @@ async function sealedAttachments(
     attachments.push({
       filename: auditTrailName(envelope),
       content: trail,
+      contentType: 'application/pdf',
+    });
+  }
+  const provider = await providerAuditTrailFile(rt, envelope).catch(() => null);
+  if (
+    provider &&
+    provider.bytes.byteLength <= PROVIDER_TRAIL_ATTACH_BYTES &&
+    total + provider.bytes.byteLength <= rt.limits.maxAttachmentBytes
+  ) {
+    attachments.push({
+      filename: provider.filename,
+      content: provider.bytes,
       contentType: 'application/pdf',
     });
   }

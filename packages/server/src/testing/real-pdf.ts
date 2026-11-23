@@ -32,3 +32,23 @@ export function makeP12(commonName: string, passphrase: string, bits = 2048): Ui
   });
   return new Uint8Array(Buffer.from(forge.asn1.toDer(asn1).getBytes(), 'binary'));
 }
+
+/**
+ * Rewrites the outer SEQUENCE of the only signature in `pdf` to BER's indefinite length, as
+ * Leegality's Aadhaar eSign writes it. The /Contents keeps its size, so the file stays valid.
+ */
+export function toIndefiniteLength(pdf: Uint8Array): Uint8Array {
+  const text = Buffer.from(pdf).toString('latin1');
+  const match = /\/Contents\s*<([0-9a-fA-F]+)>/.exec(text);
+  if (!match?.[1]) throw new Error('no /Contents');
+  const bytes = Buffer.from(match[1], 'hex');
+  if (bytes[0] !== 0x30) throw new Error('the signature is not a SEQUENCE');
+  const octets = (bytes[1] ?? 0) & 0x7f;
+  let length = 0;
+  for (let i = 0; i < octets; i += 1) length = length * 256 + (bytes[2 + i] ?? 0);
+  const body = bytes.subarray(2 + octets, 2 + octets + length);
+  const ber = Buffer.concat([Buffer.from([0x30, 0x80]), body, Buffer.from([0, 0])]);
+  const padded = Buffer.alloc(bytes.length);
+  ber.copy(padded);
+  return Buffer.from(text.replace(match[1], padded.toString('hex')), 'latin1');
+}

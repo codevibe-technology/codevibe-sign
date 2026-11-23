@@ -46,6 +46,8 @@ export interface SignatureSummary {
   signer?: { commonName?: string; organization?: string };
   issuer?: { commonName?: string; organization?: string };
   signedAt?: string;
+  /** Time of a signature timestamp whose imprint matches the signature. */
+  timestampedAt?: string;
   certificateSha256?: string;
 }
 
@@ -81,10 +83,18 @@ export interface CertificateInput extends CertificateDetails {
   /** IANA zone the times are also shown in, next to UTC. */
   timeZone?: string;
   /**
-   * The certificate goes on the file an Aadhaar eSign signer is about to sign, so the
-   * provider's signature covers it; see `CertificateData.esign` in the PDF package.
+   * The Aadhaar eSign of the envelope, as its signed file tells it; see
+   * `CertificateData.esign` in the PDF package.
    */
-  esign?: { recipientId: string; provider: string; sandbox?: boolean };
+  esign?: {
+    recipientId: string;
+    provider: string;
+    sandbox?: boolean;
+    signerName?: string;
+    issuer?: string;
+    signedAt?: string;
+    signedFileSha256?: string;
+  };
 }
 
 /**
@@ -99,8 +109,7 @@ export interface PdfEngine {
     fields: Field[],
     values: FieldValue[],
     recipients: Recipient[],
-    /** `esignProvider` is the provider an Aadhaar eSign box names, such as "Leegality". */
-    options: { documentId: string; timeZone?: string; esignProvider?: string },
+    options: { documentId: string; timeZone?: string },
   ): Promise<Uint8Array>;
   appendCertificate(pdf: Uint8Array, input: CertificateInput): Promise<Uint8Array>;
   /** Must be the last change to the file: anything after it breaks the seal. */
@@ -131,6 +140,13 @@ export interface PdfEngine {
   /** The signing certificate as a file of its own. */
   certificatePdf?(input: CertificateInput): Promise<Uint8Array>;
   /**
+   * The signing certificate followed by the audit trail, as one file: what goes with a
+   * document signed with Aadhaar eSign, whose pages nothing can be added to.
+   */
+  certificateWithAuditTrailPdf?(
+    input: CertificateInput & { networkAddresses?: boolean },
+  ): Promise<Uint8Array>;
+  /**
    * The envelope's audit trail as a PDF, sent with the completed copy and offered for
    * download. Without it the completed copy carries the signed files only.
    */
@@ -157,6 +173,8 @@ export const defaultPdfEngine: PdfEngine = {
   countersign: (pdf, options) => signPdf.countersign(pdf, options),
   verifySignatures: (pdf) => signPdf.verifySignatures(pdf),
   certificatePdf: (input) => signPdf.certificatePdf(input),
+  certificateWithAuditTrailPdf: ({ networkAddresses, ...data }) =>
+    signPdf.certificateWithAuditTrailPdf(data, networkAddresses ? { networkAddresses } : {}),
   auditTrailPdf: ({ networkAddresses, ...data }) =>
     signPdf.auditTrailPdf(data, networkAddresses ? { networkAddresses } : {}),
 };

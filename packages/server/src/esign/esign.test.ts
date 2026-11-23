@@ -25,12 +25,12 @@ const signature = (recipient: string, x: number, type = 'signature') => ({
 const box = (recipient: string, x: number) => signature(recipient, x, 'aadhaar');
 const title = (recipient: string) => ({ ...signature(recipient, 72, 'text'), y: 700 });
 
-/** Asha signs by email link, then Ravi with Aadhaar eSign. */
+/** Asha signs by email link, then Ravi with Aadhaar eSign, who has no fields. */
 const aadhaarBody = (overrides: Record<string, unknown> = {}) =>
   envelopeBody({
     send: true,
     recipients: [people.asha, people.ravi],
-    fields: [signature('asha', 72), box('ravi', 300), title('ravi')],
+    fields: [signature('asha', 72), title('asha')],
     ...overrides,
   });
 
@@ -160,18 +160,13 @@ describe('sending with an Aadhaar signer', () => {
       'can hold one document',
     ],
     [
-      'an Aadhaar signer without the Aadhaar eSign box',
+      'a field to fill in for the Aadhaar signer',
       { fields: [signature('asha', 72), title('ravi')] },
-      'Place the Aadhaar eSign box for Ravi Kumar',
-    ],
-    [
-      'a drawn signature next to the Aadhaar eSign box',
-      { fields: [signature('asha', 72), box('ravi', 300), signature('ravi', 72)] },
-      'remove this signature field',
+      'Ravi Kumar signs with Aadhaar eSign and fills in nothing here',
     ],
     [
       'an Aadhaar eSign box for someone who signs by email',
-      { fields: [signature('asha', 72), box('asha', 72), box('ravi', 300)] },
+      { fields: [signature('asha', 72), box('asha', 72)] },
       'Only a signer who uses Aadhaar eSign',
     ],
     [
@@ -199,25 +194,31 @@ describe('sending with an Aadhaar signer', () => {
   it('lets one Aadhaar signer sign alone', async () => {
     const { h } = setup();
     const { status } = await h.call('POST', '/v1/envelopes', {
-      body: aadhaarBody({ recipients: [people.ravi], fields: [box('ravi', 300)] }),
+      body: aadhaarBody({ recipients: [people.ravi], fields: [] }),
     });
     expect(status).toBe(201);
   });
 
-  it('takes the lone signature field of an older request as the Aadhaar eSign box', async () => {
+  it('drops the signature, initials and box an older request gives the Aadhaar signer', async () => {
     const { h } = setup();
+    const older = [
+      signature('asha', 72),
+      signature('ravi', 300),
+      signature('ravi', 300, 'initials'),
+      box('ravi', 300),
+    ];
     const created = await h.call('POST', '/v1/envelopes', {
-      body: aadhaarBody({ fields: [signature('asha', 72), signature('ravi', 300)] }),
+      body: aadhaarBody({ fields: older }),
     });
     expect(created.status).toBe(201);
-    const fields = (created.json as Api).fields.map((f) => f.type);
-    expect(fields).toEqual(['signature', 'aadhaar']);
+    expect((created.json as Api).fields.map((f) => f.type)).toEqual(['signature']);
     const draft = await h.call('POST', '/v1/envelopes', {
-      body: aadhaarBody({ send: false, fields: [signature('asha', 72), signature('ravi', 300)] }),
+      body: aadhaarBody({ send: false, fields: older }),
     });
+    expect((draft.json as Api).fields).toHaveLength(4);
     const sent = await h.call('POST', `/v1/envelopes/${draft.json.id}/send`);
     expect(sent.status).toBe(200);
-    expect((sent.json as Api).fields.map((f) => f.type)).toEqual(['signature', 'aadhaar']);
+    expect((sent.json as Api).fields.map((f) => f.type)).toEqual(['signature']);
   });
 });
 
@@ -238,10 +239,9 @@ describe('POST /v1/sign/:token/esign', () => {
     expect(request.callbackUrl).toBe('https://sign.example.com/v1/esign/webhooks/leegality');
     expect(request.redirectUrl).toBe('https://sign.example.com/sign?esign=return');
     expect(request.reference).not.toBe(envelope.id);
-    expect(new TextDecoder().decode(request.documentBytes)).toContain('fields=3;values=2');
-    expect(request.signaturePositions).toEqual([
-      { page: 1, rect: { x: 300, y: 600, width: 180, height: 48 } },
-    ]);
+    // Asha's two fields are drawn; nothing is added for Ravi, no box and no certificate page.
+    expect(new TextDecoder().decode(request.documentBytes)).toMatch(/fields=2;values=2\n$/);
+    expect(request.signaturePositions).toBeUndefined();
     expect(hooks).toEqual(['start']);
 
     const again = await start();
@@ -265,16 +265,31 @@ describe('POST /v1/sign/:token/esign', () => {
     expect(status.json).toMatchObject({ status: 'pending', signUrl: started.json.signUrl });
   });
 
-  it('needs consent, the required fields and the right recipient', async () => {
+  it('sends the document exactly as uploaded when nobody fills anything in first', async () => {
+    const { h, provider } = setup();
+    const body = aadhaarBody({ recipients: [people.ravi], fields: [] });
+    const created = await h.call('POST', '/v1/envelopes', { body });
+    expect(created.status).toBe(201);
+    const token = h.tokenFor('ravi@example.com');
+    const started = await h.call('POST', `/v1/sign/${token}/esign`, {
+      body: { consent: true, values: [] },
+    });
+    expect(started.status).toBe(200);
+    const sent = provider.requests[0]!.request.documentBytes;
+    const uploaded = Buffer.from(body.documents[0]!.content, 'base64');
+    expect(Buffer.from(sent).equals(uploaded)).toBe(true);
+  });
+
+  it('needs consent, only the values of the signer and the right recipient', async () => {
     const { h, provider } = setup();
     const { envelope, token } = await readyForRavi(h);
     const values = valuesOf(envelope, 'ravi@example.com');
     const noConsent = await h.call('POST', `/v1/sign/${token}/esign`, { body: { values } });
     expect(noConsent.status).toBe(400);
-    const empty = await h.call('POST', `/v1/sign/${token}/esign`, {
-      body: { consent: true, values: [] },
+    const others = await h.call('POST', `/v1/sign/${token}/esign`, {
+      body: { consent: true, values: valuesOf(envelope, 'asha@example.com') },
     });
-    expect(empty.json.error.code).toBe('REQUIRED_FIELDS_MISSING');
+    expect(others.json.error.code).toBe('FIELD_NOT_YOURS');
     const plain = await h.call('POST', `/v1/sign/${token}/submit`, {
       body: { consent: true, values },
     });
@@ -754,6 +769,60 @@ describe('time and the envelope around an eSign', () => {
   });
 });
 
+describe('the name on the eSign certificate', () => {
+  async function signedAs(certificateName: string, reported?: string) {
+    const engine = fakePdfEngine({
+      async verifySignatures() {
+        return [
+          {
+            valid: true,
+            coversWholeDocument: true,
+            signer: { commonName: certificateName },
+            issuer: { commonName: 'Test ESP CA' },
+          },
+        ];
+      },
+    });
+    const { h, provider } = setup({ server: { pdf: engine } });
+    const { envelope, start } = await readyForRavi(h);
+    await start();
+    const ref = provider.requests[0]!.ref;
+    provider.finish(ref);
+    await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed', reported) });
+    const events = (await h.call('GET', `/v1/envelopes/${envelope.id}/events`)).json.events as {
+      action: string;
+      recipientId?: string;
+      data?: Record<string, unknown>;
+    }[];
+    return { h, envelope, events, done: await statusOf(h, envelope.id) };
+  }
+
+  it('takes the name from the signed file over the name the provider reports', async () => {
+    const { events, done } = await signedAs('RAVI S KUMAR', 'Shubham Dhall');
+    expect(done.recipients[1]!.esign).toMatchObject({ signerName: 'RAVI S KUMAR' });
+    expect(events.filter((e) => e.action === 'recipient.signed').at(-1)!.data).toMatchObject({
+      signerName: 'RAVI S KUMAR',
+      providerSignerName: 'Shubham Dhall',
+    });
+    expect(events.map((e) => e.action)).not.toContain('recipient.esign_name_differs');
+    expect(JSON.stringify(events)).not.toContain('"signerName":"Shubham Dhall"');
+  });
+
+  it('notes a name that is not the recipient, and still completes', async () => {
+    const { events, done } = await signedAs('PRAKRITI S IYER', 'Prakriti S Iyer');
+    expect(done.status).toBe('completed');
+    const signed = events.findIndex((e) => e.action === 'recipient.signed' && e.data?.method);
+    expect(events[signed + 1]).toMatchObject({
+      action: 'recipient.esign_name_differs',
+      recipientId: expect.any(String),
+      data: { recipientName: 'Ravi Kumar', certificateName: 'PRAKRITI S IYER' },
+    });
+    expect(events.filter((e) => e.action === 'recipient.signed').at(-1)!.data).not.toHaveProperty(
+      'providerSignerName',
+    );
+  });
+});
+
 describe('sealing after an eSign', () => {
   const engine = (overrides: Parameters<typeof fakePdfEngine>[0] = {}) => {
     const calls: string[] = [];
@@ -766,10 +835,6 @@ describe('sealing after an eSign', () => {
           calls.push('countersign');
           return tail(pdf, 'countersigned\n');
         },
-        async certificatePdf(input) {
-          calls.push('certificate');
-          return new TextEncoder().encode(`%PDF-1.7\ncertificate-of=${input.envelope.id}\n`);
-        },
         async verifySignatures() {
           return [
             {
@@ -777,6 +842,8 @@ describe('sealing after an eSign', () => {
               coversWholeDocument: true,
               signer: { commonName: 'RAVI KUMAR' },
               issuer: { commonName: 'Test ESP CA' },
+              signedAt: '2026-11-24T10:00:00.000Z',
+              timestampedAt: '2026-11-24T10:00:05.000Z',
               certificateSha256: 'c'.repeat(64),
             },
           ];
@@ -786,25 +853,30 @@ describe('sealing after an eSign', () => {
     };
   };
 
-  /** `startedBefore` plays a request started before the certificate page went on first. */
+  /**
+   * `startedAs` plays a request started under an earlier flow: `embedded` while the
+   * certificate page went on the file before signing, `before` from before that.
+   */
   async function completed(
     pdfOverrides: Parameters<typeof fakePdfEngine>[0] = {},
-    startedBefore = false,
+    startedAs?: 'embedded' | 'before',
+    server: Partial<SignServerOptions> = {},
   ) {
     const { pdf, calls } = engine(pdfOverrides);
     const provider = fakeEsignProvider({
       sign: (bytes) => new Uint8Array([...bytes, ...new TextEncoder().encode('esp-signature\n')]),
     });
-    const { h, hooks } = setup({ provider, server: { pdf } });
+    const { h, hooks } = setup({ provider, server: { pdf, ...server } });
     const { envelope, token, start } = await readyForRavi(h);
     await start();
-    if (startedBefore) {
+    if (startedAs) {
       const list = h.store.listEvents.bind(h.store);
       h.store.listEvents = async (id) =>
         (await list(id)).map((e) => {
           if (e.action !== 'recipient.esign_started' || !e.data) return e;
           const data = { ...e.data };
-          delete data.certificate;
+          if (startedAs === 'embedded') data.certificate = 'embedded';
+          else delete data.certificate;
           return { ...e, data };
         });
     }
@@ -817,82 +889,146 @@ describe('sealing after an eSign', () => {
         `/v1/envelopes/${envelope.id}/documents/${docId}?version=${version}`,
         { headers: { authorization: 'Bearer test-key-0123456789abcdef' } },
       );
-      return { status: res.status, text: await res.text() };
+      return {
+        status: res.status,
+        text: await res.text(),
+        name: res.headers.get('content-disposition') ?? '',
+      };
     };
-    return { h, hooks, calls, envelope, token, docId, download };
+    const events = async () =>
+      (await h.call('GET', `/v1/envelopes/${envelope.id}/events`)).json.events as {
+        action: string;
+        data?: Record<string, unknown>;
+      }[];
+    const receipt = async () => {
+      const status = await h.call('GET', `/v1/sign/${token}/esign`);
+      const headers = { 'x-sign-receipt': status.res.headers.get('x-sign-receipt')! };
+      return { headers, view: (await h.call('GET', '/v1/sign/receipt', { headers })).json };
+    };
+    return { h, hooks, calls, envelope, token, docId, ref, download, events, receipt };
   }
 
-  it('signs and seals one file: the pages and the certificate page together', async () => {
-    const { h, calls, envelope, token, docId, download } = await completed();
+  it('seals the signed file as it came and gives the certificate and audit trail apart', async () => {
+    const { h, calls, envelope, docId, ref, download, events, receipt } = await completed();
     expect(calls).toEqual(['countersign']);
     const sealed = await download('sealed');
-    expect(sealed.text).toMatch(
-      new RegExp(
-        `fields=3;values=2\\ncertificate=${envelope.id};events=\\d+[^\\n]*\\nesp-signature\\ncountersigned\\n$`,
-      ),
-    );
-    expect((await download('certificate')).status).toBe(409);
+    expect(sealed.text).toMatch(/fields=2;values=2\nesp-signature\ncountersigned\n$/);
+    expect(sealed.text).not.toContain('certificate');
 
-    const events = (await h.call('GET', `/v1/envelopes/${envelope.id}/events`)).json.events as {
-      action: string;
-      data?: Record<string, unknown>;
-    }[];
-    expect(events.find((e) => e.action === 'recipient.esign_started')!.data).toMatchObject({
-      certificate: 'embedded',
-    });
-    const seal = events.find((e) => e.action === 'document.sealed')!;
-    expect(seal.data).toMatchObject({ seal: 'countersigned' });
-    expect(seal.data).not.toHaveProperty('certificate');
-
-    const status = await h.call('GET', `/v1/sign/${token}/esign`);
-    const headers = { 'x-sign-receipt': status.res.headers.get('x-sign-receipt')! };
-    const receipt = await h.call('GET', '/v1/sign/receipt', { headers });
-    expect(receipt.json.documents).toEqual([
-      { id: docId, name: 'offer.pdf', sealed: true, certificate: false },
-    ]);
-    const mail = h.mailer.sent.filter((m) => m.attachments?.length).at(-1)!;
-    expect(mail.attachments!.map((a) => a.filename)).toEqual([
-      'offer.pdf',
-      'Offer letter (audit trail).pdf',
-    ]);
-  });
-
-  it('keeps the certificate apart for a request started before it went on the file', async () => {
-    const { h, calls, envelope, token, docId, download } = await completed({}, true);
-    expect(calls).toEqual(['countersign', 'certificate']);
-    const sealed = await download('sealed');
-    expect(sealed.text).toMatch(/esp-signature\ncountersigned\n$/);
     const certificate = await download('certificate');
     expect(certificate.status).toBe(200);
-    expect(certificate.text).toContain(`certificate-of=${envelope.id}`);
+    expect(certificate.text).toContain(`certificate-and-audit-trail=${envelope.id}`);
+    expect(certificate.text).toContain(
+      'esign=RAVI KUMAR;issuer=Test ESP CA;signedAt=2026-11-24T10:00:05.000Z',
+    );
     expect(certificate.text).toContain('sealed;reason=Test seal');
+    expect(decodeURIComponent(certificate.name)).toContain(
+      'Offer letter (certificate and audit trail).pdf',
+    );
 
-    const events = (await h.call('GET', `/v1/envelopes/${envelope.id}/events`)).json.events as {
-      action: string;
-      data?: Record<string, unknown>;
-    }[];
-    const seal = events.find((e) => e.action === 'document.sealed')!;
-    expect(seal.data).toMatchObject({ seal: 'countersigned', certificate: 'separate' });
-    const signed = events.filter((e) => e.action === 'recipient.signed').at(-1)!;
-    expect(signed.data).toMatchObject({ certificateSha256: 'c'.repeat(64) });
+    const log = await events();
+    expect(log.find((e) => e.action === 'recipient.esign_started')!.data).toMatchObject({
+      certificate: 'separate',
+    });
+    const seal = log.find((e) => e.action === 'document.sealed')!;
+    expect(seal.data).toMatchObject({ seal: 'countersigned', certificate: 'with_audit_trail' });
+    expect(certificate.text).toContain(`signed=${String(seal.data!.sha256)}`);
+    expect(log.filter((e) => e.action === 'recipient.signed').at(-1)!.data).toMatchObject({
+      signerName: 'RAVI KUMAR',
+      certificateIssuer: 'Test ESP CA',
+      providerAuditTrail: true,
+    });
 
-    const status = await h.call('GET', `/v1/sign/${token}/esign`);
-    const headers = { 'x-sign-receipt': status.res.headers.get('x-sign-receipt')! };
-    const receipt = await h.call('GET', '/v1/sign/receipt', { headers });
-    expect(receipt.json.documents).toEqual([
-      { id: docId, name: 'offer.pdf', sealed: true, certificate: true },
+    const { headers, view } = await receipt();
+    expect(view.documents).toEqual([
+      {
+        id: docId,
+        name: 'offer.pdf',
+        sealed: true,
+        certificate: true,
+        certificateWithAuditTrail: true,
+      },
     ]);
     const copy = await h.server.app.request(
       `/v1/sign/receipt/documents/${docId}?file=certificate`,
       { headers },
     );
-    expect(await copy.text()).toContain(`certificate-of=${envelope.id}`);
+    expect(await copy.text()).toContain(`certificate-and-audit-trail=${envelope.id}`);
 
+    const mail = h.mailer.sent.filter((m) => m.attachments?.length).at(-1)!;
+    expect(mail.attachments!.map((a) => a.filename)).toEqual([
+      'offer.pdf',
+      'Offer letter (certificate and audit trail).pdf',
+      'Offer letter (Leegality audit trail).pdf',
+    ]);
+    expect(mail.text).toContain(
+      'The document signed with Aadhaar eSign and its certificate and audit trail are attached.',
+    );
+
+    const theirs = await download('provider-audit-trail');
+    expect(theirs.status).toBe(200);
+    expect(theirs.text).toContain(`provider-audit-trail=${ref}`);
+    expect(decodeURIComponent(theirs.name)).toContain('Offer letter (Leegality audit trail).pdf');
+  });
+
+  it('links the certificate and audit trail when the files cannot be attached', async () => {
+    const { h } = await completed({}, undefined, { limits: { maxAttachmentBytes: 1 } });
+    const mail = h.mailer.sent.filter((m) => m.meta?.kind === 'completed_copy').at(-1)!;
+    expect(mail.attachments).toBeUndefined();
+    expect(mail.text).toContain('Offer letter (certificate and audit trail).pdf: ');
+    expect(mail.text).toContain('&file=certificate');
+    expect(mail.text).not.toContain('file=audit-trail');
+    expect(mail.text).not.toContain('Leegality audit trail');
+  });
+
+  it('keeps the certificate page of a request started while it went on the file', async () => {
+    const { h, docId, download, events, receipt } = await completed({}, 'embedded');
+    const seal = (await events()).find((e) => e.action === 'document.sealed')!.data;
+    expect(seal).toMatchObject({ seal: 'countersigned' });
+    expect(seal).not.toHaveProperty('certificate');
+    expect((await download('certificate')).status).toBe(409);
+    expect((await receipt()).view.documents).toEqual([
+      {
+        id: docId,
+        name: 'offer.pdf',
+        sealed: true,
+        certificate: false,
+        certificateWithAuditTrail: false,
+      },
+    ]);
+    const mail = h.mailer.sent.filter((m) => m.attachments?.length).at(-1)!;
+    expect(mail.attachments!.map((a) => a.filename)).toEqual([
+      'offer.pdf',
+      'Offer letter (audit trail).pdf',
+      'Offer letter (Leegality audit trail).pdf',
+    ]);
+  });
+
+  it('gives a request started before the certificate page went on the file the same files', async () => {
+    const { envelope, download, events } = await completed({}, 'before');
+    const seal = (await events()).find((e) => e.action === 'document.sealed')!.data;
+    expect(seal).toMatchObject({ seal: 'countersigned', certificate: 'with_audit_trail' });
+    expect((await download('certificate')).text).toContain(
+      `certificate-and-audit-trail=${envelope.id}`,
+    );
+  });
+
+  it('falls back to the certificate alone on an engine without the combined file', async () => {
+    const { h, envelope, download, events } = await completed({
+      certificateWithAuditTrailPdf: undefined,
+      async certificatePdf(input) {
+        return new TextEncoder().encode(`%PDF-1.7\ncertificate-of=${input.envelope.id}\n`);
+      },
+    });
+    const seal = (await events()).find((e) => e.action === 'document.sealed')!.data;
+    expect(seal).toMatchObject({ certificate: 'separate' });
+    expect((await download('certificate')).text).toContain(`certificate-of=${envelope.id}`);
     const mail = h.mailer.sent.filter((m) => m.attachments?.length).at(-1)!;
     expect(mail.attachments!.map((a) => a.filename)).toEqual([
       'offer.pdf',
       'offer (signing certificate).pdf',
       'Offer letter (audit trail).pdf',
+      'Offer letter (Leegality audit trail).pdf',
     ]);
   });
 
@@ -912,9 +1048,8 @@ describe('sealing after an eSign', () => {
       data?: Record<string, unknown>;
     }[];
     const seal = events.find((e) => e.action === 'document.sealed')!.data;
-    expect(seal).toMatchObject({ seal: 'provider_only' });
-    expect(seal).not.toHaveProperty('certificate');
-    expect((await download('certificate')).status).toBe(409);
+    expect(seal).toMatchObject({ seal: 'provider_only', certificate: 'with_audit_trail' });
+    expect((await download('certificate')).status).toBe(200);
   });
 
   it('says there is no separate certificate for an ordinary envelope', async () => {
@@ -939,8 +1074,31 @@ describe('sealing after an eSign', () => {
 });
 
 describe('starting again, replaced recipients and the provider file', () => {
-  const note = { recipient: 'ravi', type: 'text', page: 1, x: 300, y: 500, width: 180, height: 24 };
-  const withNote = { fields: [signature('asha', 72), box('ravi', 300), note] };
+  /**
+   * An envelope sent while an Aadhaar eSign signer could still fill in a field of their own,
+   * so starting again with another value asks the provider again.
+   */
+  async function readyWithNote(h: Harness) {
+    const ready = await readyForRavi(h);
+    const stored = (await h.store.load(ready.envelope.id))!;
+    const ravi = stored.envelope.recipients.find((r) => r.email === 'ravi@example.com')!;
+    const note = {
+      id: 'note',
+      documentId: stored.envelope.documents[0]!.id,
+      recipientId: ravi.id,
+      type: 'text' as const,
+      page: 1,
+      rect: { x: 300, y: 500, width: 180, height: 24 },
+      required: true,
+    };
+    await h.store.save(
+      { ...stored.envelope, fields: [...stored.envelope.fields, note] },
+      [],
+      stored.version,
+    );
+    const envelope = (await h.call('GET', `/v1/envelopes/${ready.envelope.id}`)).json as Api;
+    return { ...ready, envelope };
+  }
 
   function raviValues(envelope: Api, text: string) {
     const recipient = envelope.recipients.find((r) => r.email === 'ravi@example.com')!;
@@ -955,7 +1113,7 @@ describe('starting again, replaced recipients and the provider file', () => {
 
   it('keeps what the first request reserved when the signer starts again', async () => {
     const { h, provider, hooks } = setup();
-    const { envelope, token } = await readyForRavi(h, withNote);
+    const { envelope, token } = await readyWithNote(h);
     const first = await startWith(h, token, envelope, 'one');
     const second = await startWith(h, token, envelope, 'two');
     expect(second.status).toBe(200);
@@ -981,7 +1139,7 @@ describe('starting again, replaced recipients and the provider file', () => {
 
   it('gives back a replaced request only when it runs out', async () => {
     const { h, hooks } = setup();
-    const { envelope, token } = await readyForRavi(h, withNote);
+    const { envelope, token } = await readyWithNote(h);
     await startWith(h, token, envelope, 'one');
     await startWith(h, token, envelope, 'two');
     await h.server.tick();
@@ -1005,7 +1163,7 @@ describe('starting again, replaced recipients and the provider file', () => {
         },
       },
     });
-    const { envelope, token } = await readyForRavi(h, withNote);
+    const { envelope, token } = await readyWithNote(h);
     const first = await startWith(h, token, envelope, 'one');
     const second = await startWith(h, token, envelope, 'two');
     expect(second.status).toBe(200);

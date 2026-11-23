@@ -5,9 +5,14 @@ import { pdfResponse } from '../http/body';
 import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import { RECEIPT_COOKIE, RECEIPT_HEADER, verifyReceipt } from '../http/session';
-import { auditTrailFile } from '../runtime/audit-trail';
+import { auditTrailFile, certificateWithAuditTrailName } from '../runtime/audit-trail';
 import type { Runtime } from '../runtime/context';
-import { certificateFileKey, sealedFileKey, separateCertificates } from '../runtime/seal';
+import {
+  certificateFileKey,
+  certificatesWithAuditTrail,
+  sealedFileKey,
+  separateCertificates,
+} from '../runtime/seal';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import { receiptView } from '../views';
 
@@ -44,14 +49,22 @@ export function receiptRoutes(rt: Runtime) {
           .map((e) => String(e.data?.documentId ?? '')),
       ),
       certificates: separateCertificates(events),
+      withTrail: certificatesWithAuditTrail(events),
     };
   }
 
   app.get('/', async (c) => {
     const { envelope, recipient, workspaceId } = await resolve(c);
-    const { sealed, certificates } = await sealedIds(envelope.id);
+    const { sealed, certificates, withTrail } = await sealedIds(envelope.id);
     return c.json(
-      receiptView(envelope, recipient, workspaceId ?? DEFAULT_WORKSPACE, sealed, certificates),
+      receiptView(
+        envelope,
+        recipient,
+        workspaceId ?? DEFAULT_WORKSPACE,
+        sealed,
+        certificates,
+        withTrail,
+      ),
     );
   });
 
@@ -73,7 +86,17 @@ export function receiptRoutes(rt: Runtime) {
     const sealed =
       envelope.status === 'completed' ? await rt.files.get(key(envelope.id, document.id)) : null;
     if (!sealed) throw new SignError('INVALID_STATE', 'The signed copy is not ready yet');
-    return pdfResponse(c, sealed, document.name, certificate ? 'certificate' : 'sealed');
+    const withTrail = certificate && (await sealedIds(envelope.id)).withTrail.has(document.id);
+    return pdfResponse(
+      c,
+      sealed,
+      document.name,
+      withTrail
+        ? { filename: certificateWithAuditTrailName(envelope) }
+        : certificate
+          ? 'certificate'
+          : 'sealed',
+    );
   });
 
   return app;

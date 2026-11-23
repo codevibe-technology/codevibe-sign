@@ -10,7 +10,6 @@ import {
   type AuditAction,
   type AuditContext,
   type Envelope,
-  type Field,
   type FieldValue,
   type Id,
   type PendingAuditEvent,
@@ -20,10 +19,10 @@ import {
 } from '@codevibe_technology/sign-core';
 import { HttpError, validation } from '../errors';
 import { enforce } from '../http/rate-limit';
-import type { CertificateInput } from '../engine';
 import type { Runtime } from '../runtime/context';
 import { mutate } from '../runtime/mutate';
 import { timeZoneFor } from '../runtime/time-zone';
+import { namesMatch } from './names';
 import { HELD_STATUSES, OPEN_STATUSES, endSession, settle } from './settle';
 import type { EsignSession, EsignSignature, EsignUnavailable } from './types';
 
@@ -33,6 +32,10 @@ import type { EsignSession, EsignSignature, EsignUnavailable } from './types';
  */
 export const esignedFileKey = (envelopeId: Id, documentId: Id, ref?: string) =>
   `envelopes/${envelopeId}/documents/${documentId}/esigned${ref ? `-${ref}` : ''}.pdf`;
+
+/** Where the eSign provider's own audit trail of a signed request is kept, as evidence. */
+export const providerAuditTrailKey = (envelopeId: Id, documentId: Id, ref: string) =>
+  `envelopes/${envelopeId}/documents/${documentId}/provider-audit-trail-${ref}.pdf`;
 
 const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 /** A session whose provider call never came back is given up after this long. */
@@ -314,33 +317,24 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
   let created: { providerRef: string; signUrl: string };
   try {
     const timeZone = await timeZoneFor(rt, workspaceId);
-    const fields = envelope.fields.filter((f) => f.documentId === document.id);
+    // What the provider signs is the document as the sender approved it, with the values of
+    // the signers before this one drawn on it. Nothing else is added: the certificate and the
+    // audit trail go in a file of their own once the eSign is done, and the provider places
+    // its signature where its workflow says.
+    const fields = envelope.fields.filter(
+      (f) => f.documentId === document.id && f.type !== 'aadhaar',
+    );
     const fieldIds = new Set(fields.map((f) => f.id));
-    const drawn = await rt.pdf.renderFields(
-      original,
-      fields,
-      signed.values.filter((v) => fieldIds.has(v.fieldId)),
-      signed.recipients,
-      {
-        documentId: document.id,
-        esignProvider: providerLabel(provider.name),
-        ...(timeZone ? { timeZone } : {}),
-      },
-    );
-    // The certificate page goes on before the signer signs, so the Aadhaar eSign covers it
-    // and the signed file is one file, as with any other envelope.
-    const rendered = await rt.pdf.appendCertificate(
-      drawn,
-      await esignCertificate(rt, {
-        envelope,
-        document,
-        workspaceId,
-        recipientId: recipient.id,
-        provider: provider.name,
-        ...(timeZone ? { timeZone } : {}),
-        ...(session.sandbox ? { sandbox: true } : {}),
-      }),
-    );
+    const rendered =
+      fields.length === 0
+        ? original
+        : await rt.pdf.renderFields(
+            original,
+            fields,
+            signed.values.filter((v) => fieldIds.has(v.fieldId)),
+            signed.recipients,
+            { documentId: document.id, ...(timeZone ? { timeZone } : {}) },
+          );
     // The account `onStart` settled on is the one that signs, even if the workspace's
     // choice changed between the first look and the hold.
     const account = await sessionProvider(rt, session);
@@ -359,7 +353,6 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
       },
       documentBytes: rendered,
       documentName: document.name,
-      signaturePositions: signaturePositions(ownFields),
       callbackUrl: `${rt.publicUrl}${rt.basePath}/v1/esign/webhooks/${provider.name}`,
       redirectUrl: `${rt.signingPageUrl}?esign=return`,
     });
@@ -409,62 +402,12 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
           provider: provider.name,
           providerRef: created.providerRef,
           ref: session.id,
-          certificate: 'embedded',
+          certificate: 'separate',
         },
       },
     ),
   );
   return { signUrl: created.signUrl, expiresAt: expiresAt.toISOString() };
-}
-
-/** The certificate page for the file sent to the provider, with the signing so far. */
-async function esignCertificate(
-  rt: Runtime,
-  input: {
-    envelope: Envelope;
-    document: Envelope['documents'][number];
-    workspaceId: string;
-    recipientId: Id;
-    provider: string;
-    timeZone?: string;
-    sandbox?: boolean;
-  },
-): Promise<CertificateInput> {
-  const { envelope, workspaceId } = input;
-  const [events, note, details] = await Promise.all([
-    rt.store.listEvents(envelope.id),
-    rt.certificateNote ? rt.certificateNote(workspaceId) : null,
-    rt.certificateDetails ? rt.certificateDetails({ workspaceId, envelope }) : null,
-  ]);
-  return {
-    envelope,
-    document: input.document,
-    events,
-    ...(details?.sender ? { sender: details.sender } : {}),
-    ...(details?.recordUrl ? { recordUrl: details.recordUrl } : {}),
-    ...(note ? { note } : {}),
-    ...(input.timeZone ? { timeZone: input.timeZone } : {}),
-    esign: {
-      recipientId: input.recipientId,
-      provider: input.provider,
-      ...(input.sandbox ? { sandbox: true } : {}),
-    },
-  };
-}
-
-/** "leegality" as the box on the page names it: "Leegality". */
-const providerLabel = (name: string) => `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-
-/**
- * Where the signature goes: the signer's Aadhaar eSign box, or the signature fields of an
- * envelope sent before the box existed.
- */
-function signaturePositions(fields: Field[]) {
-  const boxes = fields.filter((f) => f.type === 'aadhaar');
-  return (boxes.length > 0 ? boxes : fields.filter((f) => f.type === 'signature')).map((f) => ({
-    page: f.page,
-    rect: f.rect,
-  }));
 }
 
 const invalidFile = (message: string) =>
@@ -574,7 +517,16 @@ export async function completeSigned(
     return;
   }
   const signedAt = rt.clock.now().toISOString();
-  const signerName = result.signerName ?? signature?.signerCommonName;
+  // The name on the eSign certificate in the signed file is the one that counts. What the
+  // provider reports comes from its own records, such as a name prefilled in its workflow,
+  // and is kept beside it only as what the provider said.
+  const signerName = signature?.signerCommonName ?? result.signerName;
+  const same = (x: string, y: string) =>
+    x.replace(/\s+/g, ' ').trim().toLowerCase() === y.replace(/\s+/g, ' ').trim().toLowerCase();
+  const providerSignerName =
+    result.signerName && signerName && !same(result.signerName, signerName)
+      ? result.signerName
+      : undefined;
 
   const stored = await rt.store.load(session.envelopeId);
   const recipient = stored?.envelope.recipients.find((r) => r.id === session.recipientId);
@@ -591,6 +543,7 @@ export async function completeSigned(
       bytes,
       'application/pdf',
     );
+    const providerAuditTrail = await keepProviderAuditTrail(rt, session);
     const ownIds = new Set(session.values.map((v) => v.fieldId));
     try {
       await mutate(rt, session.envelopeId, (current) => {
@@ -606,18 +559,36 @@ export async function completeSigned(
               providerRef: session.providerRef ?? '',
               ...(session.sandbox ? { sandbox: true } : {}),
               ...(signerName ? { signerName } : {}),
+              ...(providerSignerName ? { providerSignerName } : {}),
               ...(signature?.certificateSha256
                 ? { certificateSha256: signature.certificateSha256 }
                 : {}),
+              ...(signature?.issuerCommonName
+                ? { certificateIssuer: signature.issuerCommonName }
+                : {}),
               ...(signature && !signature.intact ? { signature: 'unverified' } : {}),
+              ...(providerAuditTrail ? { providerAuditTrail: true } : {}),
             },
           },
           { clock: rt.clock },
         );
+        const signer = current.recipients.find((r) => r.id === session.recipientId);
+        const certificateName = signature?.signerCommonName;
+        const events =
+          signer && certificateName && !namesMatch(signer.name, certificateName)
+            ? withNameNote(next.events, {
+                envelopeId: current.id,
+                action: 'recipient.esign_name_differs',
+                at: signedAt,
+                recipientId: signer.id,
+                data: { recipientName: signer.name, certificateName },
+              })
+            : next.events;
         // The page the provider signed shows the values of the moment the signer started.
         const kept = next.envelope.values.filter((v) => !ownIds.has(v.fieldId));
         return {
           ...next,
+          events,
           envelope: withEsign(
             { ...next.envelope, values: [...kept, ...session.values] },
             session.recipientId,
@@ -645,6 +616,41 @@ export async function completeSigned(
     ...(signerName ? { signerName } : {}),
     ...(signature ? { signature } : {}),
   });
+}
+
+/** Puts the note on the name right after the signature it is about. */
+function withNameNote(events: PendingAuditEvent[], note: PendingAuditEvent): PendingAuditEvent[] {
+  const at = events.findIndex((e) => e.action === 'recipient.signed');
+  return at === -1
+    ? [...events, note]
+    : [...events.slice(0, at + 1), note, ...events.slice(at + 1)];
+}
+
+/**
+ * Keeps the provider's own audit trail of the request as evidence, when it offers one.
+ * Answers whether it was kept; a provider that cannot hand it over does not hold up the
+ * signature.
+ */
+async function keepProviderAuditTrail(rt: Runtime, session: EsignSession): Promise<boolean> {
+  if (!session.providerRef) return false;
+  try {
+    const provider = await providerOf(rt, session);
+    if (!provider.fetchAuditTrail) return false;
+    const trail = await provider.fetchAuditTrail(session.providerRef);
+    await rt.files.put(
+      providerAuditTrailKey(session.envelopeId, session.documentId, session.id),
+      trail,
+      'application/pdf',
+    );
+    return true;
+  } catch (err) {
+    rt.logger.warn('the eSign provider audit trail was not kept', {
+      envelope: session.envelopeId,
+      session: session.id,
+      error: err instanceof SignError ? err.code : err instanceof Error ? err.message : 'Error',
+    });
+    return false;
+  }
 }
 
 /** Applies a verified provider event to its session. Repeats change nothing. */

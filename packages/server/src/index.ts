@@ -40,7 +40,7 @@ export type {
   EsignSignature,
   EsignUnavailable,
 } from './esign/types';
-export { esignedFileKey } from './esign/flow';
+export { esignedFileKey, providerAuditTrailKey } from './esign/flow';
 export { certificateFileKey, sealedFileKey } from './runtime/seal';
 export type { TickResult, TickOptions } from './runtime/tick';
 export { signWebhook, verifyWebhook, SIGNATURE_HEADER, TEST_EVENT } from './runtime/webhooks';

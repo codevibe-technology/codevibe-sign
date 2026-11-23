@@ -32,6 +32,11 @@ export interface CompletedMailContext {
    * otherwise as one of the `downloads`. Absent means false.
    */
   auditTrail?: boolean;
+  /**
+   * The document was signed with Aadhaar eSign: the signed file, then its certificate and
+   * audit trail as one file of their own. Absent means false.
+   */
+  esign?: boolean;
   /** When not attached, a download link for each sealed file. Empty otherwise. */
   downloads: CopyDownload[];
 }
@@ -119,19 +124,25 @@ function linkMail(ctx: LinkMailContext, reminder: boolean): RenderedMail {
 export const defaultTemplates: MailTemplates = {
   invite: (ctx) => linkMail(ctx, false),
   reminder: (ctx) => linkMail(ctx, true),
-  completed({ envelope, recipient, attached, auditTrail, downloads }) {
+  completed({ envelope, recipient, attached, auditTrail, esign, downloads }) {
     const lines = [
       `Hello ${recipient.name},`,
       `Everyone has finished with "${envelope.title}".`,
-      attached
-        ? auditTrail
-          ? 'The signed copy and its audit trail are attached. Keep them for your records.'
-          : 'The sealed copy is attached. Keep it for your records.'
-        : downloads.length
+      esign
+        ? attached
+          ? 'The document signed with Aadhaar eSign and its certificate and audit trail are attached. Keep them for your records.'
+          : downloads.length
+            ? 'The document signed with Aadhaar eSign and its certificate and audit trail could not be attached. Download them here and keep them for your records. The links are personal and work for 30 days.'
+            : 'The signed copy could not be attached. Ask the sender for a copy.'
+        : attached
           ? auditTrail
-            ? 'The signed copy and its audit trail could not be attached. Download them here and keep them for your records. The links are personal and work for 30 days.'
-            : 'The sealed copy could not be attached. Download it here and keep it for your records. The link is personal and works for 30 days.'
-          : 'The sealed copy could not be attached. Ask the sender for a copy.',
+            ? 'The signed copy and its audit trail are attached. Keep them for your records.'
+            : 'The sealed copy is attached. Keep it for your records.'
+          : downloads.length
+            ? auditTrail
+              ? 'The signed copy and its audit trail could not be attached. Download them here and keep them for your records. The links are personal and work for 30 days.'
+              : 'The sealed copy could not be attached. Download it here and keep it for your records. The link is personal and works for 30 days.'
+            : 'The sealed copy could not be attached. Ask the sender for a copy.',
     ];
     const text = [...lines, ...downloads.map((d) => `${d.name}: ${d.url}`)].join('\n\n');
     return {

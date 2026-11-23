@@ -375,7 +375,7 @@ describe('a full run against the server', () => {
     expect(aadhaar.json.recipients[0].auth).toBe('aadhaar');
     const esignToken = h.tokenFor('asha.esign@example.com');
     expect((await call('GET', `/v1/sign/${esignToken}/esign`)).json.status).toBe('none');
-    expect(aadhaar.json.fields[0].type).toBe('aadhaar');
+    expect(aadhaar.json.fields).toEqual([]);
     const esignValues: { fieldId: string; value: string }[] = [];
     const startedEsign = await call('POST', `/v1/sign/${esignToken}/esign`, {
       body: { consent: true, values: esignValues },
@@ -402,16 +402,29 @@ describe('a full run against the server', () => {
     const esignDoc = aadhaar.json.documents[0].id as string;
     expect(
       (await call('GET', '/v1/sign/receipt', { headers: esignReceipt })).json.documents,
-    ).toEqual([{ id: esignDoc, name: 'offer.pdf', sealed: true, certificate: false }]);
-    const page2 = await call('GET', `/v1/sign/receipt/documents/${esignDoc}?file=certificate`, {
+    ).toEqual([
+      {
+        id: esignDoc,
+        name: 'offer.pdf',
+        sealed: true,
+        certificate: true,
+        certificateWithAuditTrail: true,
+      },
+    ]);
+    const evidence = await call('GET', `/v1/sign/receipt/documents/${esignDoc}?file=certificate`, {
       headers: esignReceipt,
     });
-    expect(page2.status).toBe(409);
+    expect(evidence.status).toBe(200);
     const apart = await call(
       'GET',
       `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}?version=certificate`,
     );
-    expect(apart.status).toBe(409);
+    expect(apart.status).toBe(200);
+    const theirs = await call(
+      'GET',
+      `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}?version=provider-audit-trail`,
+    );
+    expect(theirs.status).toBe(200);
     const checkedEsign = await call(
       'GET',
       `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}/verification`,

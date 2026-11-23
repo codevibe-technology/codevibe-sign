@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultPdfEngine } from '../engine';
 import { fakeEsignProvider } from '../testing/fake-esign';
 import { API_KEY, harness } from '../testing/harness';
-import { makeP12, makePdf } from '../testing/real-pdf';
+import { makeP12, makePdf, toIndefiniteLength } from '../testing/real-pdf';
 
 const WEBHOOK = '/v1/esign/webhooks/leegality';
 
@@ -23,8 +23,11 @@ describe('an Aadhaar eSign with real files', () => {
   async function run(locked: boolean) {
     let signed: Uint8Array | undefined;
     const provider = fakeEsignProvider({
+      // Written in BER, as Leegality's Aadhaar eSign is.
       sign: async (bytes) =>
-        (signed ??= await seal(bytes, { p12: espP12, passphrase: 'esp', certify: locked })),
+        (signed ??= toIndefiniteLength(
+          await seal(bytes, { p12: espP12, passphrase: 'esp', certify: locked }),
+        )),
     });
     const h = harness({
       pdf: defaultPdfEngine,
@@ -66,11 +69,14 @@ describe('an Aadhaar eSign with real files', () => {
         ).arrayBuffer(),
       );
     const esigned = await provider.fetchSignedDocument(ref);
-    return { h, id, docId, file, esigned };
+    const sent = provider.requests[0]!.request.documentBytes;
+    return { h, id, docId, file, esigned, sent };
   }
 
   it('adds the seal after the provider signature and leaves its bytes alone', async () => {
-    const { h, id, docId, file, esigned } = await run(false);
+    const { h, id, docId, file, esigned, sent } = await run(false);
+    // Nothing but the document went to the provider: no box and no certificate page.
+    expect(Buffer.from(sent).equals(Buffer.from(pdf))).toBe(true);
     const sealed = await file('sealed');
     expect(sealed.byteLength).toBeGreaterThan(esigned.byteLength);
     expect(Buffer.from(sealed.subarray(0, esigned.byteLength)).equals(Buffer.from(esigned))).toBe(
@@ -116,21 +122,24 @@ describe('an Aadhaar eSign with real files', () => {
     const broken = await h.call('POST', '/v1/verify', { body: tamperedForm });
     expect(broken.json).toMatchObject({ valid: false, envelope: null });
 
-    // One file: the two pages and the certificate page, all under the Aadhaar eSign.
-    expect((await PDFDocument.load(sealed)).getPageCount()).toBe(3);
-    expect((await PDFDocument.load(esigned)).getPageCount()).toBe(3);
+    // The signed file keeps the two pages of the document, and the seal draws on none.
+    expect((await PDFDocument.load(sealed)).getPageCount()).toBe(2);
+    expect((await PDFDocument.load(esigned)).getPageCount()).toBe(2);
     const trust = { certificates: [] as string[], fingerprints: [check.json.certificateSha256] };
     expect((await verify(sealed, { trust, allowEarlierSignatures: true })).valid).toBe(true);
-    expect(new TextDecoder().decode(await file('certificate'))).toContain(
-      'no separate certificate',
-    );
+
+    // The certificate and audit trail are a sealed file of their own.
+    const evidence = await file('certificate');
+    const evidenceDoc = await PDFDocument.load(evidence);
+    expect(evidenceDoc.getPageCount()).toBeGreaterThanOrEqual(2);
+    expect(evidenceDoc.getTitle()).toBe('Signing certificate and audit trail: Appointment letter');
+    expect((await verify(evidence, { trust })).valid).toBe(true);
     const events = (await h.call('GET', `/v1/envelopes/${id}/events`)).json.events as {
       action: string;
       data?: Record<string, unknown>;
     }[];
     const sealEvent = events.find((e) => e.action === 'document.sealed')!.data;
-    expect(sealEvent).toMatchObject({ seal: 'countersigned' });
-    expect(sealEvent).not.toHaveProperty('certificate');
+    expect(sealEvent).toMatchObject({ seal: 'countersigned', certificate: 'with_audit_trail' });
     const signedEvent = events.find((e) => e.action === 'recipient.signed')!;
     expect(signedEvent.data).toMatchObject({ method: 'aadhaar_esign', signerName: 'RAVI KUMAR' });
     expect(JSON.stringify(events)).not.toMatch(/\b\d{12}\b/);
@@ -161,6 +170,6 @@ describe('an Aadhaar eSign with real files', () => {
     const changedForm = new FormData();
     changedForm.set('file', new Blob([changed], { type: 'application/pdf' }), 'sealed.pdf');
     expect((await h.call('POST', '/v1/verify', { body: changedForm })).json.valid).toBe(false);
-    expect((await PDFDocument.load(sealed)).getPageCount()).toBe(3);
+    expect((await PDFDocument.load(sealed)).getPageCount()).toBe(2);
   }, 60_000);
 });

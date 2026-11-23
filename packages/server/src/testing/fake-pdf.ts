@@ -43,6 +43,15 @@ export function fakePdfEngine(overrides: Partial<PdfEngine> = {}): PdfEngine {
     async seal(pdf, options) {
       return append(pdf, `sealed;reason=${options.reason}\n`);
     },
+    async certificateWithAuditTrailPdf(input) {
+      const esign = input.esign
+        ? `;esign=${input.esign.signerName ?? ''};issuer=${input.esign.issuer ?? ''}` +
+          `;signedAt=${input.esign.signedAt ?? ''};signed=${input.esign.signedFileSha256 ?? ''}`
+        : '';
+      return encoder.encode(
+        `%PDF-1.7\ncertificate-and-audit-trail=${input.envelope.id};events=${input.events.length}${esign}\n`,
+      );
+    },
     async auditTrailPdf(input) {
       const ips = input.networkAddresses
         ? input.events.flatMap((e) => (e.context?.ip ? [e.context.ip] : []))

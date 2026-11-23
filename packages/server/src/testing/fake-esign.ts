@@ -35,6 +35,8 @@ export function fakeEsignProvider(
     secret?: string;
     /** Turns the file sent for signing into the file the provider gives back. */
     sign?: (pdf: Uint8Array) => Promise<Uint8Array> | Uint8Array;
+    /** Hands over its own audit trail of a signed request. Defaults to true. */
+    auditTrail?: boolean;
   } = {},
 ): FakeEsignProvider {
   const secret = options.secret ?? 'salt';
@@ -107,6 +109,17 @@ export function fakeEsignProvider(
       const bytes = request.request.documentBytes;
       return options.sign ? options.sign(bytes) : bytes;
     },
+    ...(options.auditTrail === false
+      ? {}
+      : {
+          async fetchAuditTrail(providerRef: string) {
+            const request = find(providerRef);
+            if (!request || request.status !== 'signed') {
+              throw new SignError('INVALID_STATE', 'The document is not signed by everyone yet');
+            }
+            return new TextEncoder().encode(`%PDF-1.7\nprovider-audit-trail=${providerRef}\n`);
+          },
+        }),
     webhookRef(rawBody) {
       try {
         const body = JSON.parse(

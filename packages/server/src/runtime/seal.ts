@@ -4,6 +4,7 @@ import {
   type AuditEvent,
   type Effect,
   type Id,
+  type Recipient,
   type TransitionResult,
 } from '@codevibe_technology/sign-core';
 import { sha256Hex } from '../crypto';
@@ -30,11 +31,29 @@ export const sealedFileKey = (envelopeId: Id, documentId: Id) =>
 export const certificateFileKey = (envelopeId: Id, documentId: Id) =>
   `envelopes/${envelopeId}/documents/${documentId}/certificate.pdf`;
 
-/** Documents whose signing certificate is a file of its own, from the sealed events. */
+/**
+ * Documents whose signing certificate is a file of its own, from the sealed events: for a
+ * document signed with Aadhaar eSign, the certificate with the audit trail after it, or for
+ * one sealed before that, the certificate alone.
+ */
 export const separateCertificates = (events: AuditEvent[]) =>
   new Set(
     events
-      .filter((e) => e.action === 'document.sealed' && e.data?.certificate === 'separate')
+      .filter(
+        (e) =>
+          e.action === 'document.sealed' &&
+          (e.data?.certificate === 'separate' || e.data?.certificate === WITH_AUDIT_TRAIL),
+      )
+      .map((e) => String(e.data?.documentId ?? '')),
+  );
+
+const WITH_AUDIT_TRAIL = 'with_audit_trail';
+
+/** Documents whose separate certificate also holds the audit trail. */
+export const certificatesWithAuditTrail = (events: AuditEvent[]) =>
+  new Set(
+    events
+      .filter((e) => e.action === 'document.sealed' && e.data?.certificate === WITH_AUDIT_TRAIL)
       .map((e) => String(e.data?.documentId ?? '')),
   );
 
@@ -113,6 +132,7 @@ export async function runSeal(
       (ref ? await rt.files.get(esignedFileKey(envelope.id, document.id, ref)) : null) ??
       (await rt.files.get(esignedFileKey(envelope.id, document.id)));
     if (esigned) {
+      const esigner = envelope.recipients.find((r) => r.esign?.status === 'signed');
       sealed.push(
         await sealEsigned(
           rt,
@@ -121,6 +141,7 @@ export async function runSeal(
           esigned,
           certificateEmbedded(history, ref) ? null : certificate,
           { sealOptions, assertVerified },
+          esigner,
         ),
       );
       continue;
@@ -162,8 +183,8 @@ export async function runSeal(
 }
 
 /**
- * Whether the provider signed a file that already had the certificate page: true for every
- * request started since the page went on before signing, false for those started earlier.
+ * Whether the provider signed a file that already had the certificate page: true only for
+ * requests started while the page went on before signing. Such a file keeps its page.
  */
 function certificateEmbedded(events: AuditEvent[], ref: string | undefined): boolean {
   return events.some(
@@ -182,10 +203,11 @@ interface SealedDocument {
 
 /**
  * Finishes a file an eSign provider signed. Nothing but another signature can be added to
- * it, so the seal goes on as an incremental update that leaves the provider's bytes as they
- * are. The certificate page is normally part of the signed file already; for a request
- * started before that (`certificate` given), it becomes a sealed file of its own. A file the
- * provider locked against any further signature is kept exactly as it came.
+ * it, so the seal goes on as an incremental update that leaves the provider's bytes, and so
+ * every page, as they are. The certificate and the audit trail become a sealed file of
+ * their own (`certificate` given); a request started while the certificate page went on
+ * before signing has it in the signed file already. A file the provider locked against any
+ * further signature is kept exactly as it came.
  */
 async function sealEsigned(
   rt: Runtime,
@@ -197,6 +219,7 @@ async function sealEsigned(
     sealOptions: (documentId: Id) => SealOptions;
     assertVerified: (output: Uint8Array, documentId: Id, earlier?: boolean) => Promise<boolean>;
   },
+  esigner: Recipient | undefined,
 ): Promise<SealedDocument> {
   let output = esigned;
   let mode = 'provider_only';
@@ -224,16 +247,63 @@ async function sealEsigned(
     });
     data.earlierSignatures = 'unverified';
   }
-  if (certificate && rt.pdf.certificatePdf) {
-    const page = await rt.pdf.certificatePdf(certificate);
-    const sealedPage = await rt.pdf.seal(page, tools.sealOptions(documentId));
-    await tools.assertVerified(sealedPage, documentId);
-    await rt.files.put(certificateFileKey(envelopeId, documentId), sealedPage, 'application/pdf');
-    data.certificate = 'separate';
-    data.certificateSha256 = sha256Hex(sealedPage);
+  const sha256 = sha256Hex(output);
+  if (certificate) {
+    const evidence = await evidenceFile(rt, certificate, esigned, sha256, esigner);
+    if (evidence) {
+      const sealedFile = await rt.pdf.seal(evidence.bytes, tools.sealOptions(documentId));
+      await tools.assertVerified(sealedFile, documentId);
+      await rt.files.put(certificateFileKey(envelopeId, documentId), sealedFile, 'application/pdf');
+      data.certificate = evidence.kind;
+      data.certificateSha256 = sha256Hex(sealedFile);
+    }
   }
   await rt.files.put(sealedFileKey(envelopeId, documentId), output, 'application/pdf');
-  return { documentId, sha256: sha256Hex(output), data };
+  return { documentId, sha256, data };
+}
+
+/**
+ * The certificate of a document signed with Aadhaar eSign, with the audit trail after it,
+ * truthful about the eSign: who the signing certificate names, who issued it and when it was
+ * made, read from the signature on the provider's file. Without the combined file the PDF
+ * engine can draw, the certificate alone.
+ */
+async function evidenceFile(
+  rt: Runtime,
+  certificate: CertificateInput,
+  esigned: Uint8Array,
+  signedFileSha256: string,
+  esigner: Recipient | undefined,
+): Promise<{ bytes: Uint8Array; kind: 'with_audit_trail' | 'separate' } | null> {
+  const signature = esigner ? (await rt.pdf.verifySignatures?.(esigned))?.at(-1) : undefined;
+  const signedAt = signature?.timestampedAt ?? signature?.signedAt;
+  const signerName = signature?.signer?.commonName ?? esigner?.esign?.signerName;
+  const input: CertificateInput = {
+    ...certificate,
+    ...(esigner?.esign
+      ? {
+          esign: {
+            recipientId: esigner.id,
+            provider: esigner.esign.provider,
+            ...(esigner.esign.sandbox ? { sandbox: true } : {}),
+            ...(signerName ? { signerName } : {}),
+            ...(signature?.issuer?.commonName ? { issuer: signature.issuer.commonName } : {}),
+            ...(signedAt ? { signedAt } : {}),
+            signedFileSha256,
+          },
+        }
+      : {}),
+  };
+  if (rt.pdf.certificateWithAuditTrailPdf) {
+    return {
+      bytes: await rt.pdf.certificateWithAuditTrailPdf({ ...input, networkAddresses: true }),
+      kind: WITH_AUDIT_TRAIL,
+    };
+  }
+  if (rt.pdf.certificatePdf) {
+    return { bytes: await rt.pdf.certificatePdf(input), kind: 'separate' };
+  }
+  return null;
 }
 
 /** Core emits one webhook per seal; receivers get one `document.sealed` per envelope. */

@@ -1,6 +1,6 @@
 import {
   SignError,
-  adoptAadhaarBox,
+  dropAadhaarSignatureFields,
   remind,
   send,
   updateEnvelope,
@@ -21,9 +21,13 @@ import { enforce } from '../http/rate-limit';
 import { parseFields, parseJsonObject, parseRecipients, parseSettings } from '../input';
 import type { Runtime } from '../runtime/context';
 import type { EnvelopeListQuery } from '../store/types';
-import { auditTrailFile } from '../runtime/audit-trail';
+import {
+  auditTrailFile,
+  certificateWithAuditTrailName,
+  providerAuditTrailFile,
+} from '../runtime/audit-trail';
 import { mutate } from '../runtime/mutate';
-import { certificateFileKey, sealedFileKey } from '../runtime/seal';
+import { certificateFileKey, certificatesWithAuditTrail, sealedFileKey } from '../runtime/seal';
 import { assertEsignReady } from '../esign/flow';
 import { revisionRoutes } from './revisions';
 import { createEnvelopeFromParts } from './create';
@@ -127,7 +131,7 @@ export function senderRoutes(rt: Runtime) {
       rt,
       c.req.param('id'),
       async (current) => {
-        const sent = send(adoptAadhaarBox(current), deps);
+        const sent = send(dropAadhaarSignatureFields(current), deps);
         await assertEsignReady(rt, scopeOf(c).workspaceId, current);
         return sent;
       },
@@ -180,9 +184,12 @@ export function senderRoutes(rt: Runtime) {
       version !== undefined &&
       version !== 'original' &&
       version !== 'sealed' &&
-      version !== 'certificate'
+      version !== 'certificate' &&
+      version !== 'provider-audit-trail'
     ) {
-      throw validation('version must be original, sealed or certificate', { field: 'version' });
+      throw validation('version must be original, sealed, certificate or provider-audit-trail', {
+        field: 'version',
+      });
     }
     if (version === 'certificate') {
       const certificate = await rt.files.get(certificateFileKey(envelope.id, document.id));
@@ -192,7 +199,25 @@ export function senderRoutes(rt: Runtime) {
           'This document has no separate certificate; it is the last page of the sealed file',
         );
       }
-      return pdfResponse(c, certificate, document.name, 'certificate');
+      const withTrail = certificatesWithAuditTrail(await rt.store.listEvents(envelope.id));
+      return pdfResponse(
+        c,
+        certificate,
+        document.name,
+        withTrail.has(document.id)
+          ? { filename: certificateWithAuditTrailName(envelope) }
+          : 'certificate',
+      );
+    }
+    if (version === 'provider-audit-trail') {
+      const trail = await providerAuditTrailFile(rt, envelope);
+      if (!trail) {
+        throw new SignError(
+          'INVALID_STATE',
+          'There is no audit trail from the eSign provider for this document',
+        );
+      }
+      return pdfResponse(c, trail.bytes, document.name, { filename: trail.filename });
     }
     const sealed =
       version === 'original' ? null : await rt.files.get(sealedFileKey(envelope.id, document.id));

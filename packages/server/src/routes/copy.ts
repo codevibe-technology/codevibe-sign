@@ -4,9 +4,9 @@ import { pdfResponse } from '../http/body';
 import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import { verifyCopyClaim } from '../http/session';
-import { auditTrailFile } from '../runtime/audit-trail';
+import { auditTrailFile, certificateWithAuditTrailName } from '../runtime/audit-trail';
 import type { Runtime } from '../runtime/context';
-import { certificateFileKey, sealedFileKey } from '../runtime/seal';
+import { certificateFileKey, certificatesWithAuditTrail, sealedFileKey } from '../runtime/seal';
 
 const linkInvalid = () =>
   new SignError(
@@ -45,7 +45,19 @@ export function copyRoutes(rt: Runtime) {
     const key = certificate ? certificateFileKey : sealedFileKey;
     const sealed = await rt.files.get(key(envelope.id, document.id));
     if (!sealed) throw new SignError('INVALID_STATE', 'The signed copy is not ready yet');
-    return pdfResponse(c, sealed, document.name, certificate ? 'certificate' : 'sealed');
+    const withTrail =
+      certificate &&
+      certificatesWithAuditTrail(await rt.store.listEvents(envelope.id)).has(document.id);
+    return pdfResponse(
+      c,
+      sealed,
+      document.name,
+      withTrail
+        ? { filename: certificateWithAuditTrailName(envelope) }
+        : certificate
+          ? 'certificate'
+          : 'sealed',
+    );
   });
 
   return app;

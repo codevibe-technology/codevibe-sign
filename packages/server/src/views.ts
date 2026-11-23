@@ -95,6 +95,8 @@ export function receiptView(
   sealed: ReadonlySet<string>,
   /** Documents whose signing certificate is a file of its own. */
   certificates: ReadonlySet<string> = new Set(),
+  /** Of those, the ones whose certificate file holds the audit trail too. */
+  withTrail: ReadonlySet<string> = new Set(),
 ) {
   return {
     workspaceId,
@@ -116,6 +118,7 @@ export function receiptView(
       name: d.name,
       sealed: sealed.has(d.id),
       certificate: certificates.has(d.id),
+      certificateWithAuditTrail: withTrail.has(d.id),
     })),
   };
 }
