@@ -10,6 +10,7 @@ import {
   type AuditAction,
   type AuditContext,
   type Envelope,
+  type Field,
   type FieldValue,
   type Id,
   type PendingAuditEvent,
@@ -319,7 +320,11 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
       fields,
       signed.values.filter((v) => fieldIds.has(v.fieldId)),
       signed.recipients,
-      { documentId: document.id, ...(timeZone ? { timeZone } : {}) },
+      {
+        documentId: document.id,
+        esignProvider: providerLabel(provider.name),
+        ...(timeZone ? { timeZone } : {}),
+      },
     );
     // The account `onStart` settled on is the one that signs, even if the workspace's
     // choice changed between the first look and the hold.
@@ -339,9 +344,7 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
       },
       documentBytes: rendered,
       documentName: document.name,
-      signaturePositions: ownFields
-        .filter((f) => f.type === 'signature')
-        .map((f) => ({ page: f.page, rect: f.rect })),
+      signaturePositions: signaturePositions(ownFields),
       callbackUrl: `${rt.publicUrl}${rt.basePath}/v1/esign/webhooks/${provider.name}`,
       redirectUrl: `${rt.signingPageUrl}?esign=return`,
     });
@@ -392,6 +395,21 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
     ),
   );
   return { signUrl: created.signUrl, expiresAt: expiresAt.toISOString() };
+}
+
+/** "leegality" as the box on the page names it: "Leegality". */
+const providerLabel = (name: string) => `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+
+/**
+ * Where the signature goes: the signer's Aadhaar eSign box, or the signature fields of an
+ * envelope sent before the box existed.
+ */
+function signaturePositions(fields: Field[]) {
+  const boxes = fields.filter((f) => f.type === 'aadhaar');
+  return (boxes.length > 0 ? boxes : fields.filter((f) => f.type === 'signature')).map((f) => ({
+    page: f.page,
+    rect: f.rect,
+  }));
 }
 
 const invalidFile = (message: string) =>

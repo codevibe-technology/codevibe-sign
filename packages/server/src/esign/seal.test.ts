@@ -49,7 +49,7 @@ describe('an Aadhaar eSign with real files', () => {
     const docId = created.json.documents[0].id as string;
     const token = h.tokenFor('ravi@example.com');
     const started = await h.call('POST', `/v1/sign/${token}/esign`, {
-      body: { consent: true, values: [{ fieldId: created.json.fields[0].id, value: PNG }] },
+      body: { consent: true, values: [] },
     });
     expect(started.status).toBe(200);
     const ref = provider.requests[0]!.ref;

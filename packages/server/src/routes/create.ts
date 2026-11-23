@@ -1,5 +1,6 @@
 import {
   addDocument,
+  adoptAadhaarBox,
   createEnvelope,
   send,
   type Envelope,
@@ -73,7 +74,7 @@ export async function createEnvelopeFromParts(
 
   let result: TransitionResult = { ...created, envelope };
   if (parts.send) {
-    const sent = send(envelope, deps);
+    const sent = send(adoptAadhaarBox(envelope), deps);
     await assertEsignReady(rt, workspaceId, envelope);
     result = {
       envelope: sent.envelope,

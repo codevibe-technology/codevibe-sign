@@ -94,7 +94,8 @@ export interface PdfEngine {
     fields: Field[],
     values: FieldValue[],
     recipients: Recipient[],
-    options: { documentId: string; timeZone?: string },
+    /** `esignProvider` is the provider an Aadhaar eSign box names, such as "Leegality". */
+    options: { documentId: string; timeZone?: string; esignProvider?: string },
   ): Promise<Uint8Array>;
   appendCertificate(pdf: Uint8Array, input: CertificateInput): Promise<Uint8Array>;
   /** Must be the last change to the file: anything after it breaks the seal. */
@@ -124,6 +125,20 @@ export interface PdfEngine {
   verifySignatures?(pdf: Uint8Array): Promise<SignatureSummary[]>;
   /** The signing certificate as a file of its own. */
   certificatePdf?(input: CertificateInput): Promise<Uint8Array>;
+  /**
+   * The envelope's audit trail as a PDF, sent with the completed copy and offered for
+   * download. Without it the completed copy carries the signed files only.
+   */
+  auditTrailPdf?(input: AuditTrailInput): Promise<Uint8Array>;
+}
+
+export interface AuditTrailInput {
+  envelope: Envelope;
+  events: AuditEvent[];
+  /** IANA zone the times are shown in, next to UTC. */
+  timeZone?: string;
+  /** Print the network address of each event where one was recorded. */
+  networkAddresses?: boolean;
 }
 
 export const defaultPdfEngine: PdfEngine = {
@@ -137,4 +152,6 @@ export const defaultPdfEngine: PdfEngine = {
   countersign: (pdf, options) => signPdf.countersign(pdf, options),
   verifySignatures: (pdf) => signPdf.verifySignatures(pdf),
   certificatePdf: (input) => signPdf.certificatePdf(input),
+  auditTrailPdf: ({ networkAddresses, ...data }) =>
+    signPdf.auditTrailPdf(data, networkAddresses ? { networkAddresses } : {}),
 };

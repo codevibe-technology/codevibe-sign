@@ -13,22 +13,24 @@ const people = {
   asha: { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
   ravi: { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'aadhaar' },
 };
-const signature = (recipient: string, x: number) => ({
+const signature = (recipient: string, x: number, type = 'signature') => ({
   recipient,
-  type: 'signature',
+  type,
   page: 1,
   x,
   y: 600,
   width: 180,
   height: 48,
 });
+const box = (recipient: string, x: number) => signature(recipient, x, 'aadhaar');
+const title = (recipient: string) => ({ ...signature(recipient, 72, 'text'), y: 700 });
 
 /** Asha signs by email link, then Ravi with Aadhaar eSign. */
 const aadhaarBody = (overrides: Record<string, unknown> = {}) =>
   envelopeBody({
     send: true,
     recipients: [people.asha, people.ravi],
-    fields: [signature('asha', 72), signature('ravi', 300)],
+    fields: [signature('asha', 72), box('ravi', 300), title('ravi')],
     ...overrides,
   });
 
@@ -61,15 +63,15 @@ type Harness = ReturnType<typeof harness>;
 interface Api {
   id: string;
   recipients: { id: string; email: string }[];
-  fields: { id: string; recipientId: string }[];
+  fields: { id: string; recipientId: string; type: string }[];
   documents: { id: string }[];
 }
 
 function valuesOf(envelope: Api, email: string) {
   const recipient = envelope.recipients.find((r) => r.email === email)!;
   return envelope.fields
-    .filter((f) => f.recipientId === recipient.id)
-    .map((f) => ({ fieldId: f.id, value: PNG }));
+    .filter((f) => f.recipientId === recipient.id && f.type !== 'aadhaar')
+    .map((f) => ({ fieldId: f.id, value: f.type === 'text' ? 'Manager' : PNG }));
 }
 
 /** Sends the envelope and has Asha sign, so it is Ravi's turn. */
@@ -158,6 +160,21 @@ describe('sending with an Aadhaar signer', () => {
       'can hold one document',
     ],
     [
+      'an Aadhaar signer without the Aadhaar eSign box',
+      { fields: [signature('asha', 72), title('ravi')] },
+      'Place the Aadhaar eSign box for Ravi Kumar',
+    ],
+    [
+      'a drawn signature next to the Aadhaar eSign box',
+      { fields: [signature('asha', 72), box('ravi', 300), signature('ravi', 72)] },
+      'remove this signature field',
+    ],
+    [
+      'an Aadhaar eSign box for someone who signs by email',
+      { fields: [signature('asha', 72), box('asha', 72), box('ravi', 300)] },
+      'Only a signer who uses Aadhaar eSign',
+    ],
+    [
       'an Aadhaar approver',
       {
         recipients: [people.asha, { ...people.ravi, role: 'approver' }],
@@ -182,9 +199,25 @@ describe('sending with an Aadhaar signer', () => {
   it('lets one Aadhaar signer sign alone', async () => {
     const { h } = setup();
     const { status } = await h.call('POST', '/v1/envelopes', {
-      body: aadhaarBody({ recipients: [people.ravi], fields: [signature('ravi', 300)] }),
+      body: aadhaarBody({ recipients: [people.ravi], fields: [box('ravi', 300)] }),
     });
     expect(status).toBe(201);
+  });
+
+  it('takes the lone signature field of an older request as the Aadhaar eSign box', async () => {
+    const { h } = setup();
+    const created = await h.call('POST', '/v1/envelopes', {
+      body: aadhaarBody({ fields: [signature('asha', 72), signature('ravi', 300)] }),
+    });
+    expect(created.status).toBe(201);
+    const fields = (created.json as Api).fields.map((f) => f.type);
+    expect(fields).toEqual(['signature', 'aadhaar']);
+    const draft = await h.call('POST', '/v1/envelopes', {
+      body: aadhaarBody({ send: false, fields: [signature('asha', 72), signature('ravi', 300)] }),
+    });
+    const sent = await h.call('POST', `/v1/envelopes/${draft.json.id}/send`);
+    expect(sent.status).toBe(200);
+    expect((sent.json as Api).fields.map((f) => f.type)).toEqual(['signature', 'aadhaar']);
   });
 });
 
@@ -205,7 +238,10 @@ describe('POST /v1/sign/:token/esign', () => {
     expect(request.callbackUrl).toBe('https://sign.example.com/v1/esign/webhooks/leegality');
     expect(request.redirectUrl).toBe('https://sign.example.com/sign?esign=return');
     expect(request.reference).not.toBe(envelope.id);
-    expect(new TextDecoder().decode(request.documentBytes)).toContain('fields=2;values=2');
+    expect(new TextDecoder().decode(request.documentBytes)).toContain('fields=3;values=2');
+    expect(request.signaturePositions).toEqual([
+      { page: 1, rect: { x: 300, y: 600, width: 180, height: 48 } },
+    ]);
     expect(hooks).toEqual(['start']);
 
     const again = await start();
@@ -776,7 +812,7 @@ describe('sealing after an eSign', () => {
     const { h, calls, envelope, token, docId, download } = await completed();
     expect(calls).toEqual(['countersign', 'certificate']);
     const sealed = await download('sealed');
-    expect(sealed.text).toMatch(/fields=2;values=2\nesp-signature\ncountersigned\n$/);
+    expect(sealed.text).toMatch(/fields=3;values=2\nesp-signature\ncountersigned\n$/);
     expect(sealed.text).not.toContain('certificate=');
     const certificate = await download('certificate');
     expect(certificate.status).toBe(200);
@@ -856,12 +892,12 @@ describe('sealing after an eSign', () => {
 
 describe('starting again, replaced recipients and the provider file', () => {
   const note = { recipient: 'ravi', type: 'text', page: 1, x: 300, y: 500, width: 180, height: 24 };
-  const withNote = { fields: [signature('asha', 72), signature('ravi', 300), note] };
+  const withNote = { fields: [signature('asha', 72), box('ravi', 300), note] };
 
   function raviValues(envelope: Api, text: string) {
     const recipient = envelope.recipients.find((r) => r.email === 'ravi@example.com')!;
     return (envelope.fields as (Api['fields'][number] & { type: string })[])
-      .filter((f) => f.recipientId === recipient.id)
+      .filter((f) => f.recipientId === recipient.id && f.type !== 'aadhaar')
       .map((f) => ({ fieldId: f.id, value: f.type === 'text' ? text : PNG }));
   }
   const startWith = (h: Harness, token: string, envelope: Api, text: string) =>

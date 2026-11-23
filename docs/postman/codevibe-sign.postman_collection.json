@@ -479,6 +479,22 @@
             },
             "description": "Signing certificate\n\nWhat the certificate page of the sealed PDF shows, as JSON: the hash of each document\nbefore and after sealing, each recipient with the authentication they used and every\naction they took, and the head of the audit chain."
           }
+        },
+        {
+          "name": "Audit trail as a PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/audit-trail",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "audit-trail"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Audit trail as a PDF\n\nThe envelope's audit trail as a PDF, the same file the completed-copy email carries:\nthe envelope, the SHA-256 of each document before and after signing, each recipient\nwith the method they used (an Aadhaar eSign names its provider), and every event with\nits time in the workspace's time zone and UTC, who acted and the network address it\ncame from, then the head of the hash chain."
+          }
         }
       ]
     },
@@ -795,7 +811,7 @@
                 {
                   "key": "file",
                   "value": "",
-                  "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.",
+                  "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt, `audit-trail` for the envelope's audit trail as a PDF. Leave out for the signed document.",
                   "disabled": true
                 }
               ],

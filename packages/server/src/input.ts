@@ -23,6 +23,7 @@ const FIELD_TYPES: readonly FieldType[] = [
   'name',
   'text',
   'checkbox',
+  'aadhaar',
 ];
 const EMAIL = /^[^\s@<>()[\],;:"]+@[^\s@<>()[\],;:"]+\.[^\s@<>()[\],;:"]+$/;
 const PHONE = /^\+[1-9]\d{6,14}$/;

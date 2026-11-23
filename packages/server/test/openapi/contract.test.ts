@@ -375,7 +375,8 @@ describe('a full run against the server', () => {
     expect(aadhaar.json.recipients[0].auth).toBe('aadhaar');
     const esignToken = h.tokenFor('asha.esign@example.com');
     expect((await call('GET', `/v1/sign/${esignToken}/esign`)).json.status).toBe('none');
-    const esignValues = [{ fieldId: aadhaar.json.fields[0].id as string, value: PNG }];
+    expect(aadhaar.json.fields[0].type).toBe('aadhaar');
+    const esignValues: { fieldId: string; value: string }[] = [];
     const startedEsign = await call('POST', `/v1/sign/${esignToken}/esign`, {
       body: { consent: true, values: esignValues },
     });
@@ -419,6 +420,8 @@ describe('a full run against the server', () => {
     expect(checkedEsign.json.earlierSignatures).toHaveLength(1);
     await call('GET', `/v1/envelopes/${aadhaar.json.id}`);
     await call('GET', `/v1/envelopes/${aadhaar.json.id}/events`);
+    const trail = await call('GET', `/v1/envelopes/${aadhaar.json.id}/audit-trail`);
+    expect(trail.res.headers.get('content-type')).toBe('application/pdf');
     const blocked = await call('POST', '/v1/envelopes', {
       body: {
         ...body,

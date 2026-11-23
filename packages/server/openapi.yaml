@@ -919,6 +919,28 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/envelopes/{id}/audit-trail:
+    parameters:
+      - $ref: '#/components/parameters/EnvelopeId'
+    get:
+      operationId: getAuditTrailPdf
+      tags: [Audit trail]
+      summary: Audit trail as a PDF
+      description: |
+        The envelope's audit trail as a PDF, the same file the completed-copy email carries:
+        the envelope, the SHA-256 of each document before and after signing, each recipient
+        with the method they used (an Aadhaar eSign names its provider), and every event with
+        its time in the workspace's time zone and UTC, who acted and the network address it
+        came from, then the head of the hash chain.
+      responses:
+        '200':
+          $ref: '#/components/responses/Pdf'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /v1/templates:
     get:
       operationId: listTemplates
@@ -1419,10 +1441,11 @@ paths:
         required: false
         description: >-
           `certificate` for the signing certificate of a document whose `certificate` is
-          `true` in the receipt. Leave out for the signed document.
+          `true` in the receipt, `audit-trail` for the envelope's audit trail as a PDF. Leave
+          out for the signed document.
         schema:
           type: string
-          enum: [certificate]
+          enum: [certificate, audit-trail]
     get:
       operationId: getEmailedCopy
       tags: [Signing]
@@ -2743,7 +2766,13 @@ components:
       description: '`sequential` goes by `order`, lowest first (equal orders sign together); `parallel` invites everyone at once.'
     FieldType:
       type: string
-      enum: [signature, initials, date_signed, name, text, checkbox]
+      enum: [signature, initials, date_signed, name, text, checkbox, aadhaar]
+      description: |
+        `aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
+        signer has exactly one, required, and no `signature` or `initials` fields; nobody else
+        can have one. It takes no value: the signer signs the whole file at the eSign provider.
+        A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
+        sign with is still accepted: that field becomes the box when the envelope is sent.
     AuditAction:
       type: string
       enum:
@@ -2968,7 +2997,7 @@ components:
           type: string
           description: |
             Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or
-            `false`. Date: an ISO date.
+            `false`. Date: an ISO date. An `aadhaar` box takes no value; leave it out.
     EnvelopeSummary:
       type: object
       additionalProperties: false
