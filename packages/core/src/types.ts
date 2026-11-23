@@ -31,7 +31,18 @@ export type RecipientStatus =
 
 export type AuthMethod = 'email_link' | 'email_otp' | 'sms_otp' | 'aadhaar';
 
-export type FieldType = 'signature' | 'initials' | 'date_signed' | 'name' | 'text' | 'checkbox';
+/**
+ * `aadhaar` marks where an Aadhaar eSign signer signs. It takes no value: the signer signs
+ * the whole file at the eSign provider, and only a recipient with `auth: 'aadhaar'` has one.
+ */
+export type FieldType =
+  | 'signature'
+  | 'initials'
+  | 'date_signed'
+  | 'name'
+  | 'text'
+  | 'checkbox'
+  | 'aadhaar';
 
 export interface Rect {
   /** PDF points from the left edge of the page. */
@@ -61,7 +72,7 @@ export interface Field {
 
 export interface FieldValue {
   fieldId: Id;
-  /** Signature and initials: PNG bytes as base64. Text and name: the text. Checkbox: 'true' or 'false'. Date: ISO date. */
+  /** Signature and initials: PNG bytes as base64. Text and name: the text. Checkbox: 'true' or 'false'. Date: ISO date. Aadhaar boxes have none. */
   value: string;
 }
 

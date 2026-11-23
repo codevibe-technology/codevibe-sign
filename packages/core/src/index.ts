@@ -6,6 +6,7 @@ export {
   addField,
   addRecipient,
   aadhaarIssues,
+  adoptAadhaarBox,
   assertReadyToSend,
   createEnvelope,
   DEFAULT_REMINDERS,

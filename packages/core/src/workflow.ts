@@ -327,7 +327,7 @@ function collectValues(
   }
 
   const missing = [...own.values()]
-    .filter((f) => f.required && !isFilled(f, stored.get(f.id)))
+    .filter((f) => f.required && f.type !== 'aadhaar' && !isFilled(f, stored.get(f.id)))
     .map((f) => f.id);
   if (missing.length > 0) {
     throw new SignError('REQUIRED_FIELDS_MISSING', 'Fill in every required field', {

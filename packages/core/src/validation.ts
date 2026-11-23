@@ -226,6 +226,11 @@ export function checkFieldValue(type: FieldType, raw: string): ValueCheck {
       return raw === 'true' || raw === 'false'
         ? { ok: true, value: raw }
         : { ok: false, problem: "Checkbox value must be 'true' or 'false'" };
+    case 'aadhaar':
+      return {
+        ok: false,
+        problem: 'An Aadhaar eSign box takes no value; it is signed at the eSign provider',
+      };
     case 'name':
     case 'text': {
       const max = type === 'name' ? MAX_NAME_LENGTH : MAX_TEXT_LENGTH;

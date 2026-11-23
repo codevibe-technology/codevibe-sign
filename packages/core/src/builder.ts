@@ -601,6 +601,7 @@ export function aadhaarIssues(envelope: Envelope): ValidationIssue[] {
     });
   }
   const signer = aadhaar[0]!;
+  issues.push(...aadhaarBoxIssues(envelope, signer));
   const others = envelope.recipients.filter((r) => isActor(r) && r.id !== signer.id);
   if (others.length > 0 && envelope.routing !== 'sequential') {
     issues.push({
@@ -616,6 +617,76 @@ export function aadhaarIssues(envelope: Envelope): ValidationIssue[] {
   return issues;
 }
 
+/**
+ * An Aadhaar eSign signer signs at the provider and draws nothing, so they have one required
+ * `aadhaar` box, where the signature goes, and no signature or initials fields. Nobody else
+ * may have an `aadhaar` box.
+ */
+function aadhaarBoxIssues(envelope: Envelope, signer: Recipient): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const own = envelope.fields.filter((f) => f.recipientId === signer.id);
+  const boxes = own.filter((f) => f.type === 'aadhaar');
+  if (signer.role === 'signer' && boxes.length === 0) {
+    issues.push({
+      path: `recipients.${signer.id}.fields`,
+      message: `Place the Aadhaar eSign box for ${signer.name}; their signature goes there`,
+    });
+  }
+  for (const box of boxes.slice(1)) {
+    issues.push({
+      path: `fields.${box.id}`,
+      message: `${signer.name} signs once with Aadhaar eSign; keep one Aadhaar eSign box`,
+    });
+  }
+  for (const box of boxes.filter((f) => !f.required)) {
+    issues.push({
+      path: `fields.${box.id}.required`,
+      message: 'The Aadhaar eSign box must be required',
+    });
+  }
+  for (const field of own.filter((f) => f.type === 'signature' || f.type === 'initials')) {
+    issues.push({
+      path: `fields.${field.id}`,
+      message: `${signer.name} signs with Aadhaar eSign and draws nothing; remove this ${field.type} field`,
+    });
+  }
+  return issues;
+}
+
+/** An `aadhaar` box given to a recipient who does not sign with Aadhaar eSign. */
+function strayAadhaarBoxes(envelope: Envelope): ValidationIssue[] {
+  return envelope.fields
+    .filter((f) => f.type === 'aadhaar')
+    .filter((f) => envelope.recipients.find((r) => r.id === f.recipientId)?.auth !== 'aadhaar')
+    .map((f) => ({
+      path: `fields.${f.id}`,
+      message: 'Only a signer who uses Aadhaar eSign can have an Aadhaar eSign box',
+    }));
+}
+
+/**
+ * Before the `aadhaar` box existed, an Aadhaar eSign signer was given a signature field.
+ * When that is all they have (one signature field, no initials, no box), the signature
+ * field becomes their required box, so envelopes built that way still send.
+ */
+export function adoptAadhaarBox(envelope: Envelope): Envelope {
+  const signer = envelope.recipients.find((r) => r.auth === 'aadhaar' && r.role === 'signer');
+  if (!signer) return envelope;
+  const own = envelope.fields.filter((f) => f.recipientId === signer.id);
+  const signatures = own.filter((f) => f.type === 'signature');
+  const legacy =
+    signatures.length === 1 && !own.some((f) => f.type === 'initials' || f.type === 'aadhaar');
+  if (!legacy) return envelope;
+  const id = signatures[0]!.id;
+  return {
+    ...envelope,
+    fields: envelope.fields.map((f) =>
+      f.id === id ? { ...f, type: 'aadhaar', required: true } : f,
+    ),
+    values: envelope.values.filter((v) => v.fieldId !== id),
+  };
+}
+
 /** Everything that must hold before an envelope can be sent. Empty means ready. */
 export function validateForSend(envelope: Envelope, now: Date): ValidationIssue[] {
   const issues: ValidationIssue[] = [...titleIssues(envelope.title)];
@@ -629,7 +700,7 @@ export function validateForSend(envelope: Envelope, now: Date): ValidationIssue[
   for (const recipient of envelope.recipients) {
     issues.push(...recipientIssues(recipient, `recipients.${recipient.id}`));
   }
-  for (const signer of actors.filter((r) => r.role === 'signer')) {
+  for (const signer of actors.filter((r) => r.role === 'signer' && r.auth !== 'aadhaar')) {
     const hasSignature = envelope.fields.some(
       (f) => f.recipientId === signer.id && f.type === 'signature' && f.required,
     );
@@ -643,7 +714,7 @@ export function validateForSend(envelope: Envelope, now: Date): ValidationIssue[
   for (const field of envelope.fields) {
     issues.push(...fieldIssues(envelope, field, `fields.${field.id}`));
   }
-  issues.push(...valueIssues(envelope), ...aadhaarIssues(envelope));
+  issues.push(...valueIssues(envelope), ...aadhaarIssues(envelope), ...strayAadhaarBoxes(envelope));
   issues.push(...reminderIssues(envelope.reminders), ...expiryIssues(envelope.expiresAt, now));
   return issues;
 }
