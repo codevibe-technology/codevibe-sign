@@ -1,12 +1,12 @@
 import 'server-only';
 import type postgres from 'postgres';
-import { limitsFor, type Plan, type PlanSettings } from '@/lib/plans';
+import { PLAN_NAMES, limitsFor, upgradeHint, type Plan, type PlanSettings } from '@/lib/plans';
 import { isTimeZone } from '@/lib/preferences';
 import { suggestAddress } from '@/lib/workspace-address';
 import type { Role } from '@/lib/roles';
 import { randomId } from './crypto';
 import { AppError } from './errors';
-import { assertRoom, planSettings } from './plans';
+import { PlanLimitError, assertRoom, planSettings } from './plans';
 import {
   assertAddressFree,
   claimAddress,
@@ -87,6 +87,43 @@ export async function createWorkspace(
     throw err;
   }
 }
+
+/**
+ * Refuses to make `userId` an owner of a workspace when its plan lets a person own only so
+ * many and they already do. Creating a workspace is counted the same way, so becoming an
+ * owner by promotion or by an owner's invitation cannot get around it. The user's row is
+ * locked while the count is taken.
+ */
+export async function assertCanOwn(
+  tx: postgres.TransactionSql,
+  input: { userId: string; workspaceId: string; field?: string },
+  settings: PlanSettings = planSettings(),
+): Promise<void> {
+  if (settings.mode === 'self-hosted') return;
+  const [workspace] = await tx<{ plan: Plan }[]>`
+    select plan from app_workspaces where id = ${input.workspaceId}`;
+  if (!workspace) return;
+  const max = limitsFor(workspace.plan, settings).ownedWorkspaces;
+  if (max === null) return;
+  await tx`select 1 from auth_users where id = ${input.userId} for update`;
+  const [owned] = await tx<{ n: number }[]>`
+    select count(*)::int as n from app_members m join app_workspaces w on w.id = m.workspace_id
+    where m.user_id = ${input.userId} and m.role = 'owner' and w.plan = ${workspace.plan}
+      and w.id <> ${input.workspaceId}`;
+  const used = owned?.n ?? 0;
+  if (used < max) return;
+  const name = PLAN_NAMES[workspace.plan];
+  throw new PlanLimitError({
+    limit: 'ownedWorkspaces',
+    used,
+    max,
+    plan: workspace.plan,
+    ...(input.field ? { field: input.field } : {}),
+    message: `This person already owns ${used === 1 ? `a ${name} workspace` : `${used} ${name} workspaces`}, and each person can own ${max}. Give them another role here, or ${lowerFirst(upgradeHint(workspace.plan))}`,
+  });
+}
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 /** The address the name suggests, or the first free one numbered after it. */
 async function addressFromName(tx: postgres.TransactionSql, name: string): Promise<string> {

@@ -6,6 +6,7 @@ import { randomId, randomSecret, sha256Hex } from './crypto';
 import { AppError } from './errors';
 import { assertRoom, countSeats, lockedPlan } from './plans';
 import { cleanPersonName, userLabel } from './profile';
+import { assertCanOwn } from './workspaces';
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -176,6 +177,9 @@ export async function acceptInvitation(
         select count(*)::int as members, bool_or(user_id = ${user.id}) as joined
         from app_members where workspace_id = ${invitation.workspaceId}`;
       if (!count?.joined) assertRoom(plan, 'members', count?.members ?? 0);
+    }
+    if (invitation.role === 'owner') {
+      await assertCanOwn(tx, { userId: user.id, workspaceId: invitation.workspaceId });
     }
     await tx`insert into app_members (workspace_id, user_id, role)
       values (${invitation.workspaceId}, ${user.id}, ${invitation.role})

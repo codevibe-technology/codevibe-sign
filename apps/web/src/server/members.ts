@@ -3,6 +3,7 @@ import type postgres from 'postgres';
 import { canManageRole, type Role } from '@/lib/roles';
 import { AppError } from './errors';
 import { userLabel } from './profile';
+import { assertCanOwn } from './workspaces';
 
 export interface Member {
   userId: string;
@@ -58,6 +59,13 @@ export async function changeRole(sql: postgres.Sql, change: Change & { role: Rol
     if (target.role === change.role) return;
     if (lastOwner) {
       throw new AppError('CONFLICT', 'Make someone else an owner first', 'role');
+    }
+    if (change.role === 'owner') {
+      await assertCanOwn(tx, {
+        userId: change.userId,
+        workspaceId: change.workspaceId,
+        field: 'role',
+      });
     }
     await tx`update app_members set role = ${change.role}
       where workspace_id = ${change.workspaceId} and user_id = ${change.userId}`;
