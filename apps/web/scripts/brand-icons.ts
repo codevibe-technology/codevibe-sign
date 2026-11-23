@@ -101,3 +101,41 @@ const text = readFileSync(module, 'utf8');
 const mark = source.toString('utf8').trim();
 if (mark.includes("'")) throw new Error('mark.svg must not contain single quotes');
 write(module, text.replace(/(export const MARK_SVG =\n {2}')[^']*(';)/, `$1${mark}$2`));
+
+// The lockup: mark and outlined "codevibe sign", drawn on codevibe.in's logo grid. The four
+// colourways live next to the mark in apps/site/public/brand; the app serves the same files.
+const brand = path('../../site/public/brand/');
+const LOCKUPS = ['logo.svg', 'logo-white.svg', 'logo-mono.svg', 'logo-mono-white.svg'];
+for (const name of LOCKUPS) write(path(`../public/brand/${name}`), readFileSync(brand + name));
+
+const lockup = readFileSync(`${brand}logo.svg`);
+/** Emails cannot show SVG; this PNG is twice the 28 px the account emails draw it at. */
+write(
+  path('../public/brand/logo-email.png'),
+  await sharp(lockup, { density: (72 * 56) / 135 })
+    .resize({ height: 56 })
+    .png()
+    .toBuffer(),
+);
+
+/** The light lockup as data for the PDF certificate, which draws it as vector paths. */
+const svg = lockup.toString('utf8');
+const attr = (tag: string, name: string) => new RegExp(`${name}="([^"]*)"`).exec(tag)?.[1];
+const [, width, height] = /viewBox="0 0 (\d+) (\d+)"/.exec(svg)!;
+const markScale = Number(/<g transform="scale\(([\d.]+)\)">/.exec(svg)![1]);
+const group = /<g [^>]*>(.*?)<\/g>/.exec(svg)![1]!;
+const strokes = [...group.matchAll(/<path [^>]*\/>/g)].map(([tag]) => ({
+  d: attr(tag, 'd')!,
+  color: attr(tag, 'stroke')!,
+  width: Number(attr(tag, 'stroke-width')),
+  round: attr(tag, 'stroke-linecap') === 'round',
+}));
+const fills = [...svg.replace(group, '').matchAll(/<path [^>]*\/>/g)].map(([tag]) => ({
+  d: attr(tag, 'd')!,
+  color: attr(tag, 'fill')!,
+}));
+write(
+  path('../../../packages/pdf/src/lockup-paths.ts'),
+  `// Written by \`pnpm --filter web brand:icons\` from apps/site/public/brand/logo.svg.\n` +
+    `export const LOCKUP = ${JSON.stringify({ width: Number(width), height: Number(height), markScale, strokes, fills }, null, 2)} as const;\n`,
+);
