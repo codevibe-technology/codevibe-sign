@@ -66,6 +66,8 @@ export interface CertificateEsign {
   issuer?: string;
   /** When the eSign was made: the signature's timestamp, else its signing time. */
   signedAt?: IsoDateTime;
+  /** SHA-256 of the signed document as delivered, with the Aadhaar eSign and the seal. */
+  signedFileSha256?: string;
 }
 
 export interface CertificateOptions {
@@ -333,6 +335,11 @@ function drawCertificate(
   flow.gap(1);
   flow.paragraph(document.sha256, flow.style('monoSmall'));
   flow.paragraph('SHA-256 of the document as it was sent for signing.', small);
+  if (esign?.signedFileSha256) {
+    flow.gap(3);
+    flow.paragraph(esign.signedFileSha256, flow.style('monoSmall'));
+    flow.paragraph('SHA-256 of the signed document, with the Aadhaar eSign and the seal.', small);
+  }
   if (auditHead) {
     flow.gap(3);
     flow.paragraph(

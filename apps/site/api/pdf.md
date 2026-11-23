@@ -178,10 +178,11 @@ continues on further pages with its header repeated.
 
 `options`: `font` (as above) and `maxBytes`.
 
-`esign: { recipientId, provider, sandbox?, signerName?, issuer?, signedAt? }` describes the
-Aadhaar eSign of a completed envelope, as read from the signed file: that signer's row names
-the method (`Aadhaar eSign (via Leegality)`), the time of the signature (`signedAt`, from its
-timestamp or signing time) and the subject and issuer of their eSign certificate. Use it with
+`esign: { recipientId, provider, sandbox?, signerName?, issuer?, signedAt?, signedFileSha256? }`
+describes the Aadhaar eSign of a completed envelope, as read from the signed file: that
+signer's row names the method (`Aadhaar eSign (via Leegality)`), the time of the signature
+(`signedAt`, from its timestamp or signing time) and the subject and issuer of their eSign
+certificate, and `signedFileSha256` is printed under the document fingerprint. Use it with
 `certificateWithAuditTrailPdf`, since nothing can be added to the pages of the signed file.
 
 ### `certificatePdf(data, options?) → Promise<Uint8Array>`

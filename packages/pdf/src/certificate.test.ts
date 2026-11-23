@@ -461,6 +461,7 @@ describe('certificateWithAuditTrailPdf', () => {
       signerName: 'RAVI S KUMAR',
       issuer: 'Protean eGov Technologies Limited sub-CA for Aadhaar eSign 2024',
       signedAt: '2026-11-18T09:12:40.000Z',
+      signedFileSha256: 'b'.repeat(64),
     },
   });
 
@@ -478,6 +479,8 @@ describe('certificateWithAuditTrailPdf', () => {
     expect(certificate).toContain('Issued by Protean eGov Technologies Limited');
     expect(certificate).toContain('chain head');
     expect(certificate).toContain('nothing was added to its pages');
+    expect(certificate).toContain('b'.repeat(64));
+    expect(certificate).toContain('SHA-256 of the signed document, with the Aadhaar eSign');
     const rest = (await certificateText(output, 1)).join(' ');
     expect(rest).toContain('Audit trail');
     const doc = await PDFDocument.load(output);
