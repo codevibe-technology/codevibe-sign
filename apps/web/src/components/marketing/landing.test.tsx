@@ -152,7 +152,7 @@ describe('Landing', () => {
     expect(within(pricing).getByText('500 envelopes a month, bulk sends included')).toBeTruthy();
     expect(within(pricing).getByText('Unlimited templates')).toBeTruthy();
     expect(within(pricing).getByText('Coming soon')).toBeTruthy();
-    expect(within(pricing).getByRole('link', { name: 'Talk to us' })).toHaveAttribute(
+    expect(within(pricing).getByRole('link', { name: 'Upgrade by email' })).toHaveAttribute(
       'href',
       expect.stringMatching(/^mailto:hello@codevibe\.in/),
     );
@@ -166,6 +166,7 @@ describe('Landing', () => {
     const faq = document.getElementById('faq')!;
     expect(within(faq).getByText(/Information Technology Act, 2000/)).toBeTruthy();
     expect(within(faq).getByText('Is Aadhaar eSign available?')).toBeTruthy();
+    expect(within(faq).getByText(/standalone\s+library/)).toBeTruthy();
     expect(within(faq).getByText('Where is my data kept?')).toBeTruthy();
     expect(within(faq).getByText(/Nothing already sent is affected/)).toBeTruthy();
   });

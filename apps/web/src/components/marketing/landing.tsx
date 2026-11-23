@@ -227,9 +227,10 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: 'Is Aadhaar eSign available?',
     a: (
       <p>
-        Aadhaar eSign is coming to the cloud through a licensed eSign provider. If you self-host,
-        you can add it today with the open-source <code>sign-aadhaar</code> library and your own
-        provider account.
+        Not in the app yet. The open-source <code>sign-aadhaar</code> package is a standalone
+        library: the server and the web app do not call it, so today you use it from your own
+        backend with your own eSign provider account. Aadhaar eSign in the app, through a licensed
+        eSign provider, is planned.
       </p>
     ),
   },
@@ -489,7 +490,7 @@ export function Landing({
                 </Button>
               </div>
               <p className="mt-4 text-sm text-white/70">
-                A free cloud workspace, no card needed. Or run it on your own server with no limits.
+                Start on the Free plan, no card needed. Or self-host it, free and unlimited.
               </p>
               <p className="mt-2 text-sm text-white/70">
                 Received a signed PDF?{' '}
@@ -716,7 +717,7 @@ docker compose up -d`}</code>
             <PlanCard
               name="Cloud"
               price="Coming soon"
-              note="For teams that send every day."
+              note="For teams that send every day. Write to us from a Free workspace to be upgraded."
               lines={planLines(cloud)}
               action={
                 <Button asChild variant="secondary" className="w-full">
@@ -724,7 +725,7 @@ docker compose up -d`}</code>
                     href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Codevibe Sign Cloud plan')}`}
                   >
                     <Mail aria-hidden className="h-4 w-4" />
-                    Talk to us
+                    Upgrade by email
                   </a>
                 </Button>
               }
@@ -787,8 +788,8 @@ docker compose up -d`}</code>
               Send your first document today
             </h2>
             <p className="relative mx-auto mt-3 max-w-xl text-lg text-white/80">
-              A free cloud workspace takes a minute to set up. Or run the same app on your own
-              server.
+              A Free plan workspace takes a minute to set up. Or run the same app on your own
+              server, free and unlimited.
             </p>
             <div className="relative mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Button asChild className="h-12 px-6 text-base">

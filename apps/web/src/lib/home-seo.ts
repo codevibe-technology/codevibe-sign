@@ -1,6 +1,6 @@
 export const HOME_TITLE = 'Codevibe Sign: send documents for signature in minutes';
 export const HOME_DESCRIPTION =
-  'Open-source e-signatures: send a PDF, people sign on any device, and you get a sealed PDF with a certificate anyone can verify. Free cloud or self-host.';
+  'Open-source e-signatures: send a PDF, people sign on any device, and you get a sealed PDF with a certificate anyone can verify. Free plan or self-host.';
 
 /**
  * Structured data for the home page: what the product is and that the cloud plan starts free.
@@ -21,7 +21,7 @@ export function softwareApplicationJsonLd(appUrl: string) {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'INR',
-      description: 'Free cloud workspace',
+      description: 'Free plan: a cloud workspace for Rs 0',
     },
     featureList: [
       'Send PDFs for signature',
