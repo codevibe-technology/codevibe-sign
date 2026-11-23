@@ -31,10 +31,10 @@ export default async function OnboardingPage() {
       </p>
       <h1 className="mt-2 text-[26px] leading-tight font-bold">Create your workspace</h1>
       <p className="mt-1.5 mb-6 text-muted">
-        A workspace holds your documents, templates, team and brand. Use your company or team name;
-        you can change it later.
+        A workspace holds your documents, templates, team and brand. Use your company or team name.
+        You can change the name and the address later.
       </p>
-      <CreateWorkspaceForm />
+      <CreateWorkspaceForm host={new URL(env().APP_URL).host} />
     </AuthFrame>
   );
 }
