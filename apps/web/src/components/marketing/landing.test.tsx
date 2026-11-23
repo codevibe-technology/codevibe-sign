@@ -358,8 +358,24 @@ describe('Landing', () => {
       '/terms',
       '/privacy',
     ]);
-    for (const name of ['Docs', 'Verify a PDF', 'Terms', 'Privacy']) {
+    for (const name of ['Verify a PDF', 'Terms', 'Privacy']) {
       expect(within(footer).getByRole('link', { name })).not.toHaveAttribute('target');
+    }
+  });
+
+  it('opens every docs link in a new tab and says so, from the header, the page and the footer', () => {
+    render(<Landing features={FEATURES} pricing={PRICING} />);
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('a[href^="/docs"]')];
+    const header = screen.getByRole('banner');
+    const footer = screen.getByRole('contentinfo');
+    // the nav and the folded menu; five in the footer; six on the page itself
+    expect(links.filter((a) => header.contains(a))).toHaveLength(2);
+    expect(links.filter((a) => footer.contains(a))).toHaveLength(5);
+    expect(links).toHaveLength(13);
+    for (const link of links) {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveAccessibleName(/\(opens in a new tab\)$/);
     }
   });
 

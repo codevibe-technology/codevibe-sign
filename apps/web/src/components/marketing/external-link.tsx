@@ -3,8 +3,9 @@ import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 /**
- * A link to another site. It opens in a new tab, passes neither the opener nor the referrer,
- * and says so to screen readers; sighted visitors get a small arrow unless `bare` is set.
+ * A link to another site, or to the docs. It opens in a new tab, passes neither the opener nor
+ * the referrer, and says so to screen readers; sighted visitors get a small arrow unless `bare`
+ * is set.
  */
 export function ExternalLink({
   href,

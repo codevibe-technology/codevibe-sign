@@ -1,5 +1,6 @@
-import { ArrowRight, BadgeCheck, Check, Fingerprint, Smartphone } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Check, Fingerprint, Smartphone } from 'lucide-react';
 import type { PricingView } from '@/server/billing/pricing';
+import { ExternalLink } from './external-link';
 import { AADHAAR_GUIDE } from './links';
 import { reveal } from './reveal';
 
@@ -166,13 +167,14 @@ export function AadhaarSection({ pricing }: { pricing: PricingView }) {
                 ))}
               </ul>
             </div>
-            <a
+            <ExternalLink
               href={AADHAAR_GUIDE}
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#0B47A8] hover:bg-white/90"
+              bare
+              className="mt-5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#0B47A8] hover:bg-white/90"
             >
               How Aadhaar eSign works
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </a>
+              <ArrowUpRight aria-hidden className="ml-1 h-4 w-4" />
+            </ExternalLink>
           </div>
           <div className="flex items-center pb-8 lg:pb-9" {...reveal(1)}>
             <SignerCard />

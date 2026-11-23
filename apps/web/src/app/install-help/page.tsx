@@ -68,9 +68,12 @@ export default async function InstallHelpPage() {
             </ul>
             <p className="mt-6 text-sm text-muted">
               You need a server with Docker and a domain name. Prefer to do it yourself? The{' '}
-              <a className="font-semibold text-primary hover:underline" href={SELF_HOST_DOCS}>
+              <ExternalLink
+                className="font-semibold text-primary hover:underline"
+                href={SELF_HOST_DOCS}
+              >
                 self-hosting guide
-              </a>{' '}
+              </ExternalLink>{' '}
               covers every step.
             </p>
 

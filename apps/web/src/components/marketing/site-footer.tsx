@@ -59,15 +59,16 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
 const linkClass = 'text-sm text-white/75 hover:text-white hover:underline';
 
 function FooterAnchor({ link }: { link: FooterLink }) {
-  if (link.external) {
+  // The docs are a separate static site, so they open in a tab of their own, like other sites.
+  if (link.external || link.href.startsWith('/docs')) {
     return (
       <ExternalLink href={link.href} className={linkClass}>
         {link.label}
       </ExternalLink>
     );
   }
-  // The docs are a separate static site, and section links load the home page: plain links.
-  if (link.href.startsWith('/docs') || link.href.startsWith('/#')) {
+  // Section links load the home page: plain links.
+  if (link.href.startsWith('/#')) {
     return (
       <a href={link.href} className={linkClass}>
         {link.label}

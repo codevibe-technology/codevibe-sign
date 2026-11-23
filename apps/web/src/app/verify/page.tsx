@@ -6,6 +6,7 @@ import { SiteFooter } from '@/components/marketing/site-footer';
 import { SiteHeader } from '@/components/marketing/site-header';
 import { Wordmark } from '@/components/shell/brand-mark';
 import { PublicVerifyPanel } from '@/components/verify/public-verify-panel';
+import { ExternalLink } from '@/components/marketing/external-link';
 import { SEAL_GUIDE } from '@/components/marketing/links';
 import { RecordLookup } from '@/components/verify/record-lookup';
 import { groupFingerprint, installSealCertificate } from '@/server/pdf';
@@ -123,9 +124,12 @@ export default async function PublicVerifyPage() {
               saved, and nothing about it is logged.
             </p>
             <p>
-              <a href={SEAL_GUIDE} className="font-medium text-muted underline hover:text-primary">
+              <ExternalLink
+                href={SEAL_GUIDE}
+                className="font-medium text-muted underline hover:text-primary"
+              >
                 How verification works
-              </a>
+              </ExternalLink>
             </p>
           </aside>
         </div>

@@ -4,6 +4,7 @@ import { Wordmark } from '@/components/shell/brand-mark';
 import { UserMenu } from '@/components/shell/user-menu';
 import { Button } from '@/components/ui/button';
 import { APP_HOME } from '@/lib/safe-next';
+import { ExternalLink } from './external-link';
 import { DOCS_URL } from './links';
 import { type SectionLink, SectionLinks } from './section-links';
 
@@ -20,7 +21,8 @@ export interface SiteViewer {
   email: string;
 }
 
-const menuLink = 'block rounded-md px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-2';
+const menuItem = 'rounded-md px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-2';
+const menuLink = `block ${menuItem}`;
 
 /**
  * The top bar of the public pages: the logo, the home page sections, docs and the way in.
@@ -43,12 +45,12 @@ export function SiteHeader({
         </Link>
         <nav aria-label="Site" className="ml-6 hidden items-center gap-0.5 lg:flex">
           <SectionLinks links={SECTIONS} samePage={samePage} />
-          <a
+          <ExternalLink
             href={DOCS_URL}
             className="rounded-md px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-ink"
           >
             Docs
-          </a>
+          </ExternalLink>
         </nav>
         <div className="ml-auto flex items-center gap-2">
           {viewer ? (
@@ -91,9 +93,9 @@ export function SiteHeader({
                   {link.label}
                 </a>
               ))}
-              <a href={DOCS_URL} className={menuLink}>
+              <ExternalLink href={DOCS_URL} className={`${menuItem} w-full`}>
                 Docs
-              </a>
+              </ExternalLink>
               {viewer ? null : (
                 <Link
                   href="/sign-in"

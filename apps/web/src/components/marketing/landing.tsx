@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   ArrowRight,
+  ArrowUpRight,
   BellRing,
   Blocks,
   Check,
@@ -720,13 +721,14 @@ export function Landing({
                 <Button pill asChild variant="secondary" className="h-11 px-5">
                   <Link href={VERIFY_URL}>Check a signed PDF</Link>
                 </Button>
-                <a
+                <ExternalLink
                   href={EVIDENCE_GUIDE}
-                  className="inline-flex h-11 items-center gap-1.5 px-2 text-sm font-semibold text-primary hover:underline"
+                  bare
+                  className="h-11 px-2 text-sm font-semibold text-primary hover:underline"
                 >
                   How the certificate serves as evidence
-                  <ArrowRight aria-hidden className="h-4 w-4" />
-                </a>
+                  <ArrowUpRight aria-hidden className="ml-0.5 h-4 w-4" />
+                </ExternalLink>
               </div>
             </div>
             <div className="min-w-0" {...reveal(1)}>
@@ -795,15 +797,15 @@ export function Landing({
                 Apache-2.0; the server and app under AGPL-3.0.
               </p>
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
-                <a className="text-primary hover:underline" href={API_DOCS}>
+                <ExternalLink className="text-primary hover:underline" href={API_DOCS}>
                   Read the API docs
-                </a>
-                <a className="text-primary hover:underline" href={WEBHOOKS_GUIDE}>
+                </ExternalLink>
+                <ExternalLink className="text-primary hover:underline" href={WEBHOOKS_GUIDE}>
                   Verify webhooks
-                </a>
-                <a className="text-primary hover:underline" href={SELF_HOST_DOCS}>
+                </ExternalLink>
+                <ExternalLink className="text-primary hover:underline" href={SELF_HOST_DOCS}>
                   Self-hosting guide
-                </a>
+                </ExternalLink>
                 <ExternalLink className="text-primary hover:underline" href={GITHUB_URL}>
                   View on GitHub
                 </ExternalLink>
@@ -909,7 +911,7 @@ docker compose up -d`}</code>
                 </Link>
               </Button>
               <Button pill asChild variant="secondary" className="h-12 px-7 text-base">
-                <a href={DOCS_URL}>Read the docs</a>
+                <ExternalLink href={DOCS_URL}>Read the docs</ExternalLink>
               </Button>
             </div>
           </div>
