@@ -114,17 +114,51 @@ export const ROLE_OPTIONS: { value: RecipientRole; label: string; hint: string }
  * Identity checks a sender can pick, the default first. A one-time code is the default
  * because a link alone proves only access to the inbox, which is weaker evidence.
  */
-export const AUTH_OPTIONS: { value: Exclude<AuthMethod, 'aadhaar'>; label: string }[] = [
+export const AUTH_OPTIONS: { value: AuthMethod; label: string }[] = [
   { value: 'email_otp', label: 'Email link + code (recommended)' },
   { value: 'sms_otp', label: 'Email link + SMS code' },
   { value: 'email_link', label: 'Email link only' },
+  { value: 'aadhaar', label: 'Aadhaar eSign' },
 ];
+
+/** Templates fix their signers before the documents are known, so Aadhaar eSign is left out. */
+export const TEMPLATE_AUTH_OPTIONS = AUTH_OPTIONS.filter(
+  (option): option is { value: Exclude<AuthMethod, 'aadhaar'>; label: string } =>
+    option.value !== 'aadhaar',
+);
 
 export const AUTH_LABELS: Record<AuthMethod, string> = {
   email_link: 'Email link',
   email_otp: 'Email code',
   sms_otp: 'SMS code',
-  aadhaar: 'Aadhaar',
+  aadhaar: 'Aadhaar eSign',
+};
+
+const PROVIDER_NAMES: Record<string, string> = { leegality: 'Leegality', emudhra: 'eMudhra' };
+
+/** `leegality` as people write it; an unknown provider keeps its own spelling. */
+export const esignProviderName = (provider: string) => PROVIDER_NAMES[provider] ?? provider;
+
+/** How a recipient proves who they are, naming the eSign provider once one is known. */
+export function authLabel(recipient: { auth: AuthMethod; esign?: { provider: string } }): string {
+  const label = AUTH_LABELS[recipient.auth] ?? recipient.auth;
+  return recipient.auth === 'aadhaar' && recipient.esign?.provider
+    ? `${label} (via ${esignProviderName(recipient.esign.provider)})`
+    : label;
+}
+
+/** Why an Aadhaar eSign did not go through, from the `reason` of the audit event. */
+export const ESIGN_FAILURE_REASONS: Record<string, string> = {
+  no_credits: 'the workspace had no Aadhaar eSign credits left',
+  not_configured: 'Aadhaar eSign is not set up',
+  own_not_configured: 'the Leegality account details are missing',
+  own_not_in_plan: 'the plan does not include your own Leegality account',
+  price_not_set: 'Aadhaar eSign is not open yet',
+  provider_error: 'the eSign provider did not accept the request',
+  provider_failed: 'the eSign provider reported a failure',
+  provider_expired: 'the request expired at the eSign provider',
+  expired: 'the signer did not finish in time',
+  start_interrupted: 'the request was interrupted',
 };
 
 const ACTION_LABELS: Record<AuditAction, string> = {
@@ -146,6 +180,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'recipient.declined': 'Declined',
   'recipient.link_shared': 'Link shared manually',
   'recipient.corrected': 'Details corrected',
+  'recipient.esign_started': 'Started Aadhaar eSign',
+  'recipient.esign_failed': 'Aadhaar eSign did not finish',
   'document.sealed': 'Document sealed',
 };
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, Input, NativeSelect } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import { AUTH_OPTIONS, ROLE_OPTIONS } from '@/lib/envelopes';
+import { TEMPLATE_AUTH_OPTIONS, ROLE_OPTIONS } from '@/lib/envelopes';
 import { MAX_RECIPIENTS, moveItem, type Problems } from '@/lib/send-flow';
 import { ROLE_NAME_MAX, newRole, type TemplateRoleDef } from '@/lib/templates';
 
@@ -167,7 +167,7 @@ export function StepRoles({
                           update(r.id, { auth: e.target.value as TemplateRoleDef['auth'] })
                         }
                       >
-                        {AUTH_OPTIONS.map((o) => (
+                        {TEMPLATE_AUTH_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>

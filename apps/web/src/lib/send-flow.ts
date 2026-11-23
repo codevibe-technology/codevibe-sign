@@ -46,7 +46,7 @@ export interface DraftRecipient {
   email: string;
   phone: string;
   role: RecipientRole;
-  auth: Exclude<AuthMethod, 'aadhaar'>;
+  auth: AuthMethod;
 }
 
 export interface DraftSettings {
@@ -171,6 +171,49 @@ export function recipientProblems(recipients: DraftRecipient[]): Problems {
   return problems;
 }
 
+const INDIAN_MOBILE = /^(?:\+?91)?\d{10}$/;
+
+/**
+ * The rules of an Aadhaar eSign, which signs the finished file: one such signer, on one
+ * document, and they act last. The server checks the same rules when the envelope is sent.
+ */
+export function aadhaarProblems(
+  state: Pick<SendFlowState, 'documents' | 'recipients' | 'routing'>,
+): Problems {
+  const problems: Problems = {};
+  const aadhaar = state.recipients.filter((r) => r.auth === 'aadhaar' && r.role !== 'viewer');
+  const first = aadhaar[0];
+  if (!first) return problems;
+  for (const r of aadhaar) {
+    if (r.role !== 'signer') {
+      problems[`recipients.${r.id}.auth`] =
+        'Aadhaar eSign is for signers. Pick another identity check for an approver.';
+    }
+    const phone = r.phone.replace(/[\s()-]/g, '');
+    if (phone && !INDIAN_MOBILE.test(phone)) {
+      problems[`recipients.${r.id}.phone`] =
+        'Aadhaar eSign needs a 10-digit Indian mobile number, or leave this empty.';
+    }
+  }
+  for (const r of aadhaar.slice(1)) {
+    problems[`recipients.${r.id}.auth`] =
+      'Only one person in an envelope can sign with Aadhaar eSign.';
+  }
+  const at = `recipients.${first.id}.auth`;
+  const actors = state.recipients.filter((r) => r.role !== 'viewer');
+  if (problems[at]) return problems;
+  if (state.documents.length > 1) {
+    problems[at] =
+      'Aadhaar eSign covers one document. Send the other documents in their own envelope.';
+  } else if (actors.length > 1 && actors[actors.length - 1]?.id !== first.id) {
+    problems[at] = `${first.name.trim() || 'This signer'} signs with Aadhaar eSign and has to be last. Move them below the others.`;
+  } else if (actors.length > 1 && state.routing !== 'sequential') {
+    problems[at] =
+      'With Aadhaar eSign the others sign first. Choose "One after another" as the signing order.';
+  }
+  return problems;
+}
+
 /** Every signer needs a required signature field; fields may only belong to signers. */
 export function fieldProblems(recipients: DraftRecipient[], fields: Field[]): Problems {
   const problems: Problems = {};
@@ -211,13 +254,14 @@ export function stepProblems(step: StepKey, state: SendFlowState): Problems {
     case 'documents':
       return documentProblems(state.documents);
     case 'recipients':
-      return recipientProblems(state.recipients);
+      return { ...recipientProblems(state.recipients), ...aadhaarProblems(state) };
     case 'fields':
       return fieldProblems(state.recipients, state.fields);
     case 'review':
       return {
         ...documentProblems(state.documents),
         ...recipientProblems(state.recipients),
+        ...aadhaarProblems(state),
         ...fieldProblems(state.recipients, state.fields),
         ...settingsProblems(state.settings),
       };
@@ -355,7 +399,7 @@ export function stateFromEnvelope(envelope: Envelope, now: Date = new Date()): S
         email: r.email ?? '',
         phone: r.phone ?? '',
         role: r.role,
-        auth: r.auth === 'aadhaar' ? 'email_otp' : r.auth,
+        auth: r.auth,
       })),
     routing: envelope.routing,
     fields: envelope.fields,
