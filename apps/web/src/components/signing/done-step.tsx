@@ -128,7 +128,11 @@ export function DoneStep({
                 Download the audit trail (PDF)
               </a>
             ) : null}
-            <p className="text-sm">We have emailed it to you as well.</p>
+            <p className="text-sm">
+              We have emailed{' '}
+              {receipt.documents.some((d) => d.certificateWithAuditTrail) ? 'them' : 'it'} to you as
+              well.
+            </p>
           </>
         ) : status === 'completed' ? (
           <p className="inline-flex items-center gap-2">
