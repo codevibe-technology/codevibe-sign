@@ -189,7 +189,7 @@ export function StepRecipients({
 
   return (
     <div className="space-y-6">
-      <fieldset className="grid gap-3 sm:grid-cols-2">
+      <fieldset className="grid gap-3 sm:grid-cols-2" data-tour="signing-order">
         <legend className="mb-2 text-[13px] font-semibold text-ink">Signing order</legend>
         {(
           [
@@ -250,7 +250,7 @@ export function StepRecipients({
         </p>
       ) : null}
 
-      <ol className="relative space-y-3" aria-label="Recipients">
+      <ol className="relative space-y-3" aria-label="Recipients" data-tour="recipients-list">
         {recipients.map((r, i) => {
           const at = `recipients.${r.id}`;
           const color = colorIndex(recipients, r.id);
@@ -406,6 +406,7 @@ export function StepRecipients({
                       {(props) => (
                         <NativeSelect
                           {...props}
+                          data-tour="identity-check"
                           value={r.auth}
                           onChange={(e) =>
                             update(r.id, { auth: e.target.value as DraftRecipient['auth'] })
@@ -475,7 +476,7 @@ export function StepRecipients({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" data-tour="recipients-add">
         <Button
           type="button"
           variant="secondary"

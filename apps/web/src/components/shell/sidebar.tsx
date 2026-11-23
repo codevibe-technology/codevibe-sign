@@ -39,7 +39,9 @@ export function Sidebar({
       >
         <BrandMark className="h-9 w-9" />
       </Link>
-      <WorkspaceSwitcher current={current} workspaces={workspaces} canCreate={canCreate} />
+      <div data-tour="workspace-switcher" className="rounded-md">
+        <WorkspaceSwitcher current={current} workspaces={workspaces} canCreate={canCreate} />
+      </div>
       <span aria-hidden className="my-3 h-px w-10 bg-white/10" />
       <nav aria-label="Main" className="w-full flex-1 overflow-y-auto px-2">
         <ul className="space-y-1">
@@ -51,6 +53,7 @@ export function Sidebar({
                   href={item.href}
                   onClick={onNavigate}
                   aria-current={active ? 'page' : undefined}
+                  data-tour={`nav-${item.label.toLowerCase()}`}
                   className={cn(
                     railItem,
                     active
@@ -74,6 +77,7 @@ export function Sidebar({
         <a
           href="/docs"
           {...newTab}
+          data-tour="nav-docs"
           className={cn(railItem, 'text-nav-muted hover:bg-nav-raised/60 hover:text-white')}
         >
           <BookOpen aria-hidden strokeWidth={1.8} className="h-5 w-5" />
@@ -82,7 +86,11 @@ export function Sidebar({
             <NewTabMark className="h-2.5 w-2.5" />
           </span>
         </a>
-        <UserMenu user={user} personalHref={`/dashboard/${current.slug}/settings/personal`} />
+        <UserMenu
+          user={user}
+          personalHref={`/dashboard/${current.slug}/settings/personal`}
+          {...(onNavigate ? { onNavigate } : {})}
+        />
       </div>
     </div>
   );

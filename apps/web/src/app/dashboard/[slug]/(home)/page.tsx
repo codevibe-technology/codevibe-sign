@@ -74,7 +74,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const sendButton = canSend ? (
     <Button asChild>
-      <Link href={`/dashboard/${slug}/envelopes/new`}>
+      <Link href={`/dashboard/${slug}/envelopes/new`} data-tour="send-document">
         <Send aria-hidden className="h-4 w-4" />
         Send a document
       </Link>

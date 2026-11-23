@@ -40,6 +40,7 @@ import {
 } from '@/lib/send-flow';
 import { replaceDocumentAction } from '@/server/actions/envelopes';
 import { ExcludedDocumentNotice } from '@/components/legal/excluded-document-notice';
+import { SendTour } from '@/components/tour/guided-tours';
 import { StepDocuments } from './step-documents';
 import { StepFields } from './step-fields';
 import { StepRecipients, type EsignChoice } from './step-recipients';
@@ -368,6 +369,7 @@ export function SendFlow({
             <Button
               type="button"
               variant="secondary"
+              data-tour="send-preview"
               aria-pressed={previewing}
               onClick={() => setPreviewing((p) => !p)}
             >
@@ -390,6 +392,7 @@ export function SendFlow({
             type="button"
             onClick={() => void next()}
             pending={busy !== null}
+            data-tour="send-next"
             className="min-w-[132px] shadow-[0_8px_18px_-8px_rgb(27_106_224/0.6)]"
           >
             {busy === 'creating' ? (
@@ -420,7 +423,10 @@ export function SendFlow({
         </div>
       </header>
 
-      <div className="border-b border-line bg-surface px-4 py-2 lg:hidden">
+      <div
+        className="border-b border-line bg-surface px-4 py-2 lg:hidden"
+        data-tour="send-progress"
+      >
         <p className="text-[13px] text-muted">
           Step {index + 1} of {STEPS.length} ·{' '}
           <span className="font-semibold text-ink">{current.label}</span>
@@ -536,6 +542,7 @@ export function SendFlow({
           </div>
         )}
       </div>
+      <SendTour step={step} />
     </div>
   );
 }
@@ -598,7 +605,11 @@ function StepTrail({
 }) {
   const index = STEPS.findIndex((s) => s.key === current);
   return (
-    <nav aria-label="Steps" className="hidden min-w-0 flex-1 justify-center lg:flex">
+    <nav
+      aria-label="Steps"
+      className="hidden min-w-0 flex-1 justify-center lg:flex"
+      data-tour="send-steps"
+    >
       <ol className="flex items-center gap-1">
         {STEPS.map((s, i) => {
           const done = i < index;

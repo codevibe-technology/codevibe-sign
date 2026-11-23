@@ -2,11 +2,13 @@ import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
 import { ViewerTimeZone } from '@/components/ui/local-time';
 import { TransferNotice } from '@/components/workspace/transfer-notice';
+import { can } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
 import { env } from '@/server/env';
 import { workspaceLogoUrls } from '@/server/brand';
 import { getPreferences } from '@/server/preferences';
+import { getTours } from '@/server/tours';
 import { pendingTransfersFor } from '@/server/transfers';
 import { listWorkspacesForUser } from '@/server/workspaces';
 
@@ -19,10 +21,11 @@ export default async function WorkspaceLayout({
 }) {
   const { slug } = await params;
   const access = await requireWorkspace(slug);
-  const [memberships, preferences, offers] = await Promise.all([
+  const [memberships, preferences, offers, tours] = await Promise.all([
     listWorkspacesForUser(db(), access.user.id),
     getPreferences(db(), access.user.id),
     pendingTransfersFor(db(), access.user.email),
+    getTours(db(), access.user.id),
   ]);
   const logos = await workspaceLogoUrls(db(), [
     access.workspace.id,
@@ -40,6 +43,7 @@ export default async function WorkspaceLayout({
         workspaces: memberships.map((m) => withLogo(m.workspace)),
         canCreate: !env().SINGLE_WORKSPACE,
       }}
+      tours={{ statuses: tours, canSend: can(access.role, 'envelopes.write') }}
     >
       <ViewerTimeZone zone={preferences.timezone}>
         <TransferNotice
