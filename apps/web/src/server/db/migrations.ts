@@ -531,4 +531,43 @@ create index app_install_bookings_unnotified_idx on app_install_bookings (paid_a
 alter table app_billing_orders add column payment_method text;
 `,
   },
+  {
+    name: '0018_billing_safeguards',
+    sql: `
+alter table app_billing_orders drop constraint app_billing_orders_status_check;
+alter table app_billing_orders add constraint app_billing_orders_status_check
+  check (status in ('created', 'paid', 'failed', 'expired', 'paid_unapplied', 'refunded'));
+alter table app_billing_orders add column unapplied_reason text;
+alter table app_billing_orders add column reversed_at timestamptz;
+
+create table app_operator_notices (
+  id text primary key,
+  kind text not null,
+  order_id text references app_billing_orders (id) on delete set null,
+  workspace_id text references app_workspaces (id) on delete set null,
+  data jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  attempts integer not null default 0,
+  claimed_at timestamptz
+);
+create index app_operator_notices_unsent_idx on app_operator_notices (created_at)
+  where sent_at is null;
+
+alter table app_esign_credit_ledger drop constraint app_esign_credit_ledger_kind_check;
+alter table app_esign_credit_ledger add constraint app_esign_credit_ledger_kind_check
+  check (kind in ('grant', 'reserve', 'consume', 'release', 'void'));
+alter table app_esign_credit_ledger add column mode text check (mode in ('test', 'live'));
+update app_esign_credit_ledger l set mode = o.mode
+  from app_billing_orders o where l.kind = 'grant' and l.ref = o.id;
+
+alter table app_workspaces add column plan_source text not null default 'operator'
+  check (plan_source in ('operator', 'billing'));
+update app_workspaces w set plan_source = 'billing'
+  from app_subscriptions s where s.workspace_id = w.id and s.status <> 'ended';
+
+alter table app_subscriptions add column order_id text references app_billing_orders (id);
+alter table app_subscriptions add column prior jsonb;
+`,
+  },
 ];
