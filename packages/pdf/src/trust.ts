@@ -3,7 +3,14 @@ import forge from 'node-forge';
 import { SignError } from '@codevibe_technology/sign-core';
 import { assertSealIdentity, certificateDer, readP12 } from './cms';
 import { checkParseLimits, type ParseLimits } from './limits';
-import { examineSeal, type SealSigner, type SealVerification } from './verify';
+import {
+  examineSeal,
+  examineSignatures,
+  signatureInfo,
+  type SealSigner,
+  type SealVerification,
+  type SignatureInfo,
+} from './verify';
 
 const { asn1, pki } = forge;
 
@@ -24,6 +31,12 @@ export interface VerifyOptions {
   trust: VerifyTrust;
   /** Parser limits, enforced in a worker thread before the file is read. */
   limits?: Partial<ParseLimits>;
+  /**
+   * Accept a file that carried signatures before it was sealed, as `countersign()` produces:
+   * the operator's seal must then be the latest signature and every earlier one must be
+   * intact. Default false, where any second signature fails with `multiple_signatures`.
+   */
+  allowEarlierSignatures?: boolean;
 }
 
 export type VerifyFailure =
@@ -31,12 +44,14 @@ export type VerifyFailure =
   | 'signature_invalid'
   | 'not_whole_document'
   | 'multiple_signatures'
+  | 'earlier_signature_invalid'
   | 'untrusted_signer';
 
 export interface VerifyResult {
   /**
    * The file is exactly what the trusted operator sealed: one signature, cryptographically
-   * valid, covering every byte, made with a trusted certificate.
+   * valid, covering every byte, made with a trusted certificate. With
+   * `allowEarlierSignatures`, that signature is the latest one and the earlier ones are intact.
    */
   valid: boolean;
   /** The first check that failed, when `valid` is false. */
@@ -47,8 +62,14 @@ export interface VerifyResult {
   certificateSha256?: string;
   /** How the signer certificate was trusted, when it was. */
   trustedBy?: 'certificate' | 'root';
-  /** The low-level result from `verifySeal`. */
+  /** The low-level result for the operator's signature, as `verifySeal` reports one. */
   seal: SealVerification;
+  /**
+   * The signatures the file carried before the seal, earliest first. Only with
+   * `allowEarlierSignatures`, and only when there are any. Their certificates are not
+   * checked against `trust`.
+   */
+  earlierSignatures?: SignatureInfo[];
 }
 
 export interface SealCertificate {
@@ -142,6 +163,10 @@ function chainsToRoot(
  * and the signer certificate is one of `trust.certificates` / `trust.fingerprints` or chains to
  * one of `trust.roots`. Use this to decide whether a file is genuine; `verifySeal` only checks
  * the maths and accepts a seal made with any key.
+ *
+ * With `allowEarlierSignatures` the file may carry signatures made before the seal. The seal
+ * must then be the latest signature and meet every condition above, and each earlier
+ * signature must still match the bytes it covers (`earlier_signature_invalid` otherwise).
  */
 export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise<VerifyResult> {
   const trust = options?.trust ?? {};
@@ -159,7 +184,11 @@ export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise
   }
 
   await checkParseLimits(bytes, options.limits);
-  const examination = await examineSeal(bytes);
+  const all = options.allowEarlierSignatures
+    ? await examineSignatures(bytes, { strictLast: true })
+    : [];
+  const examination = all[all.length - 1] ?? (await examineSeal(bytes));
+  const earlier = all.slice(0, -1);
   const seal = examination.result;
   const leafDer = examination.signerCertificateDer;
   const certificateSha256 = leafDer ? fingerprint(leafDer) : undefined;
@@ -169,16 +198,20 @@ export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise
     ...(seal.signer ? { signer: seal.signer } : {}),
     ...(seal.signedAt ? { signedAt: seal.signedAt } : {}),
     ...(certificateSha256 ? { certificateSha256 } : {}),
+    ...(earlier.length > 0 ? { earlierSignatures: earlier.map(signatureInfo) } : {}),
   };
 
   if (!seal.sealed) {
     return { ...base, reason: 'not_sealed' };
   }
-  if (seal.signatureCount !== 1) {
+  if (seal.signatureCount !== 1 && !options.allowEarlierSignatures) {
     return { ...base, reason: 'multiple_signatures' };
   }
   if (!seal.valid || !leafDer || !certificateSha256) {
     return { ...base, reason: 'signature_invalid' };
+  }
+  if (earlier.some((entry) => !entry.result.valid)) {
+    return { ...base, reason: 'earlier_signature_invalid' };
   }
   if (!seal.coversWholeDocument) {
     return { ...base, reason: 'not_whole_document' };

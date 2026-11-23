@@ -18,6 +18,8 @@ export interface SignatureField {
   contentsHex: string;
   /** Raw /M date string, when present. */
   signingDate?: string;
+  /** The signature format the dictionary names, for example `ETSI.CAdES.detached`. */
+  subFilter?: string;
 }
 
 const MAX_FIELD_NODES = 10_000;
@@ -92,11 +94,13 @@ export function signatureFieldsOf(doc: PDFDocument): SignatureField[] {
         const byteRange = readByteRange(resolve(doc, value.get(name('ByteRange'))));
         const contents = resolve(doc, value.get(name('Contents')));
         const date = resolve(doc, value.get(name('M')));
+        const subFilter = resolve(doc, value.get(name('SubFilter')));
         if (byteRange && contents instanceof PDFHexString) {
           found.push({
             byteRange,
             contentsHex: contents.asString(),
             ...(date instanceof PDFString ? { signingDate: date.asString() } : {}),
+            ...(subFilter instanceof PDFName ? { subFilter: subFilter.decodeText() } : {}),
           });
         } else {
           found.push({ byteRange: [0, 0, 0, 0], contentsHex: '' });

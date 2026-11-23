@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
+import { constants, createHash, verify as verifyWithKey, X509Certificate } from 'node:crypto';
 import forge from 'node-forge';
 import { OID } from './cms';
-import { signatureFields } from './signatures';
+import { signatureFields, type SignatureField } from './signatures';
 import { timestampInfo } from './tsa';
 
 const { asn1, pki } = forge;
@@ -31,6 +31,37 @@ export interface SealVerification {
    */
   timestampedAt?: string;
 }
+
+/** One signature of a file that may carry several; see `verifySignatures`. */
+export interface SignatureInfo {
+  /**
+   * The signature is intact: it matches the bytes it covers and, when it is not the first,
+   * covers the signatures before it. Trust in the certificate is not checked.
+   */
+  valid: boolean;
+  /** The signature covers every byte of the file. */
+  coversWholeDocument: boolean;
+  /** Where the covered bytes end: the length of the file when this signature was made. */
+  coveredBytes: number;
+  /** Subject of the certificate that made the signature. */
+  signer?: SealSigner;
+  /** Who issued that certificate, for example the eSign provider's certifying authority. */
+  issuer?: SealSigner;
+  /** ISO time from the signature (signing-time attribute, else the signature dictionary). */
+  signedAt?: string;
+  /** SHA-256 of the signer certificate (DER), lowercase hex. */
+  certificateSha256?: string;
+  /** The signature format, for example `ETSI.CAdES.detached` or `adbe.pkcs7.detached`. */
+  subFilter?: string;
+  /** ISO time of a signature timestamp whose imprint matches the signature. */
+  timestampedAt?: string;
+}
+
+const SIGNATURE_OID = {
+  rsaPss: '1.2.840.113549.1.1.10',
+  commonName: '2.5.4.3',
+  organization: '2.5.4.10',
+} as const;
 
 const DIGESTS: Record<string, { node: string; forge: () => forge.md.MessageDigest }> = {
   [OID.sha256]: { node: 'sha256', forge: () => forge.md.sha256.create() },
@@ -81,7 +112,9 @@ export function parsePdfDate(value: string): string | undefined {
 
 interface ParsedSignature {
   digestOid: string;
-  signedAttributes: Asn1[];
+  /** Null when the signer signed the content itself, without signed attributes. */
+  signedAttributes: Asn1[] | null;
+  signatureAlgorithm?: Asn1;
   signature: string;
   certificates: { node: Asn1; cert: forge.pki.Certificate | null }[];
   sidSerial?: Asn1;
@@ -122,9 +155,10 @@ function parseCms(binary: string): ParsedSignature | null {
     (part) => part.tagClass === asn1.Class.CONTEXT_SPECIFIC && part.type === 1,
   );
   const digestOid = oidOf(children(digestAlgorithm)[0]);
-  if (!attributesNode || !signatureNode || !digestOid || typeof signatureNode.value !== 'string') {
+  if (!signatureNode || !digestOid || typeof signatureNode.value !== 'string') {
     return null;
   }
+  const signatureAlgorithm = rest[rest.indexOf(signatureNode) - 1];
 
   const certificates = children(certificateSet).map((node) => {
     try {
@@ -137,7 +171,8 @@ function parseCms(binary: string): ParsedSignature | null {
     sid?.tagClass === asn1.Class.UNIVERSAL && sid.type === asn1.Type.SEQUENCE;
   return {
     digestOid,
-    signedAttributes: children(attributesNode),
+    signedAttributes: attributesNode ? children(attributesNode) : null,
+    ...(signatureAlgorithm && signatureAlgorithm !== attributesNode ? { signatureAlgorithm } : {}),
     signature: signatureNode.value,
     certificates,
     sidIssuer: isIssuerAndSerial ? children(sid)[0] : undefined,
@@ -178,9 +213,34 @@ function findSignerCertificate(
   return parsed.certificates.length === 1 ? parsed.certificates[0] : undefined;
 }
 
-function field(cert: forge.pki.Certificate, name: string): string | undefined {
-  const entry = cert.subject.getField(name) as { value?: unknown } | null;
-  return typeof entry?.value === 'string' ? entry.value : undefined;
+/** Common name and organisation of a certificate's subject (field 4) or issuer (field 2). */
+function nameOf(certificate: Asn1, position: 2 | 4): SealSigner | undefined {
+  const result: SealSigner = {};
+  for (const rdn of children(tbsFields(certificate)[position])) {
+    for (const pair of children(rdn)) {
+      const [typeNode, valueNode] = children(pair);
+      const type = oidOf(typeNode);
+      if (!valueNode || typeof valueNode.value !== 'string') {
+        continue;
+      }
+      let value = valueNode.value;
+      if (valueNode.type === asn1.Type.UTF8) {
+        try {
+          value = forge.util.decodeUtf8(value);
+        } catch {
+          continue;
+        }
+      } else if (valueNode.type === asn1.Type.BMPSTRING) {
+        value = Buffer.from(value, 'binary').swap16().toString('utf16le');
+      }
+      if (type === SIGNATURE_OID.commonName) {
+        result.commonName = value;
+      } else if (type === SIGNATURE_OID.organization) {
+        result.organization = value;
+      }
+    }
+  }
+  return result.commonName || result.organization ? result : undefined;
 }
 
 function signingTimeOf(attributes: Asn1[]): string | undefined {
@@ -213,10 +273,61 @@ function timestampOf(parsed: ParsedSignature): string | undefined {
   }
 }
 
+/** The salt length of an RSASSA-PSS signature, from its parameters; 20 when left out. */
+function pssSaltLength(algorithm: Asn1 | undefined): number {
+  const salt = children(children(algorithm)[1]).find(
+    (part) => part.tagClass === asn1.Class.CONTEXT_SPECIFIC && part.type === 2,
+  );
+  const value = children(salt)[0]?.value;
+  return typeof value === 'string' && value.length > 0 && value.length <= 2
+    ? Buffer.from(value, 'binary').readUIntBE(0, value.length)
+    : 20;
+}
+
+/**
+ * Checks the signature value with the certificate's public key: RSA (PKCS#1 v1.5 or PSS) or
+ * ECDSA, whichever the certificate holds.
+ */
+function publicKeyVerifies(
+  certificateDer: string,
+  parsed: ParsedSignature,
+  digest: string,
+  data: Buffer,
+): boolean {
+  try {
+    const key = new X509Certificate(Buffer.from(certificateDer, 'binary')).publicKey;
+    const signature = Buffer.from(parsed.signature, 'binary');
+    const type = key.asymmetricKeyType;
+    if (type === 'ec') {
+      return verifyWithKey(digest, data, key, signature);
+    }
+    if (type !== 'rsa' && type !== 'rsa-pss') {
+      return false;
+    }
+    const pss =
+      type === 'rsa-pss' || oidOf(children(parsed.signatureAlgorithm)[0]) === SIGNATURE_OID.rsaPss;
+    return pss
+      ? verifyWithKey(
+          digest,
+          data,
+          {
+            key,
+            padding: constants.RSA_PKCS1_PSS_PADDING,
+            saltLength: pssSaltLength(parsed.signatureAlgorithm),
+          },
+          signature,
+        )
+      : verifyWithKey(digest, data, key, signature);
+  } catch {
+    return false;
+  }
+}
+
 interface SignatureCheck {
   valid: boolean;
   timestampedAt?: string;
   signer?: SealSigner;
+  issuer?: SealSigner;
   signedAt?: string;
   signerCertificateDer?: string;
   certificates: forge.pki.Certificate[];
@@ -235,105 +346,183 @@ function checkSignature(signedContent: Buffer, cmsBinary: string): SignatureChec
   }
   const digest = DIGESTS[parsed.digestOid];
   const signerCert = findSignerCertificate(parsed);
-  const cert = signerCert?.cert ?? undefined;
   const certificates = parsed.certificates
     .map((entry) => entry.cert)
     .filter((entry): entry is forge.pki.Certificate => entry !== null);
-  const signer = cert
-    ? { commonName: field(cert, 'CN'), organization: field(cert, 'O') }
-    : undefined;
-  const signedAt = signingTimeOf(parsed.signedAttributes);
+  const signer = signerCert ? nameOf(signerCert.node, 4) : undefined;
+  const issuer = signerCert ? nameOf(signerCert.node, 2) : undefined;
+  const signedAt = parsed.signedAttributes ? signingTimeOf(parsed.signedAttributes) : undefined;
+  const signerCertificateDer = signerCert ? der(signerCert.node) : undefined;
   const invalid: SignatureCheck = {
     valid: false,
     certificates,
     ...(signer ? { signer } : {}),
+    ...(issuer ? { issuer } : {}),
     ...(signedAt ? { signedAt } : {}),
+    ...(signerCertificateDer ? { signerCertificateDer } : {}),
   };
-  if (!digest || !signerCert || !cert) {
+  if (!digest || !signerCert || !signerCertificateDer) {
     return invalid;
   }
 
-  const messageDigest = attributeValue(parsed.signedAttributes, OID.messageDigest);
-  const contentDigest = createHash(digest.node).update(signedContent).digest('binary');
-  if (!messageDigest || messageDigest.value !== contentDigest) {
-    return invalid;
-  }
-
-  const essCertificate = attributeValue(parsed.signedAttributes, OID.signingCertificateV2);
-  if (essCertificate) {
-    const essCertId = children(children(essCertificate)[0])[0];
-    const essParts = children(essCertId);
-    const hashAlgorithm =
-      essParts[0]?.type === asn1.Type.SEQUENCE ? oidOf(children(essParts[0])[0]) : OID.sha256;
-    const hashNode = essParts.find((part) => part.type === asn1.Type.OCTETSTRING);
-    const hash = hashAlgorithm ? DIGESTS[hashAlgorithm] : undefined;
-    const expected = hash
-      ? createHash(hash.node)
-          .update(Buffer.from(der(signerCert.node), 'binary'))
-          .digest('binary')
-      : undefined;
-    if (!hashNode || hashNode.value !== expected) {
+  let signedBytes = signedContent;
+  if (parsed.signedAttributes) {
+    const messageDigest = attributeValue(parsed.signedAttributes, OID.messageDigest);
+    const contentDigest = createHash(digest.node).update(signedContent).digest('binary');
+    if (!messageDigest || messageDigest.value !== contentDigest) {
       return invalid;
     }
+
+    const essCertificate = attributeValue(parsed.signedAttributes, OID.signingCertificateV2);
+    if (essCertificate) {
+      const essCertId = children(children(essCertificate)[0])[0];
+      const essParts = children(essCertId);
+      const hashAlgorithm =
+        essParts[0]?.type === asn1.Type.SEQUENCE ? oidOf(children(essParts[0])[0]) : OID.sha256;
+      const hashNode = essParts.find((part) => part.type === asn1.Type.OCTETSTRING);
+      const hash = hashAlgorithm ? DIGESTS[hashAlgorithm] : undefined;
+      const expected = hash
+        ? createHash(hash.node).update(Buffer.from(signerCertificateDer, 'binary')).digest('binary')
+        : undefined;
+      if (!hashNode || hashNode.value !== expected) {
+        return invalid;
+      }
+    }
+    signedBytes = Buffer.from(
+      der(asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, parsed.signedAttributes)),
+      'binary',
+    );
   }
 
-  const attributesDer = der(
-    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, parsed.signedAttributes),
-  );
-  const md = digest.forge();
-  md.update(attributesDer);
-  let verified: boolean;
-  try {
-    verified = (cert.publicKey as forge.pki.rsa.PublicKey).verify(
-      md.digest().getBytes(),
-      parsed.signature,
-    );
-  } catch {
-    verified = false;
-  }
+  const verified = publicKeyVerifies(signerCertificateDer, parsed, digest.node, signedBytes);
   const timestampedAt = verified ? timestampOf(parsed) : undefined;
-  return {
-    ...invalid,
-    valid: verified,
-    signerCertificateDer: der(signerCert.node),
-    ...(timestampedAt ? { timestampedAt } : {}),
-  };
+  return { ...invalid, valid: verified, ...(timestampedAt ? { timestampedAt } : {}) };
 }
 
-/** What `examineSeal` learns about the first signature, beyond the public result. */
+/** What examining one signature learns, beyond the public result. */
 export interface SealExamination {
   result: SealVerification;
   /** DER (binary string) of the certificate that made the signature, when it was found. */
   signerCertificateDer?: string;
-  /** Every certificate embedded in the signature, signer included. */
+  /** Every certificate embedded in the signature that could be read, signer included. */
   certificates: forge.pki.Certificate[];
+  issuer?: SealSigner;
+  subFilter?: string;
+  /** Where the bytes the signature covers end. */
+  coveredBytes: number;
+  /** Where the gap that holds the signature value starts. */
+  gapStart: number;
 }
 
 /**
  * Verifies the first signed signature field of the document's form: the byte range is
  * well formed and is the one the field declares, the /Contents hold exactly the CMS
- * structure, its message digest matches the covered bytes and the RSA signature checks out
+ * structure, its message digest matches the covered bytes and the signature checks out
  * against the embedded signer certificate. Whether that certificate is trusted is left to
  * the caller; `verify()` adds that check.
+ *
+ * In a file with several signatures this is the first one in the form, which usually covers
+ * only the part of the file that existed when it was made. Use `verifySignatures` to see
+ * every signature of such a file.
  */
 export async function verifySeal(bytes: Uint8Array): Promise<SealVerification> {
   return (await examineSeal(bytes)).result;
 }
 
+const asBuffer = (bytes: Uint8Array) =>
+  Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
 export async function examineSeal(bytes: Uint8Array): Promise<SealExamination> {
-  const pdf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const fields = await signatureFields(bytes);
   const first = fields[0];
   if (!first) {
     return {
       result: { sealed: false, valid: false, coversWholeDocument: false, signatureCount: 0 },
       certificates: [],
+      coveredBytes: 0,
+      gapStart: 0,
     };
   }
+  return examineField(asBuffer(bytes), first, fields.length, true);
+}
 
+/**
+ * Every signature of the file, examined on its own and ordered from the earliest revision to
+ * the latest. A signature whose gap falls inside the bytes an earlier one covers, or that
+ * covers no more than an earlier one, is reported as not valid: a later signature has to
+ * cover the earlier ones whole.
+ *
+ * With `strictLast` the latest signature must hold its value in lowercase hex, as `seal()`
+ * and `countersign()` write it, so that not even the case of a digit can change unnoticed.
+ * Earlier signatures may use either case: the latest one covers their bytes.
+ */
+export async function examineSignatures(
+  bytes: Uint8Array,
+  options: { strictLast?: boolean } = {},
+): Promise<SealExamination[]> {
+  const pdf = asBuffer(bytes);
+  const fields = (await signatureFields(bytes)).sort(
+    (a, b) => a.byteRange[2] + a.byteRange[3] - (b.byteRange[2] + b.byteRange[3]),
+  );
+  const examined = fields.map((entry, index) =>
+    examineField(
+      pdf,
+      entry,
+      fields.length,
+      options.strictLast === true && index === fields.length - 1,
+    ),
+  );
+  let previousEnd = 0;
+  return examined.map((entry) => {
+    const coversEarlier = entry.gapStart >= previousEnd && entry.coveredBytes > previousEnd;
+    previousEnd = Math.max(previousEnd, entry.coveredBytes);
+    return coversEarlier ? entry : { ...entry, result: { ...entry.result, valid: false } };
+  });
+}
+
+/** The public description of one examined signature. */
+export function signatureInfo(examination: SealExamination): SignatureInfo {
+  const { result, signerCertificateDer, issuer, subFilter } = examination;
+  return {
+    valid: result.valid,
+    coversWholeDocument: result.coversWholeDocument,
+    coveredBytes: examination.coveredBytes,
+    ...(result.signer ? { signer: result.signer } : {}),
+    ...(issuer ? { issuer } : {}),
+    ...(result.signedAt ? { signedAt: result.signedAt } : {}),
+    ...(signerCertificateDer
+      ? {
+          certificateSha256: createHash('sha256')
+            .update(Buffer.from(signerCertificateDer, 'binary'))
+            .digest('hex'),
+        }
+      : {}),
+    ...(subFilter ? { subFilter } : {}),
+    ...(result.timestampedAt ? { timestampedAt: result.timestampedAt } : {}),
+  };
+}
+
+/**
+ * Lists every signature of a PDF from the earliest to the latest, each checked against the
+ * bytes it covers: the seal, and any signature the file carried before it, such as an Aadhaar
+ * eSign applied by an eSign provider. It reads CMS signatures in `ETSI.CAdES.detached` and
+ * `adbe.pkcs7.detached` form made with RSA (PKCS#1 v1.5 or PSS) or ECDSA keys and SHA-256,
+ * SHA-384 or SHA-512. Whether a certificate is trusted is not checked; `verify()` does that
+ * for the seal.
+ */
+export async function verifySignatures(bytes: Uint8Array): Promise<SignatureInfo[]> {
+  return (await examineSignatures(bytes)).map(signatureInfo);
+}
+
+function examineField(
+  pdf: Buffer,
+  first: SignatureField,
+  signatureCount: number,
+  strictHex: boolean,
+): SealExamination {
   const [start, firstLength, secondStart, secondLength] = first.byteRange;
-  const signatureCount = fields.length;
-  const coversWholeDocument = secondStart + secondLength === pdf.length;
+  const coveredBytes = secondStart + secondLength;
+  const coversWholeDocument = coveredBytes === pdf.length;
   const dictionaryTime = first.signingDate ? parsePdfDate(first.signingDate) : undefined;
   const result: SealVerification = {
     sealed: true,
@@ -344,36 +533,45 @@ export async function examineSeal(bytes: Uint8Array): Promise<SealExamination> {
   };
 
   const gapStart = start + firstLength;
+  const unread: SealExamination = {
+    result,
+    certificates: [],
+    coveredBytes,
+    gapStart,
+    ...(first.subFilter ? { subFilter: first.subFilter } : {}),
+  };
   const wellFormed =
     start === 0 &&
     gapStart < secondStart &&
-    secondStart + secondLength <= pdf.length &&
+    coveredBytes <= pdf.length &&
     pdf[gapStart] === 0x3c &&
     pdf[secondStart - 1] === 0x3e;
   if (!wellFormed) {
-    return { result, certificates: [] };
+    return unread;
   }
 
-  // The /Contents must be exactly the DER signature in lowercase hex, padded with zeros,
-  // so that no byte of the file can change without the check failing. It must also be the
-  // value the signature field declares, so the byte range cannot point at another one.
+  // The /Contents must be exactly the DER signature in hex (lowercase for a seal), padded
+  // with zeros, so that no byte of the file can change without the check failing. It must also be the value the
+  // signature field declares, so the byte range cannot point at another one.
   const hex = pdf.toString('latin1', gapStart + 1, secondStart - 1);
-  if (!/^[0-9a-f]*$/.test(hex) || hex.length % 2 !== 0 || hex !== first.contentsHex) {
-    return { result, certificates: [] };
+  const hexDigits = strictHex ? /^[0-9a-f]*$/ : /^[0-9a-fA-F]*$/;
+  if (!hexDigits.test(hex) || hex.length % 2 !== 0 || hex !== first.contentsHex) {
+    return unread;
   }
   const contents = Buffer.from(hex, 'hex');
   const length = derLength(contents);
   if (length === null || contents.subarray(length).some((byte) => byte !== 0)) {
-    return { result, certificates: [] };
+    return unread;
   }
 
   const signedContent = Buffer.concat([
     pdf.subarray(start, gapStart),
-    pdf.subarray(secondStart, secondStart + secondLength),
+    pdf.subarray(secondStart, coveredBytes),
   ]);
   const check = checkSignature(signedContent, contents.subarray(0, length).toString('binary'));
   const signedAt = check.signedAt ?? dictionaryTime;
   return {
+    ...unread,
     result: {
       ...result,
       valid: check.valid,
@@ -382,9 +580,11 @@ export async function examineSeal(bytes: Uint8Array): Promise<SealExamination> {
       ...(check.timestampedAt ? { timestampedAt: check.timestampedAt } : {}),
     },
     ...(check.signerCertificateDer ? { signerCertificateDer: check.signerCertificateDer } : {}),
+    ...(check.issuer ? { issuer: check.issuer } : {}),
     certificates: check.certificates,
   };
 }
+
 /** Total length of the DER element at the start of the buffer, or null if it is not one. */
 function derLength(buffer: Buffer): number | null {
   if (buffer.length < 2 || buffer[0] !== 0x30) {
