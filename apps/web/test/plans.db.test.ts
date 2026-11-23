@@ -127,7 +127,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       );
       expect(err.limit).toBe('ownedWorkspaces');
       expect(err.message).toBe(
-        'You already own 1 Free workspace, and each person can own 1. Use the one you have, ask to be invited to another, or upgrade to Cloud: write to hello@codevibe.in.',
+        'You already own 1 Free workspace, and each person can own 1. Use the one you have, ask to be invited to another, or upgrade to Cloud on the Plan and usage page.',
       );
       const cloud = await createWorkspace(
         sql,
@@ -170,7 +170,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const refused = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
       expect(refused.reason).toBeInstanceOf(PlanLimitError);
       expect(refused.reason.message).toMatch(
-        /^This workspace has sent 10 of the 10 envelopes the Free plan allows each month\. Upgrade to Cloud: write to hello@codevibe\.in\. The count starts again on 1 /,
+        /^This workspace has sent 10 of the 10 envelopes the Free plan allows each month\. Upgrade to Cloud on the Plan and usage page\. The count starts again on 1 /,
       );
       expect(refused.reason.resetsAt).toBeInstanceOf(Date);
     });
@@ -292,7 +292,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       expect(big.status).toBe(403);
       const bigBody = (await big.json()) as { error: { message: string; details: object } };
       expect(bigBody.error.message).toBe(
-        'This PDF is just over 10 MB, and the Free plan takes files up to 10 MB. Compress or split it, or upgrade to Cloud: write to hello@codevibe.in.',
+        'This PDF is just over 10 MB, and the Free plan takes files up to 10 MB. Compress or split it, or upgrade to Cloud on the Plan and usage page.',
       );
       expect(bigBody.error.details).toMatchObject({ limit: 'fileBytes' });
       const many = await create({
@@ -330,25 +330,45 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const refused = await create({ documents: [doc(600)] });
       expect(refused.status).toBe(403);
       expect(((await refused.json()) as { error: { message: string } }).error.message).toBe(
-        'This workspace stores 600 bytes of documents, and the Free plan holds 1000 bytes, so these files do not fit. Upgrade to Cloud: write to hello@codevibe.in.',
+        'This workspace stores 600 bytes of documents, and the Free plan holds 1000 bytes, so these files do not fit. Upgrade to Cloud on the Plan and usage page.',
       );
     });
 
-    it('counts API-key requests per day, but not the app’s own calls', async () => {
+    it('counts API-key requests per India month, but not the app’s own calls', async () => {
       const ws = await freeWorkspace();
-      const settings: PlanSettings = { mode: 'hosted', freeOverrides: { apiRequestsPerDay: 2 } };
+      const settings: PlanSettings = { mode: 'hosted', freeOverrides: { apiRequestsPerMonth: 2 } };
       const byKey = setup(ws.id, settings, true);
       const auth = { authorization: 'Bearer cvs_x' };
       expect((await byKey.get(auth)).status).toBe(201);
       expect((await byKey.get(auth)).status).toBe(201);
       const refused = await byKey.get(auth);
-      expect(refused.status).toBe(403);
-      expect(((await refused.json()) as { error: { message: string } }).error.message).toBe(
-        'This workspace has made 2 of the 2 API requests the Free plan allows each day. Try again after 00:00 UTC, or upgrade to Cloud: write to hello@codevibe.in.',
+      expect(refused.status).toBe(429);
+      expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0);
+      const body = (await refused.json()) as {
+        error: { code: string; message: string; details: { resetsAt: string; upgradeUrl: string } };
+      };
+      expect(body.error.code).toBe('PLAN_LIMIT');
+      expect(body.error.message).toMatch(
+        /^This workspace has made 2 of the 2 API requests the Free plan allows each month\. The count starts again on \d+ \w+ \d{4} \(IST\)\. For more, upgrade to Cloud on the Plan and usage page\.$/,
       );
+      expect(new Date(body.error.details.resetsAt).toISOString().slice(10)).toBe('T18:30:00.000Z');
+      expect(body.error.details.upgradeUrl).toMatch(/\/#pricing$/);
       const bySession = setup(ws.id, settings);
       expect((await bySession.get()).status).toBe(201);
-      expect(await usageOf(sql, ws.id, 'api_requests')).toBe(2);
+      expect(await usageOf(sql, ws.id, 'api_requests_month')).toBe(2);
+    });
+
+    it('keeps a daily fair-use ceiling on Cloud and answers 429 there too', async () => {
+      const ws = await freeWorkspace();
+      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'cloud', changedBy: 'test' });
+      const plan = { id: ws.id, ...(await workspacePlan(sql, ws.id, hosted)) };
+      await reserveUsage(sql, plan, 'api_requests', 10_000);
+      const refused = await setup(ws.id, hosted, true).get({ authorization: 'Bearer cvs_x' });
+      expect(refused.status).toBe(429);
+      expect(refused.headers.get('retry-after')).not.toBeNull();
+      // The refused call is not counted, by the month or by the day.
+      expect(await usageOf(sql, ws.id, 'api_requests')).toBe(10_000);
+      expect(await usageOf(sql, ws.id, 'api_requests_month')).toBe(0);
     });
 
     it('lets the first-run sample be sent without counting it', async () => {
@@ -401,15 +421,14 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
         invitedBy: { userId: owner.id, role: 'owner' },
       });
 
-    it('counts members and open invitations against 3 seats', async () => {
+    it('counts members and open invitations against 2 seats', async () => {
       const ws = await freeWorkspace();
-      await invite(ws.id, ws.owner, 'one@example.com');
       await invite(ws.id, ws.owner, 'two@example.com');
       await invite(ws.id, ws.owner, 'two@example.com');
       const err = await planError(invite(ws.id, ws.owner, 'three@example.com'));
       expect(err.field).toBe('email');
       expect(err.message).toBe(
-        'This workspace has 3 members and open invitations, and the Free plan allows 3. Remove someone or cancel an invitation, or upgrade to Cloud: write to hello@codevibe.in.',
+        'This workspace has 2 members and open invitations, and the Free plan allows 2. Remove someone or cancel an invitation, or upgrade to Cloud on the Plan and usage page.',
       );
     });
 
@@ -425,17 +444,15 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       for (const person of people) tokens.push((await invite(ws.id, owner, person.email)).token);
       await setWorkspacePlan(sql, { slug: ws.slug, plan: 'free', changedBy: 'test' });
       await acceptInvitation(sql, tokens[0]!, people[0]!);
-      await acceptInvitation(sql, tokens[1]!, people[1]!);
-      const err = await planError(acceptInvitation(sql, tokens[2]!, people[2]!));
+      const err = await planError(acceptInvitation(sql, tokens[1]!, people[1]!));
       expect(err.limit).toBe('members');
       const [row] = await sql`select accepted_at from app_invitations where workspace_id = ${ws.id}
-        and lower(email) = ${people[2]!.email}`;
+        and lower(email) = ${people[1]!.email}`;
       expect(row?.accepted_at).toBeNull();
     });
 
     it('takes the last seat only once when invitations race', async () => {
       const ws = await freeWorkspace();
-      await invite(ws.id, ws.owner, 'one@example.com');
       const results = await Promise.allSettled(
         ['a', 'b', 'c', 'd'].map((n) => invite(ws.id, ws.owner, `${n}@example.com`)),
       );
@@ -464,13 +481,13 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       });
     }
 
-    it('keeps 5 active templates and points at archiving', async () => {
+    it('keeps 2 active templates and points at archiving', async () => {
       const ws = await freeWorkspace();
       const made = [];
-      for (let i = 1; i <= 5; i++) made.push(await template(ws.id, ws.owner.id, `T${i}`));
+      for (let i = 1; i <= 2; i++) made.push(await template(ws.id, ws.owner.id, `T${i}`));
       const err = await planError(template(ws.id, ws.owner.id, 'T6'));
       expect(err.message).toBe(
-        'This workspace has 5 active templates, and the Free plan allows 5. Archive a template you no longer use, or upgrade to Cloud: write to hello@codevibe.in.',
+        'This workspace has 2 active templates, and the Free plan allows 2. Archive a template you no longer use, or upgrade to Cloud on the Plan and usage page.',
       );
       await planError(
         duplicateTemplate(sql, files, {
@@ -484,19 +501,19 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       await planError(setTemplateArchived(sql, ws.id, made[0]!.id, false));
       await setTemplateArchived(sql, ws.id, sixth.id, true);
       await setTemplateArchived(sql, ws.id, made[0]!.id, false);
-      expect(await usageOf(sql, ws.id, 'storage_bytes')).toBe(6 * 2048);
+      expect(await usageOf(sql, ws.id, 'storage_bytes')).toBe(3 * 2048);
     });
 
     it('removes the copied files when a template is refused', async () => {
       const ws = await freeWorkspace();
-      for (let i = 1; i <= 4; i++) await template(ws.id, ws.owner.id, `T${i}`);
+      await template(ws.id, ws.owner.id, 'T1');
       const results = await Promise.allSettled(
         [5, 6, 7].map((i) => template(ws.id, ws.owner.id, `T${i}`)),
       );
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
       const [count] = await sql<{ n: number }[]>`select count(*)::int as n from app_templates
         where workspace_id = ${ws.id}`;
-      expect(count?.n).toBe(5);
+      expect(count?.n).toBe(2);
     });
 
     it('has no template limit when self-hosted', async () => {
@@ -514,14 +531,14 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       events: ['envelope.completed'],
     });
 
-    it('allows 1 endpoint on Free', async () => {
+    it('has no webhooks on Free', async () => {
       const ws = await freeWorkspace();
-      await createWebhook(sql, { ...input(1), workspaceId: ws.id, createdBy: ws.owner.id });
       const err = await planError(
-        createWebhook(sql, { ...input(2), workspaceId: ws.id, createdBy: ws.owner.id }),
+        createWebhook(sql, { ...input(1), workspaceId: ws.id, createdBy: ws.owner.id }),
       );
+      expect(err.limit).toBe('webhooks');
       expect(err.message).toBe(
-        'This workspace has 1 webhook endpoint, and the Free plan allows 1. Remove one first, or upgrade to Cloud: write to hello@codevibe.in.',
+        "Webhooks are not part of the Free plan, so this workspace's endpoints are paused. Upgrade to Cloud on the Plan and usage page.",
       );
     });
 
@@ -617,12 +634,14 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
         max: 10,
         resetsAt: '1 December 2026 (UTC)',
       });
-      expect(byKey.members).toMatchObject({ used: 1, max: 3, resetsAt: null });
+      expect(byKey.members).toMatchObject({ used: 1, max: 2, resetsAt: null });
       expect(byKey.storageBytes).toMatchObject({ usedText: '5 MB', maxText: '200 MB' });
-      expect(byKey.apiRequestsPerDay).toMatchObject({
+      expect(byKey.apiRequestsPerMonth).toMatchObject({
         used: 0,
-        resetsAt: '21 November 2026 (UTC)',
+        max: 100,
+        resetsAt: '1 December 2026 (IST)',
       });
+      expect(byKey.apiRequestsPerDay).toBeUndefined();
     });
 
     it('shows no limits when self-hosted', async () => {
