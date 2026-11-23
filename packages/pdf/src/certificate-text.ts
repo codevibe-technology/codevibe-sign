@@ -49,6 +49,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'recipient.declined': 'Declined',
   'recipient.link_shared': 'Link shared manually',
   'recipient.corrected': 'Recipient corrected',
+  'recipient.esign_started': 'Aadhaar eSign started',
+  'recipient.esign_failed': 'Aadhaar eSign not completed',
   'document.sealed': 'Document sealed',
 };
 
