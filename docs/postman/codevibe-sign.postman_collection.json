@@ -19,7 +19,7 @@
   "item": [
     {
       "name": "Envelopes",
-      "description": "Create, change, send and withdraw envelopes. Sender API key required.",
+      "description": "An envelope is one signing job: its documents, the people who act on them, the fields\nthey fill and where it stands. Create, change, send, withdraw and list envelopes.\nSender API key required.",
       "item": [
         {
           "name": "List envelopes",
@@ -216,6 +216,49 @@
           }
         },
         {
+          "name": "Recall a sent envelope to edit it",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/recall",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "recall"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Recall a sent envelope to edit it\n\nVoids a sent or in-progress envelope with the reason \"Recalled to correct\" (and your\nnote), exactly like `void`: links stop and everyone already invited is told. Then\ncreates a new draft with the same documents (the original files), recipients, fields,\ntitle, message and reminders, and an expiry of the same length from now. Signatures\nalready given are not carried over; everyone signs again. The old envelope records\n`envelope.recalled` with `replacementId`; the draft's `envelope.created` has\n`recalledFrom`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"The joining date was wrong.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Revise a declined envelope",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/revise",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "revise"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Revise a declined envelope\n\nCopies a declined envelope to a new draft, like `recall`, so you can address the\ndecline and send again. The declined envelope stays declined and unchanged; it\nrecords `envelope.revised` with `replacementId`, and the draft's `envelope.created`\nhas `revisedFrom`. Set `changeNote` on the draft to tell recipients what changed."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recipients",
+      "description": "The people on an envelope. Remind them, correct a mistyped address, or get a signing\nlink to pass on yourself. Sender API key required.",
+      "item": [
+        {
           "name": "Remind recipients",
           "request": {
             "method": "POST",
@@ -290,42 +333,40 @@
               "options": { "raw": { "language": "json" } }
             }
           }
-        },
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "description": "The PDFs of an envelope: replace a draft's file, download the original or the sealed\ncopy, and check the seal. Sender API key required.",
+      "item": [
         {
-          "name": "Recall a sent envelope to edit it",
+          "name": "Download a PDF",
           "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": {
-              "raw": "{{baseUrl}}/v1/envelopes/:id/recall",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "envelopes", ":id", "recall"],
-              "variable": [
-                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
-              ]
-            },
-            "description": "Recall a sent envelope to edit it\n\nVoids a sent or in-progress envelope with the reason \"Recalled to correct\" (and your\nnote), exactly like `void`: links stop and everyone already invited is told. Then\ncreates a new draft with the same documents (the original files), recipients, fields,\ntitle, message and reminders, and an expiry of the same length from now. Signatures\nalready given are not carried over; everyone signs again. The old envelope records\n`envelope.recalled` with `replacementId`; the draft's `envelope.created` has\n`recalledFrom`.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"note\": \"The joining date was wrong.\"\n}",
-              "options": { "raw": { "language": "json" } }
-            }
-          }
-        },
-        {
-          "name": "Revise a declined envelope",
-          "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/envelopes/:id/revise",
+              "raw": "{{baseUrl}}/v1/envelopes/:id/documents/:docId",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "envelopes", ":id", "revise"],
+              "path": ["v1", "envelopes", ":id", "documents", ":docId"],
+              "query": [
+                {
+                  "key": "version",
+                  "value": "",
+                  "description": "`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).",
+                  "disabled": true
+                }
+              ],
               "variable": [
-                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
+                {
+                  "key": "docId",
+                  "value": "{{docId}}",
+                  "description": "The document id, from `documents[].id`."
+                }
               ]
             },
-            "description": "Revise a declined envelope\n\nCopies a declined envelope to a new draft, like `recall`, so you can address the\ndecline and send again. The declined envelope stays declined and unchanged; it\nrecords `envelope.revised` with `replacementId`, and the draft's `envelope.created`\nhas `revisedFrom`. Set `changeNote` on the draft to tell recipients what changed."
+            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`."
           }
         },
         {
@@ -377,57 +418,6 @@
               ]
             }
           }
-        }
-      ]
-    },
-    {
-      "name": "Audit and files",
-      "description": "The audit log, the certificate, and the original and sealed PDFs.",
-      "item": [
-        {
-          "name": "Audit log",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/envelopes/:id/events",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "envelopes", ":id", "events"],
-              "variable": [
-                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
-              ]
-            },
-            "description": "Audit log\n\nEvery action on the envelope, oldest first, and whether the hash chain is intact: each\nevent's `hash` is `sha256(prevHash + canonical(event))` and the last one must equal the\nenvelope's `auditHead`."
-          }
-        },
-        {
-          "name": "Download a PDF",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/envelopes/:id/documents/:docId",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "envelopes", ":id", "documents", ":docId"],
-              "query": [
-                {
-                  "key": "version",
-                  "value": "",
-                  "description": "`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).",
-                  "disabled": true
-                }
-              ],
-              "variable": [
-                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." },
-                {
-                  "key": "docId",
-                  "value": "{{docId}}",
-                  "description": "The document id, from `documents[].id`."
-                }
-              ]
-            },
-            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`."
-          }
         },
         {
           "name": "Verify the sealed PDF",
@@ -448,6 +438,28 @@
               ]
             },
             "description": "Verify the sealed PDF\n\nRuns the seal check on the stored sealed file against the operator certificate and any\nolder certificates the server trusts."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit trail",
+      "description": "The hash-chained audit log of an envelope and the signing certificate built from it.\nSender API key required.",
+      "item": [
+        {
+          "name": "Audit log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/envelopes/:id/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "envelopes", ":id", "events"],
+              "variable": [
+                { "key": "id", "value": "{{envelopeId}}", "description": "The envelope id." }
+              ]
+            },
+            "description": "Audit log\n\nEvery action on the envelope, oldest first, and whether the hash chain is intact: each\nevent's `hash` is `sha256(prevHash + canonical(event))` and the last one must equal the\nenvelope's `auditHead`."
           }
         },
         {

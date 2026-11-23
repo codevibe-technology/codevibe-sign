@@ -74,9 +74,22 @@ servers:
     description: Codevibe Sign cloud, with an API key from your workspace settings
 tags:
   - name: Envelopes
-    description: Create, change, send and withdraw envelopes. Sender API key required.
-  - name: Audit and files
-    description: The audit log, the certificate, and the original and sealed PDFs.
+    description: |
+      An envelope is one signing job: its documents, the people who act on them, the fields
+      they fill and where it stands. Create, change, send, withdraw and list envelopes.
+      Sender API key required.
+  - name: Recipients
+    description: |
+      The people on an envelope. Remind them, correct a mistyped address, or get a signing
+      link to pass on yourself. Sender API key required.
+  - name: Documents
+    description: |
+      The PDFs of an envelope: replace a draft's file, download the original or the sealed
+      copy, and check the seal. Sender API key required.
+  - name: Audit trail
+    description: |
+      The hash-chained audit log of an envelope and the signing certificate built from it.
+      Sender API key required.
   - name: Signing
     description: |
       What the recipient's browser calls. `{token}` is the signing token from the link,
@@ -452,7 +465,7 @@ paths:
       - $ref: '#/components/parameters/EnvelopeId'
     post:
       operationId: remindRecipients
-      tags: [Envelopes]
+      tags: [Recipients]
       summary: Remind recipients
       description: |
         Mails a reminder with a fresh signing link to everyone whose turn it is, or to the one
@@ -501,7 +514,7 @@ paths:
       - $ref: '#/components/parameters/RecipientId'
     post:
       operationId: shareSigningLink
-      tags: [Envelopes]
+      tags: [Recipients]
       summary: Get a signing link to pass on yourself
       description: |
         A fresh signing link for a recipient whose turn it is, for when emails do not reach
@@ -550,7 +563,7 @@ paths:
       - $ref: '#/components/parameters/RecipientId'
     patch:
       operationId: correctRecipient
-      tags: [Envelopes]
+      tags: [Recipients]
       summary: Correct a recipient who has not acted
       description: |
         Changes the name, email or phone of a recipient on a sent envelope who has not signed,
@@ -686,7 +699,7 @@ paths:
       - $ref: '#/components/parameters/EnvelopeId'
     get:
       operationId: listEnvelopeEvents
-      tags: [Audit and files]
+      tags: [Audit trail]
       summary: Audit log
       description: |
         Every action on the envelope, oldest first, and whether the hash chain is intact: each
@@ -727,7 +740,7 @@ paths:
       - $ref: '#/components/parameters/DocumentId'
     put:
       operationId: replaceDocument
-      tags: [Envelopes]
+      tags: [Documents]
       summary: Replace a draft's document
       description: |
         Uploads a new version of one document of a draft, as multipart (`document`, optional
@@ -791,7 +804,7 @@ paths:
           $ref: '#/components/responses/Unprocessable'
     get:
       operationId: downloadDocument
-      tags: [Audit and files]
+      tags: [Documents]
       summary: Download a PDF
       description: |
         The sealed PDF once the envelope is complete, otherwise the original. Ask for one of
@@ -821,7 +834,7 @@ paths:
       - $ref: '#/components/parameters/DocumentId'
     get:
       operationId: verifyDocument
-      tags: [Audit and files]
+      tags: [Documents]
       summary: Verify the sealed PDF
       description: |
         Runs the seal check on the stored sealed file against the operator certificate and any
@@ -853,7 +866,7 @@ paths:
       - $ref: '#/components/parameters/EnvelopeId'
     get:
       operationId: getCertificate
-      tags: [Audit and files]
+      tags: [Audit trail]
       summary: Signing certificate
       description: |
         What the certificate page of the sealed PDF shows, as JSON: the hash of each document
