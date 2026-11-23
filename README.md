@@ -77,11 +77,13 @@ npm i codevibe-sign
 - 📄 **Envelopes** with several documents and recipients: signers, approvers and viewers.
 - 🔀 **Sequential or parallel routing**, reminders and expiry.
 - ✍️ **Fields**: signature, initials, date signed, name, text and checkbox, placed in PDF points. Signatures drawn, typed or uploaded.
+- 🔤 **Names in Indian scripts and Arabic**: Devanagari, Bengali, Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam and Arabic (including Urdu) are drawn correctly on signed PDFs and certificates with the bundled Noto Sans fonts (SIL Open Font License), with no setup.
+- 🧭 **Guided signing**: one button reads Start, then Next, and Finish when nothing is left; it moves on by itself after a signature and shows progress as a bar. In the field placer a field starts on "This page only", or goes on all pages or specific pages.
 - ⚠️ **A warning in the field placer** when a signature or initials box covers page text, and the signer's name and signing time printed under each signature.
 - 🔐 **Signer checks**: a six-digit email code by default, or SMS code or email link only, with rate limits.
 - 🛡️ **A sealed PDF**: field values flattened onto the pages, a certificate page appended and a PAdES signature applied with your certificate, so any later edit breaks the seal and shows up in `verify()`.
 - ⛓️ **An append-only audit log** chained with SHA-256.
-- 🧾 **A one-page signing certificate** with a QR code to a **public record page**, which you can turn off per envelope or per workspace. Already-signed PDFs are refused, so earlier signatures are never removed.
+- 🧾 **A one-page signing certificate** with a QR code to a **public record page**, which you can turn off per envelope or per workspace, and who provided the certificate under it. Already-signed PDFs are refused, so earlier signatures are never removed.
 - ✅ **Public verification**: the verify page, `POST /v1/verify` and `GET /v1/verify/{sha256}` say whether a file is exactly what was sealed, with no API key.
 - 🗂️ **Templates and bulk send** from a CSV, in the web app and through `/v1/templates` in the API.
 - 🏢 **Workspaces** with their own address (old links redirect), time zone for signed documents, brand, team and sign-in by password or email link.
@@ -114,7 +116,7 @@ npm i codevibe-sign
 
 Anyone who receives a PDF signed with Codevibe Sign can check it, with no account:
 
-- **Scan the QR code** on the certificate page, or open the link beside it. The public record shows the seal status, the signers, the fingerprints and the audit trail, never the document itself.
+- **Scan the QR code** on the certificate page, or click it in a PDF reader. The public record shows the seal status, the signers, the fingerprints and the audit trail, never the document itself.
 - **On the web.** Drop it on [sign.codevibe.in/verify](https://sign.codevibe.in/verify?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=verify). It shows whether the seal is intact, who signed and when, and whether the audit trail is complete. The file is checked in memory and dropped; nothing is stored or logged.
 - **Through the API.** `POST /v1/verify` with the PDF, or `GET /v1/verify/{sha256}` with its hash, gives the same answer as JSON, with no API key.
 - **From the command line.** `npx codevibe-sign verify signed.pdf` checks the seal offline; add `--fingerprint` with the fingerprint below to check it was sealed by sign.codevibe.in.

@@ -43,6 +43,10 @@ the minor version and says so in its first line.
 - A public record page for each completed envelope, reached from the QR code on the certificate
   or the verify page, and switchable off per envelope or per workspace.
 - A warning when a signature or initials field covers page text.
+- Guided signing: one button reads Start, then Next, and Finish when nothing is left, with a
+  progress bar; a signature saved on an earlier visit is reused.
+- In the field placer a field starts on "This page only"; "Show on pages" puts it on all pages
+  or specific pages.
 - Light theme by default in the app and the docs.
 
 ### Stronger evidence
@@ -55,9 +59,14 @@ the minor version and says so in its first line.
 - `verify(bytes, { trust })` passes only a file with exactly one intact signature that covers
   every byte and was made with a certificate you trust.
 - Each drawn signature is captioned with the signer's name and signing time.
+- Names, titles and field text in Devanagari, Bengali, Gurmukhi, Gujarati, Odia, Tamil,
+  Telugu, Kannada, Malayalam and Arabic (including Urdu) are shaped and drawn with bundled
+  Noto Sans fonts (SIL Open Font License), and typed signatures fall back to faces for these
+  scripts.
 - The signing certificate is one compact page: document, envelope, sender, each signer with
-  masked contact, method and time, the fingerprint and a QR code to the record page. IP
-  addresses and the event list are no longer printed in the file.
+  masked contact, method and time, the fingerprint, and a QR code to the record page with
+  "Signing certificate provided by:" and the logo under it. The QR code is also a link in PDF
+  readers; IP addresses, the record address and the event list are not printed in the file.
 
 ### Safer by default
 
