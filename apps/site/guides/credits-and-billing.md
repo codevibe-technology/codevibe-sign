@@ -52,7 +52,9 @@ Rarely an eSign is signed after its credit was returned, for example when the si
 at the provider after the wait ended, and no credit is left by then. That eSign is shown as
 owed. The next credits you buy pay for it first, and Aadhaar eSign starts again after that.
 
-Credits do not expire. This is the current policy.
+Credits do not expire. This is the current policy. If the account moves from Cloud to Free,
+the credits it has stay and can still be used; credits bought while on Free are at the Free
+price.
 
 A Cloud account that connects its own Leegality account uses no credits; see
 [Aadhaar eSign with Leegality](/guides/aadhaar-leegality#your-own-leegality-account).

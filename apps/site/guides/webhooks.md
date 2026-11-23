@@ -6,11 +6,16 @@ description: Receive signed webhook events from the server when envelopes change
 # Webhooks
 
 The server tells your backend when something happens to an envelope by sending a webhook. Each
-one corresponds to an audit action: `envelope.created`, `envelope.sent`, `envelope.completed`,
-`envelope.declined`, `envelope.expired`, `envelope.voided`, `envelope.recalled`,
-`envelope.revised`, `recipient.notified`, `recipient.reminded`, `recipient.viewed`,
-`recipient.authenticated`, `recipient.signed`, `recipient.approved`, `recipient.declined`,
-`recipient.link_shared`, `recipient.corrected` and `document.sealed`.
+one corresponds to an audit action: `envelope.created`, `envelope.updated`, `envelope.sent`,
+`envelope.completed`, `envelope.declined`, `envelope.expired`, `envelope.voided`,
+`envelope.recalled`, `envelope.revised`, `recipient.notified`, `recipient.reminded`,
+`recipient.viewed`, `recipient.authenticated`, `recipient.signed`, `recipient.approved`,
+`recipient.declined`, `recipient.link_shared`, `recipient.corrected`,
+`recipient.esign_started`, `recipient.esign_failed` and `document.sealed`.
+
+In the web app, endpoints are added under **Settings > Webhooks**. On
+[sign.codevibe.in](https://sign.codevibe.in) webhooks are part of the Cloud plan, not Free; see
+[Plans and pricing](/guides/pricing).
 
 The [webhooks reference](/http-api/reference/webhooks) lists every field of the payload and has
 the signature check in Node.js, Python and Go.

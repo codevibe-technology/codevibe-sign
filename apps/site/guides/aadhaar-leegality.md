@@ -93,7 +93,8 @@ completed eSign uses one credit.
 - With no credit left, an envelope with an Aadhaar signer cannot be sent, and a signer who
   arrives later is told the document is not available right now while the sender sees why on
   the envelope.
-- Credits do not expire. This is the current policy.
+- Credits do not expire. This is the current policy. They stay usable if the account moves
+  from Cloud to Free; credits bought while on Free are at the Free price.
 
 ### Your own Leegality account
 
@@ -128,7 +129,10 @@ mode" wherever something can be bought. Sandbox eSigns are not legally valid sig
 A self-hosted install has no credits and no billing pages. Each workspace enters its own
 Leegality account as above, or the operator sets one account for the whole install in the
 environment (`LEEGALITY_API_KEY`, `LEEGALITY_PRIVATE_SALT`, `LEEGALITY_WORKFLOW_ID`,
-`LEEGALITY_BASE_URL`). See [Self-host with Docker](/getting-started/docker) and section 12 of
+`LEEGALITY_BASE_URL`). `LEEGALITY_BASE_URL` is `https://app1.leegality.com/api` for production;
+left unset, the sandbox is used. If you add a custom header to the workflow's webhooks in
+Leegality, set the same one in `LEEGALITY_WEBHOOK_HEADER_NAME` and
+`LEEGALITY_WEBHOOK_HEADER_VALUE`, and a webhook without it is refused. See [Self-host with Docker](/getting-started/docker) and section 12 of
 the deploy guide in the repository.
 
 ## Over the HTTP API

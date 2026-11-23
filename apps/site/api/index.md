@@ -8,13 +8,16 @@ description: Reference pages for each Codevibe Sign package - core, pdf, server,
 Codevibe Sign is split into small packages with one job each. Use the whole service, or only the
 parts you need.
 
-| Package                                             | What it does                                                                        | Status       |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
-| [`@codevibe_technology/sign-core`](/api/core)       | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
-| [`@codevibe_technology/sign-pdf`](/api/pdf)         | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
-| [`@codevibe_technology/sign-server`](/api/server)   | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
-| [`@codevibe_technology/sign-react`](/api/react)     | Signature pad, signing view and field placement components.                         | Ready to try |
-| [`@codevibe_technology/sign-aadhaar`](/api/aadhaar) | Aadhaar eSign through a licensed eSign provider; the server runs it for you.        | Ready to try |
+| Package                                                                                                                           | What it does                                                                        | Status       |
+| --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
+| [`@codevibe_technology/sign-core`](/api/core)                                                                                     | Domain rules: envelopes, routing, reminders, expiry, the audit chain, tokens, OTPs. | Ready to try |
+| [`@codevibe_technology/sign-pdf`](/api/pdf)                                                                                       | Draws field values, appends the certificate page, seals and verifies PDFs.          | Ready to try |
+| [`@codevibe_technology/sign-server`](/api/server)                                                                                 | HTTP API and runtime, with adapters for storage, files, mail and OTP.               | Ready to try |
+| [`@codevibe_technology/sign-react`](/api/react)                                                                                   | Signature pad, signing view and field placement components.                         | Ready to try |
+| [`@codevibe_technology/sign-aadhaar`](/api/aadhaar)                                                                               | Aadhaar eSign through a licensed eSign provider; the server runs it for you.        | Ready to try |
+| [`@codevibe_technology/sign-client`](https://github.com/codevibe-technology/codevibe-sign/tree/main/packages/client#readme)       | Typed client for the HTTP API, signing sessions and webhooks.                       | Ready to try |
+| [`@codevibe_technology/sign-templates`](https://github.com/codevibe-technology/codevibe-sign/tree/main/packages/templates#readme) | Reusable templates with roles, prefilled fields and bulk send from CSV.             | Ready to try |
+| [`codevibe-sign`](https://github.com/codevibe-technology/codevibe-sign/tree/main/packages/codevibe-sign#readme)                   | One Apache-2.0 package with the client, PDF tools, React components and the CLI.    | Ready to try |
 
 For the HTTP API itself, with every route, schema and error code, see the
 [HTTP API reference](/http-api), which you can try against your own server.

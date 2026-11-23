@@ -20,8 +20,8 @@ the file, and in full in the audit trail.
 
 ## Three ways to verify
 
-1. **Scan the QR code** on the certificate page, or open the link printed beside it. The
-   public record shows the seal status, the signers, the fingerprints and the audit trail. It
+1. **Scan the QR code** on the certificate page, or click it in a PDF reader: the code is also
+   a link. The public record shows the seal status, the signers, the fingerprints and the audit trail. It
    never shows the document itself.
 2. **Drop the PDF on the verify page** of the site that sealed it, for the cloud
    [sign.codevibe.in/verify](https://sign.codevibe.in/verify). It checks the seal and shows the

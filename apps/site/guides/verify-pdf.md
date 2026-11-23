@@ -10,9 +10,10 @@ A sealed file can be checked by anyone who has it, without contacting the server
 ## From the certificate page
 
 The last page of a sealed PDF is its signing certificate: the document, who sent it, who
-signed, how and when, and the document's SHA-256 fingerprint. Scan the QR code on it, or open
-the link printed beside it, to see the public record of that signing at `/r/<record id>` on
-the install that sealed it. The record shows:
+signed, how and when, and the document's SHA-256 fingerprint. It fits on one page for a usual
+envelope. Scan the QR code on it, or click the code in a PDF reader, to see the public record
+of that signing at `/r/<record id>` on the install that sealed it. The address itself is not
+printed. The record shows:
 
 - whether the sealed file kept by the install still passes its seal check and matches the
   fingerprint recorded when it was sealed;

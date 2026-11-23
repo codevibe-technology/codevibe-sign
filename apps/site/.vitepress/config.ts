@@ -229,7 +229,7 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
           ],
         },
         {
-          text: 'API reference',
+          text: 'Packages',
           items: [
             { text: 'Overview', link: '/api' },
             { text: 'sign-core', link: '/api/core' },

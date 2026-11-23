@@ -103,5 +103,8 @@ PDFs of a template cannot be changed: create a new template for a new version of
 - Envelopes made from a template count towards the same per-minute limit as any other.
 - A key only sees its own workspace's templates; another workspace's id answers
   `404 NOT_FOUND`.
+- On [sign.codevibe.in](https://sign.codevibe.in) the Free plan has 2 active templates across
+  your workspaces and bulk sends of up to 10 rows; Cloud has no template limit. See
+  [Plans and pricing](/guides/pricing).
 
 The [templates reference](/http-api/reference/templates) lists every field and error.

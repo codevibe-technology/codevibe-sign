@@ -40,7 +40,7 @@ it emails each recipient in turn, checks one-time codes, records every step in a
 audit trail and seals the finished PDF with a digital signature. A **template** keeps the PDFs,
 roles and fields of an envelope you send often, so each new one only needs the people.
 
-Two kinds of caller use the API:
+Three kinds of caller use the API:
 
 | Caller                   | Authenticates with                          | Routes                                 |
 | ------------------------ | ------------------------------------------- | -------------------------------------- |

@@ -96,6 +96,8 @@ from the day the last one ended. After that the account moves to the Free plan:
   has, in every workspace, but cannot add more until it is under the limit. That includes
   workspaces: you keep them all and cannot create another.
 - Webhooks are paused, and a connected eSign provider account is not used.
+- eSign credits you have stay on the account and can still be used. Credits bought while on
+  Free are at the Free price.
 - Moving back to Cloud restores everything as it was.
 
 ### Cancelling
@@ -113,7 +115,8 @@ eSign with prepaid credits, bought in packs from Settings, Billing.
   and in the app before you buy. It is lower on Cloud than on Free.
 - A credit is held when a signer starts and used only when the eSign completes. One that is
   declined, fails or runs out of time costs nothing.
-- Credits do not expire.
+- Credits do not expire, and they stay usable if the account moves to Free. Credits bought
+  while on Free are at the Free price.
 - On Cloud you can connect your own Leegality account instead, once for all your workspaces;
   Leegality then bills you directly and no credits are used.
 
@@ -135,3 +138,8 @@ GST tax invoice. Book it at
 [sign.codevibe.in/install-help](https://sign.codevibe.in/install-help). The booking form asks
 about the server and a time that suits you. It never asks for a password or a key; access is
 arranged with you safely after booking.
+
+### A server to run it on
+
+Need a server? Our VPS hosting partners give an extra 20% discount through our links, listed
+on the [pricing section](https://sign.codevibe.in/#pricing) and the installation help page.

@@ -34,6 +34,18 @@ Microsoft 365 mailbox, through Microsoft Graph with an app registration instead 
 
 The runbook's "Microsoft 365 (Graph)" section walks through the app registration.
 
+### Workspaces and people
+
+- Each workspace lives at `/dashboard/<address>`. The address is chosen when the workspace is
+  created, and admins can change it later under **Settings → Workspace**, up to 5 times in 30
+  days. The old address keeps redirecting to the new one, and no other workspace can take it
+  for 90 days. API keys and webhooks use the workspace id and are not affected. If your
+  reverse proxy rewrites or caches paths under `/dashboard`, let `308` redirects through.
+- Each person sets their own name under **Personal settings**. It is the sender's name on the
+  certificate and the public record of the envelopes they send.
+- The app opens in the light theme. Each person can pick dark, or follow the system, under
+  **Personal settings**.
+
 ### Aadhaar eSign and payments when you self-host
 
 A self-hosted install is free and has no limits, no plans and no billing pages.
@@ -118,7 +130,3 @@ To turn a `.p12` file into the base64 value: `base64 -i seal.p12 | tr -d '\n'`.
   closes its database connections on `SIGTERM` and `SIGINT`, so rolling restarts are safe.
 - Behind a reverse proxy, set `TRUST_PROXY=true` so rate limits and the audit log see the
   client's address rather than the proxy's.
-- Each workspace lives at `/dashboard/<address>`. Admins can change the address under
-  **Settings → Workspace**; the old one keeps redirecting to the new one, and no other workspace
-  can take it for 90 days. API keys and webhooks use the workspace id and are not affected. If
-  your reverse proxy rewrites or caches paths under `/dashboard`, let `308` redirects through.

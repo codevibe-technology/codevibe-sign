@@ -41,7 +41,7 @@ const features = [
   },
   {
     title: 'Aadhaar eSign',
-    text: 'For documents that need a statutory signature in India, through your own account with a licensed provider.',
+    text: 'For documents that need a statutory signature in India, through Leegality: prepaid credits on sign.codevibe.in, or your own account.',
   },
   {
     title: 'React components',
@@ -60,7 +60,7 @@ const features = [
 const faqs = [
   {
     q: 'Is it free?',
-    a: 'Yes. Self-hosting is free and unlimited: the libraries are Apache-2.0 and the server and app are AGPL-3.0, and you pay only for what you run them on. On sign.codevibe.in the Free plan costs Rs 0 and covers 10 envelopes a month. A paid Cloud plan with higher limits is coming soon; until then, write to hello@codevibe.in from a Free workspace to be upgraded.',
+    a: 'Yes. Self-hosting is free and unlimited: the libraries are Apache-2.0 and the server and app are AGPL-3.0, and you pay only for what you run them on. On sign.codevibe.in the Free plan costs Rs 0: one workspace, two members and 10 envelopes a month. Cloud is Rs 999 a month for your account, with unlimited workspaces, 25 members and Rs 99 a month for each extra member; paying for a year costs ten months. Prices are before GST.',
   },
   {
     q: 'Can I use it in production today?',
@@ -80,7 +80,7 @@ const faqs = [
   },
   {
     q: 'Does Codevibe sell Aadhaar eSign?',
-    a: 'No. You open an account with a provider such as Leegality, buy credits from them and give the package your API keys. Each eSign is billed to you by the provider.',
+    a: 'On sign.codevibe.in, yes: buy prepaid credits and pay per completed eSign, at the price shown before you buy. Credits do not expire. On Cloud you can connect your own Leegality account instead, and Leegality bills you. A self-hosted install always uses your own provider account.',
   },
   {
     q: 'Can I build a commercial product on it?',

@@ -160,12 +160,13 @@ Place: ______________________________
    install) and sent to the recipients listed on the certificate page. Each recipient opened
    a private link sent to them and, where set, entered a one-time code, then signed in their
    browser. When the last recipient acted, the service drew the signatures on the pages,
-   added the certificate pages and applied a PAdES electronic seal over the whole file.
+   added the certificate page and applied a PAdES electronic seal over the whole file.
 
-3. What the certificate pages record. For each recipient: name, masked email or phone, the
-   identity check used, IP address, browser and the time of each action; the SHA-256 of the
-   original file; and the head of a hash chain in which every recorded step carries a
-   SHA-256 hash of the one before it.
+3. What the certificate page records. For each recipient: name, masked email or phone, the
+   identity check used and the time they signed; the SHA-256 of the original file; and the
+   head of a hash chain in which every recorded step carries a SHA-256 hash of the one before
+   it. The IP address and browser of each action are kept in the audit trail, which can be
+   exported separately.
 
 4. Integrity. The seal covers every byte of the file. Any change after sealing breaks it.
    The seal was checked on ____________ (date) at ______________________________/verify,
@@ -181,4 +182,4 @@ Place: ______________________________
    [ ] a printout of ______ pages of that PDF. Its SHA-256, given in Parts A and B, was
    computed with ______________________________ (tool), and the hash report is enclosed.
 
-Enclosures: hash report; result of the verify page; printout of the certificate pages.
+Enclosures: hash report; result of the verify page; printout of the certificate page.

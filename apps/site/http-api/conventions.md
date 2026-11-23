@@ -59,6 +59,12 @@ address on the signing routes, per client address on public verification, and pe
 for one-time codes. Over a limit the answer is
 `429 RATE_LIMITED` with a `Retry-After` header in seconds. Wait that long, then retry.
 
+On [sign.codevibe.in](https://sign.codevibe.in) the plan's counts apply as well, such as the
+Free plan's 100 API requests a month. Past one the answer has the code `PLAN_LIMIT`, with
+`details.limit`, `details.used` and `details.max`: `429` with `Retry-After` for the API request
+counts, which start again by themselves, and `403` for the others. See
+[Plans and pricing](/guides/pricing). A self-hosted server has no plan limits.
+
 ## Versioning {#versioning}
 
 The version is in the path and covers the whole API: every route is under `/v1`, and every

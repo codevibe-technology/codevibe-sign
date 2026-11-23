@@ -18,11 +18,11 @@ curl https://sign.codevibe.in/api/v1/envelopes \
   -H "Authorization: Bearer $SIGN_API_KEY"
 ```
 
-| Where you run it | Where keys come from                                                                                                                            |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cloud            | **Settings > API keys** in your workspace. A key starts with `cvs_`, is shown once, and can be revoked there. It records when it was last used. |
-| Self-hosted      | The `API_KEYS` variable, comma separated, at least 16 characters each. `npx codevibe-sign api-key` prints a new random one.                     |
-| Local sandbox    | `npx @codevibe_technology/sign-server start --memory` prints a fresh key every time it starts.                                                  |
+| Where you run it                    | Where keys come from                                                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloud, or the self-hosted web app   | **Settings > API keys** in your workspace. A key starts with `cvs_`, is shown once, and can be revoked there. It records when it was last used. |
+| The standalone server (sign-server) | The `API_KEYS` variable, comma separated, at least 32 characters each. `npx codevibe-sign api-key` prints a new random one.                     |
+| Local sandbox                       | `npx @codevibe_technology/sign-server start --memory` prints a fresh key every time it starts.                                                  |
 
 A key acts for its workspace. It sees and changes only that workspace's envelopes and
 templates: an id from another workspace answers `404`, exactly like an id that does not exist.

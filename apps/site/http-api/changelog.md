@@ -16,6 +16,11 @@ Version 1 is not yet declared stable. Until it is, a breaking change may still h
 
 ### November 2026
 
+- **Added**: Aadhaar eSign. A signer can have `auth: "aadhaar"`; the signing page starts the
+  eSign with `GET` and `POST /v1/sign/{token}/esign`, and the provider calls back on
+  `POST /v1/esign/webhooks/{provider}`. New: the `ESIGN_UNAVAILABLE` error code, the
+  `recipient.esign_started` and `recipient.esign_failed` events, and
+  `?version=certificate` for the separate certificate of an Aadhaar-signed document.
 - **Added**: templates. `GET`, `POST`, `PATCH` and `DELETE` under `/v1/templates`, and
   `POST /v1/templates/{templateId}/envelopes` to make an envelope from one.
 - **Added**: public verification of sealed PDFs, `POST /v1/verify` and
