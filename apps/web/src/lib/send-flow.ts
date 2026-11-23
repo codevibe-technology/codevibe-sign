@@ -206,7 +206,8 @@ export function aadhaarProblems(
     problems[at] =
       'Aadhaar eSign covers one document. Send the other documents in their own envelope.';
   } else if (actors.length > 1 && actors[actors.length - 1]?.id !== first.id) {
-    problems[at] = `${first.name.trim() || 'This signer'} signs with Aadhaar eSign and has to be last. Move them below the others.`;
+    problems[at] =
+      `${first.name.trim() || 'This signer'} signs with Aadhaar eSign and has to be last. Move them below the others.`;
   } else if (actors.length > 1 && state.routing !== 'sequential') {
     problems[at] =
       'With Aadhaar eSign the others sign first. Choose "One after another" as the signing order.';

@@ -50,8 +50,7 @@ export const ESIGN_BLOCKED: Record<string, string> = {
   own_not_in_plan:
     'Your own Leegality account is not part of the Free plan. Upgrade to Cloud, or switch to prepaid credits in Settings, Aadhaar eSign.',
   price_not_set: 'Aadhaar eSign is coming soon. Its price has not been published yet.',
-  no_credits:
-    'This workspace has no Aadhaar eSign credits left. Buy credits in Settings, Billing.',
+  no_credits: 'This workspace has no Aadhaar eSign credits left. Buy credits in Settings, Billing.',
 };
 
 export interface EsignState {
@@ -161,7 +160,8 @@ async function holdOf(sql: Sql, input: { workspaceId: string; ref: string }): Pr
 async function spend(sql: Sql, hold: { workspaceId: string; ref: string }): Promise<boolean> {
   const first = await holdOf(sql, hold);
   if (first === 'consumed') return true;
-  if (first === 'held') return (await consumeCredit(sql, hold)) || (await holdOf(sql, hold)) === 'consumed';
+  if (first === 'held')
+    return (await consumeCredit(sql, hold)) || (await holdOf(sql, hold)) === 'consumed';
   const late = { workspaceId: hold.workspaceId, ref: `${hold.ref}:late` };
   if ((await holdOf(sql, late)) === 'consumed') return true;
   if (!(await reserveCredit(sql, late))) return false;
