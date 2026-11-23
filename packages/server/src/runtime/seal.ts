@@ -13,6 +13,7 @@ import type { Runtime } from './context';
 import { makeJob } from './jobs';
 import { mutate } from './mutate';
 import type { NotifyPayload } from './notify';
+import { timeZoneFor } from './time-zone';
 
 export interface SealPayload {
   envelopeId: Id;
@@ -42,9 +43,9 @@ export async function runSeal(
   const stored = await rt.store.load(payload.envelopeId);
   const envelope = stored?.envelope;
   if (!envelope || envelope.status !== 'completed') return;
-  const note = rt.certificateNote
-    ? await rt.certificateNote(stored?.workspaceId ?? DEFAULT_WORKSPACE)
-    : null;
+  const workspaceId = stored?.workspaceId ?? DEFAULT_WORKSPACE;
+  const note = rt.certificateNote ? await rt.certificateNote(workspaceId) : null;
+  const timeZone = await timeZoneFor(rt, workspaceId);
   const history = await rt.store.listEvents(envelope.id);
   const done = sealedIds(history);
 
@@ -59,14 +60,14 @@ export async function runSeal(
     const values = envelope.values.filter((v) => fieldIds.has(v.fieldId));
     const rendered = await rt.pdf.renderFields(original, fields, values, envelope.recipients, {
       documentId: document.id,
-      ...(rt.timeZone ? { timeZone: rt.timeZone } : {}),
+      ...(timeZone ? { timeZone } : {}),
     });
     const withCertificate = await rt.pdf.appendCertificate(rendered, {
       envelope,
       document,
       events: history,
       ...(note ? { note } : {}),
-      ...(rt.timeZone ? { timeZone: rt.timeZone } : {}),
+      ...(timeZone ? { timeZone } : {}),
     });
     const output = await rt.pdf.seal(withCertificate, {
       ...rt.sealer,

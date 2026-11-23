@@ -201,6 +201,11 @@ export interface SignServerOptions {
    * gets the previous day's date.
    */
   timeZone?: string;
+  /**
+   * A workspace's own time zone, read when one of its envelopes is sealed, mailed or opened
+   * by a signer. Return null to use `timeZone`.
+   */
+  workspaceTimeZone?: (workspaceId: string) => Promise<string | null>;
   /** Signs signer session tokens. Set it when more than one process serves requests. */
   sessionSecret?: string;
   /** Signing links stay valid this many days unless the envelope expires sooner. Default 30. */

@@ -12,6 +12,7 @@ import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { CopyDownload, MailTemplates } from '../templates';
 import type { Runtime } from './context';
 import { sealedFileKey } from './seal';
+import { timeZoneFor } from './time-zone';
 
 export interface NotifyPayload {
   envelopeId: Id;
@@ -103,7 +104,11 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
 
   const link = await issueToken(rt, envelope, recipient);
   const template = payload.reason === 'invite' ? templates.invite : templates.reminder;
-  await rt.mailer.send({ ...base, ...template({ envelope, recipient, link }) });
+  const timeZone = await timeZoneFor(rt, workspaceId);
+  await rt.mailer.send({
+    ...base,
+    ...template({ envelope, recipient, link, ...(timeZone ? { timeZone } : {}) }),
+  });
 }
 
 /** One personal download link per document, for a completed copy sent without attachments. */

@@ -51,6 +51,7 @@ export interface Runtime {
   workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
   certificateNote?: (workspaceId: string) => Promise<string | null>;
   timeZone?: string;
+  workspaceTimeZone?: (workspaceId: string) => Promise<string | null>;
   apiKeys: StoredApiKey[];
   authenticate?: (request: Request) => Promise<Principal | null>;
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
@@ -163,6 +164,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     ...(options.workspaceMail ? { workspaceMail: options.workspaceMail } : {}),
     ...(options.certificateNote ? { certificateNote: options.certificateNote } : {}),
     ...(options.timeZone ? { timeZone: checkedTimeZone(options.timeZone) } : {}),
+    ...(options.workspaceTimeZone ? { workspaceTimeZone: options.workspaceTimeZone } : {}),
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),

@@ -40,6 +40,7 @@ import {
 import { parseJsonObject } from '../input';
 import type { Runtime } from '../runtime/context';
 import { mutate } from '../runtime/mutate';
+import { timeZoneFor } from '../runtime/time-zone';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import { signerView } from '../views';
 
@@ -227,10 +228,13 @@ export function signerRoutes(rt: Runtime) {
   app.get('/:token', async (c) => {
     const signer = await resolve(c);
     return c.json(
-      signerView(signer.envelope, signer.recipient, signer.workspaceId, {
-        required: signer.otpRequired,
-        authenticated: signer.authenticated,
-      }),
+      signerView(
+        signer.envelope,
+        signer.recipient,
+        signer.workspaceId,
+        { required: signer.otpRequired, authenticated: signer.authenticated },
+        await timeZoneFor(rt, signer.workspaceId),
+      ),
     );
   });
 

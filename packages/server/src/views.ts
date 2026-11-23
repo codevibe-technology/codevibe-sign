@@ -30,13 +30,14 @@ export function apiEnvelope(envelope: Envelope): ApiEnvelope {
  * What a signer may see: the envelope basics and their own fields only. While a one-time code
  * is still owed, the holder of the link has not shown they are the recipient, so they get no
  * more than the invitation email already says: no message, documents, fields or values, and
- * the address only in masked form.
+ * the address only in masked form. `timeZone` is the zone the signing date will be printed in.
  */
 export function signerView(
   envelope: Envelope,
   recipient: Recipient,
   workspaceId: string,
   auth: { required: boolean; authenticated: boolean },
+  timeZone = 'UTC',
 ) {
   const locked = auth.required && !auth.authenticated;
   const fields = locked ? [] : envelope.fields.filter((f) => f.recipientId === recipient.id);
@@ -68,6 +69,7 @@ export function signerView(
     otpRequired: auth.required,
     authenticated: auth.authenticated,
     canAct: currentRecipients(envelope).some((r) => r.id === recipient.id),
+    timeZone,
   };
 }
 

@@ -2184,7 +2184,8 @@
           "values",
           "otpRequired",
           "authenticated",
-          "canAct"
+          "canAct",
+          "timeZone"
         ],
         "properties": {
           "workspaceId": {
@@ -2251,7 +2252,12 @@
             "type": "boolean",
             "description": "A valid session came with this request."
           },
-          "canAct": { "type": "boolean", "description": "It is this recipient's turn." }
+          "canAct": { "type": "boolean", "description": "It is this recipient's turn." },
+          "timeZone": {
+            "type": "string",
+            "description": "IANA time zone the signing date is printed in on the document, for example `Asia/Kolkata`: the workspace's own, or the server's. `UTC` when none is set.",
+            "example": "Asia/Kolkata"
+          }
         }
       },
       "NewDocument": {

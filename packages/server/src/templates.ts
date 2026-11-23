@@ -1,4 +1,5 @@
 import type { Envelope, Recipient } from '@codevibe_technology/sign-core';
+import { formatMailDate } from './time-zone';
 
 export interface RenderedMail {
   subject: string;
@@ -11,6 +12,8 @@ export interface LinkMailContext {
   recipient: Recipient;
   /** The personal signing link. Treat it like a password. */
   link: string;
+  /** IANA zone for the dates in the text: the workspace's, or the server's. UTC when absent. */
+  timeZone?: string;
 }
 
 /** A link to download one sealed document. Personal to the recipient, like a signing link. */
@@ -84,7 +87,7 @@ function layout(
 const verb = (recipient: Recipient) => (recipient.role === 'approver' ? 'approve' : 'sign');
 
 function linkMail(ctx: LinkMailContext, reminder: boolean): RenderedMail {
-  const { envelope, recipient, link } = ctx;
+  const { envelope, recipient, link, timeZone } = ctx;
   const action = verb(recipient);
   const subject = reminder
     ? `Reminder: please ${action} "${envelope.title}"`
@@ -96,7 +99,9 @@ function linkMail(ctx: LinkMailContext, reminder: boolean): RenderedMail {
       : `You have been asked to ${action} "${envelope.title}".`,
     ...(envelope.message ? [envelope.message] : []),
     ...(envelope.changeNote ? [`What changed: ${envelope.changeNote}`] : []),
-    ...(envelope.expiresAt ? [`The request expires on ${envelope.expiresAt.slice(0, 10)}.`] : []),
+    ...(envelope.expiresAt
+      ? [`The request expires on ${formatMailDate(envelope.expiresAt, timeZone)}.`]
+      : []),
     'This link is personal. Do not forward this email.',
   ];
   return {

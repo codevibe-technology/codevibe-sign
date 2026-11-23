@@ -2374,6 +2374,7 @@ components:
           otpRequired,
           authenticated,
           canAct,
+          timeZone,
         ]
       properties:
         workspaceId:
@@ -2447,6 +2448,12 @@ components:
         canAct:
           type: boolean
           description: It is this recipient's turn.
+        timeZone:
+          type: string
+          description: >-
+            IANA time zone the signing date is printed in on the document, for example
+            `Asia/Kolkata`: the workspace's own, or the server's. `UTC` when none is set.
+          example: Asia/Kolkata
     NewDocument:
       type: object
       additionalProperties: false
