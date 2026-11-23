@@ -12,7 +12,8 @@ export interface CreditBalance {
   reserved: number;
 }
 
-export type CreditEntryKind = 'grant' | 'reserve' | 'consume' | 'release';
+/** `void`: unused credits removed after a refund, or test credits removed on going live. */
+export type CreditEntryKind = 'grant' | 'reserve' | 'consume' | 'release' | 'void';
 
 export interface CreditEntry {
   id: string;

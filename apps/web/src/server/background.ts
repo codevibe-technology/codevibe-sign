@@ -2,8 +2,10 @@ import { db } from './db';
 import { env } from './env';
 import { migrateAll } from './migrate';
 import { notifyInstallBookings } from './billing/install-help';
+import { voidTestCredits } from './billing/credit-adjust';
 import { finishPendingInvoices } from './billing/invoices';
-import { pruneRazorpayEvents } from './billing/orders';
+import { sendOperatorNotices } from './billing/notices';
+import { expireOrders, pruneRazorpayEvents } from './billing/orders';
 import { billingDeps } from './billing/runtime';
 import { runSubscriptionTick } from './billing/subscriptions';
 import { resumeBulkSends } from './bulk-worker';
@@ -20,11 +22,28 @@ async function billingTick() {
   await finishPendingInvoices(db(), deps);
   await runSubscriptionTick(db(), deps);
   await notifyInstallBookings(db(), deps);
+  await expireOrders(db(), deps);
+  if (deps.config.live) await voidTestCredits(db(), deps.now());
+  await sendOperatorNotices(db(), {
+    mailer: deps.mailer,
+    operatorEmail: deps.config.operatorEmail,
+    now: deps.now,
+  });
   await pruneRazorpayEvents(db());
+}
+
+/** Says in the server log, once at start, which billing setting is wrong; nowhere public. */
+function reportBillingSettings() {
+  try {
+    for (const problem of billingDeps().config.problems) console.error('[billing]', problem);
+  } catch (err) {
+    console.error('[billing]', err instanceof Error ? err.message : err);
+  }
 }
 
 export async function startBackground() {
   const config = env();
+  reportBillingSettings();
   if (config.AUTO_MIGRATE) {
     const applied = await migrateAll(db());
     if (applied.length) console.log(`[migrate] applied ${applied.join(', ')}`);

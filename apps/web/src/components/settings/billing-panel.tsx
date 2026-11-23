@@ -37,6 +37,7 @@ const ENTRY_LABELS: Record<CreditEntry['kind'], string> = {
   reserve: 'Held for an eSign',
   consume: 'Used',
   release: 'Returned',
+  void: 'Removed',
 };
 
 const ENTRY_SIGN: Record<CreditEntry['kind'], string> = {
@@ -44,6 +45,7 @@ const ENTRY_SIGN: Record<CreditEntry['kind'], string> = {
   reserve: '−',
   consume: '',
   release: '+',
+  void: '−',
 };
 
 type Purchase =

@@ -80,6 +80,10 @@ export const fulfilCredits: Fulfilment = async (tx, order) => {
     reason: 'purchase',
   });
   if (granted) {
+    // Credits bought with test payments are told apart, so they can be removed on going live.
+    await tx`
+      update app_esign_credit_ledger set mode = ${order.mode}
+      where workspace_id = ${order.workspaceId} and kind = 'grant' and ref = ${order.id}`;
     await recordAudit(tx, {
       workspaceId: order.workspaceId,
       actorId: order.createdBy,

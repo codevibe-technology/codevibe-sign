@@ -2,12 +2,18 @@ import 'server-only';
 import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { billingConfig } from './config';
+import { reverseCredits } from './credit-adjust';
 import { fulfilCredits } from './credit-orders';
 import { fulfilInstallHelp } from './install-help';
 import { invoiceRendering } from './invoice-assets';
-import { registerFulfilment, type BillingDeps } from './orders';
+import { registerFulfilment, registerReversal, type BillingDeps } from './orders';
 import { createRazorpay } from './razorpay';
-import { fulfilSeats, fulfilSubscription } from './subscriptions';
+import {
+  fulfilSeats,
+  fulfilSubscription,
+  reverseSeats,
+  reverseSubscription,
+} from './subscriptions';
 
 /**
  * Settings, payment client, files and mail for the billing code, built from the environment on
@@ -19,6 +25,9 @@ export function billingDeps(): BillingDeps {
   registerFulfilment('cloud_subscription', fulfilSubscription);
   registerFulfilment('extra_seats', fulfilSeats);
   registerFulfilment('install_help', fulfilInstallHelp);
+  registerReversal('esign_credits', reverseCredits);
+  registerReversal('cloud_subscription', reverseSubscription);
+  registerReversal('extra_seats', reverseSeats);
   const config = billingConfig();
   const { files, mailer } = appRuntime();
   return {
