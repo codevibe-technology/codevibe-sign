@@ -16,7 +16,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { Role } from '@/lib/roles';
 import { listAudit } from '@/server/billing/audit';
 import { billingConfig } from '@/server/billing/config';
-import { creditBalance, creditHistory, grantCredits } from '@/server/billing/credits';
+import { creditBalance, creditHistory, grantCredits, owedEsigns } from '@/server/billing/credits';
 import { createEsignOptions, esignState } from '@/server/esign/runtime';
 import {
   getEsignSettings,
@@ -549,6 +549,85 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       expect(unbilled).toBe(1);
     });
 
+    it('treats an unpaid eSign as owed: nothing starts until new credits have paid for it', async () => {
+      const ws = await workspace('free', 1);
+      const deps = { sql, config: () => billingConfig(ENV) };
+      const options = createEsignOptions(deps);
+      const late = hookInput(ws.id);
+      await options.onStart!(late);
+      await options.onEnd!({ ...late, outcome: 'expired' });
+      const other = hookInput(ws.id);
+      await options.onStart!(other);
+      await options.onEnd!({ ...other, outcome: 'signed' });
+      await options.onEnd!({ ...late, outcome: 'signed' });
+      expect(await owedEsigns(sql, ws.id)).toBe(1);
+      expect(await options.available!(ws.id)).toMatchObject({ reason: 'no_credits' });
+
+      await grantCredits(sql, { workspaceId: ws.id, credits: 1, ref: `grant_${randomUUID()}` });
+      expect(await owedEsigns(sql, ws.id)).toBe(0);
+      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      expect(await options.available!(ws.id)).toMatchObject({ reason: 'no_credits' });
+      const paid = await sql`
+        select kind from app_esign_credit_ledger
+        where workspace_id = ${ws.id} and ref = ${`${late.ref}:late`} order by kind`;
+      expect(paid.map((row) => row.kind)).toEqual(['consume', 'reserve']);
+
+      await grantCredits(sql, { workspaceId: ws.id, credits: 2, ref: `grant_${randomUUID()}` });
+      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+      expect(await options.available!(ws.id)).toBeNull();
+    });
+
+    it('pays an owed eSign with a credit that comes back, before anything else', async () => {
+      const ws = await workspace('free', 1);
+      const options = createEsignOptions({ sql, config: () => billingConfig(ENV) });
+      const first = hookInput(ws.id);
+      await options.onStart!(first);
+      await options.onEnd!({ ...first, outcome: 'expired' });
+      const second = hookInput(ws.id);
+      await options.onStart!(second);
+      await options.onEnd!({ ...first, outcome: 'signed' });
+      expect(await owedEsigns(sql, ws.id)).toBe(1);
+      await options.onEnd!({ ...second, outcome: 'expired' });
+      expect(await owedEsigns(sql, ws.id)).toBe(0);
+      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+    });
+
+    it('holds no credit when the start cannot be written down', async () => {
+      const ws = await workspace('free', 2);
+      const options = createEsignOptions({ sql, config: () => billingConfig(ENV) });
+      const broken = { ...hookInput(ws.id), envelopeId: null as unknown as string };
+      await expect(options.onStart!(broken)).rejects.toThrow();
+      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+    });
+
+    it('does not use a sandbox account of a workspace once the install is live', async () => {
+      const ws = await workspace('cloud');
+      await saveOwnCredentials(sql, {
+        workspaceId: ws.id,
+        userId: ws.owner.id,
+        credentials: {
+          apiKey: 'own-auth-token-5555',
+          privateSalt: OWN_SALT,
+          workflowId: 'wf_own',
+          environment: 'sandbox',
+        },
+      });
+      await setEsignMode(sql, { workspaceId: ws.id, userId: ws.owner.id, mode: 'own' });
+      const test = createEsignOptions({ sql, config: () => billingConfig(ENV) });
+      expect(await test.available!(ws.id)).toBeNull();
+      expect(await test.provider(ws.id)).toMatchObject({ environment: 'sandbox' });
+
+      const liveEnv = {
+        ...ENV,
+        BILLING_LIVE: 'true',
+        RAZORPAY_KEY_ID: 'rzp_live_LIVEKEY123',
+        LEEGALITY_BASE_URL: 'https://app1.leegality.com/api',
+      };
+      const live = createEsignOptions({ sql, config: () => billingConfig(liveEnv) });
+      expect(await live.available!(ws.id)).toMatchObject({ reason: 'own_sandbox_live' });
+      expect(await live.provider(ws.id)).toBeNull();
+    });
+
     it('refuses the start with words for the signer when no credit is left', async () => {
       const ws = await workspace('free', 0);
       const options = createEsignOptions({ sql, config: () => billingConfig(ENV) });
@@ -580,7 +659,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const ws = await workspace('free', 0);
       vi.stubEnv('PLAN_MODE', 'self-hosted');
       const ready = await esignState({ sql, config: () => billingConfig(ENV) }, ws.id);
-      expect(ready).toEqual({ mode: 'platform', creditsRequired: false, blocked: null });
+      expect(ready).toMatchObject({ mode: 'platform', creditsRequired: false, blocked: null });
       const options = createEsignOptions({ sql, config: () => billingConfig(ENV) });
       const input = { workspaceId: ws.id, envelopeId: 'e', recipientId: 'r', ref: 'self-1' };
       await options.onStart!(input);

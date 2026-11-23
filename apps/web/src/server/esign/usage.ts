@@ -53,13 +53,16 @@ export async function recordEsignStart(
     recipientId: string;
     mode: EsignMode;
     billed: boolean;
+    /** The provider's test environment is used. */
+    sandbox?: boolean;
   },
 ): Promise<void> {
   await sql`
-    insert into app_esign_usage (ref, workspace_id, envelope_id, recipient_id, mode, billed)
+    insert into app_esign_usage
+      (ref, workspace_id, envelope_id, recipient_id, mode, billed, sandbox)
     values (
       ${input.ref}, ${input.workspaceId}, ${input.envelopeId}, ${input.recipientId},
-      ${input.mode}, ${input.billed}
+      ${input.mode}, ${input.billed}, ${input.sandbox ?? false}
     )
     on conflict (ref) do nothing`;
 }

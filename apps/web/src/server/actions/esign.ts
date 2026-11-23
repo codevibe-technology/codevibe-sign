@@ -6,6 +6,7 @@ import { SignError } from '@codevibe_technology/sign-core';
 import { memoryRateLimiter, type RateLimiter } from '@codevibe_technology/sign-server';
 import { z } from 'zod';
 import { recordAudit } from '../billing/audit';
+import { billingConfig } from '../billing/config';
 import { clientAddress } from '../client-address';
 import { db } from '../db';
 import { AppError } from '../errors';
@@ -98,6 +99,15 @@ const credentialsShape = {
   environment: z.enum(['sandbox', 'production']),
 };
 
+/** The operator has switched the install to live payments and eSigns. */
+function liveInstall(): boolean {
+  try {
+    return billingConfig().live;
+  } catch {
+    return false;
+  }
+}
+
 /** Why a try of the provider's credentials failed, in words that name what to fix. */
 function connectionProblem(error: unknown): string {
   const reason = error instanceof SignError ? error.details?.reason : undefined;
@@ -122,6 +132,13 @@ export const saveEsignCredentialsAction = workspaceAction(
     const sql = db();
     await assertOwnEsignAccount(sql, ctx.workspace.id);
     const { apiKey, privateSalt, workflowId, environment } = input;
+    if (environment === 'sandbox' && liveInstall()) {
+      throw new AppError(
+        'VALIDATION',
+        'A sandbox account is for testing only, and signatures made there have no legal effect. Connect your production Leegality account.',
+        'environment',
+      );
+    }
     const credentials = { apiKey, privateSalt, workflowId, environment };
     let ok = true;
     try {

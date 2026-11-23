@@ -95,7 +95,42 @@ export async function grantCredits(
       update app_esign_credits
       set available = available + ${input.credits}, updated_at = now()
       where workspace_id = ${input.workspaceId}`;
+    await settleOwedEsigns(tx, input.workspaceId);
     return true;
+  });
+}
+
+/** eSigns that were signed when the workspace had no credit left to pay for them. */
+export async function owedEsigns(sql: Sql, workspaceId: string): Promise<number> {
+  const [row] = await sql<{ owed: number }[]>`
+    select count(*)::int as owed from app_esign_usage
+    where workspace_id = ${workspaceId} and unbilled and owed_settled_at is null`;
+  return row?.owed ?? 0;
+}
+
+/**
+ * Pays for owed eSigns, oldest first, with whatever credits the workspace has now. Each one
+ * is a reserve and a consume in the ledger under `<ref>:late`. Returns how many are still
+ * owed. New credits go here before they can start another eSign.
+ */
+export async function settleOwedEsigns(sql: Sql, workspaceId: string): Promise<number> {
+  if ((await owedEsigns(sql, workspaceId)) === 0) return 0;
+  return atomic(sql, async (tx) => {
+    await lockBalance(tx, workspaceId);
+    const owed = await tx<{ ref: string }[]>`
+      select ref from app_esign_usage
+      where workspace_id = ${workspaceId} and unbilled and owed_settled_at is null
+      order by started_at, ref
+      for update`;
+    let left = owed.length;
+    for (const { ref } of owed) {
+      const hold = { workspaceId, ref: `${ref}:late` };
+      if (!(await reserveCredit(tx, hold))) break;
+      await consumeCredit(tx, hold);
+      await tx`update app_esign_usage set owed_settled_at = now() where ref = ${ref}`;
+      left -= 1;
+    }
+    return left;
   });
 }
 

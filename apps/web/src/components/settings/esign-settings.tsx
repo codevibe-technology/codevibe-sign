@@ -215,6 +215,15 @@ export function EsignSettingsPanel({
                       {credits.reserved > 0 ? (
                         <dd className="text-[12px] text-muted">{credits.reserved} in use now</dd>
                       ) : null}
+                      {overview.owed > 0 ? (
+                        <dd
+                          className="text-[12px] font-medium text-danger"
+                          data-testid="esign-owed"
+                        >
+                          {overview.owed === 1 ? '1 eSign owed' : `${overview.owed} eSigns owed`}.
+                          New credits pay for {overview.owed === 1 ? 'it' : 'them'} first.
+                        </dd>
+                      ) : null}
                     </div>
                     <div className="rounded-lg border border-line bg-surface px-3 py-2">
                       <dt className="text-[12px] text-muted">Price</dt>

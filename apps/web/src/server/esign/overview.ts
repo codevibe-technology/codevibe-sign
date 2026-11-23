@@ -25,6 +25,8 @@ export interface EsignOverview {
   /** The plan lets the workspace connect its own provider account. */
   ownAllowed: boolean;
   credits: CreditBalance;
+  /** eSigns signed with no credit left; new credits pay for these first. */
+  owed: number;
   /** Price of one eSign before tax; null shows as "Price coming soon". */
   pricePaise: Paise | null;
   testMode: boolean;
@@ -66,6 +68,7 @@ export async function esignOverview(
     billingVisible: billingVisible(settings),
     ownAllowed: entitlements.ownEsignAccount,
     credits,
+    owed: state.owed,
     pricePaise: offer?.pricePaise ?? null,
     testMode: offer?.testMode ?? false,
     sandbox: config?.leegality?.environment === 'sandbox',

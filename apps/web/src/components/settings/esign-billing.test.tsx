@@ -38,6 +38,7 @@ const esign = (overrides: Partial<EsignOverview> = {}): EsignOverview => ({
     version: 0,
   },
   blocked: null,
+  owed: 0,
   platformConfigured: true,
   creditsRequired: true,
   billingVisible: true,

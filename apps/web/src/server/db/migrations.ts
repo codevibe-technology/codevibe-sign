@@ -570,4 +570,13 @@ alter table app_subscriptions add column order_id text references app_billing_or
 alter table app_subscriptions add column prior jsonb;
 `,
   },
+  {
+    name: '0019_esign_owed',
+    sql: `
+alter table app_esign_usage add column owed_settled_at timestamptz;
+alter table app_esign_usage add column sandbox boolean not null default false;
+create index app_esign_usage_owed on app_esign_usage (workspace_id)
+  where unbilled and owed_settled_at is null;
+`,
+  },
 ];

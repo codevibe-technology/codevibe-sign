@@ -18,7 +18,13 @@ import {
   type BillingConfig,
   type LeegalityConfig,
 } from '../billing/config';
-import { consumeCredit, creditBalance, releaseCredit, reserveCredit } from '../billing/credits';
+import {
+  consumeCredit,
+  creditBalance,
+  releaseCredit,
+  reserveCredit,
+  settleOwedEsigns,
+} from '../billing/credits';
 import { planSettings, workspaceEntitlements } from '../plans';
 import { getEsignSettings, ownCredentials, type EsignMode, type OwnCredentials } from './settings';
 import { getEsignUsage, markUnbilled, recordEsignOutcome, recordEsignStart } from './usage';
@@ -49,6 +55,8 @@ export const ESIGN_BLOCKED: Record<string, string> = {
     'Your Leegality account details are missing or can no longer be read. Add them again in Settings, Aadhaar eSign.',
   own_not_in_plan:
     'Your own Leegality account is not part of the Free plan. Upgrade to Cloud, or switch to prepaid credits in Settings, Aadhaar eSign.',
+  own_sandbox_live:
+    'Your Leegality account is a sandbox account, which is for testing only. Connect your production Leegality account in Settings, Aadhaar eSign.',
   price_not_set: 'Aadhaar eSign is coming soon. Its price has not been published yet.',
   no_credits: 'This workspace has no Aadhaar eSign credits left. Buy credits in Settings, Billing.',
 };
@@ -59,7 +67,42 @@ export interface EsignState {
   creditsRequired: boolean;
   /** Null when an eSign can start now. */
   blocked: { reason: string; message: string } | null;
+  /** The provider's test environment would be used. */
+  sandbox: boolean;
+  /** eSigns signed when no credit was left; they are paid before another can start. */
+  owed: number;
 }
+
+const DEFAULT_SESSION_HOURS = 24;
+const MAX_SESSION_HOURS = 24 * 90;
+
+/**
+ * `ESIGN_SESSION_HOURS`: how long a started eSign is waited for and its credit held. It
+ * should be at least as long as the provider keeps its signing page open.
+ */
+export function esignSessionHours(source: NodeJS.ProcessEnv = process.env): number {
+  const raw = source.ESIGN_SESSION_HOURS?.trim();
+  if (!raw) return DEFAULT_SESSION_HOURS;
+  const hours = Number(raw);
+  if (!Number.isInteger(hours) || hours < 1 || hours > MAX_SESSION_HOURS) {
+    throw new Error(
+      `ESIGN_SESSION_HOURS must be a whole number of hours from 1 to ${MAX_SESSION_HOURS}`,
+    );
+  }
+  return hours;
+}
+
+/** A malformed setting is reported and the default used, so the app still starts. */
+function sessionHours(): number {
+  try {
+    return esignSessionHours();
+  } catch (err) {
+    console.error('[esign]', err instanceof Error ? err.message : err);
+    return DEFAULT_SESSION_HOURS;
+  }
+}
+
+const flagOn = (value: string | undefined) => value === 'true' || value === '1';
 
 const safeConfig = (deps: EsignRuntimeDeps): BillingConfig | null => {
   try {
@@ -83,32 +126,51 @@ export async function esignState(deps: EsignRuntimeDeps, workspaceId: string): P
     message: ESIGN_BLOCKED[key] ?? ESIGN_BLOCKED.not_configured!,
   });
 
+  const config = safeConfig(deps);
   if (saved.mode === 'own') {
+    const credentials =
+      entitlements.ownEsignAccount && saved.own.configured
+        ? await ownCredentials(sql, workspaceId)
+        : null;
+    const sandbox = saved.own.environment === 'sandbox';
     const blocked = !entitlements.ownEsignAccount
       ? block('own_not_in_plan')
-      : !saved.own.configured || !(await ownCredentials(sql, workspaceId))
+      : !credentials
         ? block('own_not_configured')
-        : null;
-    return { mode: 'own', creditsRequired: false, blocked };
+        : sandbox && config?.live
+          ? block('own_sandbox_live')
+          : null;
+    return { mode: 'own', creditsRequired: false, blocked, sandbox, owed: 0 };
   }
 
-  const config = safeConfig(deps);
+  const sandbox = config?.leegality?.environment === 'sandbox';
   if (!config?.leegality) {
     return {
       mode: 'platform',
       creditsRequired: hosted,
       blocked: block('not_configured', hosted ? 'not_configured_hosted' : 'not_configured'),
+      sandbox: false,
+      owed: 0,
     };
   }
-  if (!hosted) return { mode: 'platform', creditsRequired: false, blocked: null };
+  if (!hosted) return { mode: 'platform', creditsRequired: false, blocked: null, sandbox, owed: 0 };
+  const owed = await settleOwedEsigns(sql, workspaceId);
   if (!esignPrice(config, entitlements.plan)) {
-    return { mode: 'platform', creditsRequired: true, blocked: block('price_not_set') };
+    return {
+      mode: 'platform',
+      creditsRequired: true,
+      blocked: block('price_not_set'),
+      sandbox,
+      owed,
+    };
   }
   const { available } = await creditBalance(sql, workspaceId);
   return {
     mode: 'platform',
     creditsRequired: true,
-    blocked: available < 1 ? block('no_credits') : null,
+    blocked: owed > 0 || available < 1 ? block('no_credits') : null,
+    sandbox,
+    owed,
   };
 }
 
@@ -189,6 +251,8 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
       if (hit?.key === key) return hit.provider;
       const credentials = await ownCredentials(sql, workspaceId);
       if (!credentials) return null;
+      // A sandbox signature has no legal effect, so a live install does not make them.
+      if (credentials.environment === 'sandbox' && safeConfig(deps)?.live) return null;
       const made = fromOwn(credentials, deps.fetch);
       cache.set(workspaceId, { key, provider: made });
       return made;
@@ -211,19 +275,26 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
   return {
     provider,
     available,
+    sessionTtlMs: sessionHours() * 60 * 60 * 1000,
+    ...(flagOn(process.env.ESIGN_ACCEPT_UNREADABLE_SIGNATURES)
+      ? { acceptUnreadableSignatures: true }
+      : {}),
 
     async onStart(input) {
       const state = await esignState(deps, input.workspaceId);
       const billed = state.mode === 'platform' && state.creditsRequired;
-      if (billed && !(await reserveCredit(sql, input))) {
-        throw new SignError('ESIGN_UNAVAILABLE', SIGNER_NO_CREDITS, { reason: 'no_credits' });
-      }
-      await recordEsignStart(sql, { ...input, mode: state.mode, billed });
-      await recordAudit(sql, {
-        workspaceId: input.workspaceId,
-        action: 'esign.started',
-        target: input.envelopeId,
-        data: { ref: input.ref, recipientId: input.recipientId, mode: state.mode },
+      // One transaction: a credit is never left held without the row that gives it back.
+      await sql.begin(async (tx) => {
+        if (billed && (state.owed > 0 || !(await reserveCredit(tx, input)))) {
+          throw new SignError('ESIGN_UNAVAILABLE', SIGNER_NO_CREDITS, { reason: 'no_credits' });
+        }
+        await recordEsignStart(tx, { ...input, mode: state.mode, billed, sandbox: state.sandbox });
+        await recordAudit(tx, {
+          workspaceId: input.workspaceId,
+          action: 'esign.started',
+          target: input.envelopeId,
+          data: { ref: input.ref, recipientId: input.recipientId, mode: state.mode },
+        });
       });
     },
 
@@ -232,7 +303,11 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
       if (!usage || usage.workspaceId !== input.workspaceId) return;
       const hold = { workspaceId: input.workspaceId, ref: input.ref };
       const data = { ref: input.ref, recipientId: input.recipientId, mode: usage.mode };
-      if (usage.billed && input.outcome !== 'signed') await releaseCredit(sql, hold);
+      if (usage.billed && input.outcome !== 'signed') {
+        await releaseCredit(sql, hold);
+        // A credit that came back pays for an eSign still owed before anything else.
+        await settleOwedEsigns(sql, input.workspaceId);
+      }
       if (usage.billed && input.outcome === 'signed' && !(await spend(sql, hold))) {
         if (await markUnbilled(sql, input.ref)) {
           await recordAudit(sql, {
