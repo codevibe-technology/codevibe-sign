@@ -1199,6 +1199,17 @@ describe('no entry point is left out of the matrix', () => {
       join(SRC, 'app/api/billing/workspaces/[workspaceId]/invoices/[invoiceId]/route.ts'),
     );
     expect(route).toContain('account.ownerUserId !== user.id');
+    // Billing exists on the hosted cloud only; a self-hosted install answers 404 everywhere.
+    expect(route).toContain('if (!isHosted()) return notFound();');
+    expect(read(join(SRC, 'app/api/billing/razorpay/webhook/route.ts'))).toContain(
+      'if (!isHosted()) return answer(404',
+    );
+    const billing = read(join(dir, 'billing.ts'));
+    expect(billing).toContain("if (!isHosted()) throw new AppError('NOT_FOUND', 'Not found');");
+    expect(billing.match(/accountAction\(/g)).toHaveLength(1);
+    for (const file of ['subscriptions.ts', 'install-help.ts']) {
+      expect(read(join(dir, file)), file).toContain('isHosted()');
+    }
     for (const page of ['billing', 'plan', 'aadhaar-esign']) {
       const source = read(join(SRC, `app/dashboard/[slug]/settings/${page}/page.tsx`));
       expect(source, page).toMatch(/isAccountOwner|ownerUserId/);

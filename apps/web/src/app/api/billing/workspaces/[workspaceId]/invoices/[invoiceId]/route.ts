@@ -3,6 +3,7 @@ import { getSessionUser } from '@/server/auth/session';
 import { invoicePdf } from '@/server/billing/invoices';
 import { billingDeps } from '@/server/billing/runtime';
 import { db } from '@/server/db';
+import { isHosted } from '@/server/plans';
 import { findMembership } from '@/server/workspaces';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ workspaceId: string; invoiceId: string }> },
 ) {
+  if (!isHosted()) return notFound();
   const user = await getSessionUser();
   if (!user) return notFound();
   const { workspaceId, invoiceId } = await context.params;

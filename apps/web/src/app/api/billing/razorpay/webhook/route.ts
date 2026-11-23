@@ -4,6 +4,7 @@ import { billingDeps } from '@/server/billing/runtime';
 import { clientAddress } from '@/server/client-address';
 import { db } from '@/server/db';
 import { AppError } from '@/server/errors';
+import { isHosted } from '@/server/plans';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,8 @@ async function readBody(request: Request, limit: number): Promise<string | null>
  * or is of no interest answers 200 so it is not sent again.
  */
 export async function POST(request: Request) {
+  // A self-hosted install sells nothing, so it has no payment callbacks to take.
+  if (!isHosted()) return answer(404, { ok: false });
   try {
     await enforceBillingLimit('webhooks', clientAddress(request.headers) ?? 'all');
   } catch {

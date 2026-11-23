@@ -25,13 +25,26 @@ import {
 import { AppError } from '../errors';
 import { summarizeInvoice, type InvoiceSummary } from '../billing/overview';
 import { billingDeps } from '../billing/runtime';
-import { workspacePlan } from '../plans';
-import { accountAction } from './action';
+import { isHosted, workspacePlan } from '../plans';
+import { accountAction, type AccountContext } from './action';
+
+/**
+ * An action on the account's billing. Billing exists on the hosted cloud only: a self-hosted
+ * install has nothing to buy, so every one of these answers as if it were not there.
+ */
+function billingAction<S extends z.ZodObject, T>(
+  schema: S,
+  handler: (ctx: AccountContext, input: z.infer<S>) => Promise<T>,
+) {
+  return accountAction('billing.manage', schema, async (ctx, input) => {
+    if (!isHosted()) throw new AppError('NOT_FOUND', 'Not found');
+    return handler(ctx, input);
+  });
+}
 
 const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/settings`, 'layout');
 
-export const saveBillingDetailsAction = accountAction(
-  'billing.manage',
+export const saveBillingDetailsAction = billingAction(
   z.object(billingDetailsShape).superRefine(checkGstin),
   async (ctx, details): Promise<BillingDetails> => {
     await saveBillingDetails(db(), { accountId: ctx.accountId, userId: ctx.user.id, details });
@@ -41,8 +54,7 @@ export const saveBillingDetailsAction = accountAction(
 );
 
 /** Opens an order for a pack of eSign credits and returns what Razorpay Checkout needs. */
-export const createCreditsOrderAction = accountAction(
-  'billing.manage',
+export const createCreditsOrderAction = billingAction(
   z.object({ credits: z.coerce.number().int().min(1).max(100_000) }),
   async (ctx, input): Promise<CheckoutSession> => {
     await enforceBillingLimit('orders', `${ctx.accountId}:${ctx.user.id}`);
@@ -71,8 +83,7 @@ export interface PaymentConfirmation {
  * Confirms a payment after Razorpay Checkout closes, for any kind of order of the workspace.
  * What the browser sends is only a pointer: the payment is checked with the payment service.
  */
-export const confirmPaymentAction = accountAction(
-  'billing.manage',
+export const confirmPaymentAction = billingAction(
   z.object({
     orderId: z.string().min(1).max(64),
     paymentId: z.string().min(1).max(64),
@@ -102,15 +113,13 @@ export const confirmPaymentAction = accountAction(
   },
 );
 
-export const listInvoicesAction = accountAction(
-  'billing.manage',
+export const listInvoicesAction = billingAction(
   z.object({}),
   async (ctx): Promise<InvoiceSummary[]> =>
     (await listInvoices(db(), ctx.accountId)).map(summarizeInvoice),
 );
 
-export const creditHistoryAction = accountAction(
-  'billing.manage',
+export const creditHistoryAction = billingAction(
   z.object({}),
   async (ctx): Promise<{ balance: CreditBalance; entries: CreditEntry[] }> => {
     const sql = db();

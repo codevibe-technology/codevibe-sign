@@ -1085,6 +1085,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       });
 
     it('lets the owner of the account manage billing and nobody else', async () => {
+      vi.stubEnv('PLAN_MODE', 'hosted');
       const ws = await workspace(null);
       const {
         saveBillingDetailsAction,
@@ -1201,7 +1202,44 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(body).not.toMatch(/cost|markup/i);
     });
 
+    it('is not there at all on a self-hosted install', async () => {
+      vi.stubEnv('PLAN_MODE', 'self-hosted');
+      const ws = await workspace(null);
+      const all = await actions();
+      state.user = ws.owner;
+      const answers = [
+        await all.saveBillingDetailsAction({
+          workspaceId: ws.id,
+          ...HARYANA,
+          gstin: HARYANA.gstin ?? '',
+          addressLine2: '',
+        }),
+        await all.createCreditsOrderAction({ workspaceId: ws.id, credits: 10 }),
+        await all.confirmPaymentAction({
+          workspaceId: ws.id,
+          orderId: 'order_ABCDEFGHIJKLMN',
+          paymentId: 'pay_ABCDEFGHIJKLMN',
+          signature: 'a'.repeat(64),
+        }),
+        await all.listInvoicesAction({ workspaceId: ws.id }),
+        await all.creditHistoryAction({ workspaceId: ws.id }),
+      ];
+      for (const answer of answers) expect(answer).toMatchObject({ ok: false, code: 'NOT_FOUND' });
+      expect(await getBillingDetails(sql, ws.accountId)).toBeNull();
+
+      const { POST } = await import('@/app/api/billing/razorpay/webhook/route');
+      const hook = await POST(
+        new Request('http://localhost/api/billing/razorpay/webhook', {
+          method: 'POST',
+          body: '{}',
+        }),
+      );
+      expect(hook.status).toBe(404);
+      vi.unstubAllEnvs();
+    });
+
     it('serves an invoice file to the owner of its account and 404s everyone else', async () => {
+      vi.stubEnv('PLAN_MODE', 'hosted');
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const outcome = await confirm(
@@ -1223,6 +1261,9 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect((await download(other.id, outcome.invoice.id)).status).toBe(404);
 
       state.user = ws.owner;
+      vi.stubEnv('PLAN_MODE', 'self-hosted');
+      expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
+      vi.stubEnv('PLAN_MODE', 'hosted');
       const response = await download(ws.id, outcome.invoice.id);
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toBe('application/pdf');
