@@ -615,11 +615,14 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       expect(byKey.envelopesPerMonth).toMatchObject({
         used: 3,
         max: 10,
-        resetsAt: '1 December 2026',
+        resetsAt: '1 December 2026 (UTC)',
       });
       expect(byKey.members).toMatchObject({ used: 1, max: 3, resetsAt: null });
       expect(byKey.storageBytes).toMatchObject({ usedText: '5 MB', maxText: '200 MB' });
-      expect(byKey.apiRequestsPerDay).toMatchObject({ used: 0, resetsAt: '21 November 2026' });
+      expect(byKey.apiRequestsPerDay).toMatchObject({
+        used: 0,
+        resetsAt: '21 November 2026 (UTC)',
+      });
     });
 
     it('shows no limits when self-hosted', async () => {

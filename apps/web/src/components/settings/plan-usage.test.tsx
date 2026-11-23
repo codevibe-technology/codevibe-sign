@@ -13,7 +13,7 @@ const meters: UsageMeter[] = [
     max: 10,
     usedText: '10',
     maxText: '10',
-    resetsAt: '1 December 2026',
+    resetsAt: '1 December 2026 (UTC)',
   },
   {
     key: 'members',
@@ -42,7 +42,7 @@ describe('PlanUsage', () => {
     const sends = screen.getByTestId('meter-envelopesPerMonth');
     expect(within(sends).getByRole('meter')).toHaveAttribute('aria-valuetext', '10 of 10');
     expect(within(sends).getByText('Limit reached')).toBeInTheDocument();
-    expect(within(sends).getByText('Starts again on 1 December 2026')).toBeInTheDocument();
+    expect(within(sends).getByText('Starts again on 1 December 2026 (UTC)')).toBeInTheDocument();
     expect(
       within(screen.getByTestId('meter-storageBytes')).getByText('Nearly full'),
     ).toBeInTheDocument();
