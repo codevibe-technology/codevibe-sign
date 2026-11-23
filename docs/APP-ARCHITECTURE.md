@@ -163,6 +163,16 @@ After signing in, everyone lands on `/dashboard`, which opens their workspace at
 path on the same site. The public home page stays public and shows a signed-in visitor a
 Dashboard button. The app used to live under `/w`; those paths redirect.
 
+Everyone has their own name on their account. An emailed link creates an account without one,
+so the first step after it asks: onboarding asks beside the workspace name, and the invitation
+page asks before joining, starting from the name the inviter typed if they gave one. It can be
+changed in personal settings, and a member who still has none sees a prompt in the dashboard
+that can be closed for the session. One rule (`src/lib/person-name.ts`, shared by the forms and
+the server) covers every one of these: 2 to 80 characters after trimming, letters of any
+script, no control characters. `displayName` in the same file is what the app calls someone:
+their name, or their email address only when no name is saved. A name is only ever changed
+for the signed-in person, by the id in their session.
+
 Better Auth talks to PostgreSQL through Kysely with the `kysely-postgres-js` dialect, so the
 whole app has one driver and one pool. Its tables are created by our own SQL migration
 (`auth_users`, `auth_sessions`, `auth_accounts`, `auth_verifications`, snake_case columns
@@ -218,7 +228,7 @@ released.
 | `app_workspace_slug_history`    | `slug` (primary key): an old address, the workspace it leads to and when it was given up.                |
 | `app_workspace_address_changes` | Who changed a workspace's address, from what to what, and when.                                          |
 | `app_members`                   | `(workspace_id, user_id)` primary key, `role`.                                                           |
-| `app_invitations`               | `workspace_id`, `email`, `role`, token SHA-256, expiry (7 days), accepted / revoked times.               |
+| `app_invitations`               | `workspace_id`, `email`, optional `name`, `role`, token SHA-256, expiry (7 days), accepted / revoked.    |
 | `app_brand_settings`            | One row per workspace; see Branding.                                                                     |
 | `app_api_keys`                  | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked.              |
 | `app_user_preferences`          | `user_id`: theme, timezone, language.                                                                    |
