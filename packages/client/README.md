@@ -1,13 +1,13 @@
 <p align="center">
-  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-client&utm_content=banner"><img src="https://raw.githubusercontent.com/codevibe-technology/codevibe-sign/main/.github/assets/packages/client.png" alt="@codevibe_technology/sign-client: Typed client for the HTTP API, signing sessions and webhook checks. No dependencies." width="100%"></a>
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-client&utm_content=banner"><img src="https://raw.githubusercontent.com/codevibe-technology/codevibe-sign/main/.github/assets/packages/client.png" alt="@codevibe_technology/sign-client: A typed client for the Codevibe Sign HTTP API, signing sessions and webhooks. Apache-2.0, Node 22 or later, one of the eight Codevibe Sign packages." width="100%"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@codevibe_technology/sign-client"><img src="https://img.shields.io/npm/v/@codevibe_technology/sign-client?style=flat-square&color=1B6AE0&labelColor=0A1525" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@codevibe_technology/sign-client"><img src="https://img.shields.io/npm/dm/@codevibe_technology/sign-client?style=flat-square&color=1B6AE0&labelColor=0A1525" alt="npm downloads"></a>
-  <img src="https://img.shields.io/badge/license-Apache--2.0-2DD4BF?style=flat-square&labelColor=0A1525" alt="License: Apache-2.0">
-  <img src="https://img.shields.io/badge/Node.js-22%2B-1B6AE0?style=flat-square&labelColor=0A1525" alt="Node.js 22+">
-  <a href="https://github.com/codevibe-technology/codevibe-sign"><img src="https://img.shields.io/badge/part%20of-Codevibe%20Sign-2DD4BF?style=flat-square&labelColor=0A1525" alt="Part of Codevibe Sign"></a>
+  <a href="https://www.npmjs.com/package/@codevibe_technology/sign-client"><img src="https://img.shields.io/npm/v/@codevibe_technology/sign-client?style=flat-square&color=1B6AE0&labelColor=0D1B2A" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@codevibe_technology/sign-client"><img src="https://img.shields.io/npm/dm/@codevibe_technology/sign-client?style=flat-square&color=1B6AE0&labelColor=0D1B2A" alt="npm downloads"></a>
+  <img src="https://img.shields.io/badge/license-Apache--2.0-2DD4BF?style=flat-square&labelColor=0D1B2A" alt="License: Apache-2.0">
+  <img src="https://img.shields.io/badge/Node.js-22%2B-1B6AE0?style=flat-square&labelColor=0D1B2A" alt="Node.js 22+">
+  <a href="https://github.com/codevibe-technology/codevibe-sign"><img src="https://img.shields.io/badge/part%20of-Codevibe%20Sign-2DD4BF?style=flat-square&labelColor=0D1B2A" alt="Part of Codevibe Sign"></a>
 </p>
 
 <p align="center">

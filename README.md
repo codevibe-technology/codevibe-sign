@@ -1,15 +1,15 @@
 <p align="center">
-  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=banner"><img src=".github/assets/banner.png" alt="Codevibe Sign: send it, sign it, seal it, and prove it to anyone. A sealed PDF with a PAdES seal and a hash-chained audit trail. Free cloud, or self-host with no limits." width="100%"></a>
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=banner"><img src=".github/assets/banner.png" alt="Codevibe Sign. Get documents signed. Keep the proof. PDF e-signatures, Aadhaar eSign, API and webhooks, and self-hosting, installed with npm i codevibe-sign. Beside it, the dashboard of a sample workspace and the signing page on a phone." width="100%"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/codevibe-technology/codevibe-sign/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/codevibe-technology/codevibe-sign/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0A1525" alt="CI"></a>
-  <a href="LICENSING.md"><img src="https://img.shields.io/badge/libraries-Apache--2.0-2DD4BF?style=flat-square&labelColor=0A1525" alt="Libraries: Apache-2.0"></a>
-  <a href="LICENSING.md"><img src="https://img.shields.io/badge/server%20%26%20app-AGPL--3.0-1B6AE0?style=flat-square&labelColor=0A1525" alt="Server and app: AGPL-3.0"></a>
-  <img src="https://img.shields.io/badge/Node.js-22%2B-1B6AE0?style=flat-square&labelColor=0A1525" alt="Node.js 22+">
-  <img src="https://img.shields.io/badge/TypeScript-strict-1B6AE0?style=flat-square&labelColor=0A1525" alt="TypeScript">
-  <img src="https://img.shields.io/badge/status-pre--release-F5B547?style=flat-square&labelColor=0A1525" alt="Status: pre-release">
-  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=badge"><img src="https://img.shields.io/badge/cloud-free%20plan-2DD4BF?style=flat-square&labelColor=0A1525" alt="Free cloud plan"></a>
+  <a href="https://github.com/codevibe-technology/codevibe-sign/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/codevibe-technology/codevibe-sign/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0D1B2A" alt="CI"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/libraries-Apache--2.0-2DD4BF?style=flat-square&labelColor=0D1B2A" alt="Libraries: Apache-2.0"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/server%20%26%20app-AGPL--3.0-1B6AE0?style=flat-square&labelColor=0D1B2A" alt="Server and app: AGPL-3.0"></a>
+  <img src="https://img.shields.io/badge/Node.js-22%2B-1B6AE0?style=flat-square&labelColor=0D1B2A" alt="Node.js 22+">
+  <img src="https://img.shields.io/badge/TypeScript-strict-1B6AE0?style=flat-square&labelColor=0D1B2A" alt="TypeScript">
+  <img src="https://img.shields.io/badge/status-pre--release-F5B547?style=flat-square&labelColor=0D1B2A" alt="Status: pre-release">
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=badge"><img src="https://img.shields.io/badge/cloud-free%20plan-2DD4BF?style=flat-square&labelColor=0D1B2A" alt="Free cloud plan"></a>
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/demo.gif" alt="Codevibe Sign in 30 seconds: a PDF is sent with initials on two pages and signature boxes for two people, signed on a phone with a one-time code, sealed with a one-page certificate and a QR code, and checked on the verify page" width="100%">
+  <img src=".github/assets/demo.gif" alt="Codevibe Sign in about 30 seconds: a PDF is uploaded, two recipients are added, initials go on every page and then on pages 1 and 3, signature and date boxes are placed for two people and the envelope is sent; the first person signs on a phone with a one-time code and Start, Next and Finish; the result is one sealed PDF with a one-page certificate and a QR code, and the verify page says the seal is valid" width="100%">
 </p>
 
 <p align="center">
@@ -25,6 +25,7 @@
   <a href="#features">Features</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#verify-a-signed-pdf">Verify a PDF</a> ·
+  <a href="#aadhaar-esign">Aadhaar eSign</a> ·
   <a href="#plans">Plans</a> ·
   <a href="#packages">Packages</a> ·
   <a href="#using-the-libraries">Libraries</a> ·
@@ -98,7 +99,7 @@ npm i codevibe-sign
 ## How it works
 
 <p align="center">
-  <img src=".github/assets/how-it-works.png" alt="How Codevibe Sign works: send with fields on one page, all pages or specific pages; sign in order with Start, Next and Finish; seal with a one-page certificate and a QR code; verify on the public record or the verify page" width="100%">
+  <img src=".github/assets/how-it-works.png" alt="How Codevibe Sign works, with a screen for each step: send with fields on one page, every page or a few; sign on a phone with a one-time code and Start, Next and Finish; seal into one PDF with a one-page certificate and a QR code; verify on the public record or the verify page" width="100%">
 </p>
 
 1. **Send.** The sender creates an envelope: documents, recipients, fields and routing. Each
@@ -115,7 +116,7 @@ npm i codevibe-sign
 ## Verify a signed PDF
 
 <p align="center">
-  <img src=".github/assets/verify.png" alt="The public verify page at sign.codevibe.in/verify showing a valid seal, the signers and an intact audit chain, beside the details of the seal certificate and its SHA-256 fingerprint" width="100%">
+  <img src=".github/assets/verify.png" alt="The verify page showing a sample sealed offer letter: the seal is valid, sealed by Codevibe Sign, Codevibe Technology, and signed by two people. Beside it, the seal certificate: CN=Codevibe Sign, O=Codevibe Technology, C=IN, RSA 3072, self-signed, PAdES with SHA-256, and its published SHA-256 fingerprint" width="100%">
 </p>
 
 Anyone who receives a PDF signed with Codevibe Sign can check it, with no account:
@@ -137,7 +138,27 @@ Anyone who receives a PDF signed with Codevibe Sign can check it, with no accoun
 
 What a PDF reader shows for the seal is explained in [How the seal works in PDF readers](https://sign.codevibe.in/docs/guides/seal-in-pdf-readers?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=verify-guide). If you self-host, your files are sealed with **your own** certificate, and you publish its fingerprint the same way.
 
+## Aadhaar eSign
+
+<p align="center">
+  <img src=".github/assets/aadhaar.png" alt="Aadhaar eSign through Leegality in three steps: pick Aadhaar eSign for a signer in the send flow, they confirm with an OTP on Leegality's page, and one sealed PDF comes back with the certificate page and an audit trail PDF. The send flow is shown with a signer set to Aadhaar eSign. One eSign costs Rs 35 on the Free plan and Rs 25 on Cloud, plus GST, paid only when it is completed. An illustration of the OTP step." width="100%">
+</p>
+
+When a law asks for an electronic signature listed in the IT Act's Second Schedule, pick
+Aadhaar eSign for a signer under Identity check in the send flow. They confirm with a one-time
+code on Leegality's page; Codevibe Sign never sees or stores their Aadhaar number. You get back
+one sealed PDF with their Aadhaar signature, the seal and the certificate page, plus an audit
+trail PDF. One Aadhaar signer per envelope for now.
+
+An eSign costs Rs 35 on Free and Rs 25 on Cloud, plus GST, from prepaid credits, and only a
+completed eSign is charged. On Cloud you can connect your own Leegality account instead, and
+self-hosted installs use their own.
+
 ## Plans
+
+<p align="center">
+  <img src=".github/assets/plans.png" alt="The three plans. Free: Rs 0, 1 workspace, 10 envelopes a month, 2 members, Aadhaar eSign Rs 35 per eSign. Cloud, recommended: Rs 999 a month or Rs 9,990 a year, unlimited workspaces and envelopes, 25 members then Rs 99 each a month, Aadhaar eSign Rs 25 per eSign. Self-hosted: free and unlimited on your own server, with installation help for Rs 1,999 plus GST within 4 working hours and Hostinger VPS 20% off with code CODEVIBE20. All prices are plus 18% GST." width="100%">
+</p>
 
 <!-- plans:start -->
 

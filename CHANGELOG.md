@@ -109,6 +109,8 @@ the minor version and says so in its first line.
   pull request.
 - The README, package and docs images are rendered from HTML in `.github/assets/src` with
   `pnpm assets:build`, from screenshots of the app with sample data.
+- The README shows the current app: a new banner and demo, the plans, Aadhaar eSign, and the
+  verify page with the published seal certificate. The package banners share one style.
 
 ---
 
