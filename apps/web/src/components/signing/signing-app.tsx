@@ -201,8 +201,13 @@ export function SigningApp({ smsAvailable, poll }: { smsAvailable: boolean; poll
   }
 
   return (
-    <SigningShell brand={brand}>
-      <div ref={main}>{content}</div>
+    <SigningShell brand={brand} fill={phase.kind === 'sign'}>
+      <div
+        ref={main}
+        className={phase.kind === 'sign' ? 'flex min-h-0 flex-1 flex-col' : undefined}
+      >
+        {content}
+      </div>
     </SigningShell>
   );
 }

@@ -10,9 +10,16 @@ import type { SigningBrand } from '@/lib/signing';
  */
 export function SigningShell({
   brand,
+  fill = false,
   children,
 }: {
   brand: SigningBrand | null;
+  /**
+   * Fits the frame to the window so the step inside can fill what is left: the document
+   * scrolls in its own area and the buttons under it never leave the screen. On a window too
+   * short for that the page scrolls as usual.
+   */
+  fill?: boolean;
   children: ReactNode;
 }) {
   const color = brand && isHexColor(brand.brandColor) ? brand.brandColor : null;
@@ -29,7 +36,11 @@ export function SigningShell({
   const showBadge = brand?.showBadge ?? true;
 
   return (
-    <div className="flex min-h-dvh flex-col" style={style} data-testid="signing-shell">
+    <div
+      className={fill ? 'flex h-dvh min-h-[520px] flex-col' : 'flex min-h-dvh flex-col'}
+      style={style}
+      data-testid="signing-shell"
+    >
       <header
         className="relative bg-nav text-white"
         style={color ? { background: color, color: textOn(color) } : undefined}
@@ -62,11 +73,20 @@ export function SigningShell({
           </span>
         </div>
       </header>
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10">
+      <main
+        id="main"
+        className={
+          fill
+            ? 'mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-3 py-3 sm:px-4 sm:py-5'
+            : 'mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-10'
+        }
+      >
         {children}
       </main>
       {showBadge ? (
-        <footer className="px-4 pb-6 text-center font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
+        <footer
+          className={`px-4 text-center font-mono text-[11px] tracking-[0.08em] text-muted uppercase ${fill ? 'pb-2 sm:pb-3' : 'pb-6'}`}
+        >
           <span className="inline-flex items-center gap-1.5" data-testid="secured-badge">
             <ShieldCheck aria-hidden className="h-3.5 w-3.5 text-accent" />
             Secured by Codevibe Sign

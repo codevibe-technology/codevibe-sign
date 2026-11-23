@@ -8,7 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { zoneLabel } from '@/lib/preferences';
 import { linkDocumentUrl, signingDay, type SignerView } from '@/lib/signing';
 
-/** The documents with the signer's own fields, a next-field button and a required counter. */
+/**
+ * The documents with the signer's own fields. A guide button takes the signer from Start
+ * through each field to Finish, with a count of what is left.
+ */
 export function SignStep({
   view,
   onSubmit,
@@ -36,34 +39,36 @@ export function SignStep({
   const fieldCount = view.fields.length;
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div>
-        <h1 className="text-[22px] leading-tight font-bold" tabIndex={-1} data-autofocus>
+        <h1 className="text-lg leading-tight font-bold sm:text-[22px]" tabIndex={-1} data-autofocus>
           {view.envelope.title}
         </h1>
         <p className="mt-1 text-sm text-muted">
           {approver
             ? 'Read the document, then approve it or decline.'
             : fieldCount === 1
-              ? 'Fill in the highlighted field, then finish.'
-              : `Fill in the ${fieldCount} highlighted fields. "Next field" takes you to each one.`}
+              ? 'Press Start to go to the highlighted field, then finish.'
+              : `Press Start and we take you to each of the ${fieldCount} highlighted fields in turn.`}{' '}
+          {hasDate ? (
+            <span data-testid="signing-zone">
+              The date of signing is recorded in {zoneLabel(view.timeZone)}.
+            </span>
+          ) : null}
         </p>
       </div>
-      {hasDate ? (
-        <p className="text-sm text-muted" data-testid="signing-zone">
-          The date of signing is recorded in {zoneLabel(view.timeZone)}.
-        </p>
-      ) : null}
       {view.envelope.changeNote ? (
         <p
-          className="rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"
+          className="max-h-24 overflow-y-auto rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"
           data-testid="change-note"
         >
           <span className="font-semibold">What changed:</span> {view.envelope.changeNote}
         </p>
       ) : null}
 
-      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+      {/* The card fills the rest of the window: the pages scroll inside it and the Start,
+          Next and Finish bar sits under them, always on screen. */}
+      <div className="cvs-app flex min-h-0 flex-1 flex-col overflow-clip rounded-xl border border-line bg-surface shadow-card">
         {pdf ? (
           <SigningView
             documents={documents}
@@ -74,6 +79,7 @@ export function SignStep({
             onDecline={onDecline}
             pdf={pdf}
             labels={labels}
+            className="min-h-0 flex-1"
           />
         ) : (
           <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading the document">

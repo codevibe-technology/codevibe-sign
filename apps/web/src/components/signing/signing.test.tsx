@@ -345,6 +345,32 @@ describe('consent and signing', () => {
     expect(calls.filter((c) => c.path.endsWith('/view'))).toHaveLength(1);
   });
 
+  it('fits the document step to the window so its buttons stay on screen', async () => {
+    server({
+      'GET /api/v1/sign/link': ok(view()),
+      [BRAND]: ok(brand),
+      'POST /api/v1/sign/link/view': ok({ envelopeStatus: 'sent', recipientStatus: 'viewed' }),
+    });
+    const user = userEvent.setup();
+    render(<SigningApp smsAvailable={false} />);
+    await screen.findByText('Welcome aboard');
+    // Other steps are ordinary pages that grow and scroll.
+    expect(screen.getByTestId('signing-shell')).toHaveClass('min-h-dvh');
+    expect(screen.getByTestId('signing-shell')).not.toHaveClass('h-dvh');
+
+    await user.click(screen.getByRole('checkbox', { name: /legally binding/ }));
+    await user.click(screen.getByRole('button', { name: 'Continue to the document' }));
+    const signing = await screen.findByTestId('signing-view');
+    const shell = screen.getByTestId('signing-shell');
+    expect(shell).toHaveClass('h-dvh');
+    expect(shell).not.toHaveClass('min-h-dvh');
+    // The card holding the pages takes what is left of the window and clips nothing sticky.
+    const card = signing.closest('.cvs-app')!;
+    expect(card).toHaveClass('flex-1', 'min-h-0', 'overflow-clip');
+    expect(card).not.toHaveClass('overflow-hidden');
+    expect(screen.getByText(/Press Start/)).toBeTruthy();
+  });
+
   async function openDocument(routes: Record<string, Reply | Reply[]>, roleView = view()) {
     const calls = server({
       'GET /api/v1/sign/link': ok(roleView),
