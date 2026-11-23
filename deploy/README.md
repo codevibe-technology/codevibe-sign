@@ -4,11 +4,13 @@ This folder runs the web app (the app, the HTTP API and the docs at `/docs`) and
 with Docker Compose, behind a Traefik that already runs on the server and owns ports 80 and 443. The same files serve the Codevibe cloud at `sign.codevibe.in` (`PLAN_MODE=hosted`) and
 a self-hosted install (`PLAN_MODE=self-hosted`).
 
-| File           | What it is                                                                  |
-| -------------- | --------------------------------------------------------------------------- |
-| `compose.yml`  | The `web` service (built from `apps/web/Dockerfile`) and `db` (PostgreSQL). |
-| `.env.example` | Every setting, with notes. Copy it to `.env`.                               |
-| `secrets/`     | `seal.p12`, the certificate that seals signed PDFs. Never committed.        |
+| File            | What it is                                                                  |
+| --------------- | --------------------------------------------------------------------------- |
+| `compose.yml`   | The `web` service (built from `apps/web/Dockerfile`) and `db` (PostgreSQL). |
+| `.env.example`  | Every setting, with notes. Copy it to `.env`.                               |
+| `secrets/`      | `seal.p12`, the certificate that seals signed PDFs. Never committed.        |
+| `set-secret.sh` | Sets one variable in `.env` without showing its value (step 12).            |
+| `restart.sh`    | Starts the app again with the current `.env`, without building (step 12).   |
 
 Data lives in two named volumes: `codevibe-sign_sign-db` (the database) and
 `codevibe-sign_sign-files` (uploaded and sealed PDFs, logos). Both must be backed up.
@@ -324,12 +326,159 @@ Then repeat the smoke test. Set `SIGN_IMAGE_TAG` in `.env` to the new tag so lat
 `docker compose` commands use it. Migrations only move forward: to roll back, check out the
 previous release, build it, and restore the backup taken before the upgrade.
 
+## 12. Payments, invoices and Aadhaar eSign
+
+Everything here is optional. Without these settings the app runs as before and shows
+"coming soon" where something would be sold. Start with test keys, try it, then switch to
+live keys.
+
+### Setting a value without showing it
+
+`set-secret.sh` writes one variable to `.env`. It asks for the value with the input hidden,
+so the value is not on screen, in the shell history or in the process list. The old file is
+kept as `.env.bak-<time>`. `restart.sh` starts the app again with the new `.env`; nothing is
+built, and it takes under a minute.
+
+```sh
+cd /opt/codevibe-sign/src/deploy     # the folder with compose.yml
+./set-secret.sh RAZORPAY_KEY_SECRET  # type or paste the value, press Enter
+./restart.sh
+```
+
+`./set-secret.sh --unset NAME` removes a variable. An upgrade (step 11) also picks up `.env`.
+
+### Settings
+
+| Variable                                                                 | Default                  | What it is                                                                                            |
+| ------------------------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`                                 | none                     | Razorpay API keys, set together. `rzp_test_` keys are test mode.                                      |
+| `RAZORPAY_WEBHOOK_SECRET`                                                | none                     | The secret of the Razorpay webhook (below).                                                           |
+| `BILLING_LIVE`                                                           | `false`                  | `true` once real money is taken. Test keys and the eSign sandbox are then refused.                    |
+| `INVOICE_SELLER_NAME`, `INVOICE_SELLER_GSTIN`, `INVOICE_SELLER_ADDRESS`  | none                     | Who issues the invoices, set together. The state comes from the GSTIN.                                |
+| `INVOICE_SELLER_CIN`, `INVOICE_SELLER_PAN`                               | none, from GSTIN         | Printed in the invoice header.                                                                        |
+| `INVOICE_SELLER_PHONE`, `INVOICE_SELLER_EMAIL`, `INVOICE_SELLER_WEBSITE` | none                     | Contact lines in the invoice header. Each is left out when unset.                                     |
+| `INVOICE_UPI_ID`                                                         | none                     | Printed as a "Pay using UPI" QR code.                                                                 |
+| `INVOICE_BANK_NAME`, `_HOLDER`, `_ACCOUNT`, `_IFSC`                      | none                     | Bank details on the invoice, set together. `INVOICE_BANK_BRANCH` is optional.                         |
+| `INVOICE_LOGO_PATH`, `INVOICE_SIGNATURE_PATH`                            | none                     | PNG or JPEG files inside the container, up to 1 MB (see "Logo and signature").                        |
+| `INVOICE_SERIES`                                                         | `CV-{FY}`                | Invoice numbers. `{FY}` is the financial year as six digits: `CV-2026270001`. At most 16 characters.  |
+| `CREDIT_NOTE_SERIES`, `PROFORMA_SERIES`                                  | `CVCN-{FY}`, `CVPI-{FY}` | Kept for credit notes and proforma invoices, so their numbers never collide.                          |
+| `INVOICE_SAC`                                                            | `998319`                 | The SAC code printed on invoices. Confirm it with your accountant.                                    |
+| `GST_PERCENT`                                                            | `18`                     | GST added on top of every price.                                                                      |
+| `LEEGALITY_API_KEY`, `LEEGALITY_PRIVATE_SALT`, `LEEGALITY_WORKFLOW_ID`   | none                     | The operator's Leegality account, set together: the Auth Token, the Private Salt and the Workflow ID. |
+| `LEEGALITY_BASE_URL`                                                     | the sandbox              | `https://sandbox.leegality.com/api` or `https://app1.leegality.com/api`.                              |
+| `ESIGN_PROVIDER_COST_INR`                                                | none                     | What one Aadhaar eSign costs you. Until it is set, nothing can be bought.                             |
+| `ESIGN_MARKUP_INR`                                                       | `10`                     | Added to the cost on the Free plan. Customers only see the resulting price per eSign.                 |
+| `CREDIT_PACKS`                                                           | `10,50,200`              | The credit packs offered.                                                                             |
+| `CLOUD_PRICE_INR`, `CLOUD_INCLUDED_MEMBERS`, `CLOUD_EXTRA_MEMBER_INR`    | `999`, `25`, `99`        | The Cloud plan per month, the members it includes and the price of each extra member.                 |
+| `CLOUD_ANNUAL_MONTHS`, `CLOUD_GRACE_DAYS`                                | `10`, `7`                | Months charged for a year, and days after a missed renewal before Free limits apply.                  |
+| `INSTALL_HELP_PRICE_INR`                                                 | `1999`                   | The installation help service.                                                                        |
+| `OPERATOR_EMAIL`                                                         | none                     | Where notifications for the operator go.                                                              |
+| `HOSTING_OFFERS`                                                         | empty                    | JSON list of `{ "name", "url", "note" }` shown under "Need a server?". Hidden while empty.            |
+| `SECRETS_KEY`                                                            | from `AUTH_SECRET`       | Encrypts provider credentials that workspaces save. 32 characters or more.                            |
+
+Amounts are in rupees before GST. A value that is set but malformed is reported by name in
+the logs and in the health check; the app keeps running.
+
+Changing `SECRETS_KEY`, or `AUTH_SECRET` while `SECRETS_KEY` is unset, makes the Leegality
+credentials that workspaces saved unreadable. They then have to be entered again.
+
+### Webhooks to register
+
+- **Razorpay**, Dashboard, Settings, Webhooks: URL `https://<SIGN_HOST>/api/billing/razorpay/webhook`,
+  events `payment.captured` and `order.paid`, and a secret of your choice, which also goes in
+  `RAZORPAY_WEBHOOK_SECRET`. Test mode and live mode each have their own webhook list.
+- **Leegality**, in the workflow named by `LEEGALITY_WORKFLOW_ID`: Webhook and Error Webhook
+  `https://<SIGN_HOST>/api/v1/esign/webhooks/leegality` (version 2.5), and Redirect URL
+  `https://<SIGN_HOST>/sign?esign=return`.
+
+### Test first, then live
+
+1. Add the test keys. Each command asks for one value:
+
+   ```sh
+   cd /opt/codevibe-sign/src/deploy
+   ./set-secret.sh RAZORPAY_KEY_ID          # rzp_test_...
+   ./set-secret.sh RAZORPAY_KEY_SECRET
+   ./set-secret.sh RAZORPAY_WEBHOOK_SECRET
+   ./set-secret.sh LEEGALITY_API_KEY        # from the Leegality sandbox
+   ./set-secret.sh LEEGALITY_PRIVATE_SALT
+   ./set-secret.sh LEEGALITY_WORKFLOW_ID
+   ./set-secret.sh ESIGN_PROVIDER_COST_INR  # for example 25
+   ```
+
+   The seller and bank details are not secret; put them in `.env` with an editor, or with the
+   same command.
+
+2. Restart: `./restart.sh`
+
+3. Check the mode:
+
+   ```sh
+   curl -s https://<SIGN_HOST>/api/health
+   # {"ok":true,"billing":{"razorpay":"test","leegality":"sandbox","live":false,"problems":[]}}
+   ```
+
+   The app shows "Test mode" wherever something can be paid for. Payments made with test keys
+   get documents numbered `T-2026-0001` that say they are not tax documents, so the tax
+   invoice series has no gaps and holds no test invoices.
+
+4. Go live: replace the values and declare the install live.
+
+   ```sh
+   ./set-secret.sh RAZORPAY_KEY_ID          # rzp_live_...
+   ./set-secret.sh RAZORPAY_KEY_SECRET
+   ./set-secret.sh RAZORPAY_WEBHOOK_SECRET  # the secret of the live webhook
+   ./set-secret.sh LEEGALITY_API_KEY        # from the production account
+   ./set-secret.sh LEEGALITY_PRIVATE_SALT
+   ./set-secret.sh LEEGALITY_WORKFLOW_ID
+   ./set-secret.sh LEEGALITY_BASE_URL       # https://app1.leegality.com/api
+   ./set-secret.sh BILLING_LIVE             # true
+   ./restart.sh
+   curl -s https://<SIGN_HOST>/api/health
+   # {"ok":true,"billing":{"razorpay":"live","leegality":"production","live":true,"problems":[]}}
+   ```
+
+   With `BILLING_LIVE=true` a test key or the sandbox URL left behind is refused: that part
+   stays switched off and `problems` says which variable to fix. Without `BILLING_LIVE`, test
+   payment keys together with the production Leegality URL are refused for buying eSign
+   credits, so a test payment can never buy a real eSign.
+
+### Invoices
+
+Every payment produces a GST invoice as a PDF, emailed to the buyer's billing address and
+kept on the Billing page. Buyers in the seller's state are charged CGST and SGST, everyone
+else IGST. Numbers run without gaps per financial year (1 April to 31 March, Indian time).
+When the install has a seal certificate (step 4) the invoice file is signed with it and says
+"This is a digitally signed document"; otherwise it says it is computer generated.
+
+#### Logo and signature
+
+The images live in the files volume, so they survive upgrades:
+
+```sh
+docker compose exec web mkdir -p /data/branding
+docker compose cp ./logo.png web:/data/branding/logo.png
+docker compose cp ./signature.png web:/data/branding/signature.png
+./set-secret.sh INVOICE_LOGO_PATH        # /data/branding/logo.png
+./set-secret.sh INVOICE_SIGNATURE_PATH   # /data/branding/signature.png
+./restart.sh
+```
+
+### Self-hosted installs
+
+- The seller on every invoice is whoever the `INVOICE_SELLER_*` variables name. Nothing is
+  built in, so an install never issues invoices in another company's name.
+- Without Razorpay keys nothing is sold. Aadhaar eSign then works only for workspaces that
+  enter their own Leegality account under Settings, Aadhaar eSign, billed by Leegality.
+- With `PLAN_MODE=self-hosted` there are no plan limits and no billing screens.
+
 ## Troubleshooting
 
-| What you see                                | What to check                                                                                 |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `Invalid configuration: ...` in the logs    | The variable named in the message; fix it in `.env` and `docker compose up -d`.               |
-| `SEAL_P12_PATH is not set` or a seal error  | `secrets/seal.p12` exists, belongs to 1001, and `SEAL_PASSPHRASE` matches it.                 |
-| Browser shows Traefik's default certificate | DNS (step 2), `TRAEFIK_CERTRESOLVER`, and the Traefik logs for the ACME error.                |
-| `404 page not found` from Traefik           | `TRAEFIK_NETWORK` is the network Traefik watches, and `web` is healthy (`docker compose ps`). |
-| No sign-in emails                           | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP or Microsoft Graph error.            |
+| What you see                                     | What to check                                                                                 |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `Invalid configuration: ...` in the logs         | The variable named in the message; fix it in `.env` and `docker compose up -d`.               |
+| `SEAL_P12_PATH is not set` or a seal error       | `secrets/seal.p12` exists, belongs to 1001, and `SEAL_PASSPHRASE` matches it.                 |
+| Browser shows Traefik's default certificate      | DNS (step 2), `TRAEFIK_CERTRESOLVER`, and the Traefik logs for the ACME error.                |
+| `404 page not found` from Traefik                | `TRAEFIK_NETWORK` is the network Traefik watches, and `web` is healthy (`docker compose ps`). |
+| `billing.problems` in `/api/health` is not empty | The variable each message names (step 12); fix it and run `./restart.sh`.                     |
+| No sign-in emails                                | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP or Microsoft Graph error.            |
