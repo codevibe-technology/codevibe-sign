@@ -6,6 +6,7 @@ import type {
   Id,
   OtpState,
 } from '@codevibe_technology/sign-core';
+import type { EsignSessionStore } from '../esign/types';
 import type { Template } from '../template';
 
 export interface StoredEnvelope {
@@ -152,6 +153,8 @@ export interface ServerStore extends EnvelopeStore {
   findSealed?(sha256: string): Promise<SealedDocumentRef | null>;
   /** Templates. Optional for custom stores; the `/v1/templates` routes need it. */
   templateStore?: TemplateStore;
+  /** Aadhaar eSign sessions. Optional for custom stores; without it eSign is unavailable. */
+  esign?: EsignSessionStore;
   /** Hides an active envelope from `due` until `until`, or until it is saved again. */
   deferCheck(id: Id, until: Date): Promise<void>;
 

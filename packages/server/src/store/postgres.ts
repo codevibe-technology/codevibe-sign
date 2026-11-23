@@ -9,6 +9,7 @@ import postgres from 'postgres';
 import { VersionConflictError } from '../errors';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import { decodeCursor, encodeCursor } from './cursor';
+import { postgresEsignSessions } from './esign-postgres';
 import { migrations } from './migrations';
 import type { Template } from '../template';
 import type {
@@ -222,6 +223,7 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
       return row?.document_id ? { envelopeId: row.envelope_id, documentId: row.document_id } : null;
     },
     templateStore: postgresTemplates(sql),
+    esign: postgresEsignSessions(sql),
     async due(now, limit) {
       const rows = await sql<{ data: Envelope }[]>`
         select data from sign_envelopes

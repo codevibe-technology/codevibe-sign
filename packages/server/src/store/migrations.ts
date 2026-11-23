@@ -105,4 +105,35 @@ create index sign_audit_events_sealed_sha256_idx
   where data->>'action' = 'document.sealed';
 `,
   },
+  {
+    name: '0005_esign_sessions',
+    sql: `
+create table sign_esign_sessions (
+  id text primary key,
+  workspace_id text not null,
+  envelope_id text not null references sign_envelopes (id) on delete cascade,
+  recipient_id text not null,
+  document_id text not null,
+  provider text not null,
+  provider_ref text,
+  sign_url text,
+  status text not null,
+  data jsonb not null,
+  unsettled text,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  expires_at timestamptz not null
+);
+create unique index sign_esign_sessions_ref_idx
+  on sign_esign_sessions (provider, provider_ref) where provider_ref is not null;
+create unique index sign_esign_sessions_open_idx
+  on sign_esign_sessions (envelope_id, recipient_id) where status in ('starting', 'pending');
+create index sign_esign_sessions_recipient_idx
+  on sign_esign_sessions (envelope_id, recipient_id, created_at desc);
+create index sign_esign_sessions_due_idx
+  on sign_esign_sessions (expires_at) where status in ('starting', 'pending');
+create index sign_esign_sessions_unsettled_idx
+  on sign_esign_sessions (updated_at) where unsettled is not null;
+`,
+  },
 ];

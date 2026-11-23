@@ -10,6 +10,7 @@ import {
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { VersionConflictError } from '../errors';
+import type { EsignSession } from '../esign/types';
 import { memoryStore } from './memory';
 import { migrate, postgresStore } from './postgres';
 import type { Template } from '../template';
@@ -384,6 +385,95 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       expect(await templates.get(ws, changed.id)).toBeNull();
       expect(await templates.get(`${ws}_other`, other.id)).toEqual(other);
     });
+
+    it('keeps esign sessions: one open per recipient, one per provider reference', async () => {
+      const sessions = store.esign!;
+      const envelope = draft();
+      await store.commit(envelope, [event(envelope, 1)], 0, []);
+      const recipientId = envelope.recipients[0]!.id;
+      const session = (id: string, age = 0): EsignSession => ({
+        id,
+        workspaceId: 'ws',
+        envelopeId: envelope.id,
+        recipientId,
+        documentId: envelope.documents[0]!.id,
+        provider: 'leegality',
+        providerRef: null,
+        signUrl: null,
+        status: 'starting',
+        values: [{ fieldId: envelope.fields[0]!.id, value: 'x' }],
+        context: { ip: '203.0.113.9' },
+        createdAt: new Date(T0.getTime() + age),
+        updatedAt: new Date(T0.getTime() + age),
+        expiresAt: new Date(T0.getTime() + age + 60_000),
+      });
+      const first = `${envelope.id}-s1`;
+      const second = `${envelope.id}-s2`;
+      const ref = `ref-${envelope.id}`;
+
+      expect(await sessions.insert(session(first))).toBe(true);
+      expect(await sessions.insert(session(first))).toBe(false);
+      expect(await sessions.insert(session(second, 1000))).toBe(false);
+      expect(await sessions.get(first)).toEqual(session(first));
+
+      const later = new Date(T0.getTime() + 5000);
+      const activation = {
+        providerRef: ref,
+        signUrl: 'https://esign.example.com/sign/1',
+        expiresAt: new Date(T0.getTime() + 3_600_000),
+        at: later,
+      };
+      expect(await sessions.activate(first, activation)).toBe(true);
+      expect(await sessions.activate(first, activation)).toBe(false);
+      expect(await sessions.findByRef('leegality', ref)).toMatchObject({
+        id: first,
+        status: 'pending',
+        signUrl: activation.signUrl,
+        expiresAt: activation.expiresAt,
+      });
+      expect(await sessions.findByRef('other', ref)).toBeNull();
+      expect((await sessions.open(envelope.id)).map((s) => s.id)).toEqual([first]);
+      expect(await sessions.due(later, 10)).not.toContainEqual(
+        expect.objectContaining({ id: first }),
+      );
+      expect(await sessions.due(new Date(T0.getTime() + 3_600_000), 10)).toContainEqual(
+        expect.objectContaining({ id: first }),
+      );
+
+      const results = await Promise.all(
+        [1, 2, 3].map(() =>
+          sessions.transition(first, ['pending'], 'expired', later, { unsettled: 'expired' }),
+        ),
+      );
+      expect(results.filter(Boolean)).toHaveLength(1);
+      expect(await sessions.open(envelope.id)).toEqual([]);
+      expect(await sessions.due(later, 10)).toContainEqual(
+        expect.objectContaining({ id: first, unsettled: 'expired' }),
+      );
+      await sessions.settle(first);
+      expect((await sessions.get(first))?.unsettled).toBeUndefined();
+
+      expect(
+        await sessions.transition(first, ['pending', 'expired', 'failed'], 'signed', later, {
+          signerName: 'Ravi Kumar',
+          signature: { intact: true, issuerCommonName: 'Test CA' },
+          unsettled: 'signed',
+        }),
+      ).toBe(true);
+      expect(await sessions.get(first)).toMatchObject({
+        status: 'signed',
+        signerName: 'Ravi Kumar',
+        signature: { intact: true, issuerCommonName: 'Test CA' },
+        unsettled: 'signed',
+        values: [{ fieldId: envelope.fields[0]!.id, value: 'x' }],
+      });
+      expect(await sessions.transition(first, ['pending'], 'failed', later)).toBe(false);
+
+      expect(await sessions.insert(session(second, 1000))).toBe(true);
+      expect((await sessions.latest(envelope.id, recipientId))?.id).toBe(second);
+      expect(await sessions.activate(second, activation)).toBe(false);
+      expect(await sessions.latest(envelope.id, 'nobody')).toBeNull();
+    });
   });
 }
 
@@ -405,6 +495,7 @@ describe.skipIf(!url)('postgresStore', () => {
       '0002_otp_issuance',
       '0003_workspaces',
       '0004_templates_and_sealed_lookup',
+      '0005_esign_sessions',
     ]);
     expect(await migrate(sql)).toEqual([]);
   });

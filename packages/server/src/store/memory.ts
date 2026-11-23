@@ -19,6 +19,7 @@ import type {
   TemplateStore,
 } from './types';
 import type { Template } from '../template';
+import { memoryEsignSessions } from './esign-memory';
 
 interface EnvelopeRow extends StoredEnvelope {
   workspaceId: string;
@@ -185,6 +186,7 @@ export function memoryStore(): ServerStore {
       return null;
     },
     templateStore: memoryTemplates(),
+    esign: memoryEsignSessions(),
     async due(now, limit) {
       const out: Envelope[] = [];
       for (const row of envelopes.values()) {
