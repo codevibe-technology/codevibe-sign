@@ -142,6 +142,9 @@ importers:
       next:
         specifier: 16.4.5
         version: 16.4.5(@types/node@22.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      pdf-lib:
+        specifier: 1.17.1
+        version: 1.17.1
       pdfjs-dist:
         specifier: 4.10.38
         version: 4.10.38
@@ -203,9 +206,6 @@ importers:
       node-forge:
         specifier: 1.4.3
         version: 1.4.3
-      pdf-lib:
-        specifier: 1.17.1
-        version: 1.17.1
       playwright-core:
         specifier: 1.56.1
         version: 1.56.1
@@ -4574,7 +4574,6 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
-    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
