@@ -221,11 +221,19 @@ that PDF content streams use. Placed rects are rounded to 1/100 point.
 
 ### Components
 
-| Component      | Key props                                                                                                                                            |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SignaturePad` | `value`, `onChange(png \| null)`, `modes`, `defaultMode`, `aspectRatio`, `fonts`, `colors`, `defaultText`, `upload`, `labels`                        |
-| `SigningView`  | `documents`, `fields`, `recipient`, `onSubmit(values)`, `onDecline(reason)`, `initialValues`, `today`, `signaturePad`, `pdf`, `labels`               |
-| `FieldPlacer`  | `documents`, `recipients`, `fields` or `defaultFields`, `onChange(fields)`, `fieldTypes`, `fieldSizes`, `snapThreshold`, `createId`, `pdf`, `labels` |
+| Component      | Key props                                                                                                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SignaturePad` | `value`, `onChange(png \| null)`, `modes`, `defaultMode`, `aspectRatio`, `fonts`, `colors`, `defaultText`, `upload`, `labels`                                                            |
+| `SigningView`  | `documents`, `fields`, `recipient`, `onSubmit(values)`, `onDecline(reason)`, `initialValues`, `today`, `signaturePad`, `pdf`, `labels`, `confirmBeforeFinish`                            |
+| `FieldPlacer`  | `documents`, `recipients`, `fields` or `defaultFields`, `onChange(fields)`, `fieldTypes`, `fieldSizes`, `snapThreshold`, `createId`, `pdf`, `labels`, `previewing`, `onPreviewingChange` |
+
+The field placer has a field tray grouped as signature, signer details (name, and email,
+company and title as labelled text fields) and inputs; a page rail; undo and redo; copy,
+paste and duplicate; Shift-click to select several fields and move, align or reassign them;
+resize handles on every corner; alignment guides while dragging; a summary of each signer's
+fields that flags a signer with no signature field; and a preview of the pages as a signer
+will see them. `SigningView` can ask the signer to confirm before it calls `onSubmit`, and
+offers ready-made reasons when they decline.
 
 Every visible string comes from a `labels` prop with English defaults
 (`defaultSignaturePadLabels`, `defaultSigningViewLabels`, `defaultFieldPlacerLabels`).
@@ -235,7 +243,8 @@ Every visible string comes from a `labels` prop with English defaults
 - `useSignaturePad(options)`: mode, strokes, undo and clear, typed text and font,
   upload, and `canvasProps` to spread on your own `<canvas>`.
 - `useFieldPlacement(options)`: fields, selection, `addField`, `moveField`,
-  `resizeField`, `nudgeField`, `updateField`, `removeField`, and for many pages
+  `resizeField`, `setFieldRect`, `nudgeField`, `updateField`, `removeField`, `setFields`,
+  and for many pages
   `setFieldPages`, `pagesOf`, `repeatField`, `groupOf`, `applyToGroup`, `removeGroup`,
   `addInitialsEveryPage`, `addSignatureLastPage`, `addFields`. All rects in points. A field
   added without a drop point is moved clear of the fields already on its page.
