@@ -215,14 +215,16 @@ Every visible string comes from a `labels` prop with English defaults
   upload, and `canvasProps` to spread on your own `<canvas>`.
 - `useFieldPlacement(options)`: fields, selection, `addField`, `moveField`,
   `resizeField`, `nudgeField`, `updateField`, `removeField`, and for many pages
-  `repeatField`, `groupOf`, `applyToGroup`, `removeGroup`, `addInitialsEveryPage`,
-  `addSignatureLastPage`, `addFields`. All rects in points.
+  `setFieldPages`, `pagesOf`, `repeatField`, `groupOf`, `applyToGroup`, `removeGroup`,
+  `addInitialsEveryPage`, `addSignatureLastPage`, `addFields`. All rects in points. A field
+  added without a drop point is moved clear of the fields already on its page.
 
 ### Many pages and text tags
 
-The placer's field panel repeats a field on all pages, every page but the first, the last
-page or typed pages ("1, 3, 5-7"), at the same spot relative to each page, so it lands in
-the same place on A4 and Letter and on turned pages. Copies stay plain fields: a group is
+A placed field starts on its own page only. "Show on pages" in the field panel puts it on
+all pages or on typed pages ("1, 3, 5-7"), and takes it off the pages left out, at the same
+spot relative to each page, so it lands in the same place on A4 and Letter and on turned
+pages. The choice applies when it is picked; there is no second button. Copies stay plain fields: a group is
 any set of fields of one recipient and type at the same relative spot, so it is found again
 after a reload. Quick add places initials in the corner of every page or a signature on the
 last page.
@@ -237,7 +239,17 @@ only: the drawn signature would hide the words under it, but the sender may stil
 Signature lines (`____`), dots and tags under a field do not count.
 
 The signing view asks for a signature or initials once; each further box then takes one
-tap, and "Fill all my initials" fills every initials box after the first is adopted.
+tap, and "Fill all my initials" fills every initials box after the first is adopted. A
+signature saved on an earlier visit counts as adopted, and redoing it replaces it in every
+box that used it.
+
+### Layout of the signing view
+
+Give `SigningView` a height (a fixed one, or a place in a flex or grid layout) and the pages
+scroll inside it, up and down and, zoomed in, sideways, with the action bar pinned under
+them. Without a height the view grows with the pages, the host page scrolls them and the
+action bar sticks to the bottom of the window; for that, no ancestor may set `overflow` to
+`hidden`, `auto` or `scroll` (`overflow: clip` is fine).
 
 - `usePdfSources(documents, pdfOptions)`: resolves documents to page sources.
 
@@ -246,7 +258,8 @@ tap, and "Fill all my initials" fills every initials box after the first is adop
 `validateFieldValues`, `toFieldValues`, `prefillValues`, `sortFields`, `fieldStatus`,
 `isoDate`; `pointsToPixels`, `pixelsToPoints`, `clientToPoints`, `scaleForWidth`,
 `clampRect`, `snapToPageEdges`, `flipVertical`; `createField`, `nudgeRect`,
-`defaultFieldSizes`; `parsePageRange`, `pagesForChoice`, `scaleRectBetween`,
+`defaultFieldSizes`, `freeRect`; `parsePageRange`, `formatPageList`, `pagesForChoice`,
+`choiceForPages`, `scaleRectBetween`,
 `fieldGroups`, `repeatField`, `initialsOnEveryPage`, `signatureOnLastPage`, `findTags`,
 `fieldsFromTags`, `coveredText`, `fieldsOverText`; `encodeSignature`, `imageFileToSignature`; `loadPdf`.
 
@@ -262,8 +275,12 @@ Field values are checked with core's `checkFieldValue`, the same rules the serve
 - Field placer: Enter on a palette item adds the field to the page in view. On a placed
   field, arrow keys move it 1 point (Shift: 10), Alt with arrows resizes it, Delete
   removes it, Escape deselects.
-- Signing view: Next field moves focus to the next required field in reading order.
-  Dialogs trap focus and close on Escape.
+- Field placer: picking "This page only", "All pages" or "Specific pages…" under "Show on
+  pages" applies at once; typed page numbers apply on Enter.
+- Signing view: one guide button reads Start, then Next, and Sign or Initial while the
+  guide is on a signature box; it moves focus to the next required field in reading order.
+  Enter in a text field moves on too, and Finish takes over when nothing is left. Dialogs
+  trap focus and close on Escape.
 
 ## Theming
 

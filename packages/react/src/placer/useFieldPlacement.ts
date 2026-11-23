@@ -49,6 +49,7 @@ export interface FieldPlacementState {
     documentId: string,
     page: number,
     center?: { x: number; y: number },
+    options?: { avoidOverlap?: boolean },
   ) => Field | null;
   /** Moves a field to the rect's position, with snapping and clamping. */
   moveField: (id: string, rect: Rect) => void;
@@ -68,6 +69,13 @@ export interface FieldPlacementState {
   groupOf: (id: string) => string[];
   /** Copies a field onto `pages` (zero-based) of its document, at the same spot. */
   repeatField: (id: string, pages: number[]) => number;
+  /**
+   * Makes the field show on exactly `pages` (zero-based) of its document: copies it to the
+   * pages that lack it and deletes its copies elsewhere. Its own page always keeps it.
+   */
+  setFieldPages: (id: string, pages: number[]) => { added: number; removed: number };
+  /** The pages (zero-based, in order) the field and its linked copies are on. */
+  pagesOf: (id: string) => number[];
   /** Gives every copy in the field's group its position, size, required flag and label. */
   applyToGroup: (id: string) => void;
   /** Deletes the field and every copy in its group. */
@@ -162,9 +170,22 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
   );
 
   const addField = useCallback(
-    (type: FieldType, documentId: string, page: number, center?: { x: number; y: number }) => {
+    (
+      type: FieldType,
+      documentId: string,
+      page: number,
+      center?: { x: number; y: number },
+      options: { avoidOverlap?: boolean } = {},
+    ) => {
       const size = pageSize(documentId, page);
       if (!size || !recipientId) return null;
+      // A field added without a drop point must not land on top of one already there.
+      const avoid =
+        (options.avoidOverlap ?? center === undefined)
+          ? fieldsRef.current
+              .filter((f) => f.documentId === documentId && f.page === page)
+              .map((f) => f.rect)
+          : undefined;
       const field = createField({
         id: createId(),
         documentId,
@@ -174,6 +195,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
         center: center ?? { x: size.width / 2, y: size.height / 2 },
         size: fieldSizes?.[type] ?? defaultFieldSizes[type],
         pageSize: size,
+        ...(avoid ? { avoid } : {}),
       });
       commit([...fieldsRef.current, field]);
       setSelectedId(field.id);
@@ -265,6 +287,46 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     [groupOf, pageSize, createId, addFields],
   );
 
+  const pagesOf = useCallback(
+    (id: string) => {
+      const members = new Set([id, ...groupOf(id)]);
+      return fields
+        .filter((f) => members.has(f.id))
+        .map((f) => f.page)
+        .sort((a, b) => a - b);
+    },
+    [groupOf, fields],
+  );
+
+  const setFieldPages = useCallback(
+    (id: string, pages: number[]) => {
+      const current = fieldsRef.current;
+      const field = current.find((f) => f.id === id);
+      if (!field) return { added: 0, removed: 0 };
+      const wanted = new Set([...pages, field.page]);
+      const members = new Set(groupOf(id));
+      const dropped = new Set(
+        current
+          .filter((f) => f.id !== id && members.has(f.id) && !wanted.has(f.page))
+          .map((f) => f.id),
+      );
+      const kept = current.filter((f) => !dropped.has(f.id));
+      const taken = new Set(
+        kept.filter((f) => f.id === id || members.has(f.id)).map((f) => f.page),
+      );
+      const copies = repeatCopies(
+        field,
+        [...wanted].sort((a, b) => a - b),
+        (page) => pageSize(field.documentId, page),
+        createId,
+        taken,
+      );
+      if (dropped.size > 0 || copies.length > 0) commit([...kept, ...copies]);
+      return { added: copies.length, removed: dropped.size };
+    },
+    [groupOf, pageSize, createId, commit],
+  );
+
   const applyToGroup = useCallback(
     (id: string) => {
       const members = new Set(groupOf(id));
@@ -346,6 +408,8 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     addFields,
     groupOf,
     repeatField,
+    setFieldPages,
+    pagesOf,
     applyToGroup,
     removeGroup,
     addInitialsEveryPage,

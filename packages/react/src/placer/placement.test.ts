@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createField, defaultFieldSizes, nudgeRect, placeRect, sizeRect } from './placement';
+import {
+  createField,
+  defaultFieldSizes,
+  freeRect,
+  nudgeRect,
+  placeRect,
+  sizeRect,
+} from './placement';
 
 const letter = { width: 612, height: 792 };
 
@@ -84,5 +91,27 @@ describe('placeRect and sizeRect', () => {
         height: 20.44,
       },
     );
+  });
+});
+
+describe('freeRect', () => {
+  const page = { width: 612, height: 792 };
+  const rect = { x: 216, y: 369, width: 180, height: 54 };
+
+  it('keeps a spot that is free', () => {
+    expect(freeRect(rect, [], page)).toEqual(rect);
+    expect(freeRect(rect, [{ x: 0, y: 0, width: 50, height: 50 }], page)).toEqual(rect);
+  });
+
+  it('steps below what is in the way, then further down', () => {
+    expect(freeRect(rect, [rect], page)).toEqual({ ...rect, y: 435 });
+    expect(freeRect(rect, [rect, { ...rect, y: 435 }], page)).toEqual({ ...rect, y: 501 });
+  });
+
+  it('goes above when there is no room below, and gives up on a full column', () => {
+    const low = { ...rect, y: 730 };
+    expect(freeRect(low, [low], page)).toEqual({ ...low, y: 664 });
+    const tall = { x: 216, y: 0, width: 180, height: 792 };
+    expect(freeRect(rect, [tall], page)).toEqual(rect);
   });
 });

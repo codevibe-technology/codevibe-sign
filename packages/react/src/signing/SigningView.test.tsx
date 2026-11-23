@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { checkFieldValue, type FieldValue } from '@codevibe_technology/sign-core';
-import { field, letterSource, recipient } from '../test/fixtures';
+import { fakePng, field, letterSource, recipient } from '../test/fixtures';
 import { SigningView } from './SigningView';
 
 const asha = recipient('r1', 'Asha Rao', 1);
@@ -72,15 +72,72 @@ describe('SigningView', () => {
     );
   });
 
-  it('guides to the next required field in reading order', () => {
+  it('guides from Start through each required field in reading order', () => {
     setup();
-    const next = screen.getByRole('button', { name: 'Next field' });
-    fireEvent.click(next);
-    expect(screen.getByRole('checkbox', { name: 'Checkbox, required' })).toHaveFocus();
-    fireEvent.click(next);
+    const bar = screen.getByRole('group', { name: 'Signing progress and actions' });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Start' }));
+    const agree = screen.getByRole('checkbox', { name: 'Checkbox, required' });
+    expect(agree).toHaveFocus();
+    expect(agree.closest('.cvs-field')).toHaveAttribute('data-current', 'true');
+    expect(document.querySelector('.cvs-guide-flag')).toHaveTextContent('Tick here');
+
+    fireEvent.click(within(bar).getByRole('button', { name: 'Next' }));
     expect(screen.getByRole('textbox', { name: 'Text, required' })).toHaveFocus();
-    fireEvent.click(next);
+    expect(document.querySelector('.cvs-guide-flag')).toHaveTextContent('Fill in');
+
+    fireEvent.click(within(bar).getByRole('button', { name: 'Next' }));
     expect(screen.getByRole('button', { name: 'Signature, required' })).toHaveFocus();
+    expect(document.querySelector('.cvs-guide-flag')).toHaveTextContent('Sign here');
+  });
+
+  it('turns the guide button into Sign on a signature box, then moves on by itself', async () => {
+    setup({
+      fields: [
+        field('sig', 'signature', 'r1', { y: 100 }),
+        field('city', 'text', 'r1', { y: 300 }),
+      ],
+    });
+    const bar = screen.getByRole('group', { name: 'Signing progress and actions' });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Start' }));
+    fireEvent.click(within(bar).getByRole('button', { name: 'Sign' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add your signature' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Type' }));
+    const apply = within(dialog).getByRole('button', { name: 'Apply' });
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply);
+
+    const city = screen.getByRole('textbox', { name: 'Text, required' });
+    await waitFor(() => expect(city).toHaveFocus());
+    expect(within(bar).getByRole('button', { name: 'Next' })).toBeInTheDocument();
+
+    // Enter in the last field hands over to Finish, now the main button.
+    fireEvent.change(city, { target: { value: 'Pune' } });
+    fireEvent.keyDown(city, { key: 'Enter' });
+    const finish = within(bar).getByRole('button', { name: 'Finish' });
+    await waitFor(() => expect(finish).toHaveFocus());
+    expect(finish).toHaveClass('cvs-button--primary');
+    expect(within(bar).queryByRole('button', { name: /^(Start|Next|Sign)$/ })).toBeNull();
+    expect(document.querySelector('.cvs-guide-flag')).toBeNull();
+  });
+
+  it('keeps Finish secondary while fields are left, and offers optional ones after', async () => {
+    setup({
+      fields: [
+        field('agree', 'checkbox', 'r1', { y: 100, width: 18, height: 18 }),
+        field('note', 'text', 'r1', { y: 300 }, { required: false }),
+      ],
+    });
+    expect(screen.getByRole('button', { name: 'Finish' })).not.toHaveClass('cvs-button--primary');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Checkbox, required' }));
+    expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('cvs-button--primary');
+    fireEvent.click(screen.getByRole('button', { name: 'Next field' }));
+    expect(screen.getByRole('textbox', { name: 'Text, optional' })).toHaveFocus();
+  });
+
+  it('names the scrolling pages and announces progress', () => {
+    setup();
+    expect(screen.getByRole('region', { name: 'Document pages' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByText('1 of 4 required fields done')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('submits the values in reading order with the core shapes', async () => {
@@ -235,5 +292,50 @@ describe('SigningView with many signature boxes', () => {
   it('offers no bulk fill with a single initials box', () => {
     setup({ fields: [field('i1', 'initials', 'r1')] });
     expect(screen.queryByRole('button', { name: /Fill all my initials/ })).toBeNull();
+  });
+
+  it('replaces the adopted signature everywhere when it is redone', async () => {
+    // Both boxes carry the signature adopted on an earlier visit.
+    const saved = `data:image/png;base64,${fakePng()}`;
+    setup({
+      fields: many,
+      initialValues: [
+        { fieldId: 's1', value: fakePng() },
+        { fieldId: 's2', value: fakePng() },
+      ],
+    });
+    const [first, second] = screen.getAllByRole('button', { name: 'Signature, required' });
+    const image = (box: HTMLElement) => box.querySelector('img')!.getAttribute('src');
+    expect(image(first!)).toBe(saved);
+    expect(image(second!)).toBe(saved);
+
+    fireEvent.click(first!);
+    const dialog = screen.getByRole('dialog', { name: 'Add your signature' });
+    expect(
+      within(dialog).getByText('Your other signature boxes take this signature with one tap.'),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Type' }));
+    fireEvent.change(within(dialog).getByLabelText('Your name'), { target: { value: 'A. Rao' } });
+    // Apply is live from the start here, so wait for the typed signature to be drawn.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+    expect(image(first!)).not.toBe(saved);
+    expect(image(second!)).toBe(image(first!));
+  });
+
+  it('adopts a signature saved on an earlier visit', () => {
+    setup({ fields: many, initialValues: [{ fieldId: 's1', value: fakePng() }] });
+    const second = screen.getAllByRole('button', { name: 'Signature, required' })[1]!;
+    fireEvent.click(second);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(second).toHaveAttribute('data-state', 'filled');
+  });
+
+  it('shows an empty signature box at a size a finger can hit', () => {
+    setup({ fields: [field('s1', 'signature', 'r1', { x: 72, y: 100, width: 40, height: 10 })] });
+    const box = screen.getByRole('button', { name: 'Signature, required' });
+    expect(parseFloat(box.style.width)).toBeGreaterThanOrEqual(96);
+    expect(parseFloat(box.style.height)).toBeGreaterThanOrEqual(36);
   });
 });

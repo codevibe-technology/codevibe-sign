@@ -3,6 +3,8 @@ import type { Field } from '@codevibe_technology/sign-core';
 import { field } from '../test/fixtures';
 import {
   fieldGroups,
+  choiceForPages,
+  formatPageList,
   initialsOnEveryPage,
   pagesForChoice,
   parsePageRange,
@@ -37,9 +39,37 @@ describe('pagesForChoice', () => {
   it('turns each choice into pages', () => {
     expect(pagesForChoice('this', 4, 2)).toEqual({ pages: [2] });
     expect(pagesForChoice('all', 3, 0)).toEqual({ pages: [0, 1, 2] });
-    expect(pagesForChoice('except-first', 3, 0)).toEqual({ pages: [1, 2] });
-    expect(pagesForChoice('last', 3, 0)).toEqual({ pages: [2] });
     expect(pagesForChoice('custom', 3, 0, '1-2')).toEqual({ pages: [0, 1] });
+  });
+});
+
+describe('formatPageList and choiceForPages', () => {
+  it('writes pages the way they are typed, and reads back the same', () => {
+    expect(formatPageList([0, 2, 4, 5, 6])).toBe('1, 3, 5-7');
+    expect(formatPageList([1, 0])).toBe('1, 2');
+    expect(formatPageList([3])).toBe('4');
+    expect(parsePageRange(formatPageList([0, 2, 4, 5, 6]), 8)).toEqual({ pages: [0, 2, 4, 5, 6] });
+  });
+
+  it('names the choice a set of pages amounts to', () => {
+    expect(choiceForPages([2], 4)).toBe('this');
+    expect(choiceForPages([0, 1, 2, 3], 4)).toBe('all');
+    expect(choiceForPages([0, 2], 4)).toBe('custom');
+  });
+});
+
+describe('formatPageList and choiceForPages', () => {
+  it('writes pages the way people type them', () => {
+    expect(formatPageList([0, 2, 4, 5, 6])).toBe('1, 3, 5-7');
+    expect(formatPageList([3, 0, 1, 1])).toBe('1, 2, 4');
+    expect(formatPageList([])).toBe('');
+    expect(parsePageRange(formatPageList([0, 2, 4, 5, 6]), 8)).toEqual({ pages: [0, 2, 4, 5, 6] });
+  });
+
+  it('names the choice a set of pages stands for', () => {
+    expect(choiceForPages([2], 4)).toBe('this');
+    expect(choiceForPages([0, 1, 2, 3], 4)).toBe('all');
+    expect(choiceForPages([0, 2], 4)).toBe('custom');
   });
 });
 

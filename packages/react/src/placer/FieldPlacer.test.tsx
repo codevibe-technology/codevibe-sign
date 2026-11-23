@@ -187,37 +187,92 @@ describe('useFieldPlacement', () => {
 });
 
 describe('FieldPlacer on many pages', () => {
-  it('repeats a field on every page as one group, and shows the group', async () => {
+  it('starts on "This page only" and offers just three choices', () => {
+    setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    const select = screen.getByLabelText('Show on pages');
+    expect(select).toHaveValue('this');
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['This page only', 'All pages', 'Specific pages…']);
+    expect(screen.queryByRole('button', { name: 'Repeat' })).toBeNull();
+  });
+
+  it('leaves the pages choice out of a one page document', () => {
+    setup({ documents: [{ id: 'doc', source: letterSource(1) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    expect(screen.queryByLabelText('Show on pages')).toBeNull();
+  });
+
+  it('puts a field on every page the moment "All pages" is picked, as one group', () => {
     const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
     fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
-    fireEvent.change(screen.getByLabelText('Repeat on pages'), { target: { value: 'all' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'all' } });
     const fields = last();
     expect(fields.map((f) => f.page)).toEqual([0, 1, 2, 3]);
     expect(new Set(fields.map((f) => f.type))).toEqual(new Set(['initials']));
     expect(fields.every((f) => f.rect.x === fields[0]!.rect.x)).toBe(true);
-    expect(screen.getByRole('status')).toHaveTextContent('Added to 3 more pages.');
+    expect(screen.getByText('Added to 3 more pages.')).toHaveAttribute('role', 'status');
     expect(screen.getAllByText('×4 pages')).toHaveLength(4);
+    expect(screen.getByLabelText('Show on pages')).toHaveValue('all');
   });
 
-  it('checks typed page ranges against the page count', () => {
+  it('takes the copies away again on "This page only"', () => {
     const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
     fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
-    fireEvent.change(screen.getByLabelText('Repeat on pages'), { target: { value: 'custom' } });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Pages…' }), { target: { value: '2-9' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'This document has 4 pages; 9 is past the end.',
+    const own = last()[0]!.id;
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'all' } });
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'this' } });
+    expect(last().map((f) => f.id)).toEqual([own]);
+    expect(screen.getByText('Removed from 3 other pages.')).toBeInTheDocument();
+  });
+
+  it('checks typed page numbers against the page count before changing anything', () => {
+    const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'custom' } });
+    const box = screen.getByRole('textbox', { name: 'Page numbers' });
+    expect(box).toHaveValue('1');
+    expect(screen.getByText('Page 1, where this field sits, is always included.')).toBeVisible();
+    fireEvent.change(box, { target: { value: '2-9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(screen.getByText('This document has 4 pages; 9 is past the end.')).toHaveAttribute(
+      'role',
+      'status',
     );
-    fireEvent.change(screen.getByRole('textbox', { name: 'Pages…' }), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    expect(box).toHaveAttribute('aria-invalid', 'true');
+    expect(last().map((f) => f.page)).toEqual([0]);
+
+    fireEvent.change(box, { target: { value: '3' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
     expect(last().map((f) => f.page)).toEqual([0, 2]);
+    expect(screen.getByLabelText('Show on pages')).toHaveValue('custom');
+    expect(screen.getByRole('textbox', { name: 'Page numbers' })).toHaveValue('1, 3');
+  });
+
+  it('sets specific pages exactly: adds the new ones and drops the rest', () => {
+    const { last } = setup({ documents: [{ id: 'doc', source: letterSource(5) }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'all' } });
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'custom' } });
+    const box = screen.getByRole('textbox', { name: 'Page numbers' });
+    expect(box).toHaveValue('1-5');
+    fireEvent.change(box, { target: { value: '2, 4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(
+      last()
+        .map((f) => f.page)
+        .sort(),
+    ).toEqual([0, 1, 3]);
+    expect(screen.getByText('Removed from 2 other pages.')).toBeInTheDocument();
   });
 
   it('applies a move to the whole group, and deletes one or all', () => {
     const { last } = setup({ documents: [{ id: 'doc', source: letterSource(4) }] });
     fireEvent.click(screen.getByRole('button', { name: 'Initials' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Repeat' }));
+    fireEvent.change(screen.getByLabelText('Show on pages'), { target: { value: 'all' } });
     const first = screen.getByRole('button', { name: 'Initials for Asha Rao, page 1' });
     fireEvent.keyDown(first, { key: 'ArrowRight', shiftKey: true });
     const moved = last().find((f) => f.page === 0)!;
@@ -230,6 +285,22 @@ describe('FieldPlacer on many pages', () => {
     fireEvent.focus(screen.getByRole('button', { name: 'Initials for Asha Rao, page 2' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete all 3' }));
     expect(last()).toEqual([]);
+  });
+
+  it('keeps fields added one after another from landing on top of each other', () => {
+    const { last } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Date signed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Signature' }));
+    const rects = last().map((f) => f.rect);
+    const overlap = (a: (typeof rects)[0], b: (typeof rects)[0]) =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) expect(overlap(rects[i]!, rects[j]!)).toBe(false);
+    }
+    // The first stays in the middle of the page; the others step down from it.
+    expect(rects[0]).toEqual({ x: 216, y: 369, width: 180, height: 54 });
+    expect(rects[1]!.y).toBeGreaterThan(rects[0]!.y + rects[0]!.height);
   });
 
   it('adds initials on every page and a signature on the last one for the chosen recipient', () => {
@@ -262,9 +333,9 @@ describe('FieldPlacer on many pages', () => {
       ['signature', 'r1', 1],
       ['initials', 'r2', 1],
     ]);
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Placed 2; 1 tag names a recipient number nobody has.',
-    );
+    expect(
+      screen.getByText('Placed 2; 1 tag names a recipient number nobody has.'),
+    ).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('button', { name: /Place fields from tags/ })).toBeNull();
   });
 
@@ -282,8 +353,9 @@ describe('FieldPlacer on many pages', () => {
     });
     expect(placed).toHaveAttribute('data-over-text', 'true');
     expect(within(placed).getByText('Over text')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'A signature or initials field covers page text.',
+    expect(screen.getByText(/A signature or initials field covers page text\./)).toHaveAttribute(
+      'role',
+      'status',
     );
   });
 

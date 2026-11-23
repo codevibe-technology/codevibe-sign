@@ -30,10 +30,12 @@ export interface NewFieldInput {
   size: Size;
   pageSize: PageSize;
   required?: boolean;
+  /** Rects already on the page; given these, the field is moved clear of them. */
+  avoid?: Rect[];
 }
 
 export function createField(input: NewFieldInput): Field {
-  const rect = clampRect(
+  const wanted = clampRect(
     {
       x: input.center.x - input.size.width / 2,
       y: input.center.y - input.size.height / 2,
@@ -42,6 +44,7 @@ export function createField(input: NewFieldInput): Field {
     },
     input.pageSize,
   );
+  const rect = input.avoid ? freeRect(wanted, input.avoid, input.pageSize) : wanted;
   return {
     id: input.id,
     documentId: input.documentId,
@@ -51,6 +54,32 @@ export function createField(input: NewFieldInput): Field {
     rect: roundRect(rect),
     required: input.required ?? input.type !== 'checkbox',
   };
+}
+
+const overlaps = (a: Rect, b: Rect) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/**
+ * A spot for a new field that does not sit on top of the fields already on the page: `rect`
+ * itself when it is free, else the nearest free place below it, then above it. When the page
+ * has no room in that column the rect comes back unchanged.
+ */
+export function freeRect(rect: Rect, taken: Rect[], page: PageSize, gap = 12): Rect {
+  const start = clampRect(rect, page);
+  const free = (candidate: Rect) => !taken.some((other) => overlaps(candidate, other));
+  if (free(start)) return start;
+  const step = start.height + gap;
+  for (const direction of [1, -1]) {
+    for (
+      let y = start.y + direction * step;
+      y >= 0 && y + start.height <= page.height;
+      y += direction * step
+    ) {
+      const candidate = { ...start, y };
+      if (free(candidate)) return candidate;
+    }
+  }
+  return start;
 }
 
 /** Moves a field to `rect` (same size), snapping to page edges and keeping it on the page. */

@@ -3,6 +3,7 @@ import {
   MAX_NAME_LENGTH,
   MAX_TEXT_LENGTH,
   type Field,
+  type FieldType,
   type FieldValue,
   type Recipient,
 } from '@codevibe_technology/sign-core';
@@ -39,7 +40,22 @@ export interface SigningViewLabels extends ViewerLabels {
   required: string;
   optional: string;
   progress: (done: number, total: number) => string;
+  /** The guide button before the signer has touched a field: it goes to the first one. */
+  start: string;
+  /** The guide button once started: it goes to the next field that still needs the signer. */
+  next: string;
+  /** Goes to the next empty optional field once every required one is done. */
   nextField: string;
+  /** The small flag that marks the field the guide is on. */
+  guideFlag: (type: FieldType) => string;
+  /** Names the scrolling area that holds the pages. */
+  documentRegion: string;
+  /** Names the bar with the progress and the Start, Next and Finish buttons. */
+  actions: string;
+  /** Under the signature pad when the signer has more signature boxes to fill. */
+  reuseSignature: string;
+  /** Under the signature pad when the signer has more initials boxes to fill. */
+  reuseInitials: string;
   finish: string;
   submitting: string;
   decline: string;
@@ -64,7 +80,21 @@ export const defaultSigningViewLabels: SigningViewLabels = {
   required: 'required',
   optional: 'optional',
   progress: (done, total) => `${done} of ${total} required fields done`,
+  start: 'Start',
+  next: 'Next',
   nextField: 'Next field',
+  guideFlag: (type) =>
+    type === 'signature'
+      ? 'Sign here'
+      : type === 'initials'
+        ? 'Initial here'
+        : type === 'checkbox'
+          ? 'Tick here'
+          : 'Fill in',
+  documentRegion: 'Document pages',
+  actions: 'Signing progress and actions',
+  reuseSignature: 'Your other signature boxes take this signature with one tap.',
+  reuseInitials: 'Your other initials boxes take these initials with one tap.',
   finish: 'Finish',
   submitting: 'Sending…',
   decline: 'Decline',
@@ -142,7 +172,17 @@ export function SigningView({
     for (const v of initialValues ?? []) start[v.fieldId] = v.value;
     return start;
   });
-  const [adopted, setAdopted] = useState<Partial<Record<Adoptable, string>>>({});
+  // The signature and initials the signer has adopted: later boxes take them with one tap.
+  // A value saved on an earlier visit counts, so coming back does not mean drawing again.
+  const [adopted, setAdopted] = useState<Partial<Record<Adoptable, string>>>(() => {
+    const seed: Partial<Record<Adoptable, string>> = {};
+    for (const f of fields) {
+      if (f.type !== 'signature' && f.type !== 'initials') continue;
+      const value = values[f.id];
+      if (value && !seed[f.type]) seed[f.type] = value;
+    }
+    return seed;
+  });
   const [padField, setPadField] = useState<Field | null>(null);
   const [padValue, setPadValue] = useState<string | null>(null);
   // Set when the pad was opened by "Fill all my initials": applying fills every empty box.
@@ -158,30 +198,83 @@ export function SigningView({
   const [zoom, setZoom] = useState(1);
   const fieldEls = useRef(new Map<string, HTMLElement>());
   const finishButton = useRef<HTMLButtonElement>(null);
-  const lastFocused = useRef<string | null>(null);
+  // The field the guide is on: the one last focused, by the guide or by the signer.
+  const [current, setCurrent] = useState<string | null>(null);
+  const currentRef = useRef<string | null>(null);
+  const [started, setStarted] = useState(false);
 
   const required = fields.filter((f) => f.required);
   const done = required.filter((f) => hasValue(f, values[f.id])).length;
+  const pending = required.length - done;
+  const optionalLeft = fields.some(
+    (f) => !f.required && f.type !== 'date_signed' && !hasValue(f, values[f.id]),
+  );
+  const currentField = fields.find((f) => f.id === current) ?? null;
+  const currentNeedsPad =
+    currentField !== null &&
+    (currentField.type === 'signature' || currentField.type === 'initials') &&
+    !hasValue(currentField, values[currentField.id]);
+  // What the one guide button does: Start, then Sign or Initial on a signature box, else Next.
+  const guide: 'start' | 'sign' | 'next' | 'optional' | null =
+    pending === 0
+      ? optionalLeft
+        ? 'optional'
+        : null
+      : !started
+        ? 'start'
+        : currentNeedsPad
+          ? 'sign'
+          : 'next';
 
   const setValue = (fieldId: string, value: string) =>
     setValues((prev) => ({ ...prev, [fieldId]: value }));
 
+  const markCurrent = (fieldId: string) => {
+    currentRef.current = fieldId;
+    setCurrent(fieldId);
+    setStarted(true);
+  };
+
   const focusField = (fieldId: string) => {
     const el = fieldEls.current.get(fieldId);
     if (!el) return;
-    el.scrollIntoView?.({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    el.scrollIntoView?.({
+      block: 'center',
+      inline: 'center',
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    });
     el.focus({ preventScroll: true });
-    lastFocused.current = fieldId;
+    markCurrent(fieldId);
+  };
+
+  /** The fields after `from` in reading order, wrapping round to it. */
+  const fieldsAfter = (from: string | null) => {
+    const start = fields.findIndex((f) => f.id === from);
+    return [...fields.slice(start + 1), ...fields.slice(0, start + 1)];
   };
 
   const goToNextField = () => {
-    const start = fields.findIndex((f) => f.id === lastFocused.current);
-    const ordered = [...fields.slice(start + 1), ...fields.slice(0, start + 1)];
+    const ordered = fieldsAfter(currentRef.current);
     const next =
       ordered.find((f) => f.required && !hasValue(f, values[f.id])) ??
       ordered.find((f) => !hasValue(f, values[f.id]) && f.type !== 'date_signed');
+    setStarted(true);
     if (next) focusField(next.id);
     else finishButton.current?.focus();
+  };
+
+  /**
+   * Moves on by itself once a field is done: to the next required field still empty in
+   * `filled`, or to Finish when none is left. It waits a tick so a closing dialog can hand
+   * focus back first.
+   */
+  const advance = (filled: FieldValues, from: string) => {
+    const next = fieldsAfter(from).find((f) => f.required && !hasValue(f, filled[f.id]));
+    setStarted(true);
+    setTimeout(() => {
+      if (next) focusField(next.id);
+      else finishButton.current?.focus();
+    }, 0);
   };
 
   const openPad = (field: Field) => {
@@ -189,6 +282,7 @@ export function SigningView({
     const reuse = adopted[type];
     if (!hasValue(field, values[field.id]) && reuse) {
       setValue(field.id, reuse);
+      advance({ ...values, [field.id]: reuse }, field.id);
       return;
     }
     setPadValue(values[field.id] || reuse || null);
@@ -227,9 +321,24 @@ export function SigningView({
   const applyPad = () => {
     if (!padField) return;
     if (padValue) {
-      setValue(padField.id, padValue);
-      setAdopted((prev) => ({ ...prev, [padField.type]: padValue }));
-      if (fillAll && padField.type === 'initials') fillInitials(padValue);
+      const field = padField;
+      const type = field.type as Adoptable;
+      const before = adopted[type];
+      const next = { ...values, [field.id]: padValue };
+      for (const f of fields) {
+        if (f.type !== type || f.id === field.id) continue;
+        const empty = !hasValue(f, next[f.id]);
+        // "Fill all my initials" fills the empty boxes; a redrawn signature replaces the
+        // adopted one wherever it was used, so the document carries one signature.
+        if ((fillAll && type === 'initials' && empty) || (before && next[f.id] === before)) {
+          next[f.id] = padValue;
+        }
+      }
+      setValues(next);
+      setAdopted((prev) => ({ ...prev, [type]: padValue }));
+      closePad();
+      advance(next, field.id);
+      return;
     } else {
       setValues((prev) => {
         const next = { ...prev };
@@ -282,9 +391,18 @@ export function SigningView({
     else fieldEls.current.delete(fieldId);
   };
 
-  const renderField = (field: Field, scale: number) => {
-    const box = pointsToPixels(field.rect, scale);
+  const renderField = (field: Field, { scale, page }: PageContext) => {
     const value = values[field.id];
+    const exact = pointsToPixels(field.rect, scale);
+    // An empty signature box drawn at phone width can be a few millimetres tall. Until it is
+    // signed it is shown at a size a finger can hit, grown about its own middle.
+    const box =
+      (field.type === 'signature' || field.type === 'initials') && !hasValue(field, value)
+        ? growBox(exact, field.type === 'signature' ? 96 : 64, 36, {
+            width: page.width * scale,
+            height: page.height * scale,
+          })
+        : exact;
     const status = fieldStatus(field, value, showErrors);
     const typeLabel = field.label || labels.fieldTypes[field.type];
     const name = `${typeLabel}, ${field.required ? labels.required : labels.optional}`;
@@ -294,14 +412,15 @@ export function SigningView({
       width: box.width,
       height: box.height,
       '--cvs-field-font': `${Math.max(10, Math.min(box.height * 0.62, 28))}px`,
+      '--cvs-field-room': `${Math.max(0, page.width * scale - box.left)}px`,
     } as CSSProperties;
     const common = {
       'data-state': status,
       'data-required': field.required || undefined,
       'data-type': field.type,
-      onFocus: () => {
-        lastFocused.current = field.id;
-      },
+      'data-current': (started && current === field.id) || undefined,
+      'data-cvs-field': field.id,
+      onFocus: () => markCurrent(field.id),
     };
 
     if (field.type === 'signature' || field.type === 'initials') {
@@ -373,16 +492,42 @@ export function SigningView({
         autoComplete={field.type === 'name' ? 'name' : 'off'}
         value={value ?? ''}
         placeholder={typeLabel}
+        enterKeyHint={pending > (hasValue(field, value) ? 0 : 1) ? 'next' : 'done'}
         onChange={(e) => setValue(field.id, e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          advance(values, field.id);
+        }}
         {...common}
       />
     );
   };
 
-  const renderOverlay = ({ documentId, pageIndex, scale }: PageContext) =>
-    fields
-      .filter((f) => f.documentId === documentId && f.page === pageIndex)
-      .map((f) => renderField(f, scale));
+  const renderOverlay = (ctx: PageContext) => {
+    const onPage = fields.filter(
+      (f) => f.documentId === ctx.documentId && f.page === ctx.pageIndex,
+    );
+    const flagged = onPage.find(
+      (f) => started && f.id === current && !hasValue(f, values[f.id]) && f.type !== 'date_signed',
+    );
+    const at = flagged && pointsToPixels(flagged.rect, ctx.scale);
+    return (
+      <>
+        {onPage.map((f) => renderField(f, ctx))}
+        {flagged && at && (
+          <span
+            className="cvs-guide-flag"
+            aria-hidden="true"
+            data-below={at.top < 34 || undefined}
+            style={{ left: at.left, top: at.top < 34 ? at.top + at.height : at.top }}
+          >
+            {labels.guideFlag(flagged.type)}
+          </span>
+        )}
+      </>
+    );
+  };
 
   const padAspect = padField
     ? Math.min(4, Math.max(1, padField.rect.width / Math.max(1, padField.rect.height)))
@@ -393,7 +538,14 @@ export function SigningView({
       <div className="cvs-viewer-bar">
         <ZoomControls zoom={zoom} onZoom={setZoom} labels={labels} />
       </div>
-      <div ref={scroller} className="cvs-scroller" tabIndex={0}>
+      {/* The one place the pages scroll, up and down and, zoomed in, sideways. */}
+      <div
+        ref={scroller}
+        className="cvs-scroller"
+        role="region"
+        aria-label={labels.documentRegion}
+        tabIndex={0}
+      >
         <DocumentPages
           documents={documents}
           states={states}
@@ -404,39 +556,76 @@ export function SigningView({
         />
       </div>
 
-      <div className="cvs-action-bar">
-        {onDecline && (
+      <div
+        className="cvs-action-bar"
+        role="group"
+        aria-label={labels.actions}
+        data-pending={pending > 0 || undefined}
+      >
+        <div className="cvs-progress-block">
+          <p className="cvs-progress" id={`${id}-progress`} aria-live="polite">
+            {labels.progress(done, required.length)}
+          </p>
+          {required.length > 0 && (
+            <div className="cvs-progress-track" aria-hidden="true">
+              <span style={{ width: `${(done / required.length) * 100}%` }} />
+            </div>
+          )}
+        </div>
+        <div className="cvs-action-buttons">
+          {onDecline && (
+            <button
+              type="button"
+              className="cvs-button cvs-button--ghost cvs-action-decline"
+              onClick={() => setDeclining(true)}
+              disabled={busy}
+            >
+              {labels.decline}
+            </button>
+          )}
+          {initialsCount > 1 && emptyInitials.length > 0 && (
+            <button
+              type="button"
+              className="cvs-button cvs-action-fill"
+              onClick={fillAllInitials}
+              disabled={busy}
+            >
+              {labels.fillInitials(emptyInitials.length)}
+            </button>
+          )}
+          {guide && (
+            <button
+              type="button"
+              className={`cvs-button cvs-action-guide${guide === 'optional' ? '' : ' cvs-button--primary'}`}
+              data-guide={guide}
+              onClick={() => {
+                if (guide === 'sign' && currentField) openPad(currentField);
+                else goToNextField();
+              }}
+              disabled={busy}
+            >
+              {guide === 'start'
+                ? labels.start
+                : guide === 'optional'
+                  ? labels.nextField
+                  : guide === 'sign' && currentField
+                    ? currentField.type === 'initials'
+                      ? labels.initialHere
+                      : labels.signHere
+                    : labels.next}
+            </button>
+          )}
           <button
+            ref={finishButton}
             type="button"
-            className="cvs-button cvs-button--ghost"
-            onClick={() => setDeclining(true)}
+            className={`cvs-button cvs-action-finish${pending === 0 ? ' cvs-button--primary' : ''}`}
+            onClick={() => void submit()}
             disabled={busy}
+            aria-describedby={`${id}-progress`}
           >
-            {labels.decline}
+            {busy ? labels.submitting : labels.finish}
           </button>
-        )}
-        <p className="cvs-progress" id={`${id}-progress`}>
-          {labels.progress(done, required.length)}
-        </p>
-        <span className="cvs-spacer" />
-        {initialsCount > 1 && emptyInitials.length > 0 && (
-          <button type="button" className="cvs-button" onClick={fillAllInitials} disabled={busy}>
-            {labels.fillInitials(emptyInitials.length)}
-          </button>
-        )}
-        <button type="button" className="cvs-button" onClick={goToNextField} disabled={busy}>
-          {labels.nextField}
-        </button>
-        <button
-          ref={finishButton}
-          type="button"
-          className="cvs-button cvs-button--primary"
-          onClick={() => void submit()}
-          disabled={busy}
-          aria-describedby={`${id}-progress`}
-        >
-          {busy ? labels.submitting : labels.finish}
-        </button>
+        </div>
         <p className="cvs-error cvs-action-message" role="status" aria-live="polite">
           {message}
         </p>
@@ -469,6 +658,11 @@ export function SigningView({
             aspectRatio={padAspect}
             defaultText={padField.type === 'initials' ? initialsOf(recipient.name) : recipient.name}
           />
+          {fields.filter((f) => f.type === padField.type).length > 1 && (
+            <p className="cvs-hint cvs-reuse-note">
+              {padField.type === 'initials' ? labels.reuseInitials : labels.reuseSignature}
+            </p>
+          )}
         </Dialog>
       )}
 
@@ -511,6 +705,27 @@ export function SigningView({
       )}
     </div>
   );
+}
+
+interface PixelBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** `box` grown about its middle to at least the given size, kept on its page. */
+function growBox(
+  box: PixelBox,
+  minWidth: number,
+  minHeight: number,
+  page: { width: number; height: number },
+): PixelBox {
+  const width = Math.min(Math.max(box.width, minWidth), page.width);
+  const height = Math.min(Math.max(box.height, minHeight), page.height);
+  const left = Math.min(Math.max(0, box.left - (width - box.width) / 2), page.width - width);
+  const top = Math.min(Math.max(0, box.top - (height - box.height) / 2), page.height - height);
+  return { left, top, width, height };
 }
 
 function errorMessage(error: unknown): string {

@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from 'react';
 import type { Field, FieldType, Recipient } from '@codevibe_technology/sign-core';
 import { clientToPoints, pointsToPixels, type PageSize } from '../geometry';
@@ -22,9 +23,9 @@ import {
   type PageContext,
   type ViewerLabels,
 } from '../viewer/DocumentPages';
-import { pagesForChoice, type RepeatChoice } from './multipage';
+import { choiceForPages, formatPageList, pagesForChoice, type RepeatChoice } from './multipage';
 import { fieldsOverText } from './overlap';
-import { isArrowKey, type Size } from './placement';
+import { defaultFieldSizes, isArrowKey, type Size } from './placement';
 import { fieldsFromTags, findTags, type FieldTag } from './tags';
 import { newFieldId, useFieldPlacement, type FieldPlacementState } from './useFieldPlacement';
 
@@ -43,9 +44,14 @@ export interface FieldPlacerLabels extends ViewerLabels {
   resize: string;
   repeatOn: string;
   repeatChoices: Record<RepeatChoice, string>;
+  /** Names the box for typed page numbers. */
+  pagesLabel: string;
   pagesPlaceholder: string;
+  /** Under the page numbers box; `page` is the selected field's own page, counted from 1. */
+  pagesHint: (page: number) => string;
   applyRepeat: string;
-  repeated: (count: number) => string;
+  /** What a change of pages did: copies added and copies removed. */
+  repeatChanged: (added: number, removed: number) => string;
   groupBadge: (pages: number) => string;
   applyToGroup: (count: number) => string;
   deleteThis: string;
@@ -76,22 +82,26 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   required: 'Required',
   deleteField: 'Delete field',
   resize: 'Resize',
-  repeatOn: 'Repeat on pages',
+  repeatOn: 'Show on pages',
   repeatChoices: {
     this: 'This page only',
     all: 'All pages',
-    'except-first': 'Every page except the first',
-    last: 'Last page',
-    custom: 'Pages…',
+    custom: 'Specific pages…',
   },
+  pagesLabel: 'Page numbers',
   pagesPlaceholder: 'For example 1, 3, 5-7',
-  applyRepeat: 'Repeat',
-  repeated: (count) =>
-    count === 0
-      ? 'Those pages already have this field.'
-      : count === 1
-        ? 'Added to 1 more page.'
-        : `Added to ${count} more pages.`,
+  pagesHint: (page) => `Page ${page}, where this field sits, is always included.`,
+  applyRepeat: 'Apply',
+  repeatChanged: (added, removed) => {
+    const pages = (count: number) => (count === 1 ? '1 page' : `${count} pages`);
+    if (added > 0 && removed > 0) {
+      return `Added to ${pages(added)} and removed from ${pages(removed)}.`;
+    }
+    if (added > 0) return `Added to ${added === 1 ? '1 more page' : `${added} more pages`}.`;
+    if (removed > 0)
+      return `Removed from ${removed === 1 ? '1 other page' : `${removed} other pages`}.`;
+    return 'Those pages already have this field.';
+  },
   groupBadge: (pages) => `×${pages} pages`,
   applyToGroup: (count) => `Apply to all ${count} in group`,
   deleteThis: 'Delete this one',
@@ -158,6 +168,9 @@ interface PaletteDrag {
   x: number;
   y: number;
   moved: boolean;
+  /** The field's size on screen at the current zoom, so the ghost shows what will land. */
+  width: number;
+  height: number;
 }
 
 function pageElementAt(x: number, y: number): HTMLElement | null {
@@ -214,8 +227,14 @@ export function FieldPlacer({
 
   const recipientName = (rid: string) => signers.find((r) => r.id === rid)?.name ?? '';
 
-  const [repeatChoice, setRepeatChoice] = useState<RepeatChoice>('all');
-  const [repeatPages, setRepeatPages] = useState('');
+  // Page numbers being typed for one field; until applied, the field's pages stay as they are.
+  const [typedPages, setTypedPages] = useState<{ fieldId: string; text: string } | null>(null);
+  const [repeatNotice, setRepeatNotice] = useState<{
+    fieldId: string;
+    text: string;
+    error?: boolean;
+  } | null>(null);
+  const pagesInput = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [tags, setTags] = useState<Record<string, FieldTag[]>>({});
   const [pageText, setPageText] = useState<Record<string, TextItem[][]>>({});
@@ -272,45 +291,82 @@ export function FieldPlacer({
     setNotice({ text: labels.tagsPlaced(placed, unmatched), error: unmatched > 0 });
   };
 
-  const repeatSelected = (field: Field) => {
+  /** Applies a pages choice to the field straight away: there is no separate button to press. */
+  const showOnPages = (field: Field, choice: RepeatChoice, text = '') => {
     const count = pageSizes[field.documentId]?.length ?? 0;
-    const pages = pagesForChoice(repeatChoice, count, field.page, repeatPages);
+    const pages = pagesForChoice(choice, count, field.page, text);
     if ('error' in pages) {
-      setNotice({ text: pages.error, error: true });
+      setRepeatNotice({ fieldId: field.id, text: pages.error, error: true });
       return;
     }
-    setNotice({ text: labels.repeated(placement.repeatField(field.id, pages.pages)) });
+    const { added, removed } = placement.setFieldPages(field.id, pages.pages);
+    setTypedPages(null);
+    setRepeatNotice({ fieldId: field.id, text: labels.repeatChanged(added, removed) });
   };
 
-  const pageInView = (): { documentId: string; page: number } | null => {
+  const chooseRepeat = (field: Field, choice: RepeatChoice) => {
+    if (choice !== 'custom') {
+      showOnPages(field, choice);
+      return;
+    }
+    setRepeatNotice(null);
+    setTypedPages({ fieldId: field.id, text: formatPageList(placement.pagesOf(field.id)) });
+    // The box appears with this render; move to it so the numbers can be typed at once.
+    setTimeout(() => pagesInput.current?.select(), 0);
+  };
+
+  /**
+   * The page that fills most of the viewer, with the middle of the part of it on screen in
+   * page points, so a field added by a click or Enter lands where the sender is looking.
+   */
+  const pageInView = (): {
+    documentId: string;
+    page: number;
+    center?: { x: number; y: number };
+    scale?: number;
+  } | null => {
     const container = scroller.current;
     const pages = container?.querySelectorAll<HTMLElement>('[data-cvs-page]') ?? [];
     const view = container?.getBoundingClientRect();
-    let best: { documentId: string; page: number; visible: number } | null = null;
+    let best: { el: HTMLElement; box: DOMRect; visible: number } | null = null;
     for (const el of pages) {
       const box = el.getBoundingClientRect();
       const visible = view
         ? Math.max(0, Math.min(box.bottom, view.bottom) - Math.max(box.top, view.top))
         : 0;
-      if (!best || visible > best.visible) {
-        best = {
-          documentId: el.dataset.cvsDocument ?? '',
-          page: Number(el.dataset.cvsPage),
-          visible,
-        };
-      }
+      if (!best || visible > best.visible) best = { el, box, visible };
     }
-    return best;
+    if (!best) return null;
+    const documentId = best.el.dataset.cvsDocument ?? '';
+    const page = Number(best.el.dataset.cvsPage);
+    const size = placement.pageSize(documentId, page);
+    if (!view || !size || best.visible <= 0 || best.box.width <= 0) return { documentId, page };
+    const scale = best.box.width / size.width;
+    const top = Math.max(best.box.top, view.top);
+    const bottom = Math.min(best.box.bottom, view.bottom);
+    const left = Math.max(best.box.left, view.left);
+    const right = Math.min(best.box.right, view.right);
+    return {
+      documentId,
+      page,
+      scale,
+      center: clientToPoints((left + right) / 2, (top + bottom) / 2, best.box, scale),
+    };
   };
 
   const addToPageInView = (type: FieldType) => {
     const target = pageInView();
-    if (target) placement.addField(type, target.documentId, target.page);
+    if (!target) return;
+    placement.addField(type, target.documentId, target.page, target.center, {
+      avoidOverlap: true,
+    });
   };
 
   const onPalettePointerDown = (e: ReactPointerEvent<HTMLButtonElement>, type: FieldType) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    const size = fieldSizes?.[type] ?? defaultFieldSizes[type];
+    const scale = pageInView()?.scale ?? 1;
     setPaletteDrag({
       pointerId: e.pointerId,
       type,
@@ -319,6 +375,8 @@ export function FieldPlacer({
       x: e.clientX,
       y: e.clientY,
       moved: false,
+      width: size.width * scale,
+      height: size.height * scale,
     });
   };
 
@@ -528,11 +586,9 @@ export function FieldPlacer({
             </button>
           )}
         </div>
-        {notice && (
-          <p className={notice.error ? 'cvs-error' : 'cvs-hint'} role="status">
-            {notice.text}
-          </p>
-        )}
+        <p className={notice?.error ? 'cvs-error' : 'cvs-hint'} role="status">
+          {notice?.text}
+        </p>
       </aside>
 
       <div className="cvs-viewer">
@@ -602,35 +658,19 @@ export function FieldPlacer({
               />
               {labels.required}
             </label>
-            <label className="cvs-label" htmlFor={`${id}-repeat`}>
-              {labels.repeatOn}
-            </label>
-            <div className="cvs-row">
-              <select
-                id={`${id}-repeat`}
-                className="cvs-input"
-                value={repeatChoice}
-                onChange={(e) => setRepeatChoice(e.target.value as RepeatChoice)}
-              >
-                {(Object.keys(labels.repeatChoices) as RepeatChoice[]).map((choice) => (
-                  <option key={choice} value={choice}>
-                    {labels.repeatChoices[choice]}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="cvs-button" onClick={() => repeatSelected(selected)}>
-                {labels.applyRepeat}
-              </button>
-            </div>
-            {repeatChoice === 'custom' && (
-              <input
-                className="cvs-input"
-                aria-label={labels.repeatChoices.custom}
-                placeholder={labels.pagesPlaceholder}
-                value={repeatPages}
-                onChange={(e) => setRepeatPages(e.target.value)}
-              />
-            )}
+            <RepeatControl
+              id={id}
+              labels={labels}
+              pageCount={pageSizes[selected.documentId]?.length ?? 0}
+              page={selected.page}
+              pages={placement.pagesOf(selected.id)}
+              typed={typedPages?.fieldId === selected.id ? typedPages.text : null}
+              notice={repeatNotice?.fieldId === selected.id ? repeatNotice : null}
+              inputRef={pagesInput}
+              onChoose={(choice) => chooseRepeat(selected, choice)}
+              onType={(text) => setTypedPages({ fieldId: selected.id, text })}
+              onApply={(text) => showOnPages(selected, 'custom', text)}
+            />
             <div className="cvs-inspector-actions">
               {placement.groupOf(selected.id).length > 1 ? (
                 <>
@@ -680,7 +720,14 @@ export function FieldPlacer({
           className="cvs-drag-ghost"
           data-cvs-color={recipientColorIndex(signers, placement.recipientId ?? '')}
           aria-hidden="true"
-          style={{ left: paletteDrag.x, top: paletteDrag.y } as CSSProperties}
+          style={
+            {
+              left: paletteDrag.x,
+              top: paletteDrag.y,
+              width: paletteDrag.width,
+              height: paletteDrag.height,
+            } as CSSProperties
+          }
         >
           {labels.fieldTypes[paletteDrag.type]}
         </div>
@@ -713,6 +760,97 @@ function FieldTypeIcon({ type }: { type: FieldType }) {
     >
       <path d={ICON_PATHS[type]} />
     </svg>
+  );
+}
+
+interface RepeatControlProps {
+  id: string;
+  labels: FieldPlacerLabels;
+  pageCount: number;
+  /** The selected field's own page, zero-based. */
+  page: number;
+  /** Pages the field and its copies are on now, zero-based. */
+  pages: number[];
+  /** Page numbers being typed, or null when the box is closed. */
+  typed: string | null;
+  notice: { text: string; error?: boolean } | null;
+  inputRef: RefObject<HTMLInputElement | null>;
+  onChoose: (choice: RepeatChoice) => void;
+  onType: (text: string) => void;
+  onApply: (text: string) => void;
+}
+
+/**
+ * Which pages the selected field shows on. The list always reads what is true now: "This page
+ * only" for a lone field, "All pages" once it is on every page, "Specific pages" with the
+ * numbers otherwise. Picking a choice applies it; typed numbers apply on Enter or Apply.
+ */
+function RepeatControl({
+  id,
+  labels,
+  pageCount,
+  page,
+  pages,
+  typed,
+  notice,
+  inputRef,
+  onChoose,
+  onType,
+  onApply,
+}: RepeatControlProps) {
+  if (pageCount < 2) return null;
+  const current = choiceForPages(pages, pageCount);
+  const choice: RepeatChoice = typed !== null ? 'custom' : current;
+  const text = typed ?? formatPageList(pages);
+  return (
+    <div className="cvs-repeat">
+      <label className="cvs-label" htmlFor={`${id}-repeat`}>
+        {labels.repeatOn}
+      </label>
+      <select
+        id={`${id}-repeat`}
+        className="cvs-input"
+        value={choice}
+        onChange={(e) => onChoose(e.target.value as RepeatChoice)}
+      >
+        {(['this', 'all', 'custom'] as const).map((value) => (
+          <option key={value} value={value}>
+            {labels.repeatChoices[value]}
+          </option>
+        ))}
+      </select>
+      {choice === 'custom' && (
+        <>
+          <div className="cvs-row">
+            <input
+              ref={inputRef}
+              className="cvs-input"
+              inputMode="numeric"
+              aria-label={labels.pagesLabel}
+              aria-describedby={`${id}-repeat-hint`}
+              aria-invalid={notice?.error || undefined}
+              placeholder={labels.pagesPlaceholder}
+              value={text}
+              onChange={(e) => onType(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                onApply(text);
+              }}
+            />
+            <button type="button" className="cvs-button" onClick={() => onApply(text)}>
+              {labels.applyRepeat}
+            </button>
+          </div>
+          <p className="cvs-hint" id={`${id}-repeat-hint`}>
+            {labels.pagesHint(page + 1)}
+          </p>
+        </>
+      )}
+      <p className={notice?.error ? 'cvs-error' : 'cvs-hint'} role="status">
+        {notice?.text}
+      </p>
+    </div>
   );
 }
 

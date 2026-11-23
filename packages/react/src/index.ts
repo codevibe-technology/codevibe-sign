@@ -27,9 +27,11 @@ export { FieldPlacer, defaultFieldPlacerLabels } from './placer/FieldPlacer';
 export type { FieldPlacerProps, FieldPlacerLabels } from './placer/FieldPlacer';
 export { useFieldPlacement } from './placer/useFieldPlacement';
 export type { FieldPlacementState, UseFieldPlacementOptions } from './placer/useFieldPlacement';
-export { createField, defaultFieldSizes, nudgeRect } from './placer/placement';
+export { createField, defaultFieldSizes, freeRect, nudgeRect } from './placer/placement';
 export {
+  choiceForPages,
   fieldGroups,
+  formatPageList,
   initialsOnEveryPage,
   pagesForChoice,
   parsePageRange,

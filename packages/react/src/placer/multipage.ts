@@ -2,7 +2,8 @@ import type { Field, FieldType, Rect } from '@codevibe_technology/sign-core';
 import { clampRect, roundRect, type PageSize } from '../geometry';
 import { defaultFieldSizes, type Size } from './placement';
 
-export type RepeatChoice = 'this' | 'all' | 'except-first' | 'last' | 'custom';
+/** Which pages a field shows on: only its own, every page, or a typed list. */
+export type RepeatChoice = 'this' | 'all' | 'custom';
 
 export type PageList = { pages: number[] } | { error: string };
 
@@ -39,7 +40,33 @@ export function parsePageRange(text: string, pageCount: number): PageList {
   return { pages: [...pages].sort((a, b) => a - b) };
 }
 
-/** The pages a "Repeat on pages" choice stands for, zero-based. */
+/** Zero-based pages written the way people type them: `[0, 2, 4, 5, 6]` reads "1, 3, 5-7". */
+export function formatPageList(pages: number[]): string {
+  const sorted = [...new Set(pages)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const from = sorted[i]!;
+    let to = from;
+    while (sorted[i + 1] === to + 1) to = sorted[++i]!;
+    parts.push(
+      to === from
+        ? `${from + 1}`
+        : to === from + 1
+          ? `${from + 1}, ${to + 1}`
+          : `${from + 1}-${to + 1}`,
+    );
+  }
+  return parts.join(', ');
+}
+
+/** The choice that describes a field already shown on `pages` of a `pageCount` page document. */
+export function choiceForPages(pages: number[], pageCount: number): RepeatChoice {
+  const count = new Set(pages).size;
+  if (count <= 1) return 'this';
+  return count >= pageCount ? 'all' : 'custom';
+}
+
+/** The pages a "Show on pages" choice stands for, zero-based. */
 export function pagesForChoice(
   choice: RepeatChoice,
   pageCount: number,
@@ -52,10 +79,6 @@ export function pagesForChoice(
       return { pages: [current] };
     case 'all':
       return { pages: every };
-    case 'except-first':
-      return { pages: every.slice(1) };
-    case 'last':
-      return { pages: [pageCount - 1] };
     case 'custom':
       return parsePageRange(custom, pageCount);
   }

@@ -159,7 +159,8 @@
   font-size: 0.9em;
 }
 
-.cvs-error:empty {
+.cvs-error:empty,
+.cvs-hint:empty {
   display: none;
 }
 
@@ -409,6 +410,15 @@
   background: var(--cvs-bg);
 }
 
+/*
+ * Give the signing view a height and the pages scroll inside it, both ways, with the action
+ * bar pinned underneath. Leave the height out and the view grows with the pages: the host
+ * page scrolls them and the action bar sticks to the bottom of the window.
+ */
+.cvs-signing {
+  height: 100%;
+}
+
 .cvs-viewer {
   flex: 1 1 auto;
   min-width: 0;
@@ -434,10 +444,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Sideways overscroll is contained so panning a zoomed page never swipes the browser back.
+ * Up and down it is not: a scroller that has run out, or that only scrolls sideways, hands
+ * the gesture to the page instead of swallowing it.
+ */
 .cvs-scroller {
   flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
   padding: 16px;
   -webkit-overflow-scrolling: touch;
 }
@@ -445,7 +462,7 @@
 .cvs-document {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -460,9 +477,12 @@
   color: var(--cvs-text-muted);
 }
 
+/* Centred while it fits; once zoomed wider than the viewer it starts at the left edge, so
+   every part of it can be scrolled to. */
 .cvs-page {
   position: relative;
   flex: none;
+  margin-inline: auto;
   background: var(--cvs-page-bg);
   box-shadow: var(--cvs-shadow);
   border-radius: 2px;
@@ -598,19 +618,96 @@
   z-index: 1;
 }
 
-/* Sticky action bar */
+/* The field the guide is on */
+
+.cvs-field[data-current]:not([data-state='filled']) {
+  border-style: solid;
+  border-color: var(--cvs-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cvs-accent) 30%, transparent);
+  z-index: 1;
+}
+
+.cvs-guide-flag {
+  position: absolute;
+  z-index: 2;
+  margin-top: -6px;
+  padding: 3px 8px;
+  border-radius: var(--cvs-radius-sm);
+  background: var(--cvs-accent);
+  color: var(--cvs-accent-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  transform: translateY(-100%);
+  pointer-events: none;
+  animation: cvs-flag-in 180ms ease-out;
+}
+
+.cvs-guide-flag::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  border: 5px solid transparent;
+  border-top-color: var(--cvs-accent);
+}
+
+.cvs-guide-flag[data-below] {
+  margin-top: 6px;
+  transform: none;
+}
+
+.cvs-guide-flag[data-below]::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: var(--cvs-accent);
+}
+
+@keyframes cvs-flag-in {
+  from {
+    opacity: 0;
+    margin-top: -14px;
+  }
+}
+
+/* On a touch screen a text box being typed in opens up to a readable size, and stays at
+   16px so the phone does not zoom the page in. */
+@media (pointer: coarse) {
+  .cvs-root {
+    --cvs-tap: 48px;
+  }
+
+  .cvs-field--text:focus {
+    z-index: 3;
+    min-width: min(220px, var(--cvs-field-room, 220px));
+    min-height: 40px;
+    background: var(--cvs-surface);
+    color: var(--cvs-text);
+    font-size: 16px;
+  }
+}
+
+/* Action bar: pinned under the pages, or stuck to the window when the host page scrolls */
 
 .cvs-action-bar {
   position: sticky;
   bottom: 0;
   z-index: 2;
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 8px 16px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--cvs-border);
   background: var(--cvs-surface);
+}
+
+.cvs-progress-block {
+  flex: 1 1 160px;
+  min-width: 0;
 }
 
 .cvs-progress {
@@ -619,25 +716,76 @@
   font-size: 0.9em;
 }
 
+.cvs-progress-track {
+  max-width: 260px;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cvs-text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.cvs-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cvs-success);
+  transition: width 200ms ease;
+}
+
+.cvs-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cvs-action-guide,
+.cvs-action-finish {
+  min-width: 112px;
+}
+
 .cvs-action-message {
   flex-basis: 100%;
   margin: 0;
   text-align: right;
 }
 
+.cvs-reuse-note {
+  margin-bottom: 0;
+}
+
 @media (max-width: 560px) {
-  .cvs-action-bar .cvs-progress {
+  .cvs-progress-block {
     flex-basis: 100%;
+  }
+
+  .cvs-progress-track {
+    max-width: none;
+  }
+
+  .cvs-action-buttons {
+    flex: 1 1 100%;
+  }
+
+  .cvs-action-fill {
+    flex: 1 1 100%;
     order: -1;
   }
 
-  .cvs-action-bar .cvs-spacer {
+  /* One large button does the next thing; Finish takes its place when nothing is left. */
+  .cvs-action-guide,
+  .cvs-action-finish {
+    flex: 1 1 0;
+    min-height: 48px;
+  }
+
+  .cvs-action-bar[data-pending] .cvs-action-finish {
     display: none;
   }
 
-  .cvs-action-bar .cvs-button {
-    flex: 1 1 0;
-    padding: 0 10px;
+  .cvs-action-message {
+    text-align: left;
   }
 
   .cvs-scroller {
@@ -726,6 +874,17 @@
 .cvs-placer > .cvs-viewer {
   min-width: 0;
   min-height: 0;
+}
+
+.cvs-repeat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cvs-repeat .cvs-hint,
+.cvs-repeat .cvs-error {
+  margin: 2px 0 0;
 }
 
 .cvs-placer-panel {
@@ -1071,7 +1230,14 @@
 .cvs-drag-ghost {
   position: fixed;
   z-index: 1001;
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  min-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 4px;
   border: 1.5px solid var(--cvs-color);
   border-radius: var(--cvs-radius-sm);
   background: color-mix(in srgb, var(--cvs-color) 20%, var(--cvs-surface));

@@ -38,14 +38,21 @@ export interface PageContext {
 
 const FALLBACK_WIDTH = 800;
 
-/** Tracks an element's content width, falling back when layout is unavailable. */
+/**
+ * Tracks the width an element has for its content, its padding left out, so a page fitted to
+ * it does not spill past the padding and bring a sideways scrollbar with it. Falls back when
+ * layout is unavailable.
+ */
 export function useElementWidth(ref: RefObject<HTMLElement | null>): number {
   const [width, setWidth] = useState(FALLBACK_WIDTH);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const measure = () => {
-      if (el.clientWidth > 0) setWidth(el.clientWidth);
+      if (el.clientWidth <= 0) return;
+      const style = getComputedStyle(el);
+      const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      setWidth(Math.max(1, el.clientWidth - padding));
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
