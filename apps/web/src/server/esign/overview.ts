@@ -2,6 +2,7 @@ import 'server-only';
 import type postgres from 'postgres';
 import type { Paise } from '@/lib/billing/money';
 import { billingVisible } from '@/lib/plans';
+import { accountIdOfWorkspace } from '../accounts';
 import { billingConfig, creditsOffer, type BillingConfig } from '../billing/config';
 import { creditBalance, type CreditBalance } from '../billing/credits';
 import { planSettings, workspaceEntitlements } from '../plans';
@@ -22,7 +23,7 @@ export interface EsignOverview {
   creditsRequired: boolean;
   /** Credits and billing exist on this install. */
   billingVisible: boolean;
-  /** The plan lets the workspace connect its own provider account. */
+  /** The plan lets the account connect its own provider account. */
   ownAllowed: boolean;
   credits: CreditBalance;
   /** eSigns signed with no credit left; new credits pay for these first. */
@@ -48,16 +49,22 @@ function readConfig(): BillingConfig | null {
 
 export async function esignOverview(
   sql: Sql,
-  input: { workspaceId: string; appUrl: string },
+  input: {
+    workspaceId: string;
+    appUrl: string;
+    /** The reader owns the account, so they see the eSigns of all its workspaces. */
+    wholeAccount?: boolean;
+  },
 ): Promise<EsignOverview> {
   const settings = planSettings();
   const config = readConfig();
+  const accountId = await accountIdOfWorkspace(sql, input.workspaceId);
   const [saved, entitlements, state, credits, usage] = await Promise.all([
-    getEsignSettings(sql, input.workspaceId),
+    getEsignSettings(sql, accountId),
     workspaceEntitlements(sql, input.workspaceId, settings),
     esignState({ sql }, input.workspaceId),
-    creditBalance(sql, input.workspaceId),
-    listEsignUsage(sql, input.workspaceId),
+    creditBalance(sql, accountId),
+    listEsignUsage(sql, accountId, 20, input.wholeAccount ? undefined : input.workspaceId),
   ]);
   const offer = config ? creditsOffer(config, entitlements.plan) : null;
   return {
@@ -92,10 +99,11 @@ export interface EsignSendInfo {
 export async function esignSendInfo(sql: Sql, workspaceId: string): Promise<EsignSendInfo> {
   const settings = planSettings();
   const config = readConfig();
+  const accountId = await accountIdOfWorkspace(sql, workspaceId);
   const [state, entitlements, credits] = await Promise.all([
     esignState({ sql }, workspaceId),
     workspaceEntitlements(sql, workspaceId, settings),
-    creditBalance(sql, workspaceId),
+    creditBalance(sql, accountId),
   ]);
   const billed = state.mode === 'platform' && state.creditsRequired;
   return {

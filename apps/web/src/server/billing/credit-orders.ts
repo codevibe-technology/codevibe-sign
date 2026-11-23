@@ -23,13 +23,13 @@ export const creditsLine = (credits: number, pricePaise: number) =>
   `Aadhaar eSign credits × ${credits} @ ${formatInr(pricePaise)}`;
 
 /**
- * Opens an order for one pack of eSign credits at the workspace's current price. The pack must
- * be one the operator offers, and the workspace needs billing details for the invoice.
+ * Opens an order for one pack of eSign credits at the account's current price. The pack must
+ * be one the operator offers, and the account needs billing details for the invoice.
  */
 export async function createCreditsOrder(
   sql: postgres.Sql,
   deps: BillingDeps,
-  input: { workspaceId: string; userId: string; plan: Plan; credits: number; ip?: string | null },
+  input: { accountId: string; userId: string; plan: Plan; credits: number; ip?: string | null },
 ): Promise<{ order: BillingOrder; checkout: CheckoutSession }> {
   const offer = creditsOffer(deps.config, input.plan);
   if (offer.unavailable || offer.pricePaise === null) {
@@ -41,7 +41,7 @@ export async function createCreditsOrder(
   if (!offer.packs.includes(input.credits)) {
     throw new AppError('VALIDATION', 'Pick one of the credit packs on offer', 'credits');
   }
-  const buyer = await getBillingDetails(sql, input.workspaceId);
+  const buyer = await getBillingDetails(sql, input.accountId);
   if (!buyer) {
     throw new AppError(
       'VALIDATION',
@@ -50,7 +50,7 @@ export async function createCreditsOrder(
     );
   }
   return createOrder(sql, deps, {
-    workspaceId: input.workspaceId,
+    accountId: input.accountId,
     kind: 'esign_credits',
     lines: [
       {
@@ -67,14 +67,14 @@ export async function createCreditsOrder(
   });
 }
 
-/** Paying for a credits order adds its credits to the workspace, once. */
+/** Paying for a credits order adds its credits to the account, once. */
 export const fulfilCredits: Fulfilment = async (tx, order) => {
   const credits = order.payload.credits;
-  if (!order.workspaceId || typeof credits !== 'number') {
+  if (!order.accountId || typeof credits !== 'number') {
     throw new Error(`Credits order ${order.id} has no workspace or no credit count`);
   }
   const granted = await grantCredits(tx, {
-    workspaceId: order.workspaceId,
+    accountId: order.accountId,
     credits,
     ref: order.id,
     reason: 'purchase',
@@ -83,9 +83,9 @@ export const fulfilCredits: Fulfilment = async (tx, order) => {
     // Credits bought with test payments are told apart, so they can be removed on going live.
     await tx`
       update app_esign_credit_ledger set mode = ${order.mode}
-      where workspace_id = ${order.workspaceId} and kind = 'grant' and ref = ${order.id}`;
+      where account_id = ${order.accountId} and kind = 'grant' and ref = ${order.id}`;
     await recordAudit(tx, {
-      workspaceId: order.workspaceId,
+      accountId: order.accountId,
       actorId: order.createdBy,
       action: 'credits.granted',
       target: order.id,

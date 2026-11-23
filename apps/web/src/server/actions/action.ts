@@ -5,6 +5,7 @@ import { db } from '../db';
 import { AppError, type AppErrorCode } from '../errors';
 import type { PlanLimitDetails } from '../plans';
 import { getSessionUser, type SessionUser } from '../auth/session';
+import { accountOfWorkspace } from '../accounts';
 import { findMembership, type Workspace } from '../workspaces';
 
 export type ActionResult<T = undefined> =
@@ -87,6 +88,34 @@ export function workspaceAction<S extends z.ZodObject, T>(
       handler({ user, workspace: membership.workspace, role: membership.role }, parsed.data),
     );
   };
+}
+
+export interface AccountContext extends ActionContext {
+  /** The account the workspace belongs to, which the signed-in person owns. */
+  accountId: string;
+}
+
+/**
+ * A server action on what an account holds: its plan, payments, invoices, eSign credits and
+ * own provider account. Everything `workspaceAction` checks, and then that the signed-in
+ * person owns the account of that workspace. An admin or another owner of the workspace is
+ * refused: the account pays, so only its owner decides.
+ */
+export function accountAction<S extends z.ZodObject, T>(
+  permission: Permission,
+  schema: S,
+  handler: (ctx: AccountContext, input: z.infer<S>) => Promise<T>,
+) {
+  return workspaceAction(permission, schema, async (ctx, input) => {
+    const account = await accountOfWorkspace(db(), ctx.workspace.id);
+    if (account.ownerUserId !== ctx.user.id) {
+      throw new AppError(
+        'FORBIDDEN',
+        'Only the owner of this account can do this. Ask the person whose plan this workspace is on.',
+      );
+    }
+    return handler({ ...ctx, accountId: account.id }, input);
+  });
 }
 
 /** A server action for the signed-in user, outside any workspace. */

@@ -8,6 +8,8 @@ export type EsignUsageOutcome = 'signed' | 'declined' | 'expired' | 'failed';
 
 export interface EsignUsage {
   ref: string;
+  /** The account whose credits or provider account the eSign used. */
+  accountId: string;
   workspaceId: string;
   envelopeId: string;
   recipientId: string;
@@ -21,6 +23,7 @@ export interface EsignUsage {
 
 interface Row {
   ref: string;
+  account_id: string;
   workspace_id: string;
   envelope_id: string;
   recipient_id: string;
@@ -33,6 +36,7 @@ interface Row {
 
 const toUsage = (row: Row): EsignUsage => ({
   ref: row.ref,
+  accountId: row.account_id,
   workspaceId: row.workspace_id,
   envelopeId: row.envelope_id,
   recipientId: row.recipient_id,
@@ -48,6 +52,7 @@ export async function recordEsignStart(
   sql: Sql,
   input: {
     ref: string;
+    accountId: string;
     workspaceId: string;
     envelopeId: string;
     recipientId: string;
@@ -59,9 +64,9 @@ export async function recordEsignStart(
 ): Promise<void> {
   await sql`
     insert into app_esign_usage
-      (ref, workspace_id, envelope_id, recipient_id, mode, billed, sandbox)
+      (ref, account_id, workspace_id, envelope_id, recipient_id, mode, billed, sandbox)
     values (
-      ${input.ref}, ${input.workspaceId}, ${input.envelopeId}, ${input.recipientId},
+      ${input.ref}, ${input.accountId}, ${input.workspaceId}, ${input.envelopeId}, ${input.recipientId},
       ${input.mode}, ${input.billed}, ${input.sandbox ?? false}
     )
     on conflict (ref) do nothing`;
@@ -69,7 +74,7 @@ export async function recordEsignStart(
 
 export async function getEsignUsage(sql: Sql, ref: string): Promise<EsignUsage | null> {
   const rows = await sql<Row[]>`
-    select ref, workspace_id, envelope_id, recipient_id, mode, billed, outcome, started_at,
+    select ref, account_id, workspace_id, envelope_id, recipient_id, mode, billed, outcome, started_at,
            ended_at
     from app_esign_usage where ref = ${ref}`;
   return rows[0] ? toUsage(rows[0]) : null;
@@ -102,21 +107,33 @@ export async function markUnbilled(sql: Sql, ref: string): Promise<boolean> {
 
 export interface EsignUsageLine extends EsignUsage {
   envelopeTitle: string | null;
+  workspaceName: string | null;
 }
 
-/** The newest eSigns of a workspace, with the title of each envelope. */
+/**
+ * The newest eSigns of an account, with the title and the workspace of each envelope. With
+ * `workspaceId`, only those of that workspace: what someone who does not own the account may
+ * see, since they may not be in its other workspaces.
+ */
 export async function listEsignUsage(
   sql: Sql,
-  workspaceId: string,
+  accountId: string,
   limit = 20,
+  workspaceId?: string,
 ): Promise<EsignUsageLine[]> {
-  const rows = await sql<(Row & { title: string | null })[]>`
-    select u.ref, u.workspace_id, u.envelope_id, u.recipient_id, u.mode, u.billed, u.outcome,
-           u.started_at, u.ended_at, e.data->>'title' as title
+  const rows = await sql<(Row & { title: string | null; workspace_name: string | null })[]>`
+    select u.ref, u.account_id, u.workspace_id, u.envelope_id, u.recipient_id, u.mode, u.billed, u.outcome,
+           u.started_at, u.ended_at, e.data->>'title' as title, w.name as workspace_name
     from app_esign_usage u
     left join sign_envelopes e on e.id = u.envelope_id and e.workspace_id = u.workspace_id
-    where u.workspace_id = ${workspaceId}
+    left join app_workspaces w on w.id = u.workspace_id
+    where u.account_id = ${accountId}
+      ${workspaceId ? sql`and u.workspace_id = ${workspaceId}` : sql``}
     order by u.started_at desc
     limit ${Math.min(Math.max(limit, 1), 100)}`;
-  return rows.map((row) => ({ ...toUsage(row), envelopeTitle: row.title }));
+  return rows.map((row) => ({
+    ...toUsage(row),
+    envelopeTitle: row.title,
+    workspaceName: row.workspace_name,
+  }));
 }

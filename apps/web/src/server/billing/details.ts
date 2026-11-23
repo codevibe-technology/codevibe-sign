@@ -16,14 +16,14 @@ interface Row {
   email: string;
 }
 
-/** Who the workspace's invoices are made out to, or null until someone fills the form in. */
+/** Who the account's invoices are made out to, or null until someone fills the form in. */
 export async function getBillingDetails(
   sql: Sql,
-  workspaceId: string,
+  accountId: string,
 ): Promise<BillingDetails | null> {
   const [row] = await sql<Row[]>`
     select legal_name, gstin, address_line1, address_line2, city, pin, state_code, email
-    from app_billing_details where workspace_id = ${workspaceId}`;
+    from app_billing_details where account_id = ${accountId}`;
   if (!row) return null;
   return {
     legalName: row.legal_name,
@@ -40,25 +40,25 @@ export async function getBillingDetails(
 /** Saves details already checked with `billingDetailsSchema`. Invoices issued earlier keep theirs. */
 export async function saveBillingDetails(
   sql: postgres.Sql,
-  input: { workspaceId: string; userId: string; details: BillingDetails },
+  input: { accountId: string; userId: string; details: BillingDetails },
 ): Promise<void> {
   const { details: d } = input;
   await sql.begin(async (tx) => {
     await tx`
       insert into app_billing_details (
-        workspace_id, legal_name, gstin, address_line1, address_line2, city, pin, state_code,
+        account_id, legal_name, gstin, address_line1, address_line2, city, pin, state_code,
         email, updated_by
       ) values (
-        ${input.workspaceId}, ${d.legalName}, ${d.gstin}, ${d.addressLine1}, ${d.addressLine2},
+        ${input.accountId}, ${d.legalName}, ${d.gstin}, ${d.addressLine1}, ${d.addressLine2},
         ${d.city}, ${d.pin}, ${d.stateCode}, ${d.email}, ${input.userId}
       )
-      on conflict (workspace_id) do update set
+      on conflict (account_id) do update set
         legal_name = excluded.legal_name, gstin = excluded.gstin,
         address_line1 = excluded.address_line1, address_line2 = excluded.address_line2,
         city = excluded.city, pin = excluded.pin, state_code = excluded.state_code,
         email = excluded.email, updated_by = excluded.updated_by, updated_at = now()`;
     await recordAudit(tx, {
-      workspaceId: input.workspaceId,
+      accountId: input.accountId,
       actorId: input.userId,
       action: 'billing.details_updated',
       data: { stateCode: d.stateCode, registered: d.gstin !== null },

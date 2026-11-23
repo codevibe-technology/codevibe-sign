@@ -51,25 +51,25 @@ const documentOf = (invoice: Invoice): InvoiceDocument => ({
   test: invoice.order.mode === 'test',
 });
 
-/** A workspace's invoices, newest first. */
-export async function listInvoices(sql: Sql, workspaceId: string, limit = 100): Promise<Invoice[]> {
+/** An account's invoices, newest first. */
+export async function listInvoices(sql: Sql, accountId: string, limit = 100): Promise<Invoice[]> {
   const rows = await sql<InvoiceRow[]>`
     ${SELECT(sql)}
-    where i.workspace_id = ${workspaceId}
+    where i.account_id = ${accountId}
     order by i.issued_at desc, i.number desc
     limit ${Math.min(Math.max(limit, 1), 500)}`;
   return rows.map(toInvoice);
 }
 
-/** One invoice of a workspace; null for an invoice that is not this workspace's. */
+/** One invoice of an account; null for an invoice that is not this account's. */
 export async function getInvoice(
   sql: Sql,
-  workspaceId: string | null,
+  accountId: string | null,
   invoiceId: string,
 ): Promise<Invoice | null> {
   const [row] = await sql<InvoiceRow[]>`
     ${SELECT(sql)}
-    where i.id = ${invoiceId} and i.workspace_id is not distinct from ${workspaceId}`;
+    where i.id = ${invoiceId} and i.account_id is not distinct from ${accountId}`;
   return row ? toInvoice(row) : null;
 }
 
@@ -111,12 +111,12 @@ async function storedPdf(sql: Sql, deps: BillingDeps, row: InvoiceRow): Promise<
 export async function invoicePdf(
   sql: Sql,
   deps: BillingDeps,
-  workspaceId: string | null,
+  accountId: string | null,
   invoiceId: string,
 ): Promise<{ number: string; bytes: Uint8Array } | null> {
   const [row] = await sql<InvoiceRow[]>`
     ${SELECT(sql)}
-    where i.id = ${invoiceId} and i.workspace_id is not distinct from ${workspaceId}`;
+    where i.id = ${invoiceId} and i.account_id is not distinct from ${accountId}`;
   return row ? { number: row.number, bytes: await storedPdf(sql, deps, row) } : null;
 }
 
@@ -177,7 +177,7 @@ export async function finishInvoice(
       ],
       meta: {
         kind: 'invoice',
-        ...(invoice.order.workspaceId ? { workspaceId: invoice.order.workspaceId } : {}),
+        ...(invoice.order.accountId ? { accountId: invoice.order.accountId } : {}),
       },
     });
     await sql`

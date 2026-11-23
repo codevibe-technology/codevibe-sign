@@ -5,8 +5,10 @@ import { randomId } from '../crypto';
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 export interface AuditEntry {
-  /** Null for something that belongs to no workspace, such as a public purchase. */
+  /** The workspace it happened in, when there is one. */
   workspaceId?: string | null;
+  /** The account it concerns: billing, credits and the plan belong to an account. */
+  accountId?: string | null;
   /** The signed-in person, or null for the system or a webhook. */
   actorId?: string | null;
   /** For example `billing.invoice_issued` or `esign.credentials_changed`. */
@@ -21,6 +23,7 @@ export interface AuditEntry {
 export interface AuditRecord {
   id: string;
   workspaceId: string | null;
+  accountId: string | null;
   actorId: string | null;
   action: string;
   target: string | null;
@@ -31,17 +34,21 @@ export interface AuditRecord {
 /** Appends one line to the audit log. Pass the transaction to record it with the change. */
 export async function recordAudit(sql: Sql, entry: AuditEntry): Promise<void> {
   await sql`
-    insert into app_audit_log (id, workspace_id, actor_id, action, target, data, ip)
+    insert into app_audit_log (id, workspace_id, account_id, actor_id, action, target, data, ip)
     values (
-      ${randomId('aud')}, ${entry.workspaceId ?? null}, ${entry.actorId ?? null},
+      ${randomId('aud')}, ${entry.workspaceId ?? null}, ${entry.accountId ?? null},
+      ${entry.actorId ?? null},
       ${entry.action}, ${entry.target ?? null}, ${sql.json(entry.data ?? {})}, ${entry.ip ?? null}
     )`;
 }
 
-/** The newest audit lines of a workspace, optionally only actions starting with `prefix`. */
+/**
+ * The newest audit lines of a workspace or of an account, optionally only actions starting
+ * with `prefix`.
+ */
 export async function listAudit(
   sql: Sql,
-  workspaceId: string,
+  scope: { workspaceId: string } | { accountId: string },
   options: { prefix?: string; limit?: number } = {},
 ): Promise<AuditRecord[]> {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
@@ -49,6 +56,7 @@ export async function listAudit(
     {
       id: string;
       workspace_id: string | null;
+      account_id: string | null;
       actor_id: string | null;
       action: string;
       target: string | null;
@@ -56,15 +64,16 @@ export async function listAudit(
       created_at: Date;
     }[]
   >`
-    select id, workspace_id, actor_id, action, target, data, created_at
+    select id, workspace_id, account_id, actor_id, action, target, data, created_at
     from app_audit_log
-    where workspace_id = ${workspaceId}
+    where ${'accountId' in scope ? sql`account_id = ${scope.accountId}` : sql`workspace_id = ${scope.workspaceId}`}
       ${options.prefix ? sql`and starts_with(action, ${options.prefix})` : sql``}
     order by created_at desc, id desc
     limit ${limit}`;
   return rows.map((row) => ({
     id: row.id,
     workspaceId: row.workspace_id,
+    accountId: row.account_id,
     actorId: row.actor_id,
     action: row.action,
     target: row.target,

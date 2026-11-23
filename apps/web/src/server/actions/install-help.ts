@@ -48,7 +48,7 @@ export const confirmInstallHelpAction = publicAction(
     const sql = db();
     const deps = billingDeps();
     const outcome = await confirmCheckout(sql, deps, {
-      workspaceId: null,
+      accountId: null,
       razorpayOrderId: input.orderId,
       paymentId: input.paymentId,
       signature: input.signature,

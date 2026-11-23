@@ -73,8 +73,8 @@ export type OrderPayload = Record<string, string | number | boolean | null>;
 
 export interface BillingOrder {
   id: string;
-  /** Null for a purchase made without a workspace. */
-  workspaceId: string | null;
+  /** Null for a purchase made without an account. */
+  accountId: string | null;
   kind: OrderKind;
   payload: OrderPayload;
   lines: InvoiceLine[];
@@ -148,7 +148,7 @@ export function registerReversal(kind: OrderKind, handler: Reversal): void {
 
 interface OrderRow {
   id: string;
-  workspace_id: string | null;
+  account_id: string | null;
   kind: OrderKind;
   payload: OrderPayload;
   lines: InvoiceLine[];
@@ -180,7 +180,7 @@ function toOrder(row: OrderRow): BillingOrder {
   const intra = row.seller.stateCode === row.buyer.stateCode;
   return {
     id: row.id,
-    workspaceId: row.workspace_id,
+    accountId: row.account_id,
     kind: row.kind,
     payload: row.payload,
     lines: row.lines,
@@ -235,7 +235,7 @@ function providerFailure(err: unknown): never {
 }
 
 export interface NewOrder {
-  workspaceId: string | null;
+  accountId: string | null;
   kind: OrderKind;
   /** What the invoice lists. Amounts come from the server's own prices, never from a request. */
   lines: { description: string; quantity: number; unitPaise: Paise }[];
@@ -281,7 +281,7 @@ export async function createOrder(
     .createOrder({
       amountPaise: tax.totalPaise,
       receipt: id,
-      notes: { kind: input.kind, ...(input.workspaceId ? { workspace: input.workspaceId } : {}) },
+      notes: { kind: input.kind, ...(input.accountId ? { workspace: input.accountId } : {}) },
     })
     .catch(providerFailure);
 
@@ -289,11 +289,11 @@ export async function createOrder(
   const [row] = await sql.begin(async (tx) => {
     const rows = await tx<OrderRow[]>`
       insert into app_billing_orders (
-        id, workspace_id, kind, payload, lines, buyer, seller, sac, gst_percent, taxable_paise,
+        id, account_id, kind, payload, lines, buyer, seller, sac, gst_percent, taxable_paise,
         cgst_paise, sgst_paise, igst_paise, total_paise, mode, razorpay_order_id, created_by,
         created_at, updated_at
       ) values (
-        ${id}, ${input.workspaceId}, ${input.kind}, ${tx.json(input.payload)},
+        ${id}, ${input.accountId}, ${input.kind}, ${tx.json(input.payload)},
         ${tx.json(lines as never)}, ${tx.json(input.buyer as never)}, ${tx.json(seller as never)},
         ${deps.config.sac}, ${deps.config.gstPercent}, ${tax.taxablePaise}, ${tax.cgstPaise},
         ${tax.sgstPaise}, ${tax.igstPaise}, ${tax.totalPaise}, ${keys.mode}, ${remote.id},
@@ -302,7 +302,7 @@ export async function createOrder(
       returning *`;
     await input.alongside?.(tx, id);
     await recordAudit(tx, {
-      workspaceId: input.workspaceId,
+      accountId: input.accountId,
       actorId: input.createdBy,
       action: 'billing.order_created',
       target: id,
@@ -451,7 +451,7 @@ export async function fulfilOrder(
         where id = ${order.id}
         returning *`;
       await recordAudit(tx, {
-        workspaceId: order.workspaceId,
+        accountId: order.accountId,
         action: 'billing.payment_unapplied',
         target: order.id,
         data: { paymentId: payment.id, totalPaise: order.tax.totalPaise, reason: unapplied },
@@ -459,7 +459,7 @@ export async function fulfilOrder(
       await queueOperatorNotice(tx, {
         kind: 'payment_unapplied',
         orderId: order.id,
-        workspaceId: order.workspaceId,
+        accountId: order.accountId,
         data: { reason: unapplied },
       });
       return { order: toOrder(kept!), invoice: null, fresh: true, unapplied };
@@ -467,16 +467,16 @@ export async function fulfilOrder(
     const { number, issuedAt } = await nextInvoice(tx, deps, paidOrder);
     const invoice = { id: randomId('inv'), number };
     await tx`
-      insert into app_invoices (id, number, order_id, workspace_id, issued_at)
-      values (${invoice.id}, ${number}, ${order.id}, ${order.workspaceId}, ${issuedAt})`;
+      insert into app_invoices (id, number, order_id, account_id, issued_at)
+      values (${invoice.id}, ${number}, ${order.id}, ${order.accountId}, ${issuedAt})`;
     await recordAudit(tx, {
-      workspaceId: order.workspaceId,
+      accountId: order.accountId,
       action: 'billing.payment_captured',
       target: order.id,
       data: { paymentId: payment.id, totalPaise: order.tax.totalPaise, mode: order.mode },
     });
     await recordAudit(tx, {
-      workspaceId: order.workspaceId,
+      accountId: order.accountId,
       action: 'billing.invoice_issued',
       target: invoice.id,
       data: { number, orderId: order.id, totalPaise: order.tax.totalPaise },
@@ -515,7 +515,7 @@ export async function confirmCheckout(
   deps: BillingDeps,
   input: {
     /** The workspace the caller acts in, or null for a public purchase. */
-    workspaceId: string | null;
+    accountId: string | null;
     razorpayOrderId: string;
     paymentId: string;
     signature: string;
@@ -530,7 +530,7 @@ export async function confirmCheckout(
   const [row] = await sql<OrderRow[]>`
     select * from app_billing_orders
     where razorpay_order_id = ${input.razorpayOrderId}
-      and workspace_id is not distinct from ${input.workspaceId}`;
+      and account_id is not distinct from ${input.accountId}`;
   if (!row) throw new AppError('NOT_FOUND', 'Order not found');
   if (!verifyCheckoutSignature({ ...input, orderId: row.razorpay_order_id }, keys.keySecret)) {
     throw new AppError('VALIDATION', UNVERIFIED);
@@ -695,7 +695,7 @@ async function reverseFromWebhook(
     if (!reversing || !refundedInFull || order.status === 'refunded') {
       if (order.status === 'refunded') return true;
       await recordAudit(tx, {
-        workspaceId: order.workspaceId,
+        accountId: order.accountId,
         action: 'billing.refund_noted',
         target: order.id,
         data: { ...base, paymentId, partial: Boolean(reversing) },
@@ -703,7 +703,7 @@ async function reverseFromWebhook(
       await queueOperatorNotice(tx, {
         kind: noticeOnly ?? 'refund_started',
         orderId: order.id,
-        workspaceId: order.workspaceId,
+        accountId: order.accountId,
         data: { ...base, partial: Boolean(reversing) },
       });
       return true;
@@ -718,7 +718,7 @@ async function reverseFromWebhook(
       ? ((await reversals().get(order.kind)?.(tx, toOrder(refunded!), { now })) ?? {})
       : {};
     await recordAudit(tx, {
-      workspaceId: order.workspaceId,
+      accountId: order.accountId,
       action: 'billing.payment_refunded',
       target: order.id,
       data: { ...base, paymentId, ...taken },
@@ -728,7 +728,7 @@ async function reverseFromWebhook(
       await queueOperatorNotice(tx, {
         kind: reversing,
         orderId: order.id,
-        workspaceId: order.workspaceId,
+        accountId: order.accountId,
         data: { ...base, ...taken },
       });
     }
@@ -766,15 +766,15 @@ async function finishInvoiceQuietly(
   );
 }
 
-/** An order of a workspace, by its own id. */
+/** An order of an account, by its own id. */
 export async function getOrder(
   sql: Sql,
-  workspaceId: string | null,
+  accountId: string | null,
   orderId: string,
 ): Promise<BillingOrder | null> {
   const [row] = await sql<OrderRow[]>`
     select * from app_billing_orders
-    where id = ${orderId} and workspace_id is not distinct from ${workspaceId}`;
+    where id = ${orderId} and account_id is not distinct from ${accountId}`;
   return row ? toOrder(row) : null;
 }
 

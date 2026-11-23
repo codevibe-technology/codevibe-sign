@@ -9,6 +9,7 @@ import { SignError } from '@codevibe_technology/sign-core';
 import type { EsignOptions, EsignUnavailable } from '@codevibe_technology/sign-server';
 import type postgres from 'postgres';
 import { billingVisible } from '@/lib/plans';
+import { accountIdOfWorkspace } from '../accounts';
 import { recordAudit } from '../billing/audit';
 import {
   LEEGALITY_PRODUCTION_URL,
@@ -58,7 +59,8 @@ export const ESIGN_BLOCKED: Record<string, string> = {
   own_sandbox_live:
     'Your Leegality account is a sandbox account, which is for testing only. Connect your production Leegality account in Settings, Aadhaar eSign.',
   price_not_set: 'Aadhaar eSign is coming soon. Its price has not been published yet.',
-  no_credits: 'This workspace has no Aadhaar eSign credits left. Buy credits in Settings, Billing.',
+  no_credits:
+    'This account has no Aadhaar eSign credits left. Its owner can buy credits in Settings, Billing.',
 };
 
 export interface EsignState {
@@ -112,13 +114,18 @@ const safeConfig = (deps: EsignRuntimeDeps): BillingConfig | null => {
   }
 };
 
-/** Whether a workspace can start an Aadhaar eSign now, and on which account. */
+/**
+ * Whether a workspace can start an Aadhaar eSign now, and how. The mode, the provider details
+ * and the credits all belong to the workspace's account, so every workspace of an account
+ * gets the same answer.
+ */
 export async function esignState(deps: EsignRuntimeDeps, workspaceId: string): Promise<EsignState> {
   const { sql } = deps;
   const settings = planSettings();
   const hosted = billingVisible(settings);
+  const accountId = await accountIdOfWorkspace(sql, workspaceId);
   const [saved, entitlements] = await Promise.all([
-    getEsignSettings(sql, workspaceId),
+    getEsignSettings(sql, accountId),
     workspaceEntitlements(sql, workspaceId, settings),
   ]);
   const block = (reason: string, key = reason) => ({
@@ -130,7 +137,7 @@ export async function esignState(deps: EsignRuntimeDeps, workspaceId: string): P
   if (saved.mode === 'own') {
     const credentials =
       entitlements.ownEsignAccount && saved.own.configured
-        ? await ownCredentials(sql, workspaceId)
+        ? await ownCredentials(sql, accountId)
         : null;
     const sandbox = saved.own.environment === 'sandbox';
     const blocked = !entitlements.ownEsignAccount
@@ -154,7 +161,7 @@ export async function esignState(deps: EsignRuntimeDeps, workspaceId: string): P
     };
   }
   if (!hosted) return { mode: 'platform', creditsRequired: false, blocked: null, sandbox, owed: 0 };
-  const owed = await settleOwedEsigns(sql, workspaceId);
+  const owed = await settleOwedEsigns(sql, accountId);
   if (!esignPrice(config, entitlements.plan)) {
     return {
       mode: 'platform',
@@ -164,7 +171,7 @@ export async function esignState(deps: EsignRuntimeDeps, workspaceId: string): P
       owed,
     };
   }
-  const { available } = await creditBalance(sql, workspaceId);
+  const { available } = await creditBalance(sql, accountId);
   return {
     mode: 'platform',
     creditsRequired: true,
@@ -204,10 +211,10 @@ export const providerForCredentials = (credentials: OwnCredentials, fetch?: Fetc
 
 type Hold = 'none' | 'held' | 'consumed' | 'released';
 
-async function holdOf(sql: Sql, input: { workspaceId: string; ref: string }): Promise<Hold> {
+async function holdOf(sql: Sql, input: { accountId: string; ref: string }): Promise<Hold> {
   const rows = await sql<{ kind: string }[]>`
     select kind from app_esign_credit_ledger
-    where workspace_id = ${input.workspaceId} and ref = ${input.ref}`;
+    where account_id = ${input.accountId} and ref = ${input.ref}`;
   const kinds = new Set(rows.map((row) => row.kind));
   if (kinds.has('consume')) return 'consumed';
   if (kinds.has('release')) return 'released';
@@ -217,14 +224,14 @@ async function holdOf(sql: Sql, input: { workspaceId: string; ref: string }): Pr
 /**
  * Spends the credit of a signed eSign, once however often it is asked. When the hold was
  * already given back (the signature came after the wait ended) it takes a credit again under
- * a second reference. False when the workspace has none left; the balance never goes negative.
+ * a second reference. False when the account has none left; the balance never goes negative.
  */
-async function spend(sql: Sql, hold: { workspaceId: string; ref: string }): Promise<boolean> {
+async function spend(sql: Sql, hold: { accountId: string; ref: string }): Promise<boolean> {
   const first = await holdOf(sql, hold);
   if (first === 'consumed') return true;
   if (first === 'held')
     return (await consumeCredit(sql, hold)) || (await holdOf(sql, hold)) === 'consumed';
-  const late = { workspaceId: hold.workspaceId, ref: `${hold.ref}:late` };
+  const late = { accountId: hold.accountId, ref: `${hold.ref}:late` };
   if ((await holdOf(sql, late)) === 'consumed') return true;
   if (!(await reserveCredit(sql, late))) return false;
   return (await consumeCredit(sql, late)) || (await holdOf(sql, late)) === 'consumed';
@@ -242,19 +249,20 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
   const cache = new Map<string, { key: string; provider: EsignProvider }>();
 
   async function provider(workspaceId: string): Promise<EsignProvider | null> {
-    const saved = await getEsignSettings(sql, workspaceId);
+    const accountId = await accountIdOfWorkspace(sql, workspaceId);
+    const saved = await getEsignSettings(sql, accountId);
     if (saved.mode === 'own') {
       const entitlements = await workspaceEntitlements(sql, workspaceId);
       if (!entitlements.ownEsignAccount) return null;
       const key = `own:${saved.version}`;
-      const hit = cache.get(workspaceId);
+      const hit = cache.get(accountId);
       if (hit?.key === key) return hit.provider;
-      const credentials = await ownCredentials(sql, workspaceId);
+      const credentials = await ownCredentials(sql, accountId);
       if (!credentials) return null;
       // A sandbox signature has no legal effect, so a live install does not make them.
       if (credentials.environment === 'sandbox' && safeConfig(deps)?.live) return null;
       const made = fromOwn(credentials, deps.fetch);
-      cache.set(workspaceId, { key, provider: made });
+      cache.set(accountId, { key, provider: made });
       return made;
     }
     const config = safeConfig(deps)?.leegality;
@@ -282,15 +290,26 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
 
     async onStart(input) {
       const state = await esignState(deps, input.workspaceId);
+      const accountId = await accountIdOfWorkspace(sql, input.workspaceId);
       const billed = state.mode === 'platform' && state.creditsRequired;
       // One transaction: a credit is never left held without the row that gives it back.
       await sql.begin(async (tx) => {
-        if (billed && (state.owed > 0 || !(await reserveCredit(tx, input)))) {
+        if (
+          billed &&
+          (state.owed > 0 || !(await reserveCredit(tx, { accountId, ref: input.ref })))
+        ) {
           throw new SignError('ESIGN_UNAVAILABLE', SIGNER_NO_CREDITS, { reason: 'no_credits' });
         }
-        await recordEsignStart(tx, { ...input, mode: state.mode, billed, sandbox: state.sandbox });
+        await recordEsignStart(tx, {
+          ...input,
+          accountId,
+          mode: state.mode,
+          billed,
+          sandbox: state.sandbox,
+        });
         await recordAudit(tx, {
           workspaceId: input.workspaceId,
+          accountId,
           action: 'esign.started',
           target: input.envelopeId,
           data: { ref: input.ref, recipientId: input.recipientId, mode: state.mode },
@@ -301,17 +320,18 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
     async onEnd(input) {
       const usage = await getEsignUsage(sql, input.ref);
       if (!usage || usage.workspaceId !== input.workspaceId) return;
-      const hold = { workspaceId: input.workspaceId, ref: input.ref };
+      const hold = { accountId: usage.accountId, ref: input.ref };
+      const where = { workspaceId: input.workspaceId, accountId: usage.accountId };
       const data = { ref: input.ref, recipientId: input.recipientId, mode: usage.mode };
       if (usage.billed && input.outcome !== 'signed') {
         await releaseCredit(sql, hold);
         // A credit that came back pays for an eSign still owed before anything else.
-        await settleOwedEsigns(sql, input.workspaceId);
+        await settleOwedEsigns(sql, usage.accountId);
       }
       if (usage.billed && input.outcome === 'signed' && !(await spend(sql, hold))) {
         if (await markUnbilled(sql, input.ref)) {
           await recordAudit(sql, {
-            workspaceId: input.workspaceId,
+            ...where,
             action: 'esign.unbilled',
             target: input.envelopeId,
             data,
@@ -320,7 +340,7 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
       }
       if (await recordEsignOutcome(sql, input.ref, input.outcome)) {
         await recordAudit(sql, {
-          workspaceId: input.workspaceId,
+          ...where,
           action: input.outcome === 'signed' ? 'esign.completed' : 'esign.failed',
           target: input.envelopeId,
           data: { ...data, outcome: input.outcome },

@@ -58,7 +58,7 @@ export async function createInstallBooking(
   };
   const bookingId = randomId('book');
   const { checkout } = await createOrder(sql, deps, {
-    workspaceId: null,
+    accountId: null,
     kind: 'install_help',
     lines: [{ description: SUMMARY, quantity: 1, unitPaise: deps.config.installHelpPaise }],
     payload: { bookingId },

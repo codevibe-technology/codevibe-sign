@@ -8,7 +8,7 @@ type Sql = postgres.Sql | postgres.TransactionSql;
 export type EsignMode = 'platform' | 'own';
 export type EsignEnvironment = 'sandbox' | 'production';
 
-/** What the app may show about a workspace's eSign set-up. Never holds a credential. */
+/** What the app may show about an account's eSign set-up. Never holds a credential. */
 export interface EsignSettings {
   mode: EsignMode;
   own: {
@@ -57,8 +57,8 @@ const DEFAULTS: EsignSettings = {
   version: 0,
 };
 
-const context = (workspaceId: string, what: 'apiKey' | 'privateSalt') =>
-  `${workspaceId}:leegality.${what}`;
+const context = (accountId: string, what: 'apiKey' | 'privateSalt') =>
+  `${accountId}:leegality.${what}`;
 
 const hasCredentials = (row: Row) =>
   Boolean(row.own_api_key && row.own_private_salt && row.own_workflow_id && row.own_environment);
@@ -76,16 +76,16 @@ const toSettings = (row: Row): EsignSettings => ({
   version: row.version,
 });
 
-async function read(sql: Sql, workspaceId: string): Promise<Row | null> {
+async function read(sql: Sql, accountId: string): Promise<Row | null> {
   const [row] = await sql<Row[]>`
     select mode, own_api_key, own_private_salt, own_workflow_id, own_environment, own_key_hint,
            own_saved_at, own_tested_at, own_test_ok, version
-    from app_esign_settings where workspace_id = ${workspaceId}`;
+    from app_esign_settings where account_id = ${accountId}`;
   return row ?? null;
 }
 
-export async function getEsignSettings(sql: Sql, workspaceId: string): Promise<EsignSettings> {
-  const row = await read(sql, workspaceId);
+export async function getEsignSettings(sql: Sql, accountId: string): Promise<EsignSettings> {
+  const row = await read(sql, accountId);
   return row ? toSettings(row) : DEFAULTS;
 }
 
@@ -93,16 +93,13 @@ export async function getEsignSettings(sql: Sql, workspaceId: string): Promise<E
  * The workspace's own provider credentials, opened for use on the server. Null when none are
  * saved or they can no longer be opened (the install's secret key changed).
  */
-export async function ownCredentials(
-  sql: Sql,
-  workspaceId: string,
-): Promise<OwnCredentials | null> {
-  const row = await read(sql, workspaceId);
+export async function ownCredentials(sql: Sql, accountId: string): Promise<OwnCredentials | null> {
+  const row = await read(sql, accountId);
   if (!row || !hasCredentials(row)) return null;
   try {
     return {
-      apiKey: openSecret(row.own_api_key!, context(workspaceId, 'apiKey')),
-      privateSalt: openSecret(row.own_private_salt!, context(workspaceId, 'privateSalt')),
+      apiKey: openSecret(row.own_api_key!, context(accountId, 'apiKey')),
+      privateSalt: openSecret(row.own_private_salt!, context(accountId, 'privateSalt')),
       workflowId: row.own_workflow_id!,
       environment: row.own_environment!,
     };
@@ -111,11 +108,11 @@ export async function ownCredentials(
   }
 }
 
-/** eSigns of the workspace that were started and have not ended yet. */
-export async function openEsigns(sql: Sql, workspaceId: string): Promise<number> {
+/** eSigns of the account that were started and have not ended yet. */
+export async function openEsigns(sql: Sql, accountId: string): Promise<number> {
   const [row] = await sql<{ count: number }[]>`
     select count(*)::int as count from app_esign_usage
-    where workspace_id = ${workspaceId} and outcome is null
+    where account_id = ${accountId} and outcome is null
       and started_at > now() - interval '25 hours'`;
   return row?.count ?? 0;
 }
@@ -124,8 +121,8 @@ export async function openEsigns(sql: Sql, workspaceId: string): Promise<number>
  * A callback from the provider is checked with the account the eSign was started on, so the
  * account cannot change while a signer is at the provider.
  */
-async function assertNoneOpen(sql: Sql, workspaceId: string): Promise<void> {
-  if ((await openEsigns(sql, workspaceId)) > 0) {
+async function assertNoneOpen(sql: Sql, accountId: string): Promise<void> {
+  if ((await openEsigns(sql, accountId)) > 0) {
     throw new AppError(
       'CONFLICT',
       'Someone is signing with Aadhaar eSign right now. Change this once they have finished, or after the request expires.',
@@ -135,74 +132,74 @@ async function assertNoneOpen(sql: Sql, workspaceId: string): Promise<void> {
 
 export async function setEsignMode(
   sql: Sql,
-  input: { workspaceId: string; userId: string; mode: EsignMode },
+  input: { accountId: string; userId: string; mode: EsignMode },
 ): Promise<EsignSettings> {
-  const current = await getEsignSettings(sql, input.workspaceId);
+  const current = await getEsignSettings(sql, input.accountId);
   if (current.mode === input.mode) return current;
   if (input.mode === 'own' && !current.own.configured) {
     throw new AppError('VALIDATION', 'Add your Leegality account details first.', 'credentials');
   }
-  await assertNoneOpen(sql, input.workspaceId);
+  await assertNoneOpen(sql, input.accountId);
   await sql`
-    insert into app_esign_settings (workspace_id, mode, version, updated_by)
-    values (${input.workspaceId}, ${input.mode}, 1, ${input.userId})
-    on conflict (workspace_id) do update
+    insert into app_esign_settings (account_id, mode, version, updated_by)
+    values (${input.accountId}, ${input.mode}, 1, ${input.userId})
+    on conflict (account_id) do update
     set mode = excluded.mode, version = app_esign_settings.version + 1,
         updated_by = excluded.updated_by, updated_at = now()`;
-  return getEsignSettings(sql, input.workspaceId);
+  return getEsignSettings(sql, input.accountId);
 }
 
 export async function saveOwnCredentials(
   sql: Sql,
-  input: { workspaceId: string; userId: string; credentials: OwnCredentials },
+  input: { accountId: string; userId: string; credentials: OwnCredentials },
 ): Promise<EsignSettings> {
-  const { workspaceId, credentials } = input;
-  const current = await getEsignSettings(sql, workspaceId);
-  if (current.mode === 'own') await assertNoneOpen(sql, workspaceId);
-  const apiKey = sealSecret(credentials.apiKey, context(workspaceId, 'apiKey'));
-  const salt = sealSecret(credentials.privateSalt, context(workspaceId, 'privateSalt'));
+  const { accountId, credentials } = input;
+  const current = await getEsignSettings(sql, accountId);
+  if (current.mode === 'own') await assertNoneOpen(sql, accountId);
+  const apiKey = sealSecret(credentials.apiKey, context(accountId, 'apiKey'));
+  const salt = sealSecret(credentials.privateSalt, context(accountId, 'privateSalt'));
   const hint = credentials.apiKey.slice(-4);
   await sql`
     insert into app_esign_settings (
-      workspace_id, own_api_key, own_private_salt, own_workflow_id, own_environment,
+      account_id, own_api_key, own_private_salt, own_workflow_id, own_environment,
       own_key_hint, own_saved_at, version, updated_by
     ) values (
-      ${workspaceId}, ${apiKey}, ${salt}, ${credentials.workflowId}, ${credentials.environment},
+      ${accountId}, ${apiKey}, ${salt}, ${credentials.workflowId}, ${credentials.environment},
       ${hint}, now(), 1, ${input.userId}
     )
-    on conflict (workspace_id) do update
+    on conflict (account_id) do update
     set own_api_key = excluded.own_api_key, own_private_salt = excluded.own_private_salt,
         own_workflow_id = excluded.own_workflow_id, own_environment = excluded.own_environment,
         own_key_hint = excluded.own_key_hint, own_saved_at = now(),
         own_tested_at = null, own_test_ok = null,
         version = app_esign_settings.version + 1,
         updated_by = excluded.updated_by, updated_at = now()`;
-  return getEsignSettings(sql, workspaceId);
+  return getEsignSettings(sql, accountId);
 }
 
-/** Forgets the workspace's own account and goes back to the install's. */
+/** Forgets the account's own account and goes back to the install's. */
 export async function removeOwnCredentials(
   sql: Sql,
-  input: { workspaceId: string; userId: string },
+  input: { accountId: string; userId: string },
 ): Promise<EsignSettings> {
-  const current = await getEsignSettings(sql, input.workspaceId);
-  if (current.mode === 'own') await assertNoneOpen(sql, input.workspaceId);
+  const current = await getEsignSettings(sql, input.accountId);
+  if (current.mode === 'own') await assertNoneOpen(sql, input.accountId);
   await sql`
     update app_esign_settings
     set mode = 'platform', own_api_key = null, own_private_salt = null, own_workflow_id = null,
         own_environment = null, own_key_hint = null, own_saved_at = null, own_tested_at = null,
         own_test_ok = null, version = version + 1, updated_by = ${input.userId},
         updated_at = now()
-    where workspace_id = ${input.workspaceId}`;
-  return getEsignSettings(sql, input.workspaceId);
+    where account_id = ${input.accountId}`;
+  return getEsignSettings(sql, input.accountId);
 }
 
 export async function recordConnectionTest(
   sql: Sql,
-  workspaceId: string,
+  accountId: string,
   ok: boolean,
 ): Promise<void> {
   await sql`
     update app_esign_settings set own_tested_at = now(), own_test_ok = ${ok}
-    where workspace_id = ${workspaceId}`;
+    where account_id = ${accountId}`;
 }

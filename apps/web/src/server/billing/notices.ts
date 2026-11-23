@@ -27,14 +27,14 @@ export async function queueOperatorNotice(
   input: {
     kind: OperatorNoticeKind;
     orderId?: string | null;
-    workspaceId?: string | null;
+    accountId?: string | null;
     data?: NoticeData;
   },
 ): Promise<void> {
   await sql`
-    insert into app_operator_notices (id, kind, order_id, workspace_id, data)
+    insert into app_operator_notices (id, kind, order_id, account_id, data)
     values (
-      ${randomId('note')}, ${input.kind}, ${input.orderId ?? null}, ${input.workspaceId ?? null},
+      ${randomId('note')}, ${input.kind}, ${input.orderId ?? null}, ${input.accountId ?? null},
       ${sql.json(input.data ?? {})}
     )`;
 }
@@ -49,7 +49,7 @@ const SUBJECTS: Record<OperatorNoticeKind, string> = {
 
 const ADVICE: Record<OperatorNoticeKind, string> = {
   payment_unapplied:
-    'Nothing was added to the workspace and no invoice was issued. Refund the payment from the Razorpay dashboard, or apply it by hand.',
+    'Nothing was added to the account and no invoice was issued. Refund the payment from the Razorpay dashboard, or apply it by hand.',
   payment_refunded: 'What the payment bought was taken back where it had not been used yet.',
   refund_started:
     'Nothing was changed yet. What the payment bought is taken back once the refund is processed in full.',
@@ -61,13 +61,13 @@ interface NoticeRow {
   id: string;
   kind: OperatorNoticeKind;
   order_id: string | null;
-  workspace_id: string | null;
+  account_id: string | null;
   data: NoticeData;
   order_kind: string | null;
   total_paise: string | null;
   mode: 'test' | 'live' | null;
   razorpay_payment_id: string | null;
-  workspace_name: string | null;
+  owner_email: string | null;
 }
 
 function body(row: NoticeRow): string {
@@ -82,9 +82,7 @@ function body(row: NoticeRow): string {
     ...(row.order_id ? [`Order: ${row.order_id} (${row.order_kind ?? 'unknown'})`] : []),
     ...(row.total_paise ? [`Amount: ${formatInr(Number(row.total_paise))}, GST included`] : []),
     ...(row.razorpay_payment_id ? [`Razorpay payment: ${row.razorpay_payment_id}`] : []),
-    ...(row.workspace_id
-      ? [`Workspace: ${row.workspace_name ?? ''} (${row.workspace_id})`.replace('  ', ' ')]
-      : []),
+    ...(row.account_id ? [`Account: ${row.owner_email ?? 'no owner'} (${row.account_id})`] : []),
     ...details,
   ].join('\n');
 }
@@ -114,11 +112,12 @@ export async function sendOperatorNotices(
       )
       returning *
     )
-    select c.id, c.kind, c.order_id, c.workspace_id, c.data, o.kind as order_kind,
-      o.total_paise, o.mode, o.razorpay_payment_id, w.name as workspace_name
+    select c.id, c.kind, c.order_id, c.account_id, c.data, o.kind as order_kind,
+      o.total_paise, o.mode, o.razorpay_payment_id, u.email as owner_email
     from claimed c
     left join app_billing_orders o on o.id = c.order_id
-    left join app_workspaces w on w.id = c.workspace_id
+    left join app_accounts a on a.id = c.account_id
+    left join auth_users u on u.id = a.owner_user_id
     order by c.created_at`;
   let sent = 0;
   for (const row of rows) {
@@ -129,7 +128,7 @@ export async function sendOperatorNotices(
         text: body(row),
         meta: {
           kind: 'operator_notice',
-          ...(row.workspace_id ? { workspaceId: row.workspace_id } : {}),
+          ...(row.account_id ? { accountId: row.account_id } : {}),
         },
       });
       await sql`

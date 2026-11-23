@@ -48,12 +48,12 @@ export interface BillingOverview {
 export async function billingOverview(
   sql: Sql,
   config: BillingConfig,
-  input: { workspaceId: string; plan: Plan },
+  input: { accountId: string; plan: Plan },
 ): Promise<BillingOverview> {
   const [details, credits, invoices] = await Promise.all([
-    getBillingDetails(sql, input.workspaceId),
-    creditBalance(sql, input.workspaceId),
-    listInvoices(sql, input.workspaceId),
+    getBillingDetails(sql, input.accountId),
+    creditBalance(sql, input.accountId),
+    listInvoices(sql, input.accountId),
   ]);
   return {
     details,

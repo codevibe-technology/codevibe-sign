@@ -1,4 +1,4 @@
-import { can } from '@/lib/roles';
+import { accountOfWorkspace } from '@/server/accounts';
 import { getSessionUser } from '@/server/auth/session';
 import { invoicePdf } from '@/server/billing/invoices';
 import { billingDeps } from '@/server/billing/runtime';
@@ -14,8 +14,8 @@ const notFound = () =>
   );
 
 /**
- * An invoice as a PDF, for admins and owners of the workspace it was issued to. Anyone else,
- * and an invoice of another workspace, gets the same 404.
+ * An invoice as a PDF, for the owner of the account it was issued to, reached through any
+ * workspace of that account. Anyone else, and an invoice of another account, gets the same 404.
  */
 export async function GET(
   _request: Request,
@@ -27,8 +27,10 @@ export async function GET(
   if (workspaceId.length > 64 || invoiceId.length > 64) return notFound();
   const sql = db();
   const membership = await findMembership(sql, user.id, { id: workspaceId });
-  if (!membership || !can(membership.role, 'billing.manage')) return notFound();
-  const invoice = await invoicePdf(sql, billingDeps(), membership.workspace.id, invoiceId);
+  if (!membership) return notFound();
+  const account = await accountOfWorkspace(sql, membership.workspace.id);
+  if (account.ownerUserId !== user.id) return notFound();
+  const invoice = await invoicePdf(sql, billingDeps(), account.id, invoiceId);
   if (!invoice) return notFound();
   return new Response(Buffer.from(invoice.bytes), {
     headers: {

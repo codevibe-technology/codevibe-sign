@@ -21,7 +21,7 @@ import {
   type EsignSettings,
 } from '../esign/settings';
 import { assertOwnEsignAccount } from '../plans';
-import { workspaceAction, type ActionContext } from './action';
+import { accountAction, type AccountContext } from './action';
 
 const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}`, 'layout');
 
@@ -29,9 +29,9 @@ const holder = globalThis as unknown as { __cvsEsignLimiter?: RateLimiter };
 const limiter = () => (holder.__cvsEsignLimiter ??= memoryRateLimiter({ maxKeys: 10_000 }));
 const TEN_MINUTES = 10 * 60 * 1000;
 
-async function limit(what: string, ctx: ActionContext, max: number): Promise<void> {
+async function limit(what: string, ctx: AccountContext, max: number): Promise<void> {
   const hit = await limiter().hit(
-    `${what}:${ctx.workspace.id}:${ctx.user.id}`,
+    `${what}:${ctx.accountId}:${ctx.user.id}`,
     max,
     TEN_MINUTES,
     new Date(),
@@ -45,12 +45,13 @@ async function limit(what: string, ctx: ActionContext, max: number): Promise<voi
 }
 
 async function audit(
-  ctx: ActionContext,
+  ctx: AccountContext,
   action: string,
   data: Record<string, string | number | boolean | null> = {},
 ): Promise<void> {
   await recordAudit(db(), {
     workspaceId: ctx.workspace.id,
+    accountId: ctx.accountId,
     actorId: ctx.user.id,
     action,
     data,
@@ -59,15 +60,15 @@ async function audit(
 }
 
 /** Chooses whose provider account the workspace's Aadhaar eSigns go through. */
-export const setEsignModeAction = workspaceAction(
+export const setEsignModeAction = accountAction(
   'esign.manage',
   z.object({ mode: z.enum(['platform', 'own']) }),
   async (ctx, input): Promise<EsignSettings> => {
     const sql = db();
     if (input.mode === 'own') await assertOwnEsignAccount(sql, ctx.workspace.id);
-    const before = await getEsignSettings(sql, ctx.workspace.id);
+    const before = await getEsignSettings(sql, ctx.accountId);
     const saved = await setEsignMode(sql, {
-      workspaceId: ctx.workspace.id,
+      accountId: ctx.accountId,
       userId: ctx.user.id,
       mode: input.mode,
     });
@@ -124,7 +125,7 @@ function connectionProblem(error: unknown): string {
  * Saves the workspace's own Leegality account. The values are tried against Leegality first
  * and are stored encrypted; nothing ever sends them back to a browser.
  */
-export const saveEsignCredentialsAction = workspaceAction(
+export const saveEsignCredentialsAction = accountAction(
   'esign.manage',
   z.object(credentialsShape),
   async (ctx, input): Promise<EsignSettings> => {
@@ -151,23 +152,23 @@ export const saveEsignCredentialsAction = workspaceAction(
       ok = false;
     }
     await saveOwnCredentials(sql, {
-      workspaceId: ctx.workspace.id,
+      accountId: ctx.accountId,
       userId: ctx.user.id,
       credentials,
     });
-    await recordConnectionTest(sql, ctx.workspace.id, ok);
+    await recordConnectionTest(sql, ctx.accountId, ok);
     await audit(ctx, 'esign.credentials_saved', { environment, checked: ok });
     refresh(ctx.workspace.slug);
-    return getEsignSettings(sql, ctx.workspace.id);
+    return getEsignSettings(sql, ctx.accountId);
   },
 );
 
-export const removeEsignCredentialsAction = workspaceAction(
+export const removeEsignCredentialsAction = accountAction(
   'esign.manage',
   z.object({}),
   async (ctx): Promise<EsignSettings> => {
     const saved = await removeOwnCredentials(db(), {
-      workspaceId: ctx.workspace.id,
+      accountId: ctx.accountId,
       userId: ctx.user.id,
     });
     await audit(ctx, 'esign.credentials_removed');
@@ -177,13 +178,13 @@ export const removeEsignCredentialsAction = workspaceAction(
 );
 
 /** Tries the saved account with one read-only call and says whether Leegality accepted it. */
-export const testEsignConnectionAction = workspaceAction(
+export const testEsignConnectionAction = accountAction(
   'esign.manage',
   z.object({}),
   async (ctx): Promise<{ ok: boolean; message: string }> => {
     await limit('test', ctx, 10);
     const sql = db();
-    const credentials = await ownCredentials(sql, ctx.workspace.id);
+    const credentials = await ownCredentials(sql, ctx.accountId);
     if (!credentials) {
       throw new AppError('VALIDATION', 'Add your Leegality account details first.', 'credentials');
     }
@@ -194,7 +195,7 @@ export const testEsignConnectionAction = workspaceAction(
     } catch (error) {
       result = { ok: false, message: connectionProblem(error) };
     }
-    await recordConnectionTest(sql, ctx.workspace.id, result.ok);
+    await recordConnectionTest(sql, ctx.accountId, result.ok);
     await audit(ctx, 'esign.credentials_tested', { ok: result.ok });
     refresh(ctx.workspace.slug);
     return result;
