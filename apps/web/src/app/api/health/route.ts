@@ -5,18 +5,23 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Which accounts the payment and eSign keys belong to, so an operator can check a change of
- * keys from outside. Modes and plain-language problems only; a key is never part of it.
+ * keys from outside. This answer is public, so problems are short codes only: which setting
+ * is wrong, and why, is written to the server log (`[billing]` lines), never here.
  */
 function billing() {
   try {
-    return billingMode(billingConfig());
-  } catch (err) {
+    const mode = billingMode(billingConfig());
     return {
-      razorpay: null,
-      leegality: null,
-      live: false,
-      problems: [err instanceof Error ? err.message : 'The billing settings could not be read.'],
+      razorpay: mode.razorpay,
+      leegality: mode.leegality,
+      live: mode.live,
+      problems: [
+        ...(mode.live && mode.razorpay === 'test' ? ['test_payment_key_while_live'] : []),
+        ...(mode.live && mode.leegality === 'sandbox' ? ['sandbox_esign_while_live'] : []),
+      ],
     };
+  } catch {
+    return { razorpay: null, leegality: null, live: false, problems: ['settings_invalid'] };
   }
 }
 
