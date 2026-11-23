@@ -33,7 +33,12 @@ export function fakePdfEngine(overrides: Partial<PdfEngine> = {}): PdfEngine {
     },
     async appendCertificate(pdf, input) {
       const note = input.note ? `;note=${input.note}` : '';
-      return append(pdf, `certificate=${input.envelope.id};events=${input.events.length}${note}\n`);
+      const sender = input.sender ? `;sender=${input.sender.name}` : '';
+      const record = input.recordUrl ? `;record=${input.recordUrl}` : '';
+      return append(
+        pdf,
+        `certificate=${input.envelope.id};events=${input.events.length}${sender}${record}${note}\n`,
+      );
     },
     async seal(pdf, options) {
       return append(pdf, `sealed;reason=${options.reason}\n`);

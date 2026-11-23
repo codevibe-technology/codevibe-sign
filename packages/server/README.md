@@ -353,6 +353,12 @@ it with `formatMailDate`).
 certificate of that workspace's envelopes, for example a company registration number. It is
 read when the envelope is sealed.
 
+`certificateDetails({ workspaceId, envelope })` returns
+`{ sender?: { name, organization?, email? }, recordUrl? }` for the certificate: who sent the
+envelope, and a link to a page of yours that shows its record, printed as a QR code and as
+text. It is called once when a completed envelope is sealed, so it can create the record
+then. Without it the certificate names no sender and carries no code.
+
 ## Errors
 
 Every error is JSON: `{ "error": { "code", "message", "details"? } }`. Codes are the

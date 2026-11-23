@@ -46,7 +46,20 @@ export interface SealCheck {
   certificateSha256?: string;
 }
 
-export interface CertificateInput {
+/** Who sent an envelope and where its record can be looked up, for the certificate page. */
+export interface CertificateDetails {
+  sender?: {
+    name: string;
+    /** The company or workspace the sender acts for. */
+    organization?: string;
+    /** Printed masked. */
+    email?: string;
+  };
+  /** Link to a page that shows this signing's record; printed as a QR code and as text. */
+  recordUrl?: string;
+}
+
+export interface CertificateInput extends CertificateDetails {
   envelope: Envelope;
   document: Document;
   events: AuditEvent[];

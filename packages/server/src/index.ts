@@ -22,6 +22,7 @@ export {
   type PdfEngine,
   type PdfInfo,
   type SealOptions,
+  type CertificateDetails,
   type CertificateInput,
   type SealTrust,
   type SealCheck,

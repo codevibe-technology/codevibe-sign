@@ -443,4 +443,39 @@ describe('sealing', () => {
     expect(text).toContain('note=Acme Pvt Ltd, CIN U72900KA2020PTC000000');
     expect(asked).toEqual(['default']);
   });
+
+  it('puts the sender and the record link on the certificate', async () => {
+    const asked: string[] = [];
+    const h = harness({
+      certificateDetails: async ({ workspaceId, envelope }) => {
+        asked.push(`${workspaceId}:${envelope.status}`);
+        return {
+          sender: { name: 'Meera Iyer', organization: 'Acme Pvt Ltd' },
+          recordUrl: `https://sign.example.com/r/record-of-${envelope.id}`,
+        };
+      },
+    });
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', {
+      body: envelopeBody({
+        send: true,
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
+        ],
+        fields: [
+          { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
+        ],
+      }),
+    });
+    await h.call('POST', `/v1/sign/${h.tokenFor('asha@example.com')}/submit`, {
+      body: { consent: true, values: [{ fieldId: envelope.fields[0].id, value: PNG }] },
+    });
+    const sealed = await h.call(
+      'GET',
+      `/v1/envelopes/${envelope.id}/documents/${envelope.documents[0].id}?version=sealed`,
+    );
+    const text = new TextDecoder().decode(await sealed.res.arrayBuffer());
+    expect(text).toContain('sender=Meera Iyer');
+    expect(text).toContain(`record=https://sign.example.com/r/record-of-${envelope.id}`);
+    expect(asked).toEqual(['default:completed']);
+  });
 });

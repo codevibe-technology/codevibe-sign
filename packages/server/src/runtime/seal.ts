@@ -45,6 +45,7 @@ export async function runSeal(
   if (!envelope || envelope.status !== 'completed') return;
   const workspaceId = stored?.workspaceId ?? DEFAULT_WORKSPACE;
   const note = rt.certificateNote ? await rt.certificateNote(workspaceId) : null;
+  const details = (await rt.certificateDetails?.({ workspaceId, envelope })) ?? null;
   const timeZone = await timeZoneFor(rt, workspaceId);
   const history = await rt.store.listEvents(envelope.id);
   const done = sealedIds(history);
@@ -66,6 +67,8 @@ export async function runSeal(
       envelope,
       document,
       events: history,
+      ...(details?.sender ? { sender: details.sender } : {}),
+      ...(details?.recordUrl ? { recordUrl: details.recordUrl } : {}),
       ...(note ? { note } : {}),
       ...(timeZone ? { timeZone } : {}),
     });

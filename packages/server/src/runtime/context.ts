@@ -54,6 +54,7 @@ export interface Runtime {
   templates: MailTemplates;
   workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
   certificateNote?: (workspaceId: string) => Promise<string | null>;
+  certificateDetails?: SignServerOptions['certificateDetails'];
   timeZone?: string;
   workspaceTimeZone?: (workspaceId: string) => Promise<string | null>;
   apiKeys: StoredApiKey[];
@@ -176,6 +177,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     templates: { ...defaultTemplates, ...options.templates },
     ...(options.workspaceMail ? { workspaceMail: options.workspaceMail } : {}),
     ...(options.certificateNote ? { certificateNote: options.certificateNote } : {}),
+    ...(options.certificateDetails ? { certificateDetails: options.certificateDetails } : {}),
     ...(options.timeZone ? { timeZone: checkedTimeZone(options.timeZone) } : {}),
     ...(options.workspaceTimeZone ? { workspaceTimeZone: options.workspaceTimeZone } : {}),
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),

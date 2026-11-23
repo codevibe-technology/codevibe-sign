@@ -5,9 +5,10 @@ import type {
   IdGenerator,
   Mailer,
   OtpSender,
+  Envelope,
   RandomSource,
 } from '@codevibe_technology/sign-core';
-import type { PdfEngine, SealTrust } from './engine';
+import type { CertificateDetails, PdfEngine, SealTrust } from './engine';
 import type { Logger } from './errors';
 import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore, TemplateStore } from './store/types';
@@ -208,6 +209,15 @@ export interface SignServerOptions {
    * for example a company registration number. Read when the envelope is sealed.
    */
   certificateNote?: (workspaceId: string) => Promise<string | null>;
+  /**
+   * The sender to name on the signing certificate and the link to the envelope's record, which
+   * is printed as a QR code. Read once when a completed envelope is sealed; it may create the
+   * record then. Return null, or leave a part out, to print the certificate without it.
+   */
+  certificateDetails?: (input: {
+    workspaceId: string;
+    envelope: Envelope;
+  }) => Promise<CertificateDetails | null>;
   /**
    * IANA time zone, for example `Asia/Kolkata`, for the dates printed on signed documents:
    * "date signed" fields, the line under each signature, and the local time next to UTC on
