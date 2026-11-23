@@ -293,8 +293,8 @@ function Evidence({ evidence }: { evidence: PublicEvidence }) {
           ))}
         </ol>
         <p className="border-t border-line px-5 py-3 text-xs text-muted">
-          Times are shown in your browser&rsquo;s time zone. IP addresses and devices are printed on
-          the certificate page inside the PDF.
+          Times are shown in your browser&rsquo;s time zone. Email addresses and phone numbers are
+          partly hidden.
         </p>
       </Card>
     </>

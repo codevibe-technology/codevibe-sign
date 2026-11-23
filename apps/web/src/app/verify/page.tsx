@@ -1,12 +1,13 @@
 import { LocalTime } from '@/components/ui/local-time';
-import { Download, ExternalLink, Lock } from 'lucide-react';
+import { Download, Lock } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SiteFooter } from '@/components/marketing/site-footer';
 import { SiteHeader } from '@/components/marketing/site-header';
 import { Wordmark } from '@/components/shell/brand-mark';
 import { PublicVerifyPanel } from '@/components/verify/public-verify-panel';
-import { TRUST_GUIDE } from '@/components/marketing/links';
+import { SEAL_GUIDE } from '@/components/marketing/links';
+import { RecordLookup } from '@/components/verify/record-lookup';
 import { groupFingerprint, installSealCertificate } from '@/server/pdf';
 import { siteViewer } from '@/server/auth/session';
 import { isHosted } from '@/server/plans';
@@ -70,6 +71,13 @@ export default async function PublicVerifyPage() {
               complete. No account needed.
             </p>
             <PublicVerifyPanel />
+            <section className="mt-8 rounded-xl border border-line bg-surface p-5 shadow-card">
+              <p className="eyebrow mb-1">No file at hand?</p>
+              <h2 className="mb-3 text-[16px] leading-6 font-semibold text-ink">
+                Open the record from the certificate page
+              </h2>
+              <RecordLookup />
+            </section>
           </div>
 
           <aside className="space-y-5 text-sm">
@@ -102,26 +110,15 @@ export default async function PublicVerifyPage() {
               )}
             </section>
 
-            <section className="rounded-xl border border-line bg-surface p-5 shadow-card">
-              <p className="eyebrow mb-2">Adobe says &ldquo;identity unknown&rdquo;?</p>
-              <p className="text-ink">
-                Adobe Reader trusts only certificates on its own list. Our seal is not on it, so
-                Reader can say the signer is unknown even when the file is intact. This page checks
-                the same seal. To make Reader show it as trusted, import the certificate.
-              </p>
-              <a
-                href={TRUST_GUIDE}
-                className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
-              >
-                <ExternalLink aria-hidden className="h-4 w-4" />
-                Trust the seal in Adobe
-              </a>
-            </section>
-
             <p className="flex gap-2 text-muted">
               <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
               Your PDF is checked in memory on this server and dropped straight after. It is not
               saved, and nothing about it is logged.
+            </p>
+            <p>
+              <a href={SEAL_GUIDE} className="font-medium text-muted underline hover:text-primary">
+                How verification works
+              </a>
             </p>
           </aside>
         </div>

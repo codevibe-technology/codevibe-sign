@@ -41,11 +41,8 @@ export function textOn(background: string): '#FFFFFF' | '#0D1B2A' {
 
 /**
  * The line printed at the end of the signing certificate when a workspace has not set its
- * own: why Adobe Reader shows the seal as unknown, and where to check the file instead.
+ * own: where anyone can check the file.
  */
 export function defaultCertificateNote(appHost: string): string {
-  return (
-    "Adobe Reader may show 'signer identity unknown'. This means the file is intact but the " +
-    `seal certificate is not on Adobe's trust list. Verify this document at ${appHost}/verify.`
-  );
+  return `Verify this document at ${appHost}/verify.`;
 }

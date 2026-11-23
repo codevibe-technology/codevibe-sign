@@ -17,13 +17,18 @@ export interface RedirectRule {
 }
 
 /**
- * Old addresses that still arrive: the app used to live under /w, and early links to the docs
- * left out /docs. The package reference stays at /docs/api only: /api is the app's own API.
+ * Old addresses that still arrive: the app used to live under /w, early links to the docs
+ * left out /docs, and one guide was renamed. The package reference stays at /docs/api only: /api is the app's own API.
  */
 export function redirectRules(): RedirectRule[] {
   return [
     { source: '/w', destination: '/dashboard', permanent: true },
     { source: '/w/:path*', destination: '/dashboard/:path*', permanent: true },
+    {
+      source: '/docs/guides/trust-seal-adobe',
+      destination: '/docs/guides/seal-in-pdf-readers',
+      permanent: true,
+    },
     ...DOCS_SECTIONS.flatMap((section) => [
       { source: `/${section}`, destination: `/docs/${section}`, permanent: true },
       { source: `/${section}/:path*`, destination: `/docs/${section}/:path*`, permanent: true },

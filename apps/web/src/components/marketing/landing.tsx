@@ -54,7 +54,7 @@ const STEPS: StoryStep[] = [
     id: 'seal',
     name: 'Seal',
     title: 'A sealed PDF with its certificate',
-    text: 'When the last person signs, the PDF gets a PAdES seal and a certificate page: who signed, when, from which IP address and device, and a SHA-256 fingerprint of every file.',
+    text: 'When the last person signs, the PDF gets a PAdES seal and a one-page certificate: who signed, how and when, a SHA-256 fingerprint, and a QR code that opens the record.',
     points: [
       'Any later change to the file breaks the seal',
       'Times in UTC and in your workspace time zone',
@@ -527,7 +527,7 @@ export function Landing({
               <p className="mt-4 text-muted">
                 The signer only sees the document after typing a one-time code from their email.
                 When the last person signs, the PDF is sealed and gets a certificate page: who
-                signed, when, and from which IP address and device.
+                signed, how and when, with a QR code that opens the full record.
               </p>
               <ul className="mt-8 space-y-3 border-t border-line pt-6 text-sm font-semibold">
                 <li>

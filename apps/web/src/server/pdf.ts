@@ -66,7 +66,7 @@ export function installSealCertificate(): SealCertificate {
   return holder.__cvsSealCertificate;
 }
 
-/** "6B6E D7EC ..." : a hex fingerprint in groups of four, the way Adobe Reader shows it. */
+/** "6B6E D7EC ..." : a hex fingerprint in groups of four, the way PDF readers show it. */
 export function groupFingerprint(hex: string): string {
   return (
     hex

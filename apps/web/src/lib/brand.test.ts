@@ -24,10 +24,10 @@ describe('brand colours', () => {
 });
 
 describe('default certificate note', () => {
-  it('explains the Adobe warning and points at this install, without dashes', () => {
+  it('points at the verify page of this install, plainly and without dashes', () => {
     const note = defaultCertificateNote('sign.codevibe.in');
-    expect(note).toContain("Adobe Reader may show 'signer identity unknown'.");
-    expect(note).toMatch(/Verify this document at sign\.codevibe\.in\/verify\.$/);
+    expect(note).toBe('Verify this document at sign.codevibe.in/verify.');
+    expect(note).not.toMatch(/adobe|acrobat|unknown|trust/i);
     expect(note).not.toMatch(/[\u2013\u2014]/);
     expect(note.length).toBeLessThanOrEqual(400);
   });

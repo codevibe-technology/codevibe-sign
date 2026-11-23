@@ -18,6 +18,10 @@ describe('redirectRules', () => {
     expect(target('/http-api')).toBe('/docs/http-api');
   });
 
+  it('sends the renamed seal guide to its new address', () => {
+    expect(target('/docs/guides/trust-seal-adobe')).toBe('/docs/guides/seal-in-pdf-readers');
+  });
+
   it('never takes over the app API or an app page', () => {
     expect(rules.some((rule) => rule.source.startsWith('/api'))).toBe(false);
     const appRoutes = readdirSync(join(__dirname, '../app'));

@@ -4,8 +4,8 @@ import { installSealCertificate } from '@/server/pdf';
 export const dynamic = 'force-dynamic';
 
 /**
- * The public half of this install's seal certificate, as a .crt file to import into Adobe
- * Reader's trusted certificates. The private key never leaves the PKCS#12 file.
+ * The public half of this install's seal certificate, as a .crt file to check a seal against
+ * or add to a PDF reader. The private key never leaves the PKCS#12 file.
  */
 export function GET() {
   try {
