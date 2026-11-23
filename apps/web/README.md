@@ -120,6 +120,7 @@ Traefik, from [Dockerfile](Dockerfile).
 | `test`        | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.                                                                                                                                                   |
 | `smoke`       | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API.                                                                                                                                          |
 | `e2e:signing` | Drives a running app in a browser: the Fields step and the signing page at 1440 and 390 px. Needs `BASE` and `WEB_LOG`.                                                                                                         |
+| `e2e:home`    | Drives a running hosted app in Chrome, Chromium and WebKit: every home page clip loads and plays, one key press moves the story one step, no layout shift, the reduced-motion layout. Needs `BASE`.                             |
 | `brand:icons` | Draws the favicon, touch icon, 192 and 512 icons and the docs' copies from `apps/site/public/mark.svg`, copies the lockups in `apps/site/public/brand` to the app and writes the email logo and the certificate's lockup paths. |
 
 ## Configuration
