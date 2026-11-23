@@ -215,15 +215,34 @@ describe.skipIf(!url)('against PostgreSQL', () => {
         userId: users.ravi.id,
         role: 'owner',
       });
+      // The workspace is on Asha's account, so she stays an owner of it even with a second one.
+      const second = { userId: users.ravi.id, role: 'owner' as const };
+      await rejectsWith(
+        changeRole(sql, {
+          workspaceId: ws.id,
+          actor: second,
+          userId: users.asha.id,
+          role: 'member',
+        }),
+        'CONFLICT',
+      );
+      await rejectsWith(
+        removeMember(sql, { workspaceId: ws.id, actor: second, userId: users.asha.id }),
+        'CONFLICT',
+      );
+      await rejectsWith(
+        removeMember(sql, { workspaceId: ws.id, actor: owner, userId: users.asha.id }),
+        'CONFLICT',
+      );
       await changeRole(sql, {
         workspaceId: ws.id,
         actor: owner,
-        userId: users.asha.id,
+        userId: users.ravi.id,
         role: 'member',
       });
       expect((await listMembers(sql, ws.id)).map((m) => [m.name, m.role])).toEqual([
-        ['Ravi', 'owner'],
-        ['Asha', 'member'],
+        ['Asha', 'owner'],
+        ['Ravi', 'member'],
         ['Mia', 'viewer'],
       ]);
       await removeMember(sql, {

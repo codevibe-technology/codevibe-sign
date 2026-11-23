@@ -35,7 +35,7 @@ import {
 } from '@/server/billing/subscriptions';
 import { AppError } from '@/server/errors';
 import { migrateAll } from '@/server/migrate';
-import { setWorkspacePlan } from '@/server/plan-admin';
+import { setAccountPlanByName } from '@/server/plan-admin';
 import { workspacePlan } from '@/server/plans';
 import { createWorkspace } from '@/server/workspaces';
 
@@ -139,16 +139,16 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     const email = `owner-${id.slice(0, 8)}@example.com`;
     await sql`insert into auth_users (id, name, email) values (${id}, 'Asha', ${email})`;
     const ws = await createWorkspace(sql, { name: 'Acme', userId: id }, HOSTED);
-    if (details) await saveBillingDetails(sql, { workspaceId: ws.id, userId: id, details });
+    if (details) await saveBillingDetails(sql, { accountId: ws.accountId, userId: id, details });
     return { ...ws, owner: { id, email } };
   }
 
   type Ws = Awaited<ReturnType<typeof workspace>>;
 
-  async function pay(workspaceId: string | null, checkout: CheckoutSession) {
+  async function pay(accountId: string | null, checkout: CheckoutSession) {
     const payment = razorpay.pay(checkout.orderId);
     return confirmCheckout(sql, deps, {
-      workspaceId,
+      accountId,
       razorpayOrderId: checkout.orderId,
       paymentId: payment.id,
       signature: createHmac('sha256', KEY_SECRET)
@@ -159,18 +159,18 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
 
   async function subscribe(ws: Ws, term: 'month' | 'year' = 'month', seats?: number) {
     const { checkout } = await createSubscriptionOrder(sql, deps, {
-      workspaceId: ws.id,
+      accountId: ws.accountId,
       userId: ws.owner.id,
       term,
       seats,
     });
-    expect((await pay(ws.id, checkout)).status).toBe('paid');
+    expect((await pay(ws.accountId, checkout)).status).toBe('paid');
     return checkout;
   }
 
   const planOf = async (ws: Ws) => {
     const [row] = await sql<{ plan: string; extra_seats: number }[]>`
-      select plan, extra_seats from app_workspaces where id = ${ws.id}`;
+      select plan, extra_seats from app_accounts where id = ${ws.accountId}`;
     return row!;
   };
 
@@ -218,16 +218,18 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       // 999 plus 18% IGST for a buyer outside Haryana.
       expect(checkout.amountPaise).toBe(117_882);
       expect(await planOf(ws)).toEqual({ plan: 'cloud', extra_seats: 0 });
-      const subscription = (await getSubscription(sql, ws.id))!;
+      const subscription = (await getSubscription(sql, ws.accountId))!;
       expect(subscription.status).toBe('active');
       expect(subscription.periodStart).toEqual(START);
       expect(subscription.periodEnd).toEqual(ist('2026-12-23T10:00:00'));
-      const [invoice] = await listInvoices(sql, ws.id);
+      const [invoice] = await listInvoices(sql, ws.accountId);
       expect(invoice!.order.lines[0]!.description).toBe(
         'Codevibe Sign Cloud, 1 month (23 Nov 2026 to 22 Dec 2026)',
       );
       expect(
-        (await listAudit(sql, ws.id, { prefix: 'subscription.' })).map((a) => a.action),
+        (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'subscription.' })).map(
+          (a) => a.action,
+        ),
       ).toEqual(['subscription.started']);
       expect((await workspacePlan(sql, ws.id, HOSTED)).limits.members).toBe(25);
     });
@@ -235,7 +237,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     it('charges ten months for a year and includes extra members', async () => {
       const ws = await workspace();
       const { order } = await createSubscriptionOrder(sql, deps, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         term: 'year',
         seats: 3,
@@ -254,7 +256,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       const bare = await workspace(null);
       const missing = await appError(
         createSubscriptionOrder(sql, deps, {
-          workspaceId: bare.id,
+          accountId: bare.accountId,
           userId: bare.owner.id,
           term: 'month',
         }),
@@ -263,17 +265,17 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
 
       const ws = await workspace();
       await createSubscriptionOrder(sql, deps, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         term: 'month',
       });
       expect((await planOf(ws)).plan).toBe('free');
-      expect(await getSubscription(sql, ws.id)).toBeNull();
+      expect(await getSubscription(sql, ws.accountId)).toBeNull();
 
       const closed = { ...deps, config: billingConfig({}) };
       const err = await appError(
         createSubscriptionOrder(sql, closed, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           userId: ws.owner.id,
           term: 'month',
         }),
@@ -284,14 +286,14 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     it('applies one payment once however often it is confirmed', async () => {
       const ws = await workspace();
       const { checkout } = await createSubscriptionOrder(sql, deps, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         term: 'month',
       });
       const payment = razorpay.pay(checkout.orderId);
       const confirm = () =>
         confirmCheckout(sql, deps, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           razorpayOrderId: checkout.orderId,
           paymentId: payment.id,
           signature: createHmac('sha256', KEY_SECRET)
@@ -300,10 +302,12 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
         });
       await Promise.all([confirm(), confirm(), confirm(), confirm()]);
       await confirm();
-      expect((await getSubscription(sql, ws.id))!.periodEnd).toEqual(ist('2026-12-23T10:00:00'));
-      expect(await listInvoices(sql, ws.id)).toHaveLength(1);
+      expect((await getSubscription(sql, ws.accountId))!.periodEnd).toEqual(
+        ist('2026-12-23T10:00:00'),
+      );
+      expect(await listInvoices(sql, ws.accountId)).toHaveLength(1);
       const [changes] = await sql<{ n: number }[]>`
-        select count(*)::int as n from app_plan_changes where workspace_id = ${ws.id}`;
+        select count(*)::int as n from app_plan_changes where account_id = ${ws.accountId}`;
       expect(changes!.n).toBe(1);
     });
   });
@@ -315,24 +319,26 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       now = ist('2026-12-10T10:00:00');
       const early = await appError(
         createSubscriptionOrder(sql, deps, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           userId: ws.owner.id,
           term: 'month',
         }),
       );
       expect(early.message).toBe(
-        'This workspace is paid up to 23 Dec 2026. You can pay for the next term from 16 Dec 2026.',
+        'This account is paid up to 23 Dec 2026. You can pay for the next term from 16 Dec 2026.',
       );
-      expect((await subscriptionView(sql, ws.id, now)).canRenew).toBe(false);
+      expect((await subscriptionView(sql, ws.accountId, now)).canRenew).toBe(false);
 
       now = ist('2026-12-20T18:00:00');
-      expect((await subscriptionView(sql, ws.id, now)).canRenew).toBe(true);
+      expect((await subscriptionView(sql, ws.accountId, now)).canRenew).toBe(true);
       await subscribe(ws);
-      const subscription = (await getSubscription(sql, ws.id))!;
+      const subscription = (await getSubscription(sql, ws.accountId))!;
       expect(subscription.periodStart).toEqual(ist('2026-12-23T10:00:00'));
       expect(subscription.periodEnd).toEqual(ist('2027-01-23T10:00:00'));
       expect(
-        (await listAudit(sql, ws.id, { prefix: 'subscription.' })).map((a) => a.action),
+        (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'subscription.' })).map(
+          (a) => a.action,
+        ),
       ).toContain('subscription.renewed');
     });
 
@@ -341,10 +347,10 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       await subscribe(ws);
       now = ist('2026-12-25T10:00:00');
       expect((await runSubscriptionTick(sql, deps)).graceStarted).toBe(1);
-      expect((await getSubscription(sql, ws.id))!.status).toBe('grace');
+      expect((await getSubscription(sql, ws.accountId))!.status).toBe('grace');
       expect((await planOf(ws)).plan).toBe('cloud');
       await subscribe(ws);
-      const subscription = (await getSubscription(sql, ws.id))!;
+      const subscription = (await getSubscription(sql, ws.accountId))!;
       expect(subscription.status).toBe('active');
       expect(subscription.graceEndsAt).toBeNull();
       expect(subscription.periodEnd).toEqual(ist('2027-01-23T10:00:00'));
@@ -359,7 +365,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       expect((await planOf(ws)).plan).toBe('free');
       now = ist('2027-02-10T09:00:00');
       await subscribe(ws);
-      const subscription = (await getSubscription(sql, ws.id))!;
+      const subscription = (await getSubscription(sql, ws.accountId))!;
       expect(subscription.periodStart).toEqual(now);
       expect(subscription.status).toBe('active');
       expect((await planOf(ws)).plan).toBe('cloud');
@@ -372,7 +378,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       await subscribe(ws);
       now = ist('2026-12-08T10:00:00');
       const { order, checkout } = await createSeatsOrder(sql, deps, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         add: 4,
       });
@@ -380,15 +386,15 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       expect(order.lines[0]).toMatchObject({ quantity: 4, unitPaise: 4_950 });
       expect(order.lines[0]!.description).toBe('Extra members × 4, 15 days to 22 Dec 2026');
       expect((await planOf(ws)).extra_seats).toBe(0);
-      await pay(ws.id, checkout);
+      await pay(ws.accountId, checkout);
       expect((await planOf(ws)).extra_seats).toBe(4);
       expect((await workspacePlan(sql, ws.id, HOSTED)).limits.members).toBe(29);
-      const subscription = (await getSubscription(sql, ws.id))!;
+      const subscription = (await getSubscription(sql, ws.accountId))!;
       expect([subscription.seats, subscription.renewalSeats]).toEqual([4, 4]);
 
       now = ist('2026-12-20T10:00:00');
       const renewal = await createSubscriptionOrder(sql, deps, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         term: 'month',
       });
@@ -402,7 +408,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       const ws = await workspace();
       await subscribe(ws, 'month', 5);
       await setRenewalSeats(sql, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         seats: 2,
         config: deps.config,
@@ -416,7 +422,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     it('is refused without a running term', async () => {
       const ws = await workspace();
       const err = await appError(
-        createSeatsOrder(sql, deps, { workspaceId: ws.id, userId: ws.owner.id, add: 1 }),
+        createSeatsOrder(sql, deps, { accountId: ws.accountId, userId: ws.owner.id, add: 1 }),
       );
       expect(err.message).toContain('Upgrade to Cloud first');
     });
@@ -438,7 +444,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       // The billing address and the owner each get one per stage.
       expect(reminders).toHaveLength(6);
       expect(new Set(reminders.map((m) => m.to))).toEqual(new Set([BUYER.email, ws.owner.email]));
-      expect(reminders[0]!.subject).toBe('Codevibe Sign Cloud for Acme ends on 23 Dec 2026');
+      expect(reminders[0]!.subject).toBe('Your Codevibe Sign Cloud term ends on 23 Dec 2026');
       expect(reminders[0]!.text).toContain('₹999 plus GST');
       expect(reminders.at(-1)!.text).toContain('in 1 day.');
     });
@@ -474,7 +480,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       now = ist('2026-12-23T10:00:01');
       expect(await runSubscriptionTick(sql, deps)).toMatchObject({ graceStarted: 1, ended: 0 });
       expect(await runSubscriptionTick(sql, deps)).toMatchObject({ graceStarted: 0, ended: 0 });
-      const grace = (await getSubscription(sql, ws.id))!;
+      const grace = (await getSubscription(sql, ws.accountId))!;
       expect(grace.status).toBe('grace');
       expect(grace.graceEndsAt).toEqual(new Date(grace.periodEnd.getTime() + 7 * DAY));
       expect(await planOf(ws)).toEqual({ plan: 'cloud', extra_seats: 3 });
@@ -490,7 +496,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       ]);
       expect(ticks.reduce((sum, t) => sum + t.ended, 0)).toBe(1);
       expect(await planOf(ws)).toEqual({ plan: 'free', extra_seats: 0 });
-      expect((await getSubscription(sql, ws.id))!.status).toBe('ended');
+      expect((await getSubscription(sql, ws.accountId))!.status).toBe('ended');
       expect(sent.filter((m) => m.meta?.kind === 'subscription_ended')).toHaveLength(2);
       const [kept] = await sql<{ n: number }[]>`
         select count(*)::int as n from app_templates where workspace_id = ${ws.id}`;
@@ -498,15 +504,15 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       expect((await workspacePlan(sql, ws.id, HOSTED)).limits.members).toBe(2);
       const [change] = await sql<{ from_plan: string; to_plan: string; changed_by: string }[]>`
         select from_plan, to_plan, changed_by from app_plan_changes
-        where workspace_id = ${ws.id} order by created_at desc limit 1`;
+        where account_id = ${ws.accountId} order by created_at desc limit 1`;
       expect(change).toEqual({ from_plan: 'cloud', to_plan: 'free', changed_by: 'billing' });
-      expect((await subscriptionView(sql, ws.id, now)).state).toBe('ended');
+      expect((await subscriptionView(sql, ws.accountId, now)).state).toBe('ended');
     });
 
     it('ends a cancelled term on its last day, without grace or reminders', async () => {
       const ws = await workspace();
       await subscribe(ws);
-      await scheduleCancel(sql, { workspaceId: ws.id, userId: ws.owner.id, cancel: true });
+      await scheduleCancel(sql, { accountId: ws.accountId, userId: ws.owner.id, cancel: true });
       sent.length = 0;
       now = ist('2026-12-20T10:00:00');
       expect(await runSubscriptionTick(sql, deps)).toEqual({
@@ -528,23 +534,26 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     it('lets a scheduled cancel be undone', async () => {
       const ws = await workspace();
       await subscribe(ws);
-      await scheduleCancel(sql, { workspaceId: ws.id, userId: ws.owner.id, cancel: true });
-      await scheduleCancel(sql, { workspaceId: ws.id, userId: ws.owner.id, cancel: false });
+      await scheduleCancel(sql, { accountId: ws.accountId, userId: ws.owner.id, cancel: true });
+      await scheduleCancel(sql, { accountId: ws.accountId, userId: ws.owner.id, cancel: false });
       now = ist('2026-12-23T10:00:01');
       expect((await runSubscriptionTick(sql, deps)).graceStarted).toBe(1);
-      expect((await listAudit(sql, ws.id, { prefix: 'subscription.cancel' })).length).toBe(2);
+      expect(
+        (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'subscription.cancel' }))
+          .length,
+      ).toBe(2);
     });
 
     it('never touches a plan the operator set', async () => {
       const ws = await workspace();
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'cloud', changedBy: 'ops' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'cloud', changedBy: 'ops' });
       now = ist('2030-01-01T00:00:00');
       await runSubscriptionTick(sql, deps);
       expect((await planOf(ws)).plan).toBe('cloud');
-      expect((await subscriptionView(sql, ws.id, now)).state).toBe('managed');
+      expect((await subscriptionView(sql, ws.accountId, now)).state).toBe('managed');
       const err = await appError(
         createSubscriptionOrder(sql, deps, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           userId: ws.owner.id,
           term: 'month',
         }),
@@ -555,11 +564,11 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     it('leaves a plan the operator raised after the term alone when the term ends', async () => {
       const ws = await workspace();
       await subscribe(ws);
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'unlimited', changedBy: 'ops' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'unlimited', changedBy: 'ops' });
       now = ist('2027-01-05T10:00:00');
       await runSubscriptionTick(sql, deps);
       await runSubscriptionTick(sql, deps);
-      expect((await getSubscription(sql, ws.id))!.status).toBe('ended');
+      expect((await getSubscription(sql, ws.accountId))!.status).toBe('ended');
       expect((await planOf(ws)).plan).toBe('unlimited');
     });
   });
@@ -688,7 +697,7 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
       const payment = razorpay.pay(checkout.orderId);
       const err = await appError(
         confirmCheckout(sql, deps, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           razorpayOrderId: checkout.orderId,
           paymentId: payment.id,
           signature: 'x',

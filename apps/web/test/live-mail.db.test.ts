@@ -44,7 +44,10 @@ describe.skipIf(!url)('live updates and the mail log against PostgreSQL', () => 
     sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
     expect(await migrateAll(sql)).toContain('app/0008_mail_log');
     for (const id of [ws.a, ws.b]) {
-      await sql`insert into app_workspaces (id, slug, name) values (${id}, ${id}, ${id})`;
+      await sql`insert into app_accounts (id) values (${`acct_${id}`})`;
+      await sql`
+        insert into app_workspaces (id, slug, name, account_id)
+        values (${id}, ${id}, ${id}, ${`acct_${id}`})`;
     }
   });
 

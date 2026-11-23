@@ -215,7 +215,8 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       { name: 'Acme', userId: owner.id },
       { mode: 'hosted', freeOverrides: {} },
     );
-    if (details) await saveBillingDetails(sql, { workspaceId: ws.id, userId: owner.id, details });
+    if (details)
+      await saveBillingDetails(sql, { accountId: ws.accountId, userId: owner.id, details });
     return { ...ws, owner };
   }
 
@@ -227,12 +228,16 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
     return user;
   }
 
-  const buy = (ws: { id: string; owner: { id: string } }, credits = 10, plan = 'free' as const) =>
-    createCreditsOrder(sql, deps, { workspaceId: ws.id, userId: ws.owner.id, plan, credits });
+  const buy = (
+    ws: { accountId: string; owner: { id: string } },
+    credits = 10,
+    plan = 'free' as const,
+  ) =>
+    createCreditsOrder(sql, deps, { accountId: ws.accountId, userId: ws.owner.id, plan, credits });
 
-  const confirm = (workspaceId: string, orderId: string, payment: RazorpayPayment) =>
+  const confirm = (accountId: string, orderId: string, payment: RazorpayPayment) =>
     confirmCheckout(sql, deps, {
-      workspaceId,
+      accountId,
       razorpayOrderId: orderId,
       paymentId: payment.id,
       signature: checkoutSignature(orderId, payment.id),
@@ -242,7 +247,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
     admin = postgres(url!, { max: 1, onnotice: () => {} });
     await admin.unsafe(`create schema ${schema}`);
     sql = postgres(url!, { max: 12, onnotice: () => {}, connection: { search_path: schema } });
-    expect(await migrateAll(sql)).toContain('app/0013_billing');
+    expect(await migrateAll(sql)).toContain('app/0014_billing');
     state.sql = sql;
   });
 
@@ -280,36 +285,42 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
   describe('credit ledger', () => {
     it('grants once per reference', async () => {
       const ws = await workspace();
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      expect(await grantCredits(sql, { workspaceId: ws.id, credits: 10, ref: 'ord_1' })).toBe(true);
-      expect(await grantCredits(sql, { workspaceId: ws.id, credits: 10, ref: 'ord_1' })).toBe(
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect(await grantCredits(sql, { accountId: ws.accountId, credits: 10, ref: 'ord_1' })).toBe(
+        true,
+      );
+      expect(await grantCredits(sql, { accountId: ws.accountId, credits: 10, ref: 'ord_1' })).toBe(
         false,
       );
-      expect(await grantCredits(sql, { workspaceId: ws.id, credits: 5, ref: 'ord_2' })).toBe(true);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 15, reserved: 0 });
+      expect(await grantCredits(sql, { accountId: ws.accountId, credits: 5, ref: 'ord_2' })).toBe(
+        true,
+      );
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 15, reserved: 0 });
       await expect(
-        grantCredits(sql, { workspaceId: ws.id, credits: 0, ref: 'x' }),
+        grantCredits(sql, { accountId: ws.accountId, credits: 0, ref: 'x' }),
       ).rejects.toThrow();
       await expect(
-        grantCredits(sql, { workspaceId: ws.id, credits: 1.5, ref: 'x' }),
+        grantCredits(sql, { accountId: ws.accountId, credits: 1.5, ref: 'x' }),
       ).rejects.toThrow();
     });
 
     it('reserves on start, consumes on success and releases on failure', async () => {
       const ws = await workspace();
-      const at = { workspaceId: ws.id };
+      const at = { accountId: ws.accountId };
       await grantCredits(sql, { ...at, credits: 2, ref: 'ord_1' });
 
       expect(await reserveCredit(sql, { ...at, ref: 'esign_a' })).toBe(true);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 1 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 1 });
       expect(await consumeCredit(sql, { ...at, ref: 'esign_a' })).toBe(true);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 0 });
 
       expect(await reserveCredit(sql, { ...at, ref: 'esign_b' })).toBe(true);
       expect(await releaseCredit(sql, { ...at, ref: 'esign_b' })).toBe(true);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 0 });
 
-      expect((await creditHistory(sql, ws.id)).map((e) => `${e.kind}:${e.ref}`).sort()).toEqual([
+      expect(
+        (await creditHistory(sql, ws.accountId)).map((e) => `${e.kind}:${e.ref}`).sort(),
+      ).toEqual([
         'consume:esign_a',
         'grant:ord_1',
         'release:esign_b',
@@ -320,56 +331,56 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
 
     it('ignores replays and settles a hold only once', async () => {
       const ws = await workspace();
-      const at = { workspaceId: ws.id };
+      const at = { accountId: ws.accountId };
       await grantCredits(sql, { ...at, credits: 3, ref: 'ord_1' });
 
       expect(await reserveCredit(sql, { ...at, ref: 's1' })).toBe(true);
       expect(await reserveCredit(sql, { ...at, ref: 's1' })).toBe(true);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 1 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 2, reserved: 1 });
 
       expect(await consumeCredit(sql, { ...at, ref: 's1' })).toBe(true);
       expect(await consumeCredit(sql, { ...at, ref: 's1' })).toBe(false);
       expect(await releaseCredit(sql, { ...at, ref: 's1' })).toBe(false);
       expect(await reserveCredit(sql, { ...at, ref: 's1' })).toBe(true);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 2, reserved: 0 });
 
       expect(await reserveCredit(sql, { ...at, ref: 's2' })).toBe(true);
       expect(await releaseCredit(sql, { ...at, ref: 's2' })).toBe(true);
       expect(await releaseCredit(sql, { ...at, ref: 's2' })).toBe(false);
       expect(await consumeCredit(sql, { ...at, ref: 's2' })).toBe(false);
       expect(await reserveCredit(sql, { ...at, ref: 's2' })).toBe(false);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 2, reserved: 0 });
 
       expect(await consumeCredit(sql, { ...at, ref: 'never' })).toBe(false);
       expect(await releaseCredit(sql, { ...at, ref: 'never' })).toBe(false);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 2, reserved: 0 });
     });
 
     it('never goes below zero', async () => {
       const ws = await workspace();
-      expect(await reserveCredit(sql, { workspaceId: ws.id, ref: 's1' })).toBe(false);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      expect(await creditHistory(sql, ws.id)).toEqual([]);
+      expect(await reserveCredit(sql, { accountId: ws.accountId, ref: 's1' })).toBe(false);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect(await creditHistory(sql, ws.accountId)).toEqual([]);
       await expect(
-        sql`update app_esign_credits set available = -1 where workspace_id = ${ws.id}`,
+        sql`update app_esign_credits set available = -1 where account_id = ${ws.accountId}`,
       ).rejects.toThrow(/check/);
     });
 
     it('gives exactly five of twenty parallel reservations a balance of five', async () => {
       const ws = await workspace();
-      await grantCredits(sql, { workspaceId: ws.id, credits: 5, ref: 'ord_1' });
+      await grantCredits(sql, { accountId: ws.accountId, credits: 5, ref: 'ord_1' });
       const results = await Promise.all(
         Array.from({ length: 20 }, (_, i) =>
-          reserveCredit(sql, { workspaceId: ws.id, ref: `esign_${i}` }),
+          reserveCredit(sql, { accountId: ws.accountId, ref: `esign_${i}` }),
         ),
       );
       expect(results.filter(Boolean)).toHaveLength(5);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 5 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 5 });
     });
 
     it('settles one hold once when consume and release race', async () => {
       const ws = await workspace();
-      const at = { workspaceId: ws.id };
+      const at = { accountId: ws.accountId };
       await grantCredits(sql, { ...at, credits: 1, ref: 'ord_1' });
       await reserveCredit(sql, { ...at, ref: 's1' });
       const results = await Promise.all([
@@ -379,7 +390,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         releaseCredit(sql, { ...at, ref: 's1' }),
       ]);
       expect(results.filter(Boolean)).toHaveLength(1);
-      const balance = await creditBalance(sql, ws.id);
+      const balance = await creditBalance(sql, ws.accountId);
       expect(balance.reserved).toBe(0);
       expect(balance.available).toBe(results[0] || results[2] ? 0 : 1);
     });
@@ -388,36 +399,40 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace();
       await sql
         .begin(async (tx) => {
-          await grantCredits(tx, { workspaceId: ws.id, credits: 4, ref: 'ord_1' });
+          await grantCredits(tx, { accountId: ws.accountId, credits: 4, ref: 'ord_1' });
           throw new Error('undo');
         })
         .catch(() => undefined);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
     });
 
     it('keeps workspaces apart', async () => {
       const a = await workspace();
       const b = await workspace();
-      await grantCredits(sql, { workspaceId: a.id, credits: 1, ref: 'ord_1' });
-      expect(await reserveCredit(sql, { workspaceId: b.id, ref: 's1' })).toBe(false);
-      expect(await reserveCredit(sql, { workspaceId: a.id, ref: 's1' })).toBe(true);
-      expect(await consumeCredit(sql, { workspaceId: b.id, ref: 's1' })).toBe(false);
-      expect(await creditBalance(sql, a.id)).toEqual({ available: 0, reserved: 1 });
+      await grantCredits(sql, { accountId: a.accountId, credits: 1, ref: 'ord_1' });
+      expect(await reserveCredit(sql, { accountId: b.accountId, ref: 's1' })).toBe(false);
+      expect(await reserveCredit(sql, { accountId: a.accountId, ref: 's1' })).toBe(true);
+      expect(await consumeCredit(sql, { accountId: b.accountId, ref: 's1' })).toBe(false);
+      expect(await creditBalance(sql, a.accountId)).toEqual({ available: 0, reserved: 1 });
     });
   });
 
   describe('billing details', () => {
     it('saves, replaces and audits', async () => {
       const ws = await workspace(null);
-      expect(await getBillingDetails(sql, ws.id)).toBeNull();
-      await saveBillingDetails(sql, { workspaceId: ws.id, userId: ws.owner.id, details: HARYANA });
+      expect(await getBillingDetails(sql, ws.accountId)).toBeNull();
       await saveBillingDetails(sql, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
+        userId: ws.owner.id,
+        details: HARYANA,
+      });
+      await saveBillingDetails(sql, {
+        accountId: ws.accountId,
         userId: ws.owner.id,
         details: MAHARASHTRA,
       });
-      expect(await getBillingDetails(sql, ws.id)).toEqual(MAHARASHTRA);
-      const audit = await listAudit(sql, ws.id, { prefix: 'billing.' });
+      expect(await getBillingDetails(sql, ws.accountId)).toEqual(MAHARASHTRA);
+      const audit = await listAudit(sql, { accountId: ws.accountId }, { prefix: 'billing.' });
       expect(audit.map((a) => a.action)).toEqual([
         'billing.details_updated',
         'billing.details_updated',
@@ -502,7 +517,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const err = await appError(buy(ws, 10));
       expect(err.message).toMatch(/Nothing was charged/);
       expect(log).toHaveBeenCalled();
-      const rows = await sql`select id from app_billing_orders where workspace_id = ${ws.id}`;
+      const rows = await sql`select id from app_billing_orders where account_id = ${ws.accountId}`;
       expect(rows).toHaveLength(0);
     });
   });
@@ -512,20 +527,20 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
-      const outcome = await confirm(ws.id, order.razorpayOrderId, payment);
+      const outcome = await confirm(ws.accountId, order.razorpayOrderId, payment);
       expect(outcome).toMatchObject({ status: 'paid', kind: 'esign_credits', orderId: order.id });
       if (outcome.status !== 'paid') throw new Error('unreachable');
       expect(outcome.invoice.number).toMatch(/^CV-202627\d{4}$/);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
 
-      const paid = await getOrder(sql, ws.id, order.id);
+      const paid = await getOrder(sql, ws.accountId, order.id);
       expect(paid).toMatchObject({ status: 'paid', razorpayPaymentId: payment.id, paidAt: NOW });
 
       expect(sent).toHaveLength(1);
       expect(sent[0]).toMatchObject({
         to: HARYANA.email,
         subject: `Tax invoice ${outcome.invoice.number} from Codevibe Technology Private Limited`,
-        meta: { kind: 'invoice', workspaceId: ws.id },
+        meta: { kind: 'invoice', accountId: ws.accountId },
       });
       expect(sent[0]!.text).toContain('Aadhaar eSign credits × 10 @ ₹35');
       expect(sent[0]!.text).toContain('₹413');
@@ -535,7 +550,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         contentType: 'application/pdf',
       });
 
-      const actions = (await listAudit(sql, ws.id)).map((a) => a.action);
+      const actions = (await listAudit(sql, { accountId: ws.accountId })).map((a) => a.action);
       expect(actions).toEqual(
         expect.arrayContaining([
           'billing.order_created',
@@ -544,7 +559,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
           'credits.granted',
         ]),
       );
-      const audit = JSON.stringify(await listAudit(sql, ws.id));
+      const audit = JSON.stringify(await listAudit(sql, { accountId: ws.accountId }));
       expect(audit).not.toContain(KEY_SECRET);
     });
 
@@ -552,11 +567,11 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
-      const first = await confirm(ws.id, order.razorpayOrderId, payment);
-      const second = await confirm(ws.id, order.razorpayOrderId, payment);
+      const first = await confirm(ws.accountId, order.razorpayOrderId, payment);
+      const second = await confirm(ws.accountId, order.razorpayOrderId, payment);
       expect(second).toEqual(first);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
-      expect(await listInvoices(sql, ws.id)).toHaveLength(1);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
+      expect(await listInvoices(sql, ws.accountId)).toHaveLength(1);
       expect(sent).toHaveLength(1);
     });
 
@@ -567,7 +582,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const fetchPayment = vi.spyOn(razorpay.client, 'fetchPayment');
       const err = await appError(
         confirmCheckout(sql, deps, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           razorpayOrderId: order.razorpayOrderId,
           paymentId: payment.id,
           signature: checkoutSignature(order.razorpayOrderId, 'pay_someoneElse1'),
@@ -575,38 +590,42 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       );
       expect(err.code).toBe('VALIDATION');
       expect(fetchPayment).not.toHaveBeenCalled();
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      expect((await getOrder(sql, ws.id, order.id))?.status).toBe('created');
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect((await getOrder(sql, ws.accountId, order.id))?.status).toBe('created');
     });
 
     it('does not trust a client that only says the payment succeeded', async () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId, { status: 'failed' });
-      expect(await confirm(ws.id, order.razorpayOrderId, payment)).toEqual({ status: 'failed' });
+      expect(await confirm(ws.accountId, order.razorpayOrderId, payment)).toEqual({
+        status: 'failed',
+      });
       const created = razorpay.pay(order.razorpayOrderId, { status: 'created' });
-      expect(await confirm(ws.id, order.razorpayOrderId, created)).toEqual({ status: 'pending' });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      expect(await confirm(ws.accountId, order.razorpayOrderId, created)).toEqual({
+        status: 'pending',
+      });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
     });
 
     it('refuses a payment of another amount', async () => {
       const ws = await workspace();
       const { order } = await buy(ws, 200);
       const cheap = razorpay.pay(order.razorpayOrderId, { amount: 100 });
-      await expect(confirm(ws.id, order.razorpayOrderId, cheap)).rejects.toBeInstanceOf(
+      await expect(confirm(ws.accountId, order.razorpayOrderId, cheap)).rejects.toBeInstanceOf(
         PaymentMismatchError,
       );
       const authorised = razorpay.pay(order.razorpayOrderId, { amount: 100, status: 'authorized' });
-      await expect(confirm(ws.id, order.razorpayOrderId, authorised)).rejects.toBeInstanceOf(
+      await expect(confirm(ws.accountId, order.razorpayOrderId, authorised)).rejects.toBeInstanceOf(
         PaymentMismatchError,
       );
       expect(razorpay.payments.get(authorised.id)?.status).toBe('authorized');
       const rupees = razorpay.pay(order.razorpayOrderId, { currency: 'USD' });
-      await expect(confirm(ws.id, order.razorpayOrderId, rupees)).rejects.toBeInstanceOf(
+      await expect(confirm(ws.accountId, order.razorpayOrderId, rupees)).rejects.toBeInstanceOf(
         PaymentMismatchError,
       );
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      expect(await listInvoices(sql, ws.id)).toHaveLength(0);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect(await listInvoices(sql, ws.accountId)).toHaveLength(0);
     });
 
     it('refuses a payment that belongs to another order', async () => {
@@ -614,10 +633,10 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const small = await buy(ws, 10);
       const large = await buy(ws, 200);
       const payment = razorpay.pay(small.order.razorpayOrderId);
-      await expect(confirm(ws.id, large.order.razorpayOrderId, payment)).rejects.toBeInstanceOf(
-        PaymentMismatchError,
-      );
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      await expect(
+        confirm(ws.accountId, large.order.razorpayOrderId, payment),
+      ).rejects.toBeInstanceOf(PaymentMismatchError);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
     });
 
     it('captures an authorised payment and then fulfils it', async () => {
@@ -625,9 +644,9 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const { order } = await buy(ws, 50);
       const payment = razorpay.pay(order.razorpayOrderId, { status: 'authorized' });
       const capture = vi.spyOn(razorpay.client, 'capturePayment');
-      expect((await confirm(ws.id, order.razorpayOrderId, payment)).status).toBe('paid');
+      expect((await confirm(ws.accountId, order.razorpayOrderId, payment)).status).toBe('paid');
       expect(capture).toHaveBeenCalledWith(payment.id, order.tax.totalPaise);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 50, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 50, reserved: 0 });
     });
 
     it('looks the same for an order of another workspace as for none', async () => {
@@ -635,20 +654,20 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const theirs = await workspace();
       const { order } = await buy(theirs, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
-      const err = await appError(confirm(mine.id, order.razorpayOrderId, payment));
+      const err = await appError(confirm(mine.accountId, order.razorpayOrderId, payment));
       expect(err.code).toBe('NOT_FOUND');
-      expect((await appError(confirm(mine.id, 'order_doesNotExist', payment))).code).toBe(
+      expect((await appError(confirm(mine.accountId, 'order_doesNotExist', payment))).code).toBe(
         'NOT_FOUND',
       );
-      expect(await creditBalance(sql, theirs.id)).toEqual({ available: 0, reserved: 0 });
-      expect(await getOrder(sql, mine.id, order.id)).toBeNull();
+      expect(await creditBalance(sql, theirs.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect(await getOrder(sql, mine.accountId, order.id)).toBeNull();
     });
 
     it('refuses ids that are not ids', async () => {
       const ws = await workspace();
       const err = await appError(
         confirmCheckout(sql, deps, {
-          workspaceId: ws.id,
+          accountId: ws.accountId,
           razorpayOrderId: "order_1' or '1'='1",
           paymentId: 'pay_../x',
           signature: 'ff',
@@ -664,10 +683,10 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
       expect(await handleRazorpayWebhook(sql, deps, webhook(payment))).toBe('processed');
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
-      expect((await confirm(ws.id, order.razorpayOrderId, payment)).status).toBe('paid');
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
-      expect(await listInvoices(sql, ws.id)).toHaveLength(1);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
+      expect((await confirm(ws.accountId, order.razorpayOrderId, payment)).status).toBe('paid');
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
+      expect(await listInvoices(sql, ws.accountId)).toHaveLength(1);
       expect(sent).toHaveLength(1);
     });
 
@@ -675,15 +694,15 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
-      await confirm(ws.id, order.razorpayOrderId, payment);
+      await confirm(ws.accountId, order.razorpayOrderId, payment);
       const delivery = webhook(payment);
       expect(await handleRazorpayWebhook(sql, deps, delivery)).toBe('processed');
       expect(await handleRazorpayWebhook(sql, deps, delivery)).toBe('duplicate');
       expect(await handleRazorpayWebhook(sql, deps, webhook(payment, 'order.paid'))).toBe(
         'processed',
       );
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
-      expect(await listInvoices(sql, ws.id)).toHaveLength(1);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
+      expect(await listInvoices(sql, ws.accountId)).toHaveLength(1);
       expect(sent).toHaveLength(1);
     });
 
@@ -700,7 +719,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
           'UNAUTHORIZED',
         );
       }
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
     });
 
     it('accepts and ignores what it cannot use', async () => {
@@ -714,7 +733,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       );
       const wrongAmount = razorpay.pay(order.razorpayOrderId, { amount: 1 });
       expect(await handleRazorpayWebhook(sql, deps, webhook(wrongAmount))).toBe('ignored');
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
       const [mismatch] = await sql`
         select data from app_audit_log where action = 'billing.payment_mismatch'
           and target = ${order.razorpayOrderId}`;
@@ -736,18 +755,18 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
       const results = await Promise.all([
-        confirm(ws.id, order.razorpayOrderId, payment),
+        confirm(ws.accountId, order.razorpayOrderId, payment),
         handleRazorpayWebhook(sql, deps, webhook(payment)),
-        confirm(ws.id, order.razorpayOrderId, payment),
+        confirm(ws.accountId, order.razorpayOrderId, payment),
         handleRazorpayWebhook(sql, deps, webhook(payment, 'order.paid')),
       ]);
       expect(results).toHaveLength(4);
       const again = await fulfilOrder(sql, deps, order.razorpayOrderId, payment);
       expect(again.fresh).toBe(false);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
-      expect(await listInvoices(sql, ws.id)).toHaveLength(1);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
+      expect(await listInvoices(sql, ws.accountId)).toHaveLength(1);
       expect(sent).toHaveLength(1);
-      const grants = (await creditHistory(sql, ws.id)).filter((e) => e.kind === 'grant');
+      const grants = (await creditHistory(sql, ws.accountId)).filter((e) => e.kind === 'grant');
       expect(grants).toHaveLength(1);
     });
 
@@ -759,7 +778,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const orders = await Promise.all(buyers.map((ws) => buy(ws, 10)));
       const outcomes = await Promise.all(
         orders.map(({ order }, i) =>
-          confirm(buyers[i]!.id, order.razorpayOrderId, razorpay.pay(order.razorpayOrderId)),
+          confirm(buyers[i]!.accountId, order.razorpayOrderId, razorpay.pay(order.razorpayOrderId)),
         ),
       );
       const numbers = outcomes
@@ -775,15 +794,19 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         throw new Error('handler broke');
       });
       await expect(
-        confirm(ws.id, failing.order.razorpayOrderId, razorpay.pay(failing.order.razorpayOrderId)),
+        confirm(
+          ws.accountId,
+          failing.order.razorpayOrderId,
+          razorpay.pay(failing.order.razorpayOrderId),
+        ),
       ).rejects.toThrow('handler broke');
-      expect((await getOrder(sql, ws.id, failing.order.id))?.status).toBe('created');
+      expect((await getOrder(sql, ws.accountId, failing.order.id))?.status).toBe('created');
       registerFulfilment('esign_credits', fulfilCredits);
       const [counter] = await sql<{ last_sequence: number }[]>`
         select last_sequence from app_invoice_counters where prefix = 'CV-202627'`;
       const next = await buy(ws, 10);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         next.order.razorpayOrderId,
         razorpay.pay(next.order.razorpayOrderId),
       );
@@ -796,7 +819,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       deps.now = () => new Date('2027-03-31T18:30:00Z');
       const { order } = await buy(ws, 10);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId),
       );
@@ -815,14 +838,14 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(checkout.testMode).toBe(true);
       expect(order.mode).toBe('test');
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId),
       );
       if (outcome.status !== 'paid') throw new Error('unreachable');
       expect(outcome.invoice.number).toMatch(/^T-2026-\d{4}$/);
       expect(sent[0]!.subject).toMatch(/^Test invoice T-2026-/);
-      const pdf = await invoicePdf(sql, deps, ws.id, outcome.invoice.id);
+      const pdf = await invoicePdf(sql, deps, ws.accountId, outcome.invoice.id);
       expect(pdfText(pdf!.bytes)).toContain('Not a tax document');
     });
 
@@ -832,7 +855,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         delivered.push(String(order.payload.server));
       });
       const { order, checkout } = await createOrder(sql, deps, {
-        workspaceId: null,
+        accountId: null,
         kind: 'install_help',
         lines: [{ description: 'Installation help', quantity: 1, unitPaise: 199_900 }],
         payload: { server: 'vps-1' },
@@ -843,7 +866,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(checkout.amountPaise).toBe(235_882);
       const payment = razorpay.pay(order.razorpayOrderId);
       const outcome = await confirmCheckout(sql, deps, {
-        workspaceId: null,
+        accountId: null,
         razorpayOrderId: order.razorpayOrderId,
         paymentId: payment.id,
         signature: checkoutSignature(order.razorpayOrderId, payment.id),
@@ -854,13 +877,13 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       if (outcome.status !== 'paid') throw new Error('unreachable');
       expect(await getInvoice(sql, null, outcome.invoice.id)).not.toBeNull();
       const ws = await workspace();
-      expect(await getInvoice(sql, ws.id, outcome.invoice.id)).toBeNull();
+      expect(await getInvoice(sql, ws.accountId, outcome.invoice.id)).toBeNull();
     });
 
     it('keeps the order unpaid when its kind has no fulfilment', async () => {
       const ws = await workspace();
       const { order } = await createOrder(sql, deps, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         kind: 'extra_seats',
         lines: [{ description: 'Extra members', quantity: 2, unitPaise: 9900 }],
         payload: {},
@@ -871,9 +894,9 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const holder = globalThis as unknown as { __cvsFulfilments: Map<string, unknown> };
       holder.__cvsFulfilments.delete('extra_seats');
       await expect(
-        confirm(ws.id, order.razorpayOrderId, razorpay.pay(order.razorpayOrderId)),
+        confirm(ws.accountId, order.razorpayOrderId, razorpay.pay(order.razorpayOrderId)),
       ).rejects.toThrow(/No fulfilment/);
-      expect((await getOrder(sql, ws.id, order.id))?.status).toBe('created');
+      expect((await getOrder(sql, ws.accountId, order.id))?.status).toBe('created');
     });
   });
 
@@ -882,9 +905,9 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const payment = razorpay.pay(order.razorpayOrderId);
-      const outcome = await confirm(ws.id, order.razorpayOrderId, payment);
+      const outcome = await confirm(ws.accountId, order.razorpayOrderId, payment);
       if (outcome.status !== 'paid') throw new Error('unreachable');
-      const pdf = await invoicePdf(sql, deps, ws.id, outcome.invoice.id);
+      const pdf = await invoicePdf(sql, deps, ws.accountId, outcome.invoice.id);
       expect(pdf!.number).toBe(outcome.invoice.number);
       expect(Buffer.from(pdf!.bytes.subarray(0, 5)).toString()).toBe('%PDF-');
       const text = pdfText(pdf!.bytes);
@@ -920,12 +943,12 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace(MAHARASHTRA);
       const { order } = await buy(ws, 10);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId, { method: 'card' }),
       );
       if (outcome.status !== 'paid') throw new Error('unreachable');
-      const text = pdfText((await invoicePdf(sql, deps, ws.id, outcome.invoice.id))!.bytes);
+      const text = pdfText((await invoicePdf(sql, deps, ws.accountId, outcome.invoice.id))!.bytes);
       expect(text).toContain('IGST 18.0%');
       expect(text).toContain('63.00');
       expect(text).toContain('Unregistered');
@@ -938,19 +961,19 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId),
       );
       if (outcome.status !== 'paid') throw new Error('unreachable');
       await saveBillingDetails(sql, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         details: MAHARASHTRA,
       });
       deps.config = billingConfig({ ...ENV, ESIGN_PROVIDER_COST_INR: '90', GST_PERCENT: '28' });
       deps.files = memoryFileStore();
-      const text = pdfText((await invoicePdf(sql, deps, ws.id, outcome.invoice.id))!.bytes);
+      const text = pdfText((await invoicePdf(sql, deps, ws.accountId, outcome.invoice.id))!.bytes);
       expect(text).toContain('Acme Traders Private Limited');
       expect(text).toContain('413.00');
       expect(text).toContain('CGST 9.0%');
@@ -960,12 +983,12 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const ws = await workspace({ ...HARYANA, legalName: 'आशा ट्रेडर्स Pvt Ltd' });
       const { order } = await buy(ws, 10);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId),
       );
       if (outcome.status !== 'paid') throw new Error('unreachable');
-      const text = pdfText((await invoicePdf(sql, deps, ws.id, outcome.invoice.id))!.bytes);
+      const text = pdfText((await invoicePdf(sql, deps, ws.accountId, outcome.invoice.id))!.bytes);
       expect(text).toContain('Pvt Ltd');
       expect(sent).toHaveLength(1);
     });
@@ -976,15 +999,15 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       failMail = true;
       const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId),
       );
       expect(outcome.status).toBe('paid');
       expect(log).toHaveBeenCalled();
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 10, reserved: 0 });
       if (outcome.status !== 'paid') throw new Error('unreachable');
-      expect((await getInvoice(sql, ws.id, outcome.invoice.id))?.emailedAt).toBeNull();
+      expect((await getInvoice(sql, ws.accountId, outcome.invoice.id))?.emailedAt).toBeNull();
 
       failMail = false;
       const [first, second] = await Promise.all([
@@ -994,7 +1017,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect([first, second].filter(Boolean)).toHaveLength(1);
       expect(sent.filter((m) => m.to === HARYANA.email)).toHaveLength(1);
       expect(await finishInvoice(sql, deps, outcome.invoice.id)).toBe(false);
-      expect((await getInvoice(sql, ws.id, outcome.invoice.id))?.emailedAt).toEqual(NOW);
+      expect((await getInvoice(sql, ws.accountId, outcome.invoice.id))?.emailedAt).toEqual(NOW);
     });
 
     it('picks up unfinished invoices from the timer', async () => {
@@ -1003,7 +1026,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const { order } = await buy(ws, 10);
       failMail = true;
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      await confirm(ws.id, order.razorpayOrderId, razorpay.pay(order.razorpayOrderId));
+      await confirm(ws.accountId, order.razorpayOrderId, razorpay.pay(order.razorpayOrderId));
       expect(await finishPendingInvoices(sql, deps)).toBe(0);
       failMail = false;
       expect(await finishPendingInvoices(sql, deps)).toBe(1);
@@ -1017,13 +1040,20 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const orderA = await buy(a, 10);
       const orderB = await buy(b, 50);
       const paidA = await confirm(
-        a.id,
+        a.accountId,
         orderA.order.razorpayOrderId,
         razorpay.pay(orderA.order.razorpayOrderId),
       );
-      await confirm(b.id, orderB.order.razorpayOrderId, razorpay.pay(orderB.order.razorpayOrderId));
+      await confirm(
+        b.accountId,
+        orderB.order.razorpayOrderId,
+        razorpay.pay(orderB.order.razorpayOrderId),
+      );
       if (paidA.status !== 'paid') throw new Error('unreachable');
-      const overview = await billingOverview(sql, deps.config, { workspaceId: a.id, plan: 'free' });
+      const overview = await billingOverview(sql, deps.config, {
+        accountId: a.accountId,
+        plan: 'free',
+      });
       expect(overview.invoices).toHaveLength(1);
       expect(overview.invoices[0]).toMatchObject({
         id: paidA.invoice.id,
@@ -1037,8 +1067,8 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(overview.credits).toEqual({ available: 10, reserved: 0 });
       expect(overview.offer).toMatchObject({ unavailable: null, pricePaise: 3500 });
       expect(overview.details).toEqual(HARYANA);
-      expect(await getInvoice(sql, b.id, paidA.invoice.id)).toBeNull();
-      expect(await invoicePdf(sql, deps, b.id, paidA.invoice.id)).toBeNull();
+      expect(await getInvoice(sql, b.accountId, paidA.invoice.id)).toBeNull();
+      expect(await invoicePdf(sql, deps, b.accountId, paidA.invoice.id)).toBeNull();
     });
   });
 
@@ -1054,7 +1084,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         params: Promise.resolve({ workspaceId, invoiceId }),
       });
 
-    it('lets admins and owners manage billing and nobody else', async () => {
+    it('lets the owner of the account manage billing and nobody else', async () => {
       const ws = await workspace(null);
       const {
         saveBillingDetailsAction,
@@ -1090,16 +1120,33 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
 
       state.user = await person('Outsider');
       expect(await saveBillingDetailsAction(form)).toMatchObject({ ok: false, code: 'NOT_FOUND' });
-      expect(await getBillingDetails(sql, ws.id)).toBeNull();
+      expect(await getBillingDetails(sql, ws.accountId)).toBeNull();
 
-      state.user = await member(ws.id, 'admin');
+      // An admin, or another owner of the workspace, is not the one who pays for it.
+      for (const role of ['admin', 'owner'] as const) {
+        state.user = await member(ws.id, role);
+        expect(await saveBillingDetailsAction(form)).toMatchObject({
+          ok: false,
+          code: 'FORBIDDEN',
+        });
+        expect(await createCreditsOrderAction({ workspaceId: ws.id, credits: 10 })).toMatchObject({
+          ok: false,
+          code: 'FORBIDDEN',
+        });
+        expect(await listInvoicesAction({ workspaceId: ws.id })).toMatchObject({
+          code: 'FORBIDDEN',
+        });
+      }
+      expect(await getBillingDetails(sql, ws.accountId)).toBeNull();
+
+      state.user = ws.owner;
       expect(await saveBillingDetailsAction({ ...form, gstin: '06AANCC6406C1ZY' })).toMatchObject({
         ok: false,
         code: 'VALIDATION',
         field: 'gstin',
       });
       expect(await saveBillingDetailsAction(form)).toMatchObject({ ok: true });
-      expect(await getBillingDetails(sql, ws.id)).toEqual(HARYANA);
+      expect(await getBillingDetails(sql, ws.accountId)).toEqual(HARYANA);
     });
 
     it('runs a purchase end to end through the actions', async () => {
@@ -1154,11 +1201,11 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(body).not.toMatch(/cost|markup/i);
     });
 
-    it('serves an invoice file to admins of its workspace and 404s everyone else', async () => {
+    it('serves an invoice file to the owner of its account and 404s everyone else', async () => {
       const ws = await workspace();
       const { order } = await buy(ws, 10);
       const outcome = await confirm(
-        ws.id,
+        ws.accountId,
         order.razorpayOrderId,
         razorpay.pay(order.razorpayOrderId),
       );
@@ -1167,8 +1214,10 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
 
       state.user = null;
       expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
-      state.user = await member(ws.id, 'member');
-      expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
+      for (const role of ['member', 'admin', 'owner'] as const) {
+        state.user = await member(ws.id, role);
+        expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
+      }
       state.user = other.owner;
       expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
       expect((await download(other.id, outcome.invoice.id)).status).toBe(404);

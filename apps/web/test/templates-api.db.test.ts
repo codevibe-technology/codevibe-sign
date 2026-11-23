@@ -333,7 +333,10 @@ describe.skipIf(!url)('the dashboard’s templates through the sign API', () => 
   it('keeps API templates and their envelopes within the workspace’s plan', async () => {
     vi.stubEnv('PLAN_MODE', 'hosted');
     vi.stubEnv('FREE_PLAN_LIMITS', JSON.stringify({ activeTemplates: 1, envelopesPerMonth: 1 }));
-    const ws = (await createWorkspace(sql, { name: 'Free', userId })).id;
+    // Their own account, so its Free limits are not shared with the workspaces above.
+    const freeUser = randomUUID();
+    await sql`insert into auth_users (id, name, email) values (${freeUser}, 'Mia', ${`mia-${freeUser.slice(0, 6)}@example.com`})`;
+    const ws = (await createWorkspace(sql, { name: 'Free', userId: freeUser })).id;
     const first = await call('POST', '/v1/templates', apiTemplate(), ws);
     expect(first.status, JSON.stringify(first.json)).toBe(201);
     expect(await usageOf(sql, ws, 'storage_bytes')).toBe(pdf.length);

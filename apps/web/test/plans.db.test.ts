@@ -7,7 +7,7 @@ import { getBrand, updateSigningSettings } from '@/server/brand';
 import { AppError } from '@/server/errors';
 import { acceptInvitation, createInvitation } from '@/server/invitations';
 import { migrateAll } from '@/server/migrate';
-import { setWorkspacePlan } from '@/server/plan-admin';
+import { setAccountPlanByName } from '@/server/plan-admin';
 import {
   PlanLimitError,
   releaseUsage,
@@ -127,7 +127,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       );
       expect(err.limit).toBe('ownedWorkspaces');
       expect(err.message).toBe(
-        'You already own 1 Free workspace, and each person can own 1. Use the one you have, ask to be invited to another, or upgrade to Cloud on the Plan and usage page.',
+        "Your account already has 1 workspace, and the Free plan includes 1. Use the one you have, or upgrade to Cloud on the Plan and usage page. Being invited to someone else's workspace is always possible.",
       );
       const cloud = await createWorkspace(
         sql,
@@ -170,7 +170,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const refused = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
       expect(refused.reason).toBeInstanceOf(PlanLimitError);
       expect(refused.reason.message).toMatch(
-        /^This workspace has sent 10 of the 10 envelopes the Free plan allows each month\. Upgrade to Cloud on the Plan and usage page\. The count starts again on 1 /,
+        /^Your workspaces have sent 10 of the 10 envelopes the Free plan allows each month\. Upgrade to Cloud on the Plan and usage page\. The count starts again on 1 /,
       );
       expect(refused.reason.resetsAt).toBeInstanceOf(Date);
     });
@@ -252,7 +252,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
         error: { code: string; message: string; details: Record<string, unknown> };
       };
       expect(body.error.code).toBe('PLAN_LIMIT');
-      expect(body.error.message).toContain('has sent 10 of the 10 envelopes');
+      expect(body.error.message).toContain('have sent 10 of the 10 envelopes');
       expect(body.error.details).toMatchObject({
         limit: 'envelopesPerMonth',
         used: 10,
@@ -330,7 +330,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const refused = await create({ documents: [doc(600)] });
       expect(refused.status).toBe(403);
       expect(((await refused.json()) as { error: { message: string } }).error.message).toBe(
-        'This workspace stores 600 bytes of documents, and the Free plan holds 1000 bytes, so these files do not fit. Upgrade to Cloud on the Plan and usage page.',
+        'Your workspaces store 600 bytes of documents, and the Free plan holds 1000 bytes, so these files do not fit. Upgrade to Cloud on the Plan and usage page.',
       );
     });
 
@@ -349,7 +349,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       };
       expect(body.error.code).toBe('PLAN_LIMIT');
       expect(body.error.message).toMatch(
-        /^This workspace has made 2 of the 2 API requests the Free plan allows each month\. The count starts again on \d+ \w+ \d{4} \(IST\)\. For more, upgrade to Cloud on the Plan and usage page\.$/,
+        /^Your workspaces have made 2 of the 2 API requests the Free plan allows each month\. The count starts again on \d+ \w+ \d{4} \(IST\)\. For more, upgrade to Cloud on the Plan and usage page\.$/,
       );
       expect(new Date(body.error.details.resetsAt).toISOString().slice(10)).toBe('T18:30:00.000Z');
       expect(body.error.details.upgradeUrl).toMatch(/\/#pricing$/);
@@ -360,7 +360,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
 
     it('keeps a daily fair-use ceiling on Cloud and answers 429 there too', async () => {
       const ws = await freeWorkspace();
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'cloud', changedBy: 'test' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'cloud', changedBy: 'test' });
       const plan = { id: ws.id, ...(await workspacePlan(sql, ws.id, hosted)) };
       await reserveUsage(sql, plan, 'api_requests', 10_000);
       const refused = await setup(ws.id, hosted, true).get({ authorization: 'Bearer cvs_x' });
@@ -428,7 +428,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const err = await planError(invite(ws.id, ws.owner, 'three@example.com'));
       expect(err.field).toBe('email');
       expect(err.message).toBe(
-        'This workspace has 2 members and open invitations, and the Free plan allows 2. Remove someone or cancel an invitation, or upgrade to Cloud on the Plan and usage page.',
+        'This account has 2 members and open invitations across its workspaces, and the Free plan allows 2. Remove someone or cancel an invitation, or upgrade to Cloud on the Plan and usage page.',
       );
     });
 
@@ -442,7 +442,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       const people = await Promise.all([user('Mia'), user('Ravi'), user('Zoe')]);
       const tokens = [];
       for (const person of people) tokens.push((await invite(ws.id, owner, person.email)).token);
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'free', changedBy: 'test' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'free', changedBy: 'test' });
       await acceptInvitation(sql, tokens[0]!, people[0]!);
       const err = await planError(acceptInvitation(sql, tokens[1]!, people[1]!));
       expect(err.limit).toBe('members');
@@ -487,7 +487,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
       for (let i = 1; i <= 2; i++) made.push(await template(ws.id, ws.owner.id, `T${i}`));
       const err = await planError(template(ws.id, ws.owner.id, 'T6'));
       expect(err.message).toBe(
-        'This workspace has 2 active templates, and the Free plan allows 2. Archive a template you no longer use, or upgrade to Cloud on the Plan and usage page.',
+        'This account has 2 active templates across its workspaces, and the Free plan allows 2. Archive a template you no longer use, or upgrade to Cloud on the Plan and usage page.',
       );
       await planError(
         duplicateTemplate(sql, files, {
@@ -544,7 +544,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
 
     it('allows more on Cloud', async () => {
       const ws = await freeWorkspace();
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'cloud', changedBy: 'test' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'cloud', changedBy: 'test' });
       for (let i = 1; i <= 3; i++) {
         await createWebhook(sql, { ...input(i), workspaceId: ws.id, createdBy: ws.owner.id });
       }
@@ -580,7 +580,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
 
     it('shows the badge on Free even when it was turned off on another plan', async () => {
       const ws = await freeWorkspace();
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'cloud', changedBy: 'test' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'cloud', changedBy: 'test' });
       await updateSigningSettings(
         sql,
         ws.id,
@@ -588,7 +588,7 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
         'localhost',
       );
       expect((await getBrand(sql, ws.id)).showBadge).toBe(false);
-      await setWorkspacePlan(sql, { slug: ws.slug, plan: 'free', changedBy: 'test' });
+      await setAccountPlanByName(sql, { target: ws.slug, plan: 'free', changedBy: 'test' });
       expect((await getBrand(sql, ws.id)).showBadge).toBe(true);
     });
   });
@@ -596,25 +596,30 @@ describe.skipIf(!url)('plans against PostgreSQL', () => {
   describe('plan:set', () => {
     it('changes the plan and records who did it', async () => {
       const ws = await freeWorkspace();
-      const change = await setWorkspacePlan(sql, {
-        slug: ws.slug,
+      const change = await setAccountPlanByName(sql, {
+        target: ws.slug,
         plan: 'cloud',
         changedBy: 'script:ops',
       });
-      expect(change).toEqual({ workspaceId: ws.id, slug: ws.slug, from: 'free', to: 'cloud' });
+      expect(change).toMatchObject({
+        accountId: ws.accountId,
+        workspaces: [ws.slug],
+        from: 'free',
+        to: 'cloud',
+      });
       expect((await workspacePlan(sql, ws.id, hosted)).plan).toBe('cloud');
       const audit = await sql`select from_plan, to_plan, changed_by from app_plan_changes
-        where workspace_id = ${ws.id}`;
+        where account_id = ${ws.accountId}`;
       expect(audit).toEqual([{ from_plan: 'free', to_plan: 'cloud', changed_by: 'script:ops' }]);
     });
 
     it('refuses an unknown plan or workspace', async () => {
       const ws = await freeWorkspace();
       await expect(
-        setWorkspacePlan(sql, { slug: ws.slug, plan: 'gold', changedBy: 'x' }),
+        setAccountPlanByName(sql, { target: ws.slug, plan: 'gold', changedBy: 'x' }),
       ).rejects.toThrow('Unknown plan "gold". Use free, cloud or unlimited.');
       await expect(
-        setWorkspacePlan(sql, { slug: 'nope-nope', plan: 'cloud', changedBy: 'x' }),
+        setAccountPlanByName(sql, { target: 'nope-nope', plan: 'cloud', changedBy: 'x' }),
       ).rejects.toThrow('No workspace has the slug "nope-nope".');
     });
   });

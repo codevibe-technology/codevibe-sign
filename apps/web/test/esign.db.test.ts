@@ -187,7 +187,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       { mode: 'hosted', freeOverrides: {} },
     );
     if (credits) {
-      await grantCredits(sql, { workspaceId: ws.id, credits, ref: `grant_${randomUUID()}` });
+      await grantCredits(sql, { accountId: ws.accountId, credits, ref: `grant_${randomUUID()}` });
     }
     const key = `key-${randomUUID()}`;
     keys.set(ws.id, key);
@@ -379,12 +379,12 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const document = provider.last();
       expect(signUrl).toBe(document.signUrl);
       expect(document.token).toBe('platform-token');
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 1 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 1 });
 
       const again = await start(token);
       expect(((await again.json()) as { signUrl: string }).signUrl).toBe(signUrl);
       expect(provider.calls.create).toBe(1);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 1 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 1 });
 
       const body = provider.webhook(document, 'Signed');
       expect((await hook(body)).status).toBe(200);
@@ -398,8 +398,8 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         status: 'signed',
         esign: { provider: 'leegality', status: 'signed' },
       });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 0 });
-      const kinds = (await creditHistory(sql, ws.id)).map((entry) => entry.kind);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 0 });
+      const kinds = (await creditHistory(sql, ws.accountId)).map((entry) => entry.kind);
       expect(kinds.filter((kind) => kind === 'consume')).toHaveLength(1);
 
       const sealed = await files.get(sealedFileKey(envelope.id, done.documents[0]!.id));
@@ -422,9 +422,11 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       );
       expect(certificate.status).toBe(200);
 
-      const actions = (await listAudit(sql, ws.id, { prefix: 'esign.' })).map((row) => row.action);
+      const actions = (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'esign.' })).map(
+        (row) => row.action,
+      );
       expect(actions.sort()).toEqual(['esign.completed', 'esign.started']);
-      const [usage] = await listEsignUsage(sql, ws.id);
+      const [usage] = await listEsignUsage(sql, ws.accountId);
       expect(usage).toMatchObject({
         mode: 'platform',
         billed: true,
@@ -440,14 +442,16 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const { res, email } = await send(ws);
       const envelope = (await res.json()) as Envelope;
       expect((await start(tokenFor(email))).status).toBe(200);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 1 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 1 });
 
       expect((await hook(provider.webhook(provider.last(), 'Rejected'))).status).toBe(200);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 0 });
       expect((await envelopeOf(ws, envelope.id)).status).toBe('declined');
-      const [usage] = await listEsignUsage(sql, ws.id);
+      const [usage] = await listEsignUsage(sql, ws.accountId);
       expect(usage).toMatchObject({ outcome: 'declined' });
-      const actions = (await listAudit(sql, ws.id, { prefix: 'esign.' })).map((row) => row.action);
+      const actions = (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'esign.' })).map(
+        (row) => row.action,
+      );
       expect(actions).toContain('esign.failed');
     });
 
@@ -459,7 +463,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const forged = provider.webhook(provider.last(), 'Signed', 'someone-elses-salt');
       provider.last().state = 'open';
       expect((await hook(forged)).status).toBe(401);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 1 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 1 });
       expect((await envelopeOf(ws, envelope.id)).status).not.toBe('completed');
     });
 
@@ -494,7 +498,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const message = ((await lost.json()) as { error: { message: string } }).error.message;
       expect(message).toMatch(/not available for this document right now/);
       expect(message).not.toMatch(/credit|cost|markup/i);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 2 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 2 });
       expect(provider.calls.create).toBe(1);
     });
   });
@@ -507,6 +511,33 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       ref,
     });
 
+    it('keeps one wallet for the account: two workspaces with one credit start one eSign', async () => {
+      const ws = await workspace('cloud', 1);
+      const second = await createWorkspace(
+        sql,
+        { name: 'Second', userId: ws.owner.id },
+        { mode: 'hosted', freeOverrides: {} },
+      );
+      expect(second.accountId).toBe(ws.accountId);
+      const config = () => billingConfig(ENV);
+      expect((await esignState({ sql, config }, second.id)).blocked).toBeNull();
+      const options = createEsignOptions({ sql, config });
+      const results = await Promise.allSettled([
+        options.onStart!(hookInput(ws.id, 'first-ws')),
+        options.onStart!(hookInput(second.id, 'second-ws')),
+      ]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 1 });
+      // The other workspace sees the same empty wallet and the same usage.
+      expect((await esignState({ sql, config }, second.id)).blocked?.reason).toBe('no_credits');
+      expect((await esignState({ sql, config }, ws.id)).blocked?.reason).toBe('no_credits');
+      const won = results[0]!.status === 'fulfilled' ? 'first-ws' : 'second-ws';
+      const where = won === 'first-ws' ? ws.id : second.id;
+      await options.onEnd!({ ...hookInput(where, won), outcome: 'signed' });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect((await listEsignUsage(sql, ws.accountId)).map((u) => u.workspaceId)).toEqual([where]);
+    });
+
     it('releases on expiry and failure, once', async () => {
       const ws = await workspace('free', 3);
       const options = createEsignOptions({ sql, config: () => billingConfig(ENV) });
@@ -516,7 +547,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         await options.onEnd!({ ...input, outcome });
         await options.onEnd!({ ...input, outcome });
       }
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 3, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 3, reserved: 0 });
     });
 
     it('charges a signature that arrives after the hold was given back, once', async () => {
@@ -525,11 +556,11 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const input = hookInput(ws.id);
       await options.onStart!(input);
       await options.onEnd!({ ...input, outcome: 'expired' });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 1, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 0 });
       await options.onEnd!({ ...input, outcome: 'signed' });
       await options.onEnd!({ ...input, outcome: 'signed' });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      const [usage] = await listEsignUsage(sql, ws.id);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      const [usage] = await listEsignUsage(sql, ws.accountId);
       expect(usage).toMatchObject({ outcome: 'signed' });
     });
 
@@ -544,8 +575,10 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       await options.onEnd!({ ...other, outcome: 'signed' });
       await options.onEnd!({ ...late, outcome: 'signed' });
       await options.onEnd!({ ...late, outcome: 'signed' });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      const unbilled = (await listAudit(sql, ws.id, { prefix: 'esign.unbilled' })).length;
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      const unbilled = (
+        await listAudit(sql, { accountId: ws.accountId }, { prefix: 'esign.unbilled' })
+      ).length;
       expect(unbilled).toBe(1);
     });
 
@@ -560,20 +593,28 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       await options.onStart!(other);
       await options.onEnd!({ ...other, outcome: 'signed' });
       await options.onEnd!({ ...late, outcome: 'signed' });
-      expect(await owedEsigns(sql, ws.id)).toBe(1);
+      expect(await owedEsigns(sql, ws.accountId)).toBe(1);
       expect(await options.available!(ws.id)).toMatchObject({ reason: 'no_credits' });
 
-      await grantCredits(sql, { workspaceId: ws.id, credits: 1, ref: `grant_${randomUUID()}` });
-      expect(await owedEsigns(sql, ws.id)).toBe(0);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      await grantCredits(sql, {
+        accountId: ws.accountId,
+        credits: 1,
+        ref: `grant_${randomUUID()}`,
+      });
+      expect(await owedEsigns(sql, ws.accountId)).toBe(0);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
       expect(await options.available!(ws.id)).toMatchObject({ reason: 'no_credits' });
       const paid = await sql`
         select kind from app_esign_credit_ledger
-        where workspace_id = ${ws.id} and ref = ${`${late.ref}:late`} order by kind`;
+        where account_id = ${ws.accountId} and ref = ${`${late.ref}:late`} order by kind`;
       expect(paid.map((row) => row.kind)).toEqual(['consume', 'reserve']);
 
-      await grantCredits(sql, { workspaceId: ws.id, credits: 2, ref: `grant_${randomUUID()}` });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+      await grantCredits(sql, {
+        accountId: ws.accountId,
+        credits: 2,
+        ref: `grant_${randomUUID()}`,
+      });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 2, reserved: 0 });
       expect(await options.available!(ws.id)).toBeNull();
     });
 
@@ -586,10 +627,10 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const second = hookInput(ws.id);
       await options.onStart!(second);
       await options.onEnd!({ ...first, outcome: 'signed' });
-      expect(await owedEsigns(sql, ws.id)).toBe(1);
+      expect(await owedEsigns(sql, ws.accountId)).toBe(1);
       await options.onEnd!({ ...second, outcome: 'expired' });
-      expect(await owedEsigns(sql, ws.id)).toBe(0);
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
+      expect(await owedEsigns(sql, ws.accountId)).toBe(0);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
     });
 
     it('holds no credit when the start cannot be written down', async () => {
@@ -597,13 +638,13 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const options = createEsignOptions({ sql, config: () => billingConfig(ENV) });
       const broken = { ...hookInput(ws.id), envelopeId: null as unknown as string };
       await expect(options.onStart!(broken)).rejects.toThrow();
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 2, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 2, reserved: 0 });
     });
 
     it('does not use a sandbox account of a workspace once the install is live', async () => {
       const ws = await workspace('cloud');
       await saveOwnCredentials(sql, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         credentials: {
           apiKey: 'own-auth-token-5555',
@@ -612,7 +653,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
           environment: 'sandbox',
         },
       });
-      await setEsignMode(sql, { workspaceId: ws.id, userId: ws.owner.id, mode: 'own' });
+      await setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' });
       const test = createEsignOptions({ sql, config: () => billingConfig(ENV) });
       expect(await test.available!(ws.id)).toBeNull();
       expect(await test.provider(ws.id)).toMatchObject({ environment: 'sandbox' });
@@ -664,8 +705,8 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const input = { workspaceId: ws.id, envelopeId: 'e', recipientId: 'r', ref: 'self-1' };
       await options.onStart!(input);
       await options.onEnd!({ ...input, outcome: 'signed' });
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      expect((await listEsignUsage(sql, ws.id))[0]).toMatchObject({ billed: false });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect((await listEsignUsage(sql, ws.accountId))[0]).toMatchObject({ billed: false });
     });
 
     it('shows the sender the final price only', async () => {
@@ -702,7 +743,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
     it('stores the details encrypted and never hands them back', async () => {
       const ws = await workspace('cloud');
       const saved = await saveOwnCredentials(sql, {
-        workspaceId: ws.id,
+        accountId: ws.accountId,
         userId: ws.owner.id,
         credentials,
       });
@@ -712,23 +753,27 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         environment: 'sandbox',
       });
       expect(JSON.stringify(saved)).not.toMatch(/own-auth-token|workspace-private-salt/);
-      const [row] = await sql`select * from app_esign_settings where workspace_id = ${ws.id}`;
+      const [row] = await sql`select * from app_esign_settings where account_id = ${ws.accountId}`;
       expect(JSON.stringify(row)).not.toMatch(/own-auth-token|workspace-private-salt/);
-      expect(await ownCredentials(sql, ws.id)).toEqual(credentials);
+      expect(await ownCredentials(sql, ws.accountId)).toEqual(credentials);
 
       // A sealed value copied to another workspace's row does not open there.
       const other = await workspace('cloud');
-      await saveOwnCredentials(sql, { workspaceId: other.id, userId: other.owner.id, credentials });
+      await saveOwnCredentials(sql, {
+        accountId: other.accountId,
+        userId: other.owner.id,
+        credentials,
+      });
       await sql`
         update app_esign_settings set own_api_key = ${row!.own_api_key as string}
-        where workspace_id = ${other.id}`;
-      expect(await ownCredentials(sql, other.id)).toBeNull();
+        where account_id = ${other.accountId}`;
+      expect(await ownCredentials(sql, other.accountId)).toBeNull();
     });
 
     it('signs through that account, uses no credit and checks callbacks with its salt', async () => {
       const ws = await workspace('cloud', 0);
-      await saveOwnCredentials(sql, { workspaceId: ws.id, userId: ws.owner.id, credentials });
-      await setEsignMode(sql, { workspaceId: ws.id, userId: ws.owner.id, mode: 'own' });
+      await saveOwnCredentials(sql, { accountId: ws.accountId, userId: ws.owner.id, credentials });
+      await setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' });
       const { res, email } = await send(ws);
       expect(res.status).toBe(201);
       const envelope = (await res.json()) as Envelope;
@@ -742,15 +787,18 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       expect((await hook(provider.webhook(document, 'Signed', OWN_SALT))).status).toBe(200);
       await sign.tick();
       expect((await envelopeOf(ws, envelope.id)).status).toBe('completed');
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 0, reserved: 0 });
-      expect((await listEsignUsage(sql, ws.id))[0]).toMatchObject({ mode: 'own', billed: false });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+      expect((await listEsignUsage(sql, ws.accountId))[0]).toMatchObject({
+        mode: 'own',
+        billed: false,
+      });
     });
 
     it('stops working when the workspace is no longer on a plan that includes it', async () => {
       const ws = await workspace('cloud', 5);
-      await saveOwnCredentials(sql, { workspaceId: ws.id, userId: ws.owner.id, credentials });
-      await setEsignMode(sql, { workspaceId: ws.id, userId: ws.owner.id, mode: 'own' });
-      await sql`update app_workspaces set plan = 'free' where id = ${ws.id}`;
+      await saveOwnCredentials(sql, { accountId: ws.accountId, userId: ws.owner.id, credentials });
+      await setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' });
+      await sql`update app_accounts set plan = 'free' where id = ${ws.accountId}`;
       const blocked = await esignState({ sql, config: () => billingConfig(ENV) }, ws.id);
       expect(blocked.blocked).toMatchObject({ reason: 'own_not_in_plan' });
       const options = createEsignOptions({
@@ -761,16 +809,16 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       expect(await options.provider(ws.id)).toBeNull();
       expect((await send(ws)).res.status).toBe(409);
       // The credits are not used silently in its place.
-      expect(await creditBalance(sql, ws.id)).toEqual({ available: 5, reserved: 0 });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 5, reserved: 0 });
     });
 
     it('will not change account while someone is at the provider', async () => {
       const ws = await workspace('cloud', 1);
-      await saveOwnCredentials(sql, { workspaceId: ws.id, userId: ws.owner.id, credentials });
+      await saveOwnCredentials(sql, { accountId: ws.accountId, userId: ws.owner.id, credentials });
       const { email } = await send(ws);
       expect((await start(tokenFor(email))).status).toBe(200);
       await expect(
-        setEsignMode(sql, { workspaceId: ws.id, userId: ws.owner.id, mode: 'own' }),
+        setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' }),
       ).rejects.toThrow(/signing with Aadhaar eSign right now/);
     });
   });
@@ -807,12 +855,11 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       state.user = ws.owner;
       const elsewhere = await setEsignModeAction({ workspaceId: other.id, mode: 'platform' });
       expect(elsewhere).toMatchObject({ ok: false, code: 'NOT_FOUND' });
-      expect((await getEsignSettings(sql, ws.id)).own.configured).toBe(false);
+      expect((await getEsignSettings(sql, ws.accountId)).own.configured).toBe(false);
     });
 
     it('checks the details with the provider, saves them and tests them again', async () => {
       const ws = await workspace('cloud');
-      state.user = await member(ws.id, 'admin');
       const {
         saveEsignCredentialsAction,
         setEsignModeAction,
@@ -820,10 +867,22 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         removeEsignCredentialsAction,
       } = await actions();
 
+      // The provider account belongs to the account, so an admin of the workspace cannot set it.
+      state.user = await member(ws.id, 'admin');
+      expect(await saveEsignCredentialsAction({ workspaceId: ws.id, ...form })).toMatchObject({
+        ok: false,
+        code: 'FORBIDDEN',
+      });
+      expect(await setEsignModeAction({ workspaceId: ws.id, mode: 'own' })).toMatchObject({
+        ok: false,
+        code: 'FORBIDDEN',
+      });
+      state.user = ws.owner;
+
       provider.refuseToken(form.apiKey);
       const refused = await saveEsignCredentialsAction({ workspaceId: ws.id, ...form });
       expect(refused).toMatchObject({ ok: false, field: 'apiKey' });
-      expect((await getEsignSettings(sql, ws.id)).own.configured).toBe(false);
+      expect((await getEsignSettings(sql, ws.accountId)).own.configured).toBe(false);
 
       provider.refuseToken(null);
       const saved = await saveEsignCredentialsAction({ workspaceId: ws.id, ...form });
@@ -850,7 +909,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         ok: true,
         data: { mode: 'platform', own: { configured: false, keyHint: null } },
       });
-      const audit = await listAudit(sql, ws.id, { prefix: 'esign.' });
+      const audit = await listAudit(sql, { accountId: ws.accountId }, { prefix: 'esign.' });
       expect(audit.map((row) => row.action)).toEqual(
         expect.arrayContaining([
           'esign.credentials_saved',
@@ -876,7 +935,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
           limit: { limit: 'ownEsignAccount', plan: 'free' },
         });
       }
-      expect((await getEsignSettings(sql, ws.id)).own.configured).toBe(false);
+      expect((await getEsignSettings(sql, ws.accountId)).own.configured).toBe(false);
     });
   });
 });

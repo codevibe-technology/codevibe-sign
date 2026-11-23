@@ -7,15 +7,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { FREE_PLAN_LIMITS, type Plan, type PlanSettings } from '@/lib/plans';
 import { updateSigningSettings } from '@/server/brand';
 import { acceptInvitation, createInvitation } from '@/server/invitations';
-import { changeRole } from '@/server/members';
+import { changeRole, removeMember } from '@/server/members';
 import { migrateAll } from '@/server/migrate';
-import { setWorkspacePlan } from '@/server/plan-admin';
+import { setAccountPlanByName } from '@/server/plan-admin';
 import {
   PlanLimitError,
   assertOwnEsignAccount,
   assertWithin,
   reserveUsage,
   usageOf,
+  usageReport,
   workspaceEntitlements,
   workspacePlan,
 } from '@/server/plans';
@@ -34,7 +35,7 @@ import {
   setWebhookEnabled,
   webhookTargetsFor,
 } from '@/server/webhooks';
-import { createWorkspace } from '@/server/workspaces';
+import { createWorkspace, newWorkspaceBlock } from '@/server/workspaces';
 
 const url = process.env.DATABASE_URL;
 const APP_URL = 'http://localhost:3000';
@@ -59,7 +60,7 @@ interface EntryPoint {
 interface Ctx {
   kind: Case;
   settings: PlanSettings;
-  ws: { id: string; slug: string };
+  ws: { id: string; slug: string; accountId: string };
   owner: { id: string; email: string };
 }
 
@@ -113,7 +114,7 @@ describe.skipIf(!url)('every entry point applies the plan', () => {
     admin = postgres(url!, { max: 1, onnotice: () => {} });
     await admin.unsafe(`create schema ${schema}`);
     sql = postgres(url!, { max: 10, onnotice: () => {}, connection: { search_path: schema } });
-    expect(await migrateAll(sql)).toContain('app/0014_plan_v2');
+    expect(await migrateAll(sql)).toContain('app/0013_accounts');
   });
 
   afterEach(() => {
@@ -157,7 +158,7 @@ describe.skipIf(!url)('every entry point applies the plan', () => {
   }
 
   const setPlan = (slug: string, plan: Plan) =>
-    setWorkspacePlan(sql, { slug, plan, changedBy: 'test' });
+    setAccountPlanByName(sql, { target: slug, plan, changedBy: 'test' });
 
   /** Runs `work` with the workspace lifted to Unlimited, to build a state Free would refuse. */
   async function unlimited<T>(ctx: Ctx, work: () => Promise<T>): Promise<T> {
@@ -283,45 +284,6 @@ describe.skipIf(!url)('every entry point applies the plan', () => {
         });
         await member(ctx.ws.id);
         await acceptInvitation(sql, token, invited);
-      },
-    },
-    {
-      id: 'owners.promote',
-      feature: 'ownedWorkspaces',
-      via: 'action',
-      attempt: async (ctx) => {
-        const person = await user('Second');
-        const plan: Plan = ctx.kind === 'self-hosted' ? 'unlimited' : ctx.kind;
-        await createWorkspace(sql, { name: 'Theirs', userId: person.id, plan }, hosted);
-        await unlimited(
-          ctx,
-          () =>
-            sql`insert into app_members (workspace_id, user_id, role)
-            values (${ctx.ws.id}, ${person.id}, 'admin')`,
-        );
-        await changeRole(sql, {
-          workspaceId: ctx.ws.id,
-          actor: { userId: ctx.owner.id, role: 'owner' },
-          userId: person.id,
-          role: 'owner',
-        });
-      },
-    },
-    {
-      id: 'owners.accept',
-      feature: 'ownedWorkspaces',
-      via: 'page',
-      attempt: async (ctx) => {
-        const person = await user('Third');
-        const plan: Plan = ctx.kind === 'self-hosted' ? 'unlimited' : ctx.kind;
-        await createWorkspace(sql, { name: 'Theirs', userId: person.id, plan }, hosted);
-        const { token } = await createInvitation(sql, {
-          workspaceId: ctx.ws.id,
-          email: person.email,
-          role: 'owner',
-          invitedBy: { userId: ctx.owner.id, role: 'owner' },
-        });
-        await acceptInvitation(sql, token, person);
       },
     },
     {
@@ -727,29 +689,205 @@ describe.skipIf(!url)('every entry point applies the plan', () => {
       );
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     });
+  });
 
-    it('lets a person become owner of one more Free workspace only once', async () => {
-      const person = await user('Wanted');
-      const places = await Promise.all([context('free'), context('free')]);
-      for (const place of places) {
-        await unlimited(
-          place,
-          () =>
-            sql`insert into app_members (workspace_id, user_id, role)
-            values (${place.ws.id}, ${person.id}, 'admin')`,
-        );
-      }
+  describe('one account, several workspaces', () => {
+    /** A second workspace on the same account, made while the plan allows it. */
+    async function sibling(ctx: Ctx, name = 'Second') {
+      const ws = await unlimited(ctx, () =>
+        createWorkspace(sql, { name, userId: ctx.owner.id }, hosted),
+      );
+      expect(ws.accountId).toBe(ctx.ws.accountId);
+      return { ...ctx, ws };
+    }
+
+    const invite = (ctx: Ctx, email = `${randomUUID().slice(0, 8)}@example.com`) =>
+      createInvitation(sql, {
+        workspaceId: ctx.ws.id,
+        email,
+        role: 'member',
+        invitedBy: { userId: ctx.owner.id, role: 'owner' },
+      });
+
+    it('keeps the workspaces a Free account already has, and refuses another', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      await template(second, 'Still works');
+      await expect(
+        createWorkspace(sql, { name: 'Third', userId: first.owner.id }, hosted),
+      ).rejects.toMatchObject({ limit: 'ownedWorkspaces', used: 2, max: 1 });
+      const block = await newWorkspaceBlock(sql, first.owner.id, hosted);
+      expect(block?.error.limit).toBe('ownedWorkspaces');
+      expect(block?.slug).toBe(first.ws.slug);
+      await setPlan(first.ws.slug, 'cloud');
+      expect(await newWorkspaceBlock(sql, first.owner.id, hosted)).toBeNull();
+      await createWorkspace(sql, { name: 'Third', userId: first.owner.id }, hosted);
+    });
+
+    it('counts a person once however many of the workspaces they are in', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      const person = await member(first.ws.id);
+      await sql`insert into app_members (workspace_id, user_id, role)
+        values (${second.ws.id}, ${person.id}, 'member')`;
+      const report = await usageReport(sql, second.ws.id, hosted);
+      expect(report.lines.find((l) => l.key === 'members')).toMatchObject({ used: 2, max: 2 });
+      expect(report.lines.find((l) => l.key === 'ownedWorkspaces')).toMatchObject({ used: 2 });
+      expect(report.workspaces.map((w) => [w.slug, w.members])).toEqual([
+        [first.ws.slug, 2],
+        [second.ws.slug, 2],
+      ]);
+      // Someone already counted can be invited to another workspace of the account.
+      const third = await sibling(first, 'Third');
+      await invite(third, person.email);
+      // A new person cannot: the account's two places are taken.
+      await expect(invite(third)).rejects.toMatchObject({ limit: 'members', used: 2, max: 2 });
+    });
+
+    it('counts an address invited to two workspaces once', async () => {
+      const first = await context('cloud');
+      vi.stubEnv('CLOUD_INCLUDED_MEMBERS', '3');
+      const second = await sibling(first);
+      await invite(first, 'both@example.com');
+      await invite(second, 'both@example.com');
+      const report = await usageReport(sql, first.ws.id, {
+        ...hosted,
+        cloudIncludedMembers: 3,
+      });
+      expect(report.lines.find((l) => l.key === 'members')).toMatchObject({ used: 2, max: 3 });
+      await invite(second);
+      await expect(invite(first)).rejects.toMatchObject({ limit: 'members' });
+      // At the limit, an address that already holds a place can still be invited elsewhere.
+      const third = await sibling(first, 'Third');
+      await invite(third, 'both@example.com');
+    });
+
+    it('gives the last seat to one of two invitations sent from different workspaces', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      const results = await Promise.allSettled([invite(first), invite(second)]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const refused = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+      expect(refused.reason).toBeInstanceOf(PlanLimitError);
+    });
+
+    it('gives the last seat to one of two people joining different workspaces', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      const people = [await user('A'), await user('B')];
+      const tokens = await unlimited(first, async () => [
+        (await invite(first, people[0]!.email)).token,
+        (await invite(second, people[1]!.email)).token,
+      ]);
       const results = await Promise.allSettled(
-        places.map((place) =>
-          changeRole(sql, {
-            workspaceId: place.ws.id,
-            actor: { userId: place.owner.id, role: 'owner' },
-            userId: person.id,
-            role: 'owner',
-          }),
-        ),
+        people.map((person, i) => acceptInvitation(sql, tokens[i]!, person)),
       );
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    });
+
+    it('shares the template limit and gives the last place to one of two workspaces', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      await template(first, 'One');
+      const results = await Promise.allSettled([template(first, 'A'), template(second, 'B')]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      await expect(template(second, 'C')).rejects.toMatchObject({
+        limit: 'activeTemplates',
+        used: 2,
+        max: 2,
+      });
+    });
+
+    it('lets exactly the allowance through when key calls race in two workspaces', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      const one = gate(first, true);
+      const two = gate(second, true);
+      const answers = await Promise.all(
+        Array.from({ length: 130 }, (_, i) => (i % 2 ? one : two).call('GET', '/api/v1/envelopes')),
+      );
+      expect(answers.filter((r) => r.status === 201)).toHaveLength(100);
+      expect(answers.filter((r) => r.status === 429)).toHaveLength(30);
+      expect(
+        (await usageOf(sql, first.ws.id, 'api_requests_month')) +
+          (await usageOf(sql, second.ws.id, 'api_requests_month')),
+      ).toBe(100);
+    });
+
+    it('shares the monthly envelopes, so a second workspace cannot send past them', async () => {
+      const first = await context('free');
+      const second = await sibling(first);
+      await useUp(first, 'envelopes_sent', FREE_PLAN_LIMITS.envelopesPerMonth!);
+      const { call, forward } = gate(second);
+      const refused = await call('POST', '/api/v1/envelopes', draft);
+      expect(refused.status).toBe(403);
+      expect(forward).not.toHaveBeenCalled();
+      expect(
+        ((await refused.json()) as { error: { details: { limit: string; used: number } } }).error
+          .details,
+      ).toMatchObject({ limit: 'envelopesPerMonth', used: FREE_PLAN_LIMITS.envelopesPerMonth });
+    });
+
+    it('pauses webhooks and the own eSign account in every workspace when the account leaves Cloud', async () => {
+      const first = await context('cloud');
+      const second = await sibling(first);
+      for (const ctx of [first, second]) {
+        await createWebhook(sql, { ...hook(1), workspaceId: ctx.ws.id, createdBy: ctx.owner.id });
+        expect(await webhookTargetsFor(sql, ctx.ws.id)).toHaveLength(1);
+        await assertOwnEsignAccount(sql, ctx.ws.id, hosted);
+      }
+      await setPlan(second.ws.slug, 'free');
+      for (const ctx of [first, second]) {
+        expect(await webhookTargetsFor(sql, ctx.ws.id)).toEqual([]);
+        await expect(assertOwnEsignAccount(sql, ctx.ws.id, hosted)).rejects.toBeInstanceOf(
+          PlanLimitError,
+        );
+        expect((await workspacePlan(sql, ctx.ws.id, hosted)).plan).toBe('free');
+      }
+    });
+
+    it('counts a guest against the account they are invited into, not their own', async () => {
+      const host = await context('free');
+      const guest = await context('free');
+      const { token } = await invite(host, guest.owner.email);
+      await acceptInvitation(sql, token, guest.owner);
+      const hosts = await usageReport(sql, host.ws.id, hosted);
+      const guests = await usageReport(sql, guest.ws.id, hosted);
+      expect(hosts.lines.find((l) => l.key === 'members')?.used).toBe(2);
+      expect(guests.lines.find((l) => l.key === 'members')?.used).toBe(1);
+      expect(guests.lines.find((l) => l.key === 'ownedWorkspaces')?.used).toBe(1);
+      // Being made an owner there moves nothing: the workspace stays on the host's account.
+      await changeRole(sql, {
+        workspaceId: host.ws.id,
+        actor: { userId: host.owner.id, role: 'owner' },
+        userId: guest.owner.id,
+        role: 'owner',
+      });
+      expect((await workspaceEntitlements(sql, host.ws.id, hosted)).accountId).toBe(
+        host.ws.accountId,
+      );
+      await expect(
+        createWorkspace(sql, { name: 'More', userId: guest.owner.id }, hosted),
+      ).rejects.toMatchObject({ limit: 'ownedWorkspaces', used: 1 });
+    });
+
+    it('keeps the person whose account it is as an owner of the workspace', async () => {
+      const ctx = await context('free');
+      const other = await member(ctx.ws.id, 'owner');
+      const actor = { userId: other.id, role: 'owner' as const };
+      await expect(
+        changeRole(sql, { workspaceId: ctx.ws.id, actor, userId: ctx.owner.id, role: 'admin' }),
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+      await expect(
+        removeMember(sql, { workspaceId: ctx.ws.id, actor, userId: ctx.owner.id }),
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+      await expect(
+        removeMember(sql, {
+          workspaceId: ctx.ws.id,
+          actor: { userId: ctx.owner.id, role: 'owner' },
+          userId: ctx.owner.id,
+        }),
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
   });
 
@@ -835,7 +973,7 @@ describe.skipIf(!url)('every entry point applies the plan', () => {
           invitedBy: { userId: ctx.owner.id, role: 'owner' },
         });
       await expect(invite()).rejects.toBeInstanceOf(PlanLimitError);
-      await sql`update app_workspaces set extra_seats = 1 where id = ${ctx.ws.id}`;
+      await sql`update app_accounts set extra_seats = 1 where id = ${ctx.ws.accountId}`;
       await invite();
       await expect(invite()).rejects.toBeInstanceOf(PlanLimitError);
     });
@@ -913,7 +1051,7 @@ const ACTIONS: Record<string, { entry: string; enforcedBy: string } | { free: st
   // team
   inviteMemberAction: { entry: 'members.invite', enforcedBy: 'createInvitation' },
   revokeInvitationAction: { free: 'removes' },
-  changeRoleAction: { entry: 'owners.promote', enforcedBy: 'changeRole' },
+  changeRoleAction: { free: 'a role inside a workspace; the workspace stays on its account' },
   removeMemberAction: { free: 'removes' },
   leaveWorkspaceAction: { free: 'removes' },
   acceptInvitationAction: { entry: 'members.accept', enforcedBy: 'acceptInvitation' },
@@ -1043,5 +1181,27 @@ describe('no entry point is left out of the matrix', () => {
       "if (planSettings().mode === 'self-hosted') return signServer().app.fetch(request);",
     );
     expect(server).toContain('return gate()(request, async (r) => signServer().app.fetch(r));');
+  });
+
+  it('lets only the account owner reach what an account holds', () => {
+    // Billing, credits, the subscription and the own eSign account belong to an account. An
+    // action on any of them must go through `accountAction`, never `workspaceAction` alone.
+    const dir = join(SRC, 'server', 'actions');
+    const loose: string[] = [];
+    for (const file of readdirSync(dir).filter((n) => /\.ts$/.test(n) && !/\.test\./.test(n))) {
+      const source = read(join(dir, file));
+      for (const match of source.matchAll(/(\w+)\(\s*'(billing|esign)\.manage'/g)) {
+        if (match[1] !== 'accountAction') loose.push(`${file}: ${match[1]}('${match[2]}.manage')`);
+      }
+    }
+    expect(loose).toEqual([]);
+    const route = read(
+      join(SRC, 'app/api/billing/workspaces/[workspaceId]/invoices/[invoiceId]/route.ts'),
+    );
+    expect(route).toContain('account.ownerUserId !== user.id');
+    for (const page of ['billing', 'plan', 'aadhaar-esign']) {
+      const source = read(join(SRC, `app/dashboard/[slug]/settings/${page}/page.tsx`));
+      expect(source, page).toMatch(/isAccountOwner|ownerUserId/);
+    }
   });
 });
