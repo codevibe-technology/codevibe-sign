@@ -649,7 +649,14 @@ describe.skipIf(!url)('against PostgreSQL', () => {
           headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
           body: JSON.stringify({
             ...body,
-            recipients: [{ key: 'asha', name, email: `${name.toLowerCase()}@example.com` }],
+            recipients: [
+              {
+                key: 'asha',
+                name,
+                email: `${name.toLowerCase()}@example.com`,
+                auth: 'email_link',
+              },
+            ],
             expiresAt: expiresAt.toISOString(),
             send: true,
           }),
