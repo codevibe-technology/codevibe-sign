@@ -12,6 +12,9 @@ one corresponds to an audit action: `envelope.created`, `envelope.sent`, `envelo
 `recipient.authenticated`, `recipient.signed`, `recipient.approved`, `recipient.declined`,
 `recipient.link_shared`, `recipient.corrected` and `document.sealed`.
 
+The [webhooks reference](/http-api/reference/webhooks) lists every field of the payload and has
+the signature check in Node.js, Python and Go.
+
 ## Targets
 
 List the endpoints in the server options. `events` names the actions a target wants, or `*`

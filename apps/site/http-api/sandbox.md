@@ -1,78 +1,107 @@
 ---
 title: Run a local sandbox
-description: Start a throwaway Codevibe Sign server on your machine with in-memory storage, an API key and CORS for the docs, then try every route from the interactive reference.
+description: Start a throwaway Codevibe Sign server on your machine with in-memory storage and a fresh API key, and call it from curl, Postman or the reference's Try it panel.
 ---
 
 # Run a local sandbox
 
-The `node-embed` example starts a complete server in one process: in-memory storage, a
-self-signed seal certificate, and signing links and one-time codes printed to the terminal
-instead of mailed. It also answers CORS requests from the docs, so the
-[interactive reference](./reference) can call it. Nothing leaves your machine.
+A sandbox is a complete Codevibe Sign server that keeps everything in memory, seals with a
+generated self-signed certificate and prints emails and one-time codes in the terminal instead
+of sending them. It is the safe place to try requests: nothing leaves your machine and nothing
+is kept when it stops.
 
 ## Start it
 
-You need Node 22.18 or later and pnpm.
+You need Node 22.18 or later.
 
 ```sh
-git clone https://github.com/codevibe-technology/codevibe-sign.git
-cd codevibe-sign
-pnpm install
-pnpm build
-pnpm --filter example-node-embed start
+npx @codevibe_technology/sign-server start --memory
 ```
 
 It prints what you need:
 
 ```text
-API key: 3c2f0e…
-Server on http://localhost:3000, envelope 7f3c9a2e-… sent.
-CORS allowed for http://localhost:5173, http://localhost:4173, https://sign.codevibe.in
-Signing link for asha@example.com: http://localhost:5173/?token=…
+Codevibe Sign 0.1.0 (memory mode: nothing is saved, for local development only)
+
+API              http://localhost:3000
+Health           http://localhost:3000/health
+Signing links    http://localhost:3000/sign/...
+API key          3c2f0e...
+Seal             generated, self-signed
+Email and codes  printed here instead of sent
 ```
 
-The server keeps running until you stop it with Ctrl+C. Everything is lost when it stops.
+Set `API_KEYS` to keep the same key between runs, and `--port` to use another port. Press
+Ctrl+C to stop; everything is gone.
 
-| Variable       | Default                                                                | Use                                        |
-| -------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
-| `PORT`         | `3000`                                                                 | Port of the API.                           |
-| `SIGN_API_KEY` | a new random key each run                                              | Sender API key; set it to keep one.        |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:4173,https://sign.codevibe.in` | Origins allowed to call the API, by comma. |
+## Call it
 
-## Try it in the reference
+::: code-group
 
-1. Open the [reference](./reference). Under **Server**, keep `http://localhost:3000` or enter
-   your own port.
-2. Under **Authentication**, paste the printed API key as the bearer token.
-3. Open **Create an envelope**, choose **Test Request** and send the example as it is: it
-   carries a small real PDF. To use your own file, put it in `content` as base64
-   (`base64 -i offer.pdf`).
-4. Copy the envelope `id` into **Get an envelope**, **Audit log** or **Signing certificate**.
-5. For the signing routes, take the token from a printed signing link and use it as `token`.
-   Asha signs with a one-time code: call **Send a one-time code**, read the code from the
-   terminal, verify it, and pass the returned `sessionToken` as `X-Sign-Session`.
+```sh [curl]
+KEY=<printed api key>
+curl -s http://localhost:3000/health
+curl -s -H "Authorization: Bearer $KEY" http://localhost:3000/v1/envelopes
+```
 
-The reference can only call the token routes directly. The `link` cookie flow needs the
-signing page and the API on one origin, as the [React example](https://github.com/codevibe-technology/codevibe-sign/tree/main/examples/react-signing)
-does with its dev proxy.
+```ts check [Node.js]
+import { createSignClient } from '@codevibe_technology/sign-client';
+
+const sign = createSignClient({
+  baseUrl: 'http://localhost:3000',
+  apiKey: process.env.SIGN_API_KEY!,
+});
+```
+
+:::
+
+Every example in the [API reference](/http-api/reference) works against the sandbox once you
+replace `https://sign.codevibe.in/api` with `http://localhost:3000`. The create example carries a
+small real PDF, so it works as it is.
+
+## Try it from the reference
+
+Each route in the reference has a **Try it** panel with two modes:
+
+- **Mock** answers in your browser from the API description. It checks the path and the body
+  the way the server would and returns the documented answer. Nothing is sent anywhere, so it
+  works on the public site.
+- **Local sandbox** sends the request to a server on your machine. It is offered only when the
+  docs themselves run on your machine, and only to `localhost` addresses. The public site never
+  sends requests to any server, so an API key can never be typed into it and sent to the live
+  API.
+
+To use the sandbox mode, run the docs locally with the sandbox behind them. The docs' dev server
+passes `/v1`, `/sign` and `/health` through to it, so the browser sees one origin and needs no
+CORS:
+
+```sh
+git clone https://github.com/codevibe-technology/codevibe-sign.git
+cd codevibe-sign && pnpm install && pnpm build
+
+npx @codevibe_technology/sign-server start --memory          # terminal 1
+SIGN_SERVER=http://localhost:3000 pnpm --filter site dev     # terminal 2
+```
+
+Open `http://localhost:5173/docs/http-api/reference`, choose **Local sandbox**, keep the
+suggested URL (the docs' own address) and paste the printed API key. The key stays in the form
+and is never saved.
+
+For the signing routes, take the token from a signing link printed in the sandbox terminal.
+Signers with a one-time code call **Send a one-time code**, read the code from the terminal,
+verify it, and send the returned `sessionToken` as `X-Sign-Session`.
 
 ## Or use Postman or Insomnia
 
 Import the [Postman collection](/codevibe-sign.postman_collection.json) (Insomnia imports it
-too), set `apiKey` to the printed key, and send **Create an envelope**. The requests after it
-pick up `envelopeId` and `docId` automatically. Desktop clients do not need CORS.
+too), set `baseUrl` to `http://localhost:3000` and `apiKey` to the printed key, and send
+**Create an envelope**. The requests after it pick up `envelopeId` and `docId` automatically.
+Desktop clients do not need CORS.
 
-## With curl
+## Adding CORS yourself
 
-```sh
-KEY=<printed api key>
-curl -s http://localhost:3000/health
-curl -s -H "Authorization: Bearer $KEY" http://localhost:3000/v1/envelopes/<id>
-```
-
-## How CORS is added
-
-The server itself sends no CORS headers. The sandbox puts a small Hono app in front of it:
+The server sends no CORS headers. The `node-embed` example puts a small Hono app in front of
+it when a page on another origin must call it:
 
 ```ts
 import { Hono } from 'hono';
