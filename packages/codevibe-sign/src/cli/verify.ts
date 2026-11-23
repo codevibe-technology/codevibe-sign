@@ -22,6 +22,7 @@ const REASONS: Record<VerifyFailure, string> = {
   not_whole_document:
     'something was added after the seal. The sealed part is intact, the rest is not covered.',
   multiple_signatures: 'the file has more than one signature; a sealed file has exactly one.',
+  earlier_signature_invalid: 'a signature made before the seal does not match the file any more.',
   untrusted_signer: 'the seal is intact, but it was not made with a certificate you trust.',
 };
 
