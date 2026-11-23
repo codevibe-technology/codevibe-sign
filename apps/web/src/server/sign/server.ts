@@ -21,8 +21,10 @@ import { appRuntime } from '../runtime';
 import { findMembership, workspaceTimeZone } from '../workspaces';
 import { planSettings } from '../plans';
 import { isSampleEnvelope } from '../sample-envelope';
+import { getTemplate } from '../templates';
 import { createWorkspaceMail } from './mail';
 import { createPlanGate } from './plan-gate';
+import { appTemplateStore } from './templates';
 import { createAuthenticate } from './principal';
 import { recordDelivery } from '../webhooks';
 import { webhookSecurity, webhookTargets } from './webhooks';
@@ -81,6 +83,7 @@ function build(): SignServer {
   };
   return createSignServer({
     store,
+    templateStore: appTemplateStore(sql, files),
     files,
     mailer,
     otp: mailOtpSender(mailer),
@@ -147,6 +150,9 @@ function gate(): Gate {
     settings: () => planSettings(),
     authenticate: authenticate(),
     isSampleEnvelope: (workspaceId, envelopeId) => isSampleEnvelope(sql, workspaceId, envelopeId),
+    templateSizes: async (workspaceId, templateId) =>
+      (await getTemplate(sql, workspaceId, templateId))?.definition.documents.map((d) => d.size) ??
+      null,
     basePath: SIGN_BASE_PATH,
     maxBodyBytes: MAX_REQUEST_BYTES,
   });

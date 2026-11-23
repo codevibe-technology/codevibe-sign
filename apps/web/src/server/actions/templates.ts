@@ -137,7 +137,6 @@ export const sendTemplateAction = workspaceAction(
     try {
       const envelope = await sendFromTemplate(
         {
-          files: appRuntime().files,
           request: signRequest,
           recordSender: (r) => recordSender(sql, r),
         },

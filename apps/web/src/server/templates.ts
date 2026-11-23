@@ -234,7 +234,7 @@ async function precheckRoom(sql: Sql, workspaceId: string) {
  * the workspace's stored bytes are checked with the workspace locked, so they hold under
  * concurrent saves. The template's files are removed again when it is refused.
  */
-async function insertTemplate(
+export async function insertTemplate(
   sql: Sql,
   files: FileStore,
   row: {
@@ -243,7 +243,8 @@ async function insertTemplate(
     name: string;
     description: string | null;
     definition: TemplateDefinition;
-    createdBy: string;
+    /** Null for a template created through the API with a key. */
+    createdBy: string | null;
   },
 ) {
   const bytes = row.definition.documents.reduce((sum, d) => sum + d.size, 0);

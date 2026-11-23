@@ -4,7 +4,6 @@ import { db } from './db';
 import { recordSender } from './envelopes';
 import { openBulkSends, runBulkSend, type BulkRowRecord, type BulkSendRecord } from './bulk-sends';
 import { AppError } from './errors';
-import { appRuntime } from './runtime';
 import { signRequest } from './sign/client';
 import { RateLimitedError, sendFromTemplate } from './template-send';
 import { getTemplate } from './templates';
@@ -41,7 +40,6 @@ async function sendRow(
   if (!template) throw new AppError('NOT_FOUND', 'The template was deleted.');
   const envelope = await sendFromTemplate(
     {
-      files: appRuntime().files,
       request: signRequest,
       recordSender: (input) => recordSender(sql, input),
     },

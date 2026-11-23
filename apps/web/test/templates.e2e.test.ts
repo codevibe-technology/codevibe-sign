@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,9 +72,30 @@ describe('templates and webhooks through the sign server', () => {
     writeFileSync(join(dir, 'seal.p12'), p12);
     config.value = { APP_URL, SEAL_P12_PATH: join(dir, 'seal.p12'), SEAL_PASSPHRASE: 'pass' };
     const { inProcess } = await import('@/server/sign/principal');
+    const pdf = await makePdf(1);
+    definition.documents[0]!.size = pdf.byteLength;
+    definition.documents[0]!.sha256 = createHash('sha256').update(pdf).digest('hex');
+    const { toApiTemplate } = await import('@/server/sign/templates');
+    const stored = toApiTemplate({
+      id: template.id,
+      name: template.name,
+      description: template.description,
+      definition,
+      created_at: template.createdAt,
+      created_exact: template.createdAt.toISOString(),
+      updated_at: template.updatedAt,
+    });
     sign = createSignServer({
       store: memoryStore(),
-      files: memoryFileStore(),
+      templateStore: {
+        get: async (workspaceId, id) =>
+          workspaceId === template.workspaceId && id === template.id ? stored : null,
+        list: async () => ({ templates: [stored], nextCursor: null }),
+        insert: async () => undefined,
+        replace: async () => false,
+        remove: async () => false,
+      },
+      files,
       mailer: consoleMailer({ silent: true }),
       otp: consoleOtpSender({ silent: true }),
       sealer: { p12, passphrase: 'pass' },
@@ -101,11 +123,7 @@ describe('templates and webhooks through the sign server', () => {
     });
     (globalThis as unknown as { __cvsSign?: SignServer }).__cvsSign = sign;
     const { templateFileKey } = await import('@/server/templates');
-    await files.put(
-      templateFileKey('ws_acme', 'tpl_1', 'doc_1'),
-      await makePdf(1),
-      'application/pdf',
-    );
+    await files.put(templateFileKey('ws_acme', 'tpl_1', 'doc_1'), pdf, 'application/pdf');
   });
 
   afterAll(() => {
@@ -118,7 +136,6 @@ describe('templates and webhooks through the sign server', () => {
     const { sendFromTemplate } = await import('@/server/template-send');
     const senders: unknown[] = [];
     const deps = {
-      files,
       request: signRequest,
       recordSender: async (r: unknown) => void senders.push(r),
     };
@@ -187,21 +204,34 @@ describe('templates and webhooks through the sign server', () => {
   it('maps a refusal back to the role it is about', async () => {
     const { signRequest } = await import('@/server/sign/client');
     const { sendFromTemplate, roleField } = await import('@/server/template-send');
-    const err = await sendFromTemplate(
-      { files, request: signRequest, recordSender: async () => undefined },
-      {
-        template: { ...template, workspaceId: 'ws_other' },
-        userId: 'u_asha',
-        people: {},
-      },
-    ).catch((e: unknown) => e);
-    expect(err).toMatchObject({
-      code: 'CONFLICT',
-      message: expect.stringMatching(/missing from storage/),
+    const send = (overrides: Partial<Parameters<typeof sendFromTemplate>[1]>) =>
+      sendFromTemplate(
+        { request: signRequest, recordSender: async () => undefined },
+        // Another member, whose envelopes-per-minute count is still untouched.
+        { template, userId: 'u_meera', people: {}, ...overrides },
+      ).catch((e: unknown) => e);
+
+    expect(await send({ template: { ...template, workspaceId: 'ws_other' } })).toMatchObject({
+      code: 'NOT_FOUND',
+      message: expect.stringMatching(/no longer exists/),
     });
-    expect(roleField('recipients[1].email', template)).toBe('people.r_hr.email');
-    expect(roleField('recipients[0]', template)).toBe('people.r_emp.name');
-    expect(roleField('recipients[9].email', template)).toBeUndefined();
+    const missing = await send({
+      people: { r_emp: { name: 'Ravi', email: 'ravi@example.com', phone: '' } },
+    });
+    expect(missing).toMatchObject({ code: 'VALIDATION', field: 'roles.HR' });
+    const wrong = await send({
+      people: {
+        r_emp: { name: 'Ravi', email: 'ravi@example.com', phone: '' },
+        r_hr: { name: 'Meera', email: 'not an email', phone: '' },
+        r_cc: { name: 'Payroll', email: 'payroll@example.com', phone: '' },
+      },
+    });
+    expect(wrong).toMatchObject({ code: 'VALIDATION', field: 'roles.r_hr.email' });
+
+    expect(roleField('roles.r_hr.email', template)).toBe('people.r_hr.email');
+    expect(roleField('roles.r_emp', template)).toBe('people.r_emp.name');
+    expect(roleField('roles.HR', template)).toBe('people.r_hr.name');
+    expect(roleField('roles.r_gone.email', template)).toBeUndefined();
     expect(roleField('title', template)).toBe('title');
   });
 });

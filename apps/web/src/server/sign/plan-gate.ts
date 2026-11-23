@@ -16,6 +16,11 @@ export interface PlanGateDeps {
   settings: () => PlanSettings;
   /** The same resolver the sign server uses, so the gate counts for the caller it will serve. */
   authenticate: (request: Request) => Promise<Principal | null>;
+  /**
+   * The size of each PDF of a template, or null when the workspace has no such template. An
+   * envelope made from it stores a copy of each.
+   */
+  templateSizes?: (workspaceId: string, templateId: string) => Promise<number[] | null>;
   /** The first-run sample envelope, whose sending does not count. */
   isSampleEnvelope?: (workspaceId: string, envelopeId: string) => Promise<boolean>;
   basePath: string;
@@ -57,8 +62,10 @@ export function createPlanGate(deps: PlanGateDeps) {
     const creating = request.method === 'POST' && /^\/v1\/envelopes\/?$/.test(route);
     const sending =
       request.method === 'POST' ? /^\/v1\/envelopes\/([^/]+)\/send\/?$/.exec(route) : null;
+    const fromTemplate =
+      request.method === 'POST' ? /^\/v1\/templates\/([^/]+)\/envelopes\/?$/.exec(route) : null;
     const keyCall = /^Bearer\s/i.test(request.headers.get('authorization') ?? '');
-    if (!creating && !sending && !keyCall) return forward(request);
+    if (!creating && !sending && !fromTemplate && !keyCall) return forward(request);
 
     const principal = await deps.authenticate(request).catch(() => null);
     if (!principal?.workspaceId) return forward(request);
@@ -78,6 +85,19 @@ export function createPlanGate(deps: PlanGateDeps) {
           body.sizes.forEach((size, i) => assertWithin(plan, 'fileBytes', size, `documents[${i}]`));
           const total = body.sizes.reduce((a, b) => a + b, 0);
           assertWithin(plan, 'envelopeBytes', total, 'documents');
+          const storage = await reserveUsage(deps.sql, plan, 'storage_bytes', total, at);
+          if (storage) held.push(storage);
+          if (body.send) {
+            const sent = await reserveUsage(deps.sql, plan, 'envelopes_sent', 1, at);
+            if (sent) held.push(sent);
+          }
+        }
+      }
+      if (fromTemplate) {
+        const sizes = await deps.templateSizes?.(plan.id, decodeURIComponent(fromTemplate[1]!));
+        const body = sizes ? await readSendFlag(request, deps.maxBodyBytes) : null;
+        if (sizes && body) {
+          const total = sizes.reduce((a, b) => a + b, 0);
           const storage = await reserveUsage(deps.sql, plan, 'storage_bytes', total, at);
           if (storage) held.push(storage);
           if (body.send) {
@@ -177,6 +197,18 @@ export async function readCreateBody(request: Request, cap: number): Promise<Cre
       return typeof content === 'string' ? base64Bytes(content) : 0;
     });
     return { send: body.send === true, sizes };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a JSON request asks to send, read from a copy of the body; null when unreadable. */
+async function readSendFlag(request: Request, cap: number): Promise<{ send: boolean } | null> {
+  const bytes = await readCapped(request, cap);
+  if (!bytes) return null;
+  try {
+    const body = JSON.parse(new TextDecoder().decode(bytes)) as { send?: unknown } | null;
+    return { send: body?.send === true };
   } catch {
     return null;
   }

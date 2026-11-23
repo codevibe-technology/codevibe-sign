@@ -6,7 +6,6 @@ import {
   detailProblems,
   editorStateFrom,
   emptyTemplate,
-  envelopeFromTemplate,
   firstOpenStep,
   keptFields,
   roleProblems,
@@ -46,11 +45,6 @@ const definition: TemplateDefinition = {
   fields: [signature('r_emp')],
 };
 const template = { id: 'tpl_1', name: 'Offer letter' };
-const people = {
-  r_emp: { name: ' Asha Rao ', email: 'ASHA@example.com', phone: '' },
-  r_mgr: { name: 'Meera', email: 'meera@example.com', phone: '+91 98123 45678' },
-  r_hr: { name: 'HR desk', email: 'hr@example.com', phone: '' },
-};
 
 describe('template roles', () => {
   it('starts each role with a one-time code by email', () => {
@@ -223,63 +217,6 @@ describe('sending from a template', () => {
     expect(
       sendProblems({ roles: [] }, {}, { title: 'x', message: 'y'.repeat(5001) }).message,
     ).toMatch(/under 5000/);
-  });
-
-  it('builds the API body with one recipient per role, in order', () => {
-    const body = envelopeFromTemplate(template, definition, people, { metadata: { ref: 'R1' } });
-    expect(body).toMatchObject({
-      title: 'Offer letter',
-      message: 'Welcome aboard',
-      routing: 'sequential',
-      expiresInDays: 14,
-      reminders: { firstAfterDays: 2, everyDays: 2, max: 5 },
-      metadata: { ref: 'R1', templateId: 'tpl_1' },
-      documents: [{ key: 'd1', name: 'offer.pdf' }],
-      send: true,
-    });
-    expect(body.recipients).toEqual([
-      {
-        key: 'r_emp',
-        name: 'Asha Rao',
-        email: 'asha@example.com',
-        role: 'signer',
-        auth: 'email_link',
-        order: 1,
-      },
-      {
-        key: 'r_mgr',
-        name: 'Meera',
-        email: 'meera@example.com',
-        phone: '+919812345678',
-        role: 'approver',
-        auth: 'email_otp',
-        order: 2,
-      },
-      { key: 'r_hr', name: 'HR desk', email: 'hr@example.com', role: 'viewer', auth: 'email_link' },
-    ]);
-    expect(body.fields).toEqual([
-      {
-        document: 'd1',
-        recipient: 'r_emp',
-        type: 'signature',
-        page: 0,
-        rect: { x: 72, y: 600, width: 180, height: 48 },
-        required: true,
-      },
-    ]);
-  });
-
-  it('lets everyone act at once in parallel routing and uses the overrides', () => {
-    const body = envelopeFromTemplate(
-      template,
-      { ...definition, routing: 'parallel', title: 'Offer for {{name}}' },
-      people,
-      { title: '  Offer for Asha ', message: '' },
-    );
-    expect(body.title).toBe('Offer for Asha');
-    expect(body).not.toHaveProperty('message');
-    expect(body.recipients.filter((r) => 'order' in r).map((r) => r.order)).toEqual([1, 1]);
-    expect(body.metadata).toEqual({ templateId: 'tpl_1' });
   });
 
   it("matches the templates package's own rules", () => {

@@ -5,6 +5,7 @@ import {
   type Field,
   type PageSize,
   type RecipientRole,
+  type ReminderPolicy,
   type RoutingMode,
 } from '@codevibe_technology/sign-core';
 import type { Template as SignTemplate } from '@codevibe_technology/sign-templates';
@@ -16,7 +17,6 @@ import {
   documentProblems,
   fieldProblems,
   localId,
-  settingsBody,
   settingsProblems,
   type DraftDocument,
   type DraftRecipient,
@@ -53,6 +53,11 @@ export interface TemplateDefinition {
   routing: RoutingMode;
   expiresInDays: number;
   remindEveryDays: number;
+  /**
+   * The exact reminder policy of a template saved through the API. Saving from the editor
+   * drops it, and `remindEveryDays` decides again.
+   */
+  reminders?: ReminderPolicy;
   roles: TemplateRoleDef[];
   documents: TemplateDocumentDef[];
   /** `recipientId` is a role id; `documentId` a document id. */
@@ -271,7 +276,7 @@ export type People = Record<string, Person>;
 
 export const emptyPerson = (): Person => ({ name: '', email: '', phone: '' });
 
-const cleanPhone = (phone: string) => phone.replace(/[\s()-]/g, '');
+export const cleanPhone = (phone: string) => phone.replace(/[\s()-]/g, '');
 
 /** Problems keyed `people.<roleId>.<name|email|phone>`, plus `title` and `message`. */
 export function sendProblems(
@@ -311,64 +316,6 @@ export function sendProblems(
     problems.message = `Keep the message under ${MESSAGE_MAX} characters.`;
   }
   return problems;
-}
-
-/**
- * The JSON part of `POST /v1/envelopes` for one envelope from a template, sent straight away.
- * The PDFs go alongside it, keyed by document id.
- */
-export function envelopeFromTemplate(
-  template: { id: string; name: string },
-  definition: TemplateDefinition,
-  people: People,
-  options: { title?: string; message?: string; metadata?: Record<string, string> } = {},
-) {
-  const settings = settingsBody(
-    {
-      title: options.title?.trim() || envelopeTitle(template.name, definition),
-      message: options.message ?? definition.message,
-      expiresInDays: definition.expiresInDays,
-      remindEveryDays: definition.remindEveryDays,
-    },
-    template.name,
-  );
-  const actors = new Set(definition.roles.filter((r) => r.type !== 'viewer').map((r) => r.id));
-  let order = 0;
-  return {
-    title: settings.title,
-    ...(settings.message ? { message: settings.message } : {}),
-    routing: definition.routing,
-    expiresInDays: settings.expiresInDays,
-    reminders: settings.reminders,
-    metadata: { ...options.metadata, templateId: template.id },
-    documents: definition.documents.map((d) => ({ key: d.id, name: d.name })),
-    recipients: definition.roles.map((role) => {
-      const person = people[role.id] ?? emptyPerson();
-      const phone = cleanPhone(person.phone);
-      if (role.type !== 'viewer') order++;
-      return {
-        key: role.id,
-        name: person.name.trim(),
-        email: person.email.trim().toLowerCase(),
-        ...(phone ? { phone } : {}),
-        role: role.type,
-        auth: role.auth,
-        ...(role.type === 'viewer' ? {} : { order: definition.routing === 'parallel' ? 1 : order }),
-      };
-    }),
-    fields: definition.fields
-      .filter((f) => actors.has(f.recipientId))
-      .map((f) => ({
-        document: f.documentId,
-        recipient: f.recipientId,
-        type: f.type,
-        page: f.page,
-        rect: f.rect,
-        required: f.required,
-        ...(f.label ? { label: f.label } : {}),
-      })),
-    send: true,
-  };
 }
 
 /** The template in `@codevibe_technology/sign-templates`' terms, for its CSV reader. */
