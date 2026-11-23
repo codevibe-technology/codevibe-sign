@@ -4,6 +4,7 @@ import type postgres from 'postgres';
 import { passwordProblem } from '@/lib/password';
 import { AppError } from '../errors';
 import { cleanEmail, findInvitation, invitationState } from '../invitations';
+import { cleanPersonName } from '../profile';
 import type { Auth } from './auth';
 import type { PasswordLockout } from './password-lockout';
 
@@ -16,8 +17,6 @@ export interface PasswordDeps {
   /** Tells the account's owner by email; failures are the caller's to swallow. */
   notify: (email: string) => Promise<void>;
 }
-
-export const NAME_MAX = 80;
 
 /** Whether the person can sign in with a password, or only with an emailed link so far. */
 export async function hasPassword(sql: Sql, userId: string): Promise<boolean> {
@@ -108,11 +107,7 @@ export async function createInvitedAccount(
     throw new AppError('NOT_FOUND', 'This invitation is no longer valid. Ask for a new one');
   }
   const email = cleanEmail(invitation.email);
-  const name = input.name.replace(/\s+/g, ' ').trim();
-  if (!name) throw new AppError('VALIDATION', 'Enter your name', 'name');
-  if (name.length > NAME_MAX) {
-    throw new AppError('VALIDATION', `Keep the name under ${NAME_MAX} characters`, 'name');
-  }
+  const name = cleanPersonName(input.name);
   const password = checked(input.password, { email, name });
 
   const { password: hasher } = await deps.auth.$context;

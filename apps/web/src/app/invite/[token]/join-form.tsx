@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { authClient } from '@/lib/auth-client';
 import { PASSWORD_HINT, passwordProblem } from '@/lib/password';
+import { PERSON_NAME_MAX, personNameProblem } from '@/lib/person-name';
 import { joinWithPasswordAction } from '@/server/actions/account';
 import { acceptInvitationAction } from '@/server/actions/team';
 
@@ -15,18 +16,21 @@ type Errors = Partial<Record<'name' | 'password' | 'form', string>>;
 /**
  * For someone invited who has no account yet: their name and a password. The invitation was
  * emailed to them, so it confirms the address; the account is created, signed in and joined
- * to the workspace in one go.
+ * to the workspace in one go. The name starts as whatever the inviter typed, for them to
+ * correct.
  */
 export function JoinForm({
   token,
   email,
+  suggestedName = '',
   signInHref,
 }: {
   token: string;
   email: string;
+  suggestedName?: string;
   signInHref: string;
 }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(suggestedName);
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [pending, setPending] = useState(false);
@@ -49,8 +53,9 @@ export function JoinForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim()) {
-      setErrors({ name: 'Enter your name' });
+    const nameProblem = personNameProblem(name);
+    if (nameProblem) {
+      setErrors({ name: nameProblem });
       return;
     }
     const problem = passwordProblem(password, { email, name });
@@ -88,7 +93,7 @@ export function JoinForm({
             name="name"
             autoComplete="name"
             autoFocus
-            maxLength={80}
+            maxLength={PERSON_NAME_MAX}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />

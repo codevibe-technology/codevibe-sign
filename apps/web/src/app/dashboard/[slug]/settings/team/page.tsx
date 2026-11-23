@@ -24,6 +24,7 @@ export default async function TeamSettings({ params }: { params: Promise<{ slug:
       invitations={invitations.map((i) => ({
         id: i.id,
         email: i.email,
+        name: i.name,
         role: i.role,
         expiresAt: i.expiresAt.toISOString(),
       }))}

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AuthFrame, StatusPage } from '@/components/shell/status-page';
 import { Button } from '@/components/ui/button';
+import { hasName } from '@/lib/person-name';
 import { ROLE_LABELS } from '@/lib/roles';
 import { getSessionUser } from '@/server/auth/session';
 import { db } from '@/server/db';
@@ -54,7 +55,12 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <p className="eyebrow mb-2">Invitation</p>
         <h1 className="text-[26px] leading-tight font-bold">Join {invitation.workspaceName}</h1>
         <p className="mt-1.5 mb-6 text-muted">{description}</p>
-        <JoinForm token={token} email={invitation.email} signInHref={signIn} />
+        <JoinForm
+          token={token}
+          email={invitation.email}
+          suggestedName={invitation.name ?? ''}
+          signInHref={signIn}
+        />
       </AuthFrame>
     );
   }
@@ -77,7 +83,13 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       icon={Users}
       title={`Join ${invitation.workspaceName}`}
       description={description}
-      action={<AcceptInvitation token={token} />}
+      action={
+        <AcceptInvitation
+          token={token}
+          askName={!hasName(user)}
+          suggestedName={invitation.name ?? ''}
+        />
+      }
     />
   );
 }

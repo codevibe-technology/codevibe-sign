@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppError } from '@/server/errors';
 import { migrateAll } from '@/server/migrate';
 import { setOwnName } from '@/server/profile';
+import { createInvitation, findInvitation, listOpenInvitations } from '@/server/invitations';
+import { createWorkspace } from '@/server/workspaces';
 
 const url = process.env.DATABASE_URL;
 
@@ -68,6 +70,60 @@ describe.skipIf(!url)('names, against PostgreSQL', () => {
       }
       expect(await nameOf(asha.id)).toBe('Asha');
       await rejectsWith(setOwnName(sql, 'no-such-user', 'Asha Rao'), 'NOT_FOUND');
+    });
+  });
+
+  describe('an invitation', () => {
+    it('keeps the name the inviter typed, tidied, as a suggestion', async () => {
+      const owner = await person('Asha Rao');
+      const ws = await createWorkspace(sql, { name: 'Names', userId: owner.id });
+      const invitedBy = { userId: owner.id, role: 'owner' as const };
+      const { invitation, token } = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: 'ravi.names@example.com',
+        name: '  Ravi   Kumar ',
+        role: 'member',
+        invitedBy,
+      });
+      expect(invitation.name).toBe('Ravi Kumar');
+      expect(await findInvitation(sql, token)).toMatchObject({
+        name: 'Ravi Kumar',
+        invitedByName: 'Asha Rao',
+      });
+      expect((await listOpenInvitations(sql, ws.id)).map((i) => i.name)).toEqual(['Ravi Kumar']);
+
+      const blank = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: 'mia.names@example.com',
+        name: '   ',
+        role: 'member',
+        invitedBy,
+      });
+      expect(blank.invitation.name).toBeNull();
+      expect((await findInvitation(sql, blank.token))?.name).toBeNull();
+      await rejectsWith(
+        createInvitation(sql, {
+          workspaceId: ws.id,
+          email: 'zoe.names@example.com',
+          name: 'Z',
+          role: 'member',
+          invitedBy,
+        }),
+        'VALIDATION',
+        'name',
+      );
+    });
+
+    it('names an inviter who has saved no name by their email address', async () => {
+      const owner = await person(' ');
+      const ws = await createWorkspace(sql, { name: 'Unnamed', userId: owner.id });
+      const { token } = await createInvitation(sql, {
+        workspaceId: ws.id,
+        email: 'new.names@example.com',
+        role: 'member',
+        invitedBy: { userId: owner.id, role: 'owner' },
+      });
+      expect((await findInvitation(sql, token))?.invitedByName).toBe(owner.email);
     });
   });
 });

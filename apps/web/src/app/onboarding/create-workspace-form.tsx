@@ -5,19 +5,28 @@ import { useState, useTransition, type FormEvent } from 'react';
 import { AddressField, blocksSubmit, useAddressCheck } from '@/components/workspace/address-field';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
+import { PERSON_NAME_MAX, personNameProblem } from '@/lib/person-name';
 import { suggestAddress } from '@/lib/workspace-address';
 import { createWorkspaceAction } from '@/server/actions/workspace';
 
 /**
  * The name and the address of a new workspace. The address follows the name until someone
- * edits it, and says while they type whether it is free.
+ * edits it, and says while they type whether it is free. Someone who has saved no name yet is
+ * asked for it first, in the same step.
  */
-export function CreateWorkspaceForm({ host }: { host: string }) {
+export function CreateWorkspaceForm({
+  host,
+  askName = false,
+}: {
+  host: string;
+  askName?: boolean;
+}) {
   const router = useRouter();
+  const [yourName, setYourName] = useState('');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [edited, setEdited] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; slug?: string }>({});
+  const [errors, setErrors] = useState<{ yourName?: string; name?: string; slug?: string }>({});
   const [pending, start] = useTransition();
   const check = useAddressCheck(slug);
 
@@ -35,6 +44,11 @@ export function CreateWorkspaceForm({ host }: { host: string }) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    const nameProblem = askName ? personNameProblem(yourName) : null;
+    if (nameProblem) {
+      setErrors({ yourName: nameProblem });
+      return;
+    }
     if (!name.trim()) {
       setErrors({ name: 'Give the workspace a name' });
       return;
@@ -45,22 +59,49 @@ export function CreateWorkspaceForm({ host }: { host: string }) {
     }
     if (blocksSubmit(check)) return;
     start(async () => {
-      const result = await createWorkspaceAction({ name, slug });
+      const result = await createWorkspaceAction({
+        name,
+        slug,
+        ...(askName ? { yourName } : {}),
+      });
       if (result.ok) {
         router.push(`/dashboard/${result.data.slug}`);
         return;
       }
-      setErrors(result.field === 'name' ? { name: result.error } : { slug: result.error });
+      const field = result.field === 'name' || result.field === 'yourName' ? result.field : 'slug';
+      setErrors({ [field]: result.error });
     });
   }
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
+      {askName ? (
+        <Field
+          label="Your name"
+          hint="Your full name, as your team and the people you send to will see it."
+          error={errors.yourName}
+        >
+          {(props) => (
+            <Input
+              {...props}
+              name="name"
+              autoComplete="name"
+              autoFocus
+              maxLength={PERSON_NAME_MAX}
+              value={yourName}
+              onChange={(e) => {
+                setYourName(e.target.value);
+                setErrors((x) => ({ ...x, yourName: undefined }));
+              }}
+            />
+          )}
+        </Field>
+      ) : null}
       <Field label="Workspace name" hint="For example Acme HR or Acme Legal." error={errors.name}>
         {(props) => (
           <Input
             {...props}
-            autoFocus
+            autoFocus={!askName}
             maxLength={80}
             value={name}
             onChange={(e) => changeName(e.target.value)}

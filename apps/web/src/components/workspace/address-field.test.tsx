@@ -107,6 +107,44 @@ describe('CreateWorkspaceForm', () => {
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme-hr'));
   });
 
+  it('asks someone with no name for it first, and sends it with the workspace', async () => {
+    mocks.createWorkspaceAction.mockResolvedValueOnce({ ok: true, data: { slug: 'acme-hr' } });
+    render(<CreateWorkspaceForm host="sign.codevibe.in" askName />);
+    await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
+    await screen.findByText('Available');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter your name');
+    expect(mocks.createWorkspaceAction).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText('Your name'), 'José Álvarez');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(mocks.createWorkspaceAction).toHaveBeenCalledWith({
+      name: 'Acme HR',
+      slug: 'acme-hr',
+      yourName: 'José Álvarez',
+    });
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme-hr'));
+  });
+
+  it('does not ask someone who already has a name', () => {
+    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    expect(screen.queryByLabelText('Your name')).toBeNull();
+  });
+
+  it('shows the server’s word on the person’s name next to that field', async () => {
+    mocks.createWorkspaceAction.mockResolvedValueOnce({
+      ok: false,
+      code: 'VALIDATION',
+      error: 'A name needs at least one letter',
+      field: 'yourName',
+    });
+    render(<CreateWorkspaceForm host="sign.codevibe.in" askName />);
+    await userEvent.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
+    await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
+    await screen.findByText('Available');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('at least one letter');
+  });
+
   it('writes an Indian-script name in Latin letters', async () => {
     render(<CreateWorkspaceForm host="sign.codevibe.in" />);
     await userEvent.type(screen.getByLabelText('Workspace name'), 'भारत');

@@ -1,6 +1,7 @@
 import { Lock } from 'lucide-react';
 import type { Metadata } from 'next';
 import { AuthFrame, StatusPage } from '@/components/shell/status-page';
+import { hasName } from '@/lib/person-name';
 import { requireUser } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { env } from '@/server/env';
@@ -34,7 +35,7 @@ export default async function OnboardingPage() {
         A workspace holds your documents, templates, team and brand. Use your company or team name.
         You can change the name and the address later.
       </p>
-      <CreateWorkspaceForm host={new URL(env().APP_URL).host} />
+      <CreateWorkspaceForm host={new URL(env().APP_URL).host} askName={!hasName(user)} />
     </AuthFrame>
   );
 }

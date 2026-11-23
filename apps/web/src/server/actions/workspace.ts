@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { db } from '../db';
 import { recordSender } from '../envelopes';
 import { env } from '../env';
+import { hasName } from '@/lib/person-name';
 import { AppError } from '../errors';
+import { personNameInput, setOwnName } from '../profile';
 import { createSampleEnvelope, dismissStartHere } from '../sample-envelope';
 import { signRequest } from '../sign/client';
 import { changeWorkspaceAddress } from '../workspace-address';
@@ -20,15 +22,24 @@ import { userAction, workspaceAction } from './action';
 const name = z.string({ error: 'Give the workspace a name' });
 const slug = z.string({ error: 'Choose an address for the workspace.' }).max(200);
 
+/**
+ * Creates a workspace for the signed-in person. Someone who has saved no name yet gives it
+ * here (`yourName`); it is saved first, so the sample envelope is addressed to a person.
+ */
 export const createWorkspaceAction = userAction(
-  z.object({ name, slug: slug.optional() }),
-  async (user, input) => {
+  z.object({ name, slug: slug.optional(), yourName: personNameInput.optional() }),
+  async (session, input) => {
     const sql = db();
     if (env().SINGLE_WORKSPACE && (await countWorkspaces(sql)) > 0) {
       throw new AppError(
         'FORBIDDEN',
         'This installation has one workspace. Ask its admin to invite you.',
       );
+    }
+    let user = session;
+    if (!hasName(session)) {
+      if (!input.yourName) throw new AppError('VALIDATION', 'Enter your name', 'yourName');
+      user = { ...session, name: await setOwnName(sql, session.id, input.yourName, 'yourName') };
     }
     const workspace = await createWorkspace(sql, {
       name: input.name,

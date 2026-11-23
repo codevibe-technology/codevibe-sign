@@ -298,4 +298,40 @@ describe('user actions', () => {
     }
     expect(state.calls).toEqual([]);
   });
+
+  it('ask someone with no name for it before their first workspace, and save it first', async () => {
+    state.user = { id: 'u9', name: '', email: 'ravi@example.com', image: null };
+    expect(await createWorkspaceAction({ name: 'Acme' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION',
+      field: 'yourName',
+      error: 'Enter your name',
+    });
+    expect(await createWorkspaceAction({ name: 'Acme', yourName: 'R' })).toMatchObject({
+      ok: false,
+      field: 'yourName',
+    });
+    expect(state.calls).toEqual([]);
+    expect((await createWorkspaceAction({ name: 'Acme', yourName: ' Ravi  Kumar ' })).ok).toBe(
+      true,
+    );
+    expect(state.calls).toEqual(['setOwnName:u9:Ravi Kumar', 'createWorkspace']);
+  });
+
+  it('leave a saved name alone when a workspace is created', async () => {
+    expect((await createWorkspaceAction({ name: 'Acme', yourName: 'Someone Else' })).ok).toBe(true);
+    expect(state.calls).toEqual(['createWorkspace']);
+  });
+
+  it('ask someone with no name for it when they accept an invitation', async () => {
+    state.user = { id: 'u9', name: ' ', email: 'ravi@example.com', image: null };
+    expect(await acceptInvitationAction({ token: 'abc' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION',
+      field: 'name',
+    });
+    expect(state.calls).toEqual([]);
+    expect((await acceptInvitationAction({ token: 'abc', name: 'Ravi Kumar' })).ok).toBe(true);
+    expect(state.calls).toEqual(['acceptInvitation', 'setOwnName:u9:Ravi Kumar']);
+  });
 });

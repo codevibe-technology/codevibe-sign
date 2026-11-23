@@ -145,6 +145,53 @@ describe('TeamPanel', () => {
       role: 'viewer',
     });
   });
+
+  it('carries the name the inviter typed and lists it while the invitation is open', async () => {
+    const user = userEvent.setup();
+    actions.inviteMemberAction.mockResolvedValue({ ok: true, data: { email: 'ravi@x.co' } });
+    render(
+      <TeamPanel
+        workspaceId="ws_1"
+        currentUserId="u1"
+        actorRole="admin"
+        members={members}
+        invitations={[
+          {
+            id: 'inv_1',
+            email: 'zoe@x.co',
+            name: 'Zoe Zhang',
+            role: 'member',
+            expiresAt: '2026-12-01T00:00:00.000Z',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Zoe Zhang')).toBeTruthy();
+    await user.type(screen.getByLabelText('Email'), 'ravi@x.co');
+    await user.type(screen.getByLabelText('Name (optional)'), 'Ravi Kumar');
+    await user.click(screen.getByRole('button', { name: /Send invite/ }));
+    expect(actions.inviteMemberAction).toHaveBeenCalledWith({
+      workspaceId: 'ws_1',
+      email: 'ravi@x.co',
+      name: 'Ravi Kumar',
+      role: 'member',
+    });
+  });
+
+  it('calls a member with no name by their email address', () => {
+    render(
+      <TeamPanel
+        workspaceId="ws_1"
+        currentUserId="u0"
+        actorRole="owner"
+        members={[...members, { userId: 'u3', name: ' ', email: 'ravi@x.co', role: 'member' }]}
+        invitations={[]}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Role of ravi@x.co' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove ravi@x.co' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove Mia Member' })).toBeTruthy();
+  });
 });
 
 describe('BrandPreview', () => {

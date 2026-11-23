@@ -5,6 +5,7 @@ import { canManageRole, type Role } from '@/lib/roles';
 import { randomId, randomSecret, sha256Hex } from './crypto';
 import { AppError } from './errors';
 import { assertRoom, countSeats, lockedPlan } from './plans';
+import { cleanPersonName, userLabel } from './profile';
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -12,6 +13,8 @@ export interface Invitation {
   id: string;
   workspaceId: string;
   email: string;
+  /** What the inviter called the person, if anything: a suggestion for their own name. */
+  name: string | null;
   role: Role;
   expiresAt: Date;
   createdAt: Date;
@@ -44,12 +47,14 @@ export async function createInvitation(
   input: {
     workspaceId: string;
     email: string;
+    name?: string | null;
     role: Role;
     invitedBy: { userId: string; role: Role };
     now?: Date;
   },
 ): Promise<{ invitation: Invitation; token: string }> {
   const email = cleanEmail(input.email);
+  const name = input.name?.trim() ? cleanPersonName(input.name) : null;
   if (!canManageRole(input.invitedBy.role, input.role)) {
     throw new AppError('FORBIDDEN', 'Only an owner can invite another owner', 'role');
   }
@@ -59,6 +64,7 @@ export async function createInvitation(
     id: randomId('inv'),
     workspaceId: input.workspaceId,
     email,
+    name,
     role: input.role,
     expiresAt: new Date(now.getTime() + INVITATION_TTL_MS),
     createdAt: now,
@@ -77,8 +83,8 @@ export async function createInvitation(
       assertRoom(plan, 'members', seats.members + seats.invited, 1, 'email');
     }
     await tx`insert into app_invitations
-        (id, workspace_id, email, role, token_hash, invited_by, expires_at, created_at)
-      values (${invitation.id}, ${input.workspaceId}, ${email}, ${input.role},
+        (id, workspace_id, email, name, role, token_hash, invited_by, expires_at, created_at)
+      values (${invitation.id}, ${input.workspaceId}, ${email}, ${name}, ${input.role},
         ${sha256Hex(token)}, ${input.invitedBy.userId}, ${invitation.expiresAt}, ${now})`;
   });
   return { invitation, token };
@@ -90,7 +96,7 @@ export async function listOpenInvitations(
   now = new Date(),
 ): Promise<Invitation[]> {
   return sql<Invitation[]>`
-    select id, workspace_id as "workspaceId", email, role, expires_at as "expiresAt",
+    select id, workspace_id as "workspaceId", email, name, role, expires_at as "expiresAt",
       created_at as "createdAt"
     from app_invitations
     where workspace_id = ${workspaceId} and accepted_at is null and revoked_at is null
@@ -116,9 +122,11 @@ export async function findInvitation(
 ): Promise<InvitationDetails | null> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const [row] = await sql<InvitationDetails[]>`
-    select i.id, i.workspace_id as "workspaceId", i.email, i.role, i.expires_at as "expiresAt",
+    select i.id, i.workspace_id as "workspaceId", i.email, i.name, i.role,
+      i.expires_at as "expiresAt",
       i.created_at as "createdAt", i.accepted_at as "acceptedAt", i.revoked_at as "revokedAt",
-      w.name as "workspaceName", w.slug as "workspaceSlug", u.name as "invitedByName"
+      w.name as "workspaceName", w.slug as "workspaceSlug",
+      ${userLabel(sql)} as "invitedByName"
     from app_invitations i
     join app_workspaces w on w.id = i.workspace_id
     left join auth_users u on u.id = i.invited_by

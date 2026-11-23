@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { auth, lockout, notifyPasswordChanged } from '../auth/auth';
 import { createInvitedAccount, setOwnPassword } from '../auth/passwords';
 import { db } from '../db';
+import { personNameInput } from '../profile';
 import { publicAction, userAction } from './action';
 
 const password = z.string({ error: 'Enter a password' }).max(1000);
@@ -36,7 +37,7 @@ export const signOutOtherSessionsAction = userAction(z.object({}), async () => {
 export const joinWithPasswordAction = publicAction(
   z.object({
     token: z.string().min(1).max(100),
-    name: z.string({ error: 'Enter your name' }).max(200),
+    name: personNameInput,
     password,
   }),
   async (input) => createInvitedAccount({ sql: db(), auth: auth() }, input),

@@ -320,4 +320,10 @@ create index app_workspace_address_changes_workspace_idx
   on app_workspace_address_changes (workspace_id, created_at desc);
 `,
   },
+  {
+    name: '0011_invitation_names',
+    sql: `
+alter table app_invitations add column name text;
+`,
+  },
 ];

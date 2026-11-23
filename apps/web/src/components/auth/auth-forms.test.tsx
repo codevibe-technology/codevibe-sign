@@ -15,6 +15,8 @@ const actions = vi.hoisted(() => ({
   acceptInvitationAction: vi.fn(),
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/lib/auth-client', () => ({ authClient: client }));
 vi.mock('@/server/actions/account', () => actions);
 vi.mock('@/server/actions/team', () => actions);
@@ -24,6 +26,7 @@ const { SignInForm } = await import('@/app/(auth)/sign-in/sign-in-form');
 const { ForgotPasswordForm } = await import('@/app/(auth)/forgot-password/forgot-password-form');
 const { ResetPasswordForm } = await import('@/app/(auth)/reset-password/reset-password-form');
 const { JoinForm } = await import('@/app/invite/[token]/join-form');
+const { AcceptInvitation } = await import('@/app/invite/[token]/accept-invitation');
 const { PasswordForm } = await import('@/components/settings/password-form');
 
 const GOOD = 'mango-river-lantern';
@@ -267,6 +270,18 @@ describe('JoinForm', () => {
     expect(actions.joinWithPasswordAction).not.toHaveBeenCalled();
   });
 
+  it('starts from the name on the invitation and holds it to the name rule', async () => {
+    const user = userEvent.setup();
+    render(<JoinForm {...props} suggestedName="Ravi Kumar" />);
+    const name = screen.getByLabelText('Your name');
+    expect(name).toHaveValue('Ravi Kumar');
+    await user.clear(name);
+    await user.type(name, 'R');
+    await user.click(screen.getByRole('button', { name: 'Create account and join' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('at least 2 characters');
+    expect(actions.joinWithPasswordAction).not.toHaveBeenCalled();
+  });
+
   it('sends someone who already has an account to sign in', async () => {
     const user = userEvent.setup();
     actions.joinWithPasswordAction.mockResolvedValue({
@@ -301,6 +316,54 @@ describe('JoinForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('first anyone would guess');
     expect(screen.getByLabelText('Choose a password')).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+describe('AcceptInvitation', () => {
+  beforeEach(() => {
+    router.push.mockReset();
+    actions.acceptInvitationAction.mockReset();
+    actions.acceptInvitationAction.mockResolvedValue({ ok: true, data: { workspaceSlug: 'acme' } });
+  });
+
+  it('accepts with one press for someone who has a name', async () => {
+    const user = userEvent.setup();
+    render(<AcceptInvitation token="inv_token" />);
+    expect(screen.queryByLabelText('Your name')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({ token: 'inv_token' });
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/dashboard/acme'));
+  });
+
+  it('asks someone without a name for it, starting from the invitation', async () => {
+    const user = userEvent.setup();
+    render(<AcceptInvitation token="inv_token" askName suggestedName="Ravi Kumar" />);
+    const name = screen.getByLabelText('Your name');
+    expect(name).toHaveValue('Ravi Kumar');
+    await user.clear(name);
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter your name');
+    expect(actions.acceptInvitationAction).not.toHaveBeenCalled();
+    await user.type(name, 'Ravi K. Kumar');
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
+      token: 'inv_token',
+      name: 'Ravi K. Kumar',
+    });
+  });
+
+  it('shows the server’s word on the name next to the field', async () => {
+    const user = userEvent.setup();
+    actions.acceptInvitationAction.mockResolvedValue({
+      ok: false,
+      code: 'VALIDATION',
+      error: 'A name needs at least one letter',
+      field: 'name',
+    });
+    render(<AcceptInvitation token="inv_token" askName suggestedName="Ravi" />);
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('at least one letter');
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Field, Input, NativeSelect } from '@/components/ui/field';
+import { PERSON_NAME_MAX, displayName, initialOf } from '@/lib/person-name';
 import { ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, canManageRole, type Role } from '@/lib/roles';
 import {
   changeRoleAction,
@@ -27,6 +28,7 @@ export interface TeamMember {
 export interface PendingInvitation {
   id: string;
   email: string;
+  name?: string | null;
   role: Role;
   expiresAt: string;
 }
@@ -45,6 +47,7 @@ export function TeamPanel({
   invitations: PendingInvitation[];
 }) {
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('member');
   const invite = useAction();
   const change = useAction();
@@ -52,13 +55,17 @@ export function TeamPanel({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    invite.run(() => inviteMemberAction({ workspaceId, email, role }), {
-      onSuccess: (data) => {
-        setEmail('');
-        invite.clear();
-        toast.success(`Invitation sent to ${data.email}`);
+    invite.run(
+      () => inviteMemberAction({ workspaceId, email, role, ...(name.trim() ? { name } : {}) }),
+      {
+        onSuccess: (data) => {
+          setEmail('');
+          setName('');
+          invite.clear();
+          toast.success(`Invitation sent to ${data.email}`);
+        },
       },
-    });
+    );
   }
 
   return (
@@ -72,7 +79,7 @@ export function TeamPanel({
           <form
             onSubmit={submit}
             noValidate
-            className="grid gap-4 sm:grid-cols-[1fr_180px_auto] sm:items-start"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_180px_auto] lg:items-start"
           >
             <Field label="Email" error={invite.errors.email}>
               {(props) => (
@@ -82,6 +89,22 @@ export function TeamPanel({
                   placeholder="colleague@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label="Name (optional)"
+              hint="They can correct it when they join."
+              error={invite.errors.name}
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  autoComplete="off"
+                  maxLength={PERSON_NAME_MAX}
+                  placeholder="Ravi Kumar"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               )}
             </Field>
@@ -100,7 +123,7 @@ export function TeamPanel({
                 </NativeSelect>
               )}
             </Field>
-            <Button type="submit" pending={invite.pending} className="sm:mt-7">
+            <Button type="submit" pending={invite.pending} className="lg:mt-7">
               <MailPlus aria-hidden className="h-4 w-4" /> Send invite
             </Button>
           </form>
@@ -119,19 +142,18 @@ export function TeamPanel({
             return (
               <li key={member.userId} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary">
-                  {(member.name || member.email).slice(0, 1).toUpperCase()}
+                  {initialOf(member)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">
-                    {member.name || member.email}{' '}
-                    {self ? <span className="text-muted">(you)</span> : null}
+                    {displayName(member)} {self ? <span className="text-muted">(you)</span> : null}
                   </p>
                   <p className="truncate text-sm text-muted">{member.email}</p>
                 </div>
                 {editable ? (
                   <>
                     <label className="sr-only" htmlFor={`role-${member.userId}`}>
-                      Role of {member.name || member.email}
+                      Role of {displayName(member)}
                     </label>
                     <div className="w-36">
                       <NativeSelect
@@ -160,14 +182,10 @@ export function TeamPanel({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={`Remove ${member.name || member.email}`}
+                      aria-label={`Remove ${displayName(member)}`}
                       disabled={change.pending}
                       onClick={() => {
-                        if (
-                          window.confirm(
-                            `Remove ${member.name || member.email} from this workspace?`,
-                          )
-                        ) {
+                        if (window.confirm(`Remove ${displayName(member)} from this workspace?`)) {
                           change.run(
                             () => removeMemberAction({ workspaceId, userId: member.userId }),
                             {
@@ -203,8 +221,9 @@ export function TeamPanel({
             {invitations.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{invitation.email}</p>
+                  <p className="truncate font-medium">{invitation.name || invitation.email}</p>
                   <p className="text-sm text-muted">
+                    {invitation.name ? `${invitation.email} · ` : ''}
                     {ROLE_LABELS[invitation.role]} · expires{' '}
                     <LocalTime iso={invitation.expiresAt} format="day" />
                   </p>
