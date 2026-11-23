@@ -559,16 +559,29 @@ function examineField(
     return unread;
   }
   const contents = Buffer.from(hex, 'hex');
-  const length = derLength(contents);
+  // A seal is always DER. A signature from someone else may use BER's indefinite length
+  // (Leegality's Aadhaar eSign does): it is read by its end-of-contents markers and turned
+  // into DER, which re-encodes only the framing, never the signed bytes or the signature.
+  const length = derLength(contents) ?? (strictHex ? null : berLength(contents));
   if (length === null || contents.subarray(length).some((byte) => byte !== 0)) {
     return unread;
+  }
+  let cms = contents.subarray(0, length).toString('binary');
+  if (contents[1] === 0x80) {
+    try {
+      cms = asn1
+        .toDer(asn1.fromDer(cms, { strict: false, parseAllBytes: true } as never))
+        .getBytes();
+    } catch {
+      return unread;
+    }
   }
 
   const signedContent = Buffer.concat([
     pdf.subarray(start, gapStart),
     pdf.subarray(secondStart, coveredBytes),
   ]);
-  const check = checkSignature(signedContent, contents.subarray(0, length).toString('binary'));
+  const check = checkSignature(signedContent, cms);
   const signedAt = check.signedAt ?? dictionaryTime;
   return {
     ...unread,
@@ -586,6 +599,43 @@ function examineField(
 }
 
 /** Total length of the DER element at the start of the buffer, or null if it is not one. */
+/**
+ * The length of a BER value that starts at `offset`, following indefinite lengths to their
+ * end-of-contents markers. Null when the bytes do not hold one whole value.
+ */
+function berLength(buffer: Buffer, offset = 0, depth = 0): number | null {
+  if (depth > 64 || offset + 2 > buffer.length) return null;
+  let cursor = offset + 1;
+  if (((buffer[offset] ?? 0) & 0x1f) === 0x1f) {
+    while (cursor < buffer.length && ((buffer[cursor] ?? 0) & 0x80) !== 0) cursor += 1;
+    cursor += 1;
+  }
+  const first = buffer[cursor];
+  if (first === undefined) return null;
+  cursor += 1;
+  if (first === 0x80) {
+    if (((buffer[offset] ?? 0) & 0x20) === 0) return null;
+    for (;;) {
+      if (cursor + 2 > buffer.length) return null;
+      if (buffer[cursor] === 0 && buffer[cursor + 1] === 0) return cursor + 2 - offset;
+      const inner = berLength(buffer, cursor, depth + 1);
+      if (inner === null) return null;
+      cursor += inner;
+    }
+  }
+  let length = first;
+  if (first & 0x80) {
+    const octets = first & 0x7f;
+    if (octets === 0 || octets > 4 || cursor + octets > buffer.length) return null;
+    length = 0;
+    for (let index = 0; index < octets; index += 1)
+      length = length * 256 + (buffer[cursor + index] ?? 0);
+    cursor += octets;
+  }
+  const end = cursor + length;
+  return end <= buffer.length ? end - offset : null;
+}
+
 function derLength(buffer: Buffer): number | null {
   if (buffer.length < 2 || buffer[0] !== 0x30) {
     return null;
