@@ -223,7 +223,7 @@ paths:
         `send` is `true`. Send the PDFs either as base64 in JSON, or as a multipart upload with
         the envelope JSON in a form field named `envelope` and the files as `documents`.
 
-        The example carries a real one-page PDF, so it works as it is in Test Request.
+        The example carries a real one-page PDF, so it works as it is against a sandbox.
 
         Each PDF is checked: at most 20 MB by default, at most 20 per envelope, and it must
         open as a PDF. Field boxes are in PDF points from the top-left corner of the page and
