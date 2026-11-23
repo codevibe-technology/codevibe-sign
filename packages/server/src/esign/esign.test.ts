@@ -803,7 +803,8 @@ describe('sealing after an eSign', () => {
       h.store.listEvents = async (id) =>
         (await list(id)).map((e) => {
           if (e.action !== 'recipient.esign_started' || !e.data) return e;
-          const { certificate: _dropped, ...data } = e.data;
+          const data = { ...e.data };
+          delete data.certificate;
           return { ...e, data };
         });
     }

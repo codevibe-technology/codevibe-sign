@@ -130,6 +130,7 @@ async function allEmails(): Promise<Case[]> {
       ...brand,
       brandColor: '#0F766E',
       logoUrl: WORKSPACE_LOGO,
+      logoWide: true,
     }),
     link,
     'workspace',

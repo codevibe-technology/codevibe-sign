@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultPdfEngine } from '../engine';
 import { fakeEsignProvider } from '../testing/fake-esign';
-import { API_KEY, harness, PNG } from '../testing/harness';
+import { API_KEY, harness } from '../testing/harness';
 import { makeP12, makePdf } from '../testing/real-pdf';
 
 const WEBHOOK = '/v1/esign/webhooks/leegality';
