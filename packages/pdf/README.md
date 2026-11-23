@@ -242,9 +242,7 @@ granted, carry the same nonce and SHA-256 imprint, and be signed by the authorit
 sealing fails with `SEAL_FAILED` and `details.option` `tsaUrl`, unless `tsaRequired` is false.
 
 A file that already carries signatures is refused with `PDF_ALREADY_SIGNED`: sealing writes
-the whole file again and would remove them. Sealing after another signature (for example an
-Aadhaar eSign) needs an incremental update and an approval signature, which this version does
-not do yet.
+the whole file again and would remove them. Use `countersign()` for such a file.
 
 #### Signers
 
@@ -262,6 +260,46 @@ Errors: `SEAL_FAILED` (bad file or passphrase, no RSA key, weak key or certifica
 a certificate profile problem with `details.reason`, a timestamp failure), `PDF_ALREADY_SIGNED`
 and the `DOCUMENT_*` codes above.
 
+### `countersign(pdfBytes, options) → Promise<Uint8Array>`
+
+Seals a file that is already signed, for example one that came back from an eSign provider
+with an Aadhaar eSign in it. It takes the same options as `seal()`.
+
+#### Sealing a file that is already signed
+
+A digital signature covers the bytes of the file as it was when it was made. `seal()` writes
+the file again, which would break such a signature, so `countersign()` leaves every existing
+byte where it is and appends one incremental update after them: an approval signature from
+the operator in an invisible field, plus the few objects that have to name that field (the
+form, and the first page's annotation list). The output starts with the input, byte for
+byte.
+
+Adding a signature is a change earlier signatures permit. The earlier signature stays valid
+and is shown as covering the file up to the point where it was made; the operator's seal
+covers the whole file, earlier signatures included. Nothing else can be added this way:
+drawing on a page or appending a certificate page after someone else's signature would make
+readers report that signature as broken. Draw the fields before the file goes to the
+provider, and keep the certificate as a file of its own (`certificatePdf`).
+
+```ts
+const signedByProvider = await provider.fetchSignedDocument(ref);
+const sealed = await countersign(signedByProvider, { p12, passphrase, tsaUrl });
+
+const check = await verify(sealed, { trust, allowEarlierSignatures: true });
+check.valid; // the seal is the operator's and covers everything
+check.earlierSignatures; // the provider's signature: signer, issuer, time, still intact
+```
+
+It works on files with a classic cross-reference table and on files with cross-reference
+and object streams, and continues with whichever the file ends with. The seal is never a
+certification (`certify` is ignored), since only the first signature of a file can be one.
+
+Errors: `VALIDATION` when the file carries no signature (use `seal()`), `DOCUMENT_INVALID`
+for an encrypted or unreadable file, the `SEAL_FAILED` cases of `seal()`, and
+`PDF_ALREADY_SIGNED` with `details.reason` `locked` when an existing signature forbids
+another one: a certification that allows no changes (DocMDP `P` 1), or a signature field
+lock that covers fields it does not name. Keep such a file as it is.
+
 ### `sealCertificate({ p12, passphrase?, allowWeakKey?, at? }) → SealCertificate`
 
 Opens the PKCS#12 file with the same checks as `seal()` and returns
@@ -276,7 +314,7 @@ Creates a self-signed RSA-2048 sealing certificate for development and tests and
 `notBefore`. PDF readers show seals made with it as untrusted; production needs a certificate
 issued by a certificate authority. Node only.
 
-### `verify(bytes, { trust, limits? }) → Promise<VerifyResult>`
+### `verify(bytes, { trust, limits?, allowEarlierSignatures? }) → Promise<VerifyResult>`
 
 The check to use when deciding whether a file is genuine. `valid` is true only when:
 
@@ -290,6 +328,11 @@ The check to use when deciding whether a file is genuine. `valid` is true only w
 `trust` must name at least one certificate, fingerprint or root. The file is read under the
 parser limits in a worker first, as in `inspectPdf`.
 
+With `allowEarlierSignatures: true` the file may carry signatures made before the seal, as
+`countersign()` produces. The seal must then be the latest signature and meet conditions 2
+to 4, and every earlier signature must still match the bytes it covers. The result lists
+them in `earlierSignatures`; their certificates are not checked against `trust`.
+
 ```ts
 interface VerifyResult {
   valid: boolean;
@@ -298,12 +341,14 @@ interface VerifyResult {
     | 'multiple_signatures'
     | 'signature_invalid'
     | 'not_whole_document'
+    | 'earlier_signature_invalid'
     | 'untrusted_signer';
   signer?: { commonName?: string; organization?: string };
   signedAt?: string;
   certificateSha256?: string; // of the signer certificate
   trustedBy?: 'certificate' | 'root';
-  seal: SealVerification; // the low-level result below
+  seal: SealVerification; // the low-level result below, for the operator's signature
+  earlierSignatures?: SignatureInfo[]; // with allowEarlierSignatures, when there are any
 }
 ```
 
@@ -317,7 +362,10 @@ document's form (text that only looks like a signature dictionary is ignored), a
 that its byte range is well formed and brackets the `/Contents` the field declares,
 `/Contents` holds exactly the CMS structure (any change to it, even in padding, fails), the
 message digest matches the signed bytes, the signing-certificate-v2 hash matches the
-embedded certificate, and the RSA signature verifies.
+embedded certificate, and the signature verifies with the certificate's key.
+
+In a file with several signatures this is the first one in the form, which covers only the
+part of the file that existed when it was made. Use `verifySignatures` for such a file.
 
 ```ts
 interface SealVerification {
@@ -337,6 +385,32 @@ authority's signature on the token verifies; whether the authority is trusted is
 `valid` says nothing about who sealed the file: anyone can seal an altered copy with their
 own key and `verifySeal` will call it valid. It also runs without parser limits. Use
 `verify()` with your operator certificate to decide whether a file is genuine.
+
+### `verifySignatures(bytes) → Promise<SignatureInfo[]>`
+
+Every signature of the file, from the earliest to the latest, each checked like `verifySeal`
+checks one. It reads CMS signatures in `ETSI.CAdES.detached` and `adbe.pkcs7.detached` form,
+made with RSA (PKCS#1 v1.5 or PSS) or ECDSA keys and SHA-256, SHA-384 or SHA-512, so it can
+tell whether a signature from another product is intact. A signature that does not cover the
+ones before it is reported as not valid.
+
+```ts
+interface SignatureInfo {
+  valid: boolean; // intact, and covers the signatures before it
+  coversWholeDocument: boolean;
+  coveredBytes: number; // the length of the file when it was signed
+  signer?: { commonName?: string; organization?: string };
+  issuer?: { commonName?: string; organization?: string }; // who issued the certificate
+  signedAt?: string;
+  certificateSha256?: string;
+  subFilter?: string; // for example 'adbe.pkcs7.detached'
+  timestampedAt?: string;
+}
+```
+
+Like `verifySeal`, it says nothing about who a signer is: it does not check certificate
+chains, revocation or whether a certifying authority is trusted. Open the file in a PDF
+reader to see the reader's own verdict on a provider's certificate.
 
 ### `maskEmail(email)`, `maskPhone(phone)`
 
@@ -381,11 +455,14 @@ The bundled fonts are Noto Sans, under the SIL Open Font License 1.1 (see `fonts
 ## Limits
 
 - Sealing keys must be RSA. Encrypted PDFs are rejected rather than decrypted.
-- Sealing rewrites the file; seal last, and do not seal a file that already carries
-  someone else's signature.
-- `verify` and `verifySeal` locate signatures through the form's signature fields and
-  check PAdES B-B seals like the ones produced here. They are not a general PDF signature
-  validator: no revocation checks, timestamps or long-term validation.
+- Sealing rewrites the file; seal last. For a file that already carries someone else's
+  signature use `countersign()`, which only appends.
+- `verify`, `verifySeal` and `verifySignatures` locate signatures through the form's
+  signature fields and check that each matches its bytes. They are not a general PDF
+  signature validator: no certificate chain or revocation checks for other signers, no
+  long-term validation. Signatures in forms other than detached CMS (for example
+  `adbe.pkcs7.sha1` or `adbe.x509.rsa_sha1`) and CMS that is not DER encoded are reported as
+  not valid.
 - Sanitising drops document-level features such as bookmarks and the tagged structure tree.
 
 ## Docs
