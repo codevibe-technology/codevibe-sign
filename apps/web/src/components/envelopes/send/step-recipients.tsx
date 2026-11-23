@@ -1,11 +1,13 @@
 'use client';
 
 import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2, UserRound } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 import type { RoutingMode } from '@codevibe_technology/sign-core';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, Input, NativeSelect } from '@/components/ui/field';
+import { formatInr } from '@/lib/billing/money';
 import { cn } from '@/lib/cn';
 import { AUTH_OPTIONS, ROLE_OPTIONS } from '@/lib/envelopes';
 import {
@@ -15,6 +17,58 @@ import {
   type DraftRecipient,
   type Problems,
 } from '@/lib/send-flow';
+
+/** Whether Aadhaar eSign can be chosen for a signer, and what it costs the workspace. */
+export interface EsignChoice {
+  available: boolean;
+  /** Why not, in words for the sender. */
+  message: string | null;
+  /** eSigns use prepaid credits here. */
+  creditsRequired: boolean;
+  credits: number;
+  /** Price of one eSign before tax; null shows as "Price coming soon". */
+  pricePaise: number | null;
+  /** Settings, Aadhaar eSign, for someone who may open it; null otherwise. */
+  settingsHref: string | null;
+}
+
+const AUTH_HINTS = {
+  email_link: 'The link in their email is enough. Weaker evidence: anyone with the email can sign.',
+  email_otp: 'They also enter a code we email them.',
+  sms_otp: 'They also enter a code we text to their phone.',
+  aadhaar:
+    "They confirm with a one-time code from Aadhaar on the eSign provider's page. One signer per envelope, on one document, and they sign last.",
+} as const;
+
+function EsignNote({ esign }: { esign: EsignChoice | undefined }) {
+  if (!esign) return null;
+  const settings = esign.settingsHref ? (
+    <Link className="font-semibold text-primary hover:underline" href={esign.settingsHref}>
+      Open Aadhaar eSign settings
+    </Link>
+  ) : null;
+  if (!esign.available) {
+    return (
+      <p
+        className="sm:col-span-2 rounded-lg bg-warning-soft px-3 py-2 text-[13px] text-ink"
+        data-testid="esign-unavailable"
+      >
+        {esign.message} {settings}
+      </p>
+    );
+  }
+  if (!esign.creditsRequired) return null;
+  return (
+    <p
+      className="sm:col-span-2 rounded-lg bg-primary-soft px-3 py-2 text-[13px] text-ink"
+      data-testid="esign-cost"
+    >
+      Uses 1 credit when they finish signing
+      {esign.pricePaise === null ? '' : ` (${formatInr(esign.pricePaise)} per eSign)`}. This
+      workspace has {esign.credits} {esign.credits === 1 ? 'credit' : 'credits'} left. {settings}
+    </p>
+  );
+}
 
 /** Index of the recipient's colour in the field placer: signers and approvers, in order. */
 export function colorIndex(recipients: DraftRecipient[], id: string): number | null {
@@ -42,9 +96,11 @@ export function StepRecipients({
   routing,
   problems,
   me,
+  esign,
   onChange,
   onRoutingChange,
 }: {
+  esign?: EsignChoice;
   recipients: DraftRecipient[];
   routing: RoutingMode;
   problems: Problems;
@@ -231,13 +287,8 @@ export function StepRecipients({
                 {r.role === 'viewer' ? null : (
                   <Field
                     label="Identity check"
-                    hint={
-                      r.auth === 'email_link'
-                        ? 'The link in their email is enough. Weaker evidence: anyone with the email can sign.'
-                        : r.auth === 'email_otp'
-                          ? 'They also enter a code we email them.'
-                          : 'They also enter a code we text to their phone.'
-                    }
+                    hint={AUTH_HINTS[r.auth]}
+                    error={problems[`${at}.auth`]}
                   >
                     {(props) => (
                       <NativeSelect
@@ -248,14 +299,25 @@ export function StepRecipients({
                         }
                       >
                         {AUTH_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
+                          <option
+                            key={o.value}
+                            value={o.value}
+                            disabled={
+                              o.value === 'aadhaar' &&
+                              r.auth !== 'aadhaar' &&
+                              esign?.available === false
+                            }
+                          >
+                            {o.value === 'aadhaar' && esign?.available === false
+                              ? `${o.label} (not available)`
+                              : o.label}
                           </option>
                         ))}
                       </NativeSelect>
                     )}
                   </Field>
                 )}
+                {r.auth === 'aadhaar' && r.role !== 'viewer' ? <EsignNote esign={esign} /> : null}
                 {r.auth === 'sms_otp' && r.role !== 'viewer' ? (
                   <Field
                     label="Mobile number"

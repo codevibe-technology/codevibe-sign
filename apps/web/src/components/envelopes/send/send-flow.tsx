@@ -30,7 +30,7 @@ import { replaceDocumentAction } from '@/server/actions/envelopes';
 import { ExcludedDocumentNotice } from '@/components/legal/excluded-document-notice';
 import { StepDocuments } from './step-documents';
 import { StepFields } from './step-fields';
-import { StepRecipients } from './step-recipients';
+import { StepRecipients, type EsignChoice } from './step-recipients';
 import { StepReview } from './step-review';
 import { Stepper } from './stepper';
 
@@ -66,13 +66,23 @@ export interface SendFlowProps {
   initial?: SendFlowState;
   initialStep?: StepKey;
   revision?: RevisionNote;
+  /** Whether a signer can be asked to sign with Aadhaar eSign. */
+  esign?: EsignChoice;
 }
 
 /**
  * Upload, recipients, fields, review. The draft is created on the server once there is
  * someone to send to, and every later change is saved on its own a moment after it is made.
  */
-export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision }: SendFlowProps) {
+export function SendFlow({
+  slug,
+  workspaceId,
+  me,
+  initial,
+  initialStep,
+  revision,
+  esign,
+}: SendFlowProps) {
   const router = useRouter();
   const [state, setState] = useState<SendFlowState>(initial ?? emptyFlow);
   const [step, setStep] = useState<StepKey>(initialStep ?? 'documents');
@@ -360,6 +370,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
           routing={state.routing}
           problems={problems}
           me={me}
+          {...(esign ? { esign } : {})}
           onChange={(fn) => update((s) => ({ ...s, recipients: fn(s.recipients) }))}
           onRoutingChange={(routing) => update((s) => ({ ...s, routing }))}
         />
