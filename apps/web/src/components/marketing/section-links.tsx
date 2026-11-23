@@ -60,8 +60,8 @@ export function SectionLinks({
             href={samePage ? link.href.slice(1) : link.href}
             aria-current={here ? 'location' : undefined}
             className={cn(
-              'relative rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10 hover:text-white',
-              here ? 'text-white' : 'text-white/80',
+              'relative rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-surface-2 hover:text-ink',
+              here ? 'text-ink' : 'text-muted',
               className,
             )}
           >
@@ -69,7 +69,7 @@ export function SectionLinks({
             <span
               aria-hidden
               className={cn(
-                'absolute inset-x-3 -bottom-[13px] h-0.5 origin-left bg-accent transition-transform duration-300',
+                'absolute inset-x-3 -bottom-[13px] h-0.5 origin-left bg-primary transition-transform duration-300',
                 here ? 'scale-x-100' : 'scale-x-0',
               )}
             />

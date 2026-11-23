@@ -1,6 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import { BrandMark } from '@/components/shell/brand-mark';
+import { Wordmark } from '@/components/shell/brand-mark';
 import { BRAND_FONT_STACKS, isHexColor, textOn } from '@/lib/brand';
 import type { SigningBrand } from '@/lib/signing';
 
@@ -63,11 +63,13 @@ export function SigningShell({
               {brand.name.slice(0, 1).toUpperCase()}
             </span>
           ) : (
-            <BrandMark />
+            <Wordmark surface="dark" className="h-[24px] sm:h-[28px]" />
           )}
-          <span className="truncate font-display text-base font-semibold tracking-tight">
-            {brand?.name ?? 'Codevibe Sign'}
-          </span>
+          {brand ? (
+            <span className="truncate font-display text-base font-semibold tracking-tight">
+              {brand.name}
+            </span>
+          ) : null}
           <span className="ml-auto hidden font-mono text-[10.5px] tracking-[0.12em] uppercase sm:inline">
             Secure signing
           </span>

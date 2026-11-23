@@ -10,8 +10,10 @@ export const BRAND_COLORS = { navy: '#0D1B2A', blue: '#1B6AE0', teal: '#2DD4BF' 
 export const LOCKUP = {
   width: 823,
   height: 135,
+  /** The logo, as the docs show it: navy "codevibe", blue "sign". */
   light: '/brand/logo.svg',
-  white: '/brand/logo-white.svg',
+  /** The same lockup for dark surfaces only: white "codevibe", light blue "sign". */
+  inverse: '/brand/logo-white.svg',
   email: '/brand/logo-email.png',
 } as const;
 

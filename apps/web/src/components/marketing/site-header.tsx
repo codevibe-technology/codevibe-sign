@@ -31,16 +31,16 @@ export function SiteHeader({
   samePage?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-header/95 text-header-ink backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-surface/95 text-ink backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
         <Link href="/" className="shrink-0 rounded-md" aria-label="Codevibe Sign home">
-          <Wordmark />
+          <Wordmark surface="theme" />
         </Link>
         <nav aria-label="Site" className="ml-6 hidden items-center gap-1 md:flex">
           <SectionLinks links={SECTIONS} samePage={samePage} />
           <a
             href={DOCS_URL}
-            className="rounded-md px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
+            className="rounded-md px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-ink"
           >
             Docs
           </a>
@@ -57,7 +57,7 @@ export function SiteHeader({
             <>
               <Link
                 href="/sign-in"
-                className="hidden rounded-md px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 sm:inline-flex"
+                className="hidden rounded-md px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-2 sm:inline-flex"
               >
                 Sign in
               </Link>

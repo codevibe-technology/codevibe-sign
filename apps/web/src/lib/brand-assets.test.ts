@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { BRAND_COLORS, BRAND_FONTS, LOCKUP } from './brand-assets';
+import { contrastRatio } from './contrast';
 
 const web = fileURLToPath(new URL('../../', import.meta.url));
 const site = fileURLToPath(new URL('../../../site/', import.meta.url));
@@ -68,11 +69,10 @@ describe('the logo', () => {
   });
 });
 
+/** One logo, the docs' own, and its inverse for dark surfaces; the mark is the same in both. */
 const LOCKUPS = {
-  'logo.svg': { word: '#0D1B2A', sign: '#1B6AE0', mark: null },
-  'logo-white.svg': { word: '#FFFFFF', sign: '#2DD4BF', mark: null },
-  'logo-mono.svg': { word: '#0D1B2A', sign: '#0D1B2A', mark: '#0D1B2A' },
-  'logo-mono-white.svg': { word: '#FFFFFF', sign: '#FFFFFF', mark: '#FFFFFF' },
+  'logo.svg': { word: '#0D1B2A', sign: '#1B6AE0' },
+  'logo-white.svg': { word: '#FFFFFF', sign: '#6AA2F5' },
 } as const;
 
 /**
@@ -104,10 +104,21 @@ describe('the lockup', () => {
     text(site, 'public/mark.svg'),
   )![1]!;
 
-  it('is the four colourways in the docs, copied unchanged to the app', () => {
+  it('is the logo and its inverse in the docs, copied unchanged to the app, and nothing else', () => {
     for (const name of Object.keys(LOCKUPS)) {
       expect(text(web, `public/brand/${name}`)).toBe(text(site, `public/brand/${name}`));
     }
+    const svgs = (root: string) =>
+      readdirSync(join(root, 'public/brand')).filter((name) => name.endsWith('.svg'));
+    expect(svgs(site).sort()).toEqual(Object.keys(LOCKUPS).sort());
+    expect(svgs(web).sort()).toEqual(Object.keys(LOCKUPS).sort());
+  });
+
+  it('keeps "sign" readable on the dark surfaces in its inverse', () => {
+    for (const surface of ['#0D1B2A', '#17304A']) {
+      expect(contrastRatio(LOCKUPS['logo-white.svg'].sign, surface)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrastRatio(LOCKUPS['logo.svg'].sign, '#FFFFFF')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('is the mark and the outlined words on the codevibe.in grid, never a font', () => {
@@ -118,10 +129,7 @@ describe('the lockup', () => {
       expect(lockup.viewBox).toBe(`0 0 ${LOCKUP.width} ${LOCKUP.height}`);
       // The mark is drawn on a 512 grid and stands 122 units tall, as codevibe.in's mark does.
       expect(Number(lockup.markScale) * 512).toBeCloseTo(122, 2);
-      const expectedMark = colours.mark
-        ? mark.replace(/stroke="#[0-9A-Fa-f]{6}"/g, `stroke="${colours.mark}"`)
-        : mark;
-      expect(lockup.mark).toBe(expectedMark);
+      expect(lockup.mark).toBe(mark);
       expect(lockup.words.map((word) => sha256(word.d))).toEqual(WORD_HASHES);
       expect(lockup.words.map((word) => word.fill)).toEqual([colours.word, colours.sign]);
     }
@@ -137,21 +145,27 @@ describe('the lockup', () => {
     for (const [, d] of mark.matchAll(/d="([^"]*)"/g)) expect(paths).toContain(`d: '${d}'`);
   });
 
-  it('is the logo wherever the app shows the name, in the version for the navy surfaces', () => {
+  it('is the logo wherever the app shows the name, inverted only on dark surfaces', () => {
     const wordmark = text(web, 'src/components/shell/brand-mark.tsx');
-    expect(wordmark).toContain('src={LOCKUP.white}');
+    expect(wordmark).toContain("surface = 'light'");
     expect(wordmark).not.toContain('{BRAND_NAME}</');
-    for (const file of [
-      'src/components/marketing/site-header.tsx',
-      'src/components/marketing/site-footer.tsx',
-      'src/components/records/public-shell.tsx',
-      'src/components/shell/app-shell.tsx',
-      'src/components/shell/status-page.tsx',
-      'src/app/verify/page.tsx',
-    ]) {
-      expect(text(web, file)).toContain('<Wordmark');
-    }
-    expect(text(web, 'src/app/share-image.tsx')).toContain('LOCKUP.white');
+    const placed: Record<string, string> = {
+      'src/components/marketing/site-header.tsx': '<Wordmark surface="theme"',
+      'src/app/verify/page.tsx': '<Wordmark surface="theme"',
+      'src/components/records/public-shell.tsx': '<Wordmark surface="theme"',
+      'src/components/marketing/site-footer.tsx': '<Wordmark surface="dark"',
+      'src/components/shell/app-shell.tsx': '<Wordmark surface="dark"',
+      'src/components/shell/status-page.tsx': '<Wordmark surface="dark"',
+      'src/components/signing/signing-shell.tsx': '<Wordmark surface="dark"',
+    };
+    for (const [file, use] of Object.entries(placed)) expect(text(web, file)).toContain(use);
+    const named = sources(join(web, 'src')).filter((file) =>
+      /['"]Codevibe Sign['"]\s*\}?\s*<\/span>|>\s*Codevibe Sign\s*<\/span>/.test(
+        readFileSync(file, 'utf8'),
+      ),
+    );
+    expect(named).toEqual([]);
+    expect(text(web, 'src/app/share-image.tsx')).toContain('LOCKUP.inverse');
     expect(text(web, 'src/server/mail.ts')).toContain('LOCKUP.email');
     expect(pngSize(read(web, `public${LOCKUP.email}`))[1]).toBe(56);
   });

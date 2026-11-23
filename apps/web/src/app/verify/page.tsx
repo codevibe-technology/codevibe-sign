@@ -47,10 +47,10 @@ export default async function PublicVerifyPage() {
       {hosted ? (
         <SiteHeader viewer={viewer} />
       ) : (
-        <header className="border-b border-white/10 bg-header text-header-ink">
+        <header className="border-b border-line bg-surface text-ink">
           <div className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
             <Link href="/" className="rounded-md" aria-label="Home">
-              <Wordmark />
+              <Wordmark surface="theme" />
             </Link>
           </div>
         </header>

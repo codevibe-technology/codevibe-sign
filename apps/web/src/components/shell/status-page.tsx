@@ -49,7 +49,7 @@ export function AuthFrame({ children, wide }: { children: ReactNode; wide?: bool
           }}
         />
         <div className="relative px-4 py-4 lg:p-0">
-          <Wordmark />
+          <Wordmark surface="dark" />
         </div>
         <div className="relative hidden lg:block">
           <p className="mb-4 flex items-center gap-2 font-mono text-[11px] tracking-[0.12em] text-accent uppercase">

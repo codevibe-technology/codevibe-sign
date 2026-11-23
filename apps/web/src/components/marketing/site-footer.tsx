@@ -17,7 +17,7 @@ export function SiteFooter() {
     <footer className="border-t border-white/10 bg-header text-header-ink">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-12 sm:px-6 md:flex-row md:items-start md:justify-between">
         <div className="max-w-sm">
-          <Wordmark />
+          <Wordmark surface="dark" />
           <p className="mt-3 text-sm text-white/70">
             Open-source e-signatures, made in India by Codevibe, a software agency. Questions:{' '}
             <a

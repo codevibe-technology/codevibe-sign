@@ -14,7 +14,7 @@ export const shareSize = { width: 1200, height: 630 };
 export async function shareImage() {
   const shot = await readFile(join(process.cwd(), 'src/app/share-shot.jpg'));
   const shotUrl = `data:image/jpeg;base64,${shot.toString('base64')}`;
-  const lockup = await readFile(join(process.cwd(), 'public', LOCKUP.white));
+  const lockup = await readFile(join(process.cwd(), 'public', LOCKUP.inverse));
   const lockupUrl = `data:image/svg+xml;base64,${lockup.toString('base64')}`;
   return new ImageResponse(
     (

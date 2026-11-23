@@ -97,10 +97,11 @@ write(path('../../site/public/icon-192.png'), icon192);
 write(path('../../site/public/icon-512.png'), icon512);
 write(path('../../site/public/site.webmanifest'), manifest('/docs/'));
 
-// The lockup: mark and outlined "codevibe sign", drawn on codevibe.in's logo grid. The four
-// colourways live next to the mark in apps/site/public/brand; the app serves the same files.
+// The lockup: mark and outlined "codevibe sign", drawn on codevibe.in's logo grid. It has one
+// colourway for light surfaces and its inverse for dark ones, next to the mark in
+// apps/site/public/brand; the app serves the same files.
 const brand = path('../../site/public/brand/');
-const LOCKUPS = ['logo.svg', 'logo-white.svg', 'logo-mono.svg', 'logo-mono-white.svg'];
+const LOCKUPS = ['logo.svg', 'logo-white.svg'];
 for (const name of LOCKUPS) write(path(`../public/brand/${name}`), readFileSync(brand + name));
 
 const lockup = readFileSync(`${brand}logo.svg`);

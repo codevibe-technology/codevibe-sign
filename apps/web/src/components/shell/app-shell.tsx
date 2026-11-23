@@ -44,7 +44,7 @@ export function AppShell({
               </Dialog.Content>
             </Dialog.Portal>
           </Dialog.Root>
-          <Wordmark />
+          <Wordmark surface="dark" />
           <span className="ml-auto min-w-0 truncate text-sm text-nav-muted">
             {sidebar.current.name}
           </span>

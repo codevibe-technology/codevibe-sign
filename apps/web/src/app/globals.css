@@ -309,6 +309,32 @@ html [data-sonner-toaster][data-sonner-theme] {
   }
 }
 
+/* A lockup on a surface that follows the theme: the logo on light, its inverse on dark. */
+.wordmark-on-dark {
+  display: none;
+}
+[data-theme='dark'] .wordmark-on-light {
+  display: none;
+}
+[data-theme='dark'] .wordmark-on-dark {
+  display: block;
+}
+@media (prefers-color-scheme: dark) {
+  [data-theme='system'] .wordmark-on-light {
+    display: none;
+  }
+  [data-theme='system'] .wordmark-on-dark {
+    display: block;
+  }
+}
+/* The home page options are always light. */
+.home-skin .wordmark-on-light {
+  display: block;
+}
+.home-skin .wordmark-on-dark {
+  display: none;
+}
+
 .marketing ::selection {
   background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
