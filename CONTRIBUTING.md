@@ -8,7 +8,7 @@ security@codevibe.in, not to the issue tracker; see [SECURITY.md](SECURITY.md).
 
 ## Setup
 
-You need Node 20 or later and pnpm 10 (`corepack enable` picks the version from
+You need Node 22.18 or later and pnpm 10 (`corepack enable` picks the version from
 `package.json`).
 
 ```sh
@@ -100,7 +100,7 @@ Changelog policy:
 ## Pull requests
 
 Keep pull requests focused on one concern. CI runs lint, format check, build, type check and
-tests on Node 20 and 22, and all of them must pass. A maintainer reviews every pull request;
+tests on Node 22 and 24, and all of them must pass. A maintainer reviews every pull request;
 changes to sealing, verification, authentication or the audit log get a second review.
 
 ## Licence

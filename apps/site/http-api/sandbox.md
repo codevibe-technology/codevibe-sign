@@ -12,7 +12,7 @@ instead of mailed. It also answers CORS requests from the docs, so the
 
 ## Start it
 
-You need Node 20 or later and pnpm.
+You need Node 22.18 or later and pnpm.
 
 ```sh
 git clone https://github.com/codevibe-technology/codevibe-sign.git

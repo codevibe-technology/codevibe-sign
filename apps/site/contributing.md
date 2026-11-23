@@ -12,7 +12,7 @@ tracker.
 
 ## Setup
 
-You need Node 20 or later and pnpm 10 (`corepack enable` picks the version from
+You need Node 22.18 or later and pnpm 10 (`corepack enable` picks the version from
 `package.json`).
 
 ```sh
@@ -63,7 +63,7 @@ fewer.
 ## Pull requests
 
 Keep each pull request to one concern. CI runs lint, format check, build, type check and tests
-on Node 20 and 22. A maintainer reviews every pull request, and changes to sealing,
+on Node 22 and 24. A maintainer reviews every pull request, and changes to sealing,
 verification, authentication or the audit log get a second review.
 
 Sign off every commit with `git commit -s`. The `Signed-off-by: Your Name <you@example.com>` line

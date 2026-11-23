@@ -11,7 +11,7 @@ How it is built, and the rules for changing it, are in
 
 ## Run it locally
 
-You need Node 20+, pnpm and a PostgreSQL 16 database.
+You need Node 22.18+, pnpm and a PostgreSQL 16 database.
 
 ```sh
 pnpm install

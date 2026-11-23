@@ -2,7 +2,7 @@
 # The web app (app, HTTP API and docs at /docs) as one image.
 # Build from the repository root: docker build -f apps/web/Dockerfile -t codevibe-sign-web .
 
-ARG NODE_IMAGE=node:20.19.5-bookworm-slim
+ARG NODE_IMAGE=node:22.23.5-bookworm-slim
 
 FROM ${NODE_IMAGE} AS base
 ENV PNPM_HOME=/pnpm
