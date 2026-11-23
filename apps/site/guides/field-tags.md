@@ -1,16 +1,24 @@
 ---
 title: Place fields across pages and from text tags
-description: Repeat a field on many pages, add initials to every page in one click, and let tags in your PDF place fields for you.
+description: Show a field on many pages, add initials to every page in one click, and let tags in your PDF place fields for you.
 ---
 
 # Place fields across pages and from text tags
 
-## Repeat a field on many pages
+## Show a field on many pages
 
-Select a placed field and pick **Repeat on pages**: this page only, all pages, every page
-except the first, the last page, or **Pages…** with numbers such as `1, 3, 5-7`. Pages are
-counted from 1 and must exist in the document. Each copy sits at the same spot relative to
-its page, so it lands in the same place on A4 and Letter pages and on turned pages.
+A field you place is on its own page only. To put it on more, select it and pick under
+**Show on pages**:
+
+- **This page only**: the field as placed. Picking it again takes the copies away.
+- **All pages**: a copy on every page of the document.
+- **Specific pages…**: type numbers such as `1, 3, 5-7`, then press Enter or **Apply**. The
+  field ends up on exactly those pages, plus the page it is on.
+
+The choice applies as soon as you pick it. Pages are counted from 1 and must exist in the
+document; a number past the end is refused and nothing changes. Each copy sits at the same
+spot relative to its page, so it lands in the same place on A4 and Letter pages and on
+turned pages.
 
 Copies form a group, shown as `×N pages` on each of them. After moving or resizing one,
 **Apply to all in group** moves the others the same way; deleting offers **Delete this
@@ -48,6 +56,7 @@ hand.
 
 ## Signing many boxes
 
-The signer adopts a signature or initials once. Every other box of theirs then takes one
-tap, still one box at a time, and **Fill all my initials** fills every initials box once
-the initials are adopted.
+The signer presses **Start** and is taken to each field in turn. On a signature box the
+same button reads **Sign**; the signature is adopted once, and every other box of theirs
+then takes one tap, still one box at a time. **Fill all my initials** fills every initials
+box once the initials are adopted. When nothing is left, the button becomes **Finish**.

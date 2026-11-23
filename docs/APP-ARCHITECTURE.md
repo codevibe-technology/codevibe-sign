@@ -361,7 +361,7 @@ the token in an HttpOnly cookie for `/api/v1/sign` and redirects to `/sign`.
 | Not their turn | `canAct` is false: says someone else signs first and that an email will follow.                                                                                               |
 | Code           | OTP recipients ask for a code (`POST link/otp`), type it (`link/otp/verify`); wrong, expired and locked codes each say what to do next.                                       |
 | Consent        | Who asks, the title, the sender's message, the documents; the signer must tick the agreement to sign electronically. Continuing posts `link/view`.                            |
-| Document       | `SigningView` from `sign-react` with the PDFs from `link/documents/<id>`, "Next field", a required-field counter, Finish (Approve for approvers), Decline with a reason.      |
+| Document       | `SigningView` from `sign-react`, fitted to the window so the action bar stays on screen: Start/Next/Sign guide, required counter, Finish (Approve for approvers), Decline.    |
 | Thank you      | After submit, polls `GET /api/v1/sign/receipt` (3 s while sealing, 15 s while others sign, 10 minutes at most) and offers "Download your copy" once every document is sealed. |
 
 - **Dead links**: a link that is used, expired, withdrawn, declined or complete redirects to

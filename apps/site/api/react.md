@@ -241,8 +241,12 @@ Field values are checked with core's `checkFieldValue`, the same rules the serve
 - Field placer: Enter on a palette item adds the field to the page in view. On a placed
   field, arrow keys move it 1 point (Shift: 10), Alt with arrows resizes it, Delete
   removes it, Escape deselects.
-- Signing view: Next field moves focus to the next required field in reading order.
-  Dialogs trap focus and close on Escape.
+- Field placer: picking "This page only", "All pages" or "Specific pages…" under "Show on
+  pages" applies at once; typed page numbers apply on Enter.
+- Signing view: one guide button reads Start, then Next, and Sign or Initial while the
+  guide is on a signature box; it moves focus to the next required field in reading order.
+  Enter in a text field moves on too, and Finish takes over when nothing is left. Dialogs
+  trap focus and close on Escape.
 
 ## Theming
 
