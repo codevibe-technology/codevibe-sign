@@ -196,7 +196,7 @@ describe('send through the app, then sign through the /sign page', () => {
             },
           ],
           recipients: [
-            { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com' },
+            { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
             { key: 'hr', name: 'HR', email: 'hr@example.com', role: 'viewer' },
           ],
           fields: [

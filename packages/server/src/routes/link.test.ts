@@ -112,7 +112,9 @@ describe('a link that no longer works', () => {
       headers: auth,
       body: envelopeBody({
         send: true,
-        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'solo@example.com' }],
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'solo@example.com', auth: 'email_link' },
+        ],
         fields: [
           { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
         ],

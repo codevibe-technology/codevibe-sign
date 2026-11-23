@@ -390,7 +390,9 @@ describe('sealing', () => {
     const { json: envelope } = await h.call('POST', '/v1/envelopes', {
       body: envelopeBody({
         send: true,
-        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
+        ],
         fields: [
           { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
         ],
@@ -421,7 +423,9 @@ describe('sealing', () => {
     const { json: envelope } = await h.call('POST', '/v1/envelopes', {
       body: envelopeBody({
         send: true,
-        recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' },
+        ],
         fields: [
           { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
         ],

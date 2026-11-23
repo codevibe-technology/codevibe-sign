@@ -1823,7 +1823,7 @@ components:
     AuthMethod:
       type: string
       enum: [email_link, email_otp, sms_otp, aadhaar]
-      description: How the recipient proves who they are. `email_link` needs only the link.
+      description: How the recipient proves who they are. `email_otp`, the default, asks for the link and a code sent by email; `email_link` needs only the link.
     Routing:
       type: string
       enum: [sequential, parallel]
@@ -2504,7 +2504,7 @@ components:
           default: signer
         auth:
           $ref: '#/components/schemas/AuthMethod'
-          default: email_link
+          default: email_otp
         order:
           type: integer
           minimum: 1

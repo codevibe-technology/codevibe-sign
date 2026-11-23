@@ -99,7 +99,7 @@ describe('draft edits with events', () => {
     expect(added.recipient).toEqual(addRecipient(envelope, input, deps()).recipient);
     expect(only(added)).toMatchObject({
       recipientId: added.recipient.id,
-      data: { change: 'recipient.added', role: 'approver', order: 3, auth: 'email_link' },
+      data: { change: 'recipient.added', role: 'approver', order: 3, auth: 'email_otp' },
     });
 
     const patch = { name: 'Asha Rao', phone: undefined };

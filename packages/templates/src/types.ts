@@ -46,7 +46,7 @@ export interface TemplateRole {
    * Defaults to the role's position among signers and approvers (1, 2, ...).
    */
   order?: number;
-  /** Defaults to `email_link` when the person has an email address, otherwise `sms_otp`. */
+  /** Defaults to `email_otp` when the person has an email address, otherwise `sms_otp`. */
   auth?: AuthMethod;
   /** Fields this role fills in. Viewers have none. */
   fields?: TemplateField[];

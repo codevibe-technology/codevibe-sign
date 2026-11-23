@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { envelopeBody, harness, PNG } from '../testing/harness';
 
 const oneSigner = {
-  recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com' }],
+  recipients: [{ key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_link' }],
   fields: [
     { recipient: 'asha', type: 'signature', page: 0, x: 72, y: 600, width: 180, height: 48 },
   ],

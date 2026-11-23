@@ -46,7 +46,7 @@ describe('server logs', () => {
         send: true,
         recipients: [
           { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'email_otp' },
-          { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com' },
+          { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'email_link' },
         ],
       }),
     });
