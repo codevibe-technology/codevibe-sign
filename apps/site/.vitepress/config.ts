@@ -52,7 +52,7 @@ export default defineConfig({
   lang: 'en',
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
-  srcExclude: ['README.md'],
+  srcExclude: ['README.md', 'public/**'],
   rewrites: {
     'getting-started/index.md': 'getting-started.md',
     'http-api/index.md': 'http-api.md',
