@@ -96,6 +96,9 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 
 ## Payments and billing (web app, if used)
 
+- [ ] Plan, billing and eSign provider settings are changed only by the owner of the account
+      (`accountAction`); a workspace admin who is not that person is refused and sees no
+      invoices. Limits are counted over all workspaces of an account, never per workspace.
 - [ ] Set `RAZORPAY_WEBHOOK_SECRET` and register the webhook; without the secret the webhook
       route answers 404 and a payment is confirmed only when the buyer's browser returns.
 - [ ] Keep `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` and the Leegality values out of

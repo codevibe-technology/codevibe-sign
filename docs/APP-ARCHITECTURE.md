@@ -261,18 +261,19 @@ released.
 | `app_webhooks`                  | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.                 |
 | `app_webhook_deliveries`        | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days.    |
 | `app_usage`                     | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.         |
-| `app_plan_changes`              | Who moved a workspace from one plan to another, and when.                                                   |
+| `app_accounts`                  | One per person who has created a workspace: owner, plan, who set it, extra members.                         |
+| `app_plan_changes`              | Who moved an account from one plan to another, and when.                                                    |
 | `app_audit_log`                 | Who did what in a workspace outside an envelope: billing, credentials, eSign starts and ends. No secrets.   |
-| `app_billing_details`           | One row per workspace: legal name, GSTIN, address, state, billing email.                                    |
+| `app_billing_details`           | One row per account: legal name, GSTIN, address, state, billing email.                                      |
 | `app_billing_orders`            | One order: what is bought, amounts and tax split in paise, buyer and seller as they were, Razorpay ids.     |
 | `app_invoice_counters`          | The running number of each invoice series, one row per prefix.                                              |
 | `app_invoices`                  | One invoice per paid order: number, file key, whether the email went out.                                   |
 | `app_razorpay_events`           | Ids of Razorpay webhook events already handled, so a replay does nothing.                                   |
 | `app_esign_credits`             | A workspace's Aadhaar eSign credits: available and held.                                                    |
-| `app_esign_credit_ledger`       | Every grant, hold, use and return, unique per workspace, kind and reference.                                |
+| `app_esign_credit_ledger`       | Every grant, hold, use and return, unique per account, kind and reference.                                  |
 | `app_esign_settings`            | Which account a workspace signs with, and its own Leegality credentials, encrypted.                         |
 | `app_esign_usage`               | One row per eSign attempt: the account used, whether it was billed, how it ended.                           |
-| `app_subscriptions`             | One Cloud subscription per workspace: term, dates, extra members, status.                                   |
+| `app_subscriptions`             | One Cloud subscription per account: term, dates, extra members, status.                                     |
 | `app_install_bookings`          | A booking for installation help: contact, server, time, paid and notified times.                            |
 | `app_first_run`                 | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.                |
 | `sign_*`                        | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                       |
@@ -510,6 +511,7 @@ table between its `plans:start` and `plans:end` comments with the module.
 
 |                                   | Free                 | Cloud                                         |
 | --------------------------------- | -------------------- | --------------------------------------------- |
+| Workspaces on the account         | 1                    | no plan number                                |
 | Envelopes sent                    | 10 a month (UTC)     | no plan number                                |
 | Members, with open invitations    | 2                    | `CLOUD_INCLUDED_MEMBERS` (25) + `extra_seats` |
 | Active templates                  | 2                    | no plan number                                |
@@ -520,23 +522,66 @@ table between its `plans:start` and `plans:end` comments with the module.
 | Own signing domain, badge off     | no                   | yes                                           |
 | Own eSign provider account        | no                   | yes                                           |
 
-`FREE_PLAN_LIMITS` (JSON) overrides Free numbers for an install. `app_workspaces.extra_seats`
-holds the members a Cloud workspace pays for on top of the included ones.
+`FREE_PLAN_LIMITS` (JSON) overrides Free numbers for an install. `app_accounts.extra_seats`
+holds the members a Cloud account pays for on top of the included ones.
 
-Limits are enforced where the work happens, never in memory, and with the workspace (or the
-person) row locked wherever two requests could otherwise both pass:
+### Accounts
+
+A plan belongs to an **account**, not to a workspace. An account (`app_accounts`) is the
+paying side of the app: one per person, created with their first workspace, holding the plan,
+the subscription, the eSign credits, the billing details and a connected eSign provider
+account. Every workspace a person creates joins their account and stays on it
+(`app_workspaces.account_id`); `workspacePlan(workspaceId)` reads the plan through it.
+
+- **Every count is the account's.** Members are the people in any of the account's
+  workspaces, each counted once, plus open invitations to addresses that are not one of them
+  yet (an address invited to two workspaces counts once). Active templates, webhook
+  endpoints, envelopes a month, API requests and stored bytes are summed over the account's
+  workspaces. `app_usage` keeps its counters per workspace, for the breakdown on Plan and
+  usage; the check is on the sum.
+- **One lock.** Each check that counts takes `select ... for update` on the account's row
+  (`lockedPlan`, `reserveUsage`), then counts, then writes. Two requests at once, in one
+  workspace or in two workspaces of the same account, cannot both take the last place.
+- **Workspaces.** Free includes one workspace; Cloud has no number. `createWorkspace` counts
+  the account's workspaces under that lock. Being invited into someone else's workspace is
+  always possible: it takes a place on that workspace's account, never on the guest's own.
+- **Roles do not move a workspace.** Making someone an owner of a workspace leaves it on the
+  account of the person who created it. That person stays an owner of it: they cannot be
+  removed, cannot leave and cannot be given a lower role, so a workspace is never on an
+  account nobody in it can manage. Moving a workspace to another account is not available.
+- **Who manages what.** Only the account owner can change the plan, pay, see invoices and
+  billing details, buy credits, or choose and connect the eSign provider account
+  (`accountAction`, the invoice route and the three settings pages check
+  `app_accounts.owner_user_id`). An admin or another owner of a workspace sees the plan, the
+  account's usage and their own workspace's row of the breakdown, read only, with "Managed by"
+  and the owner's name. They are not shown the names or usage of the account's other
+  workspaces, which they may not be in.
+- **Existing installs.** Migration `0013_accounts` gives every workspace an account: its
+  creator's if they still own it, otherwise its earliest owner's, otherwise its earliest admin,
+  member or viewer. A person's account gets all such workspaces and the highest plan among
+  them. A workspace with nobody left gets an account without an owner, on its old plan; the
+  operator can still set its plan. `app_workspaces.plan` is no longer read; it is kept equal to
+  the account's plan so an older build finds a sensible value after a rollback.
+- **Free owners of several workspaces** keep all of them, read and write, with everything in
+  them. They cannot create another until they move to Cloud or are back to one. Their limits
+  are now shared: members, templates and usage are counted across those workspaces together,
+  and the rules below for an account over its limits apply.
+- **Self-hosted.** Accounts exist as rows and nothing is counted or sold.
+
+Limits are enforced where the work happens, never in memory, and with the account's row
+locked wherever two requests could otherwise both pass:
 
 | Limit                                  | Where                                                                                                                                                                         |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Envelopes sent per month, stored bytes | `createPlanGate` in front of the sign API: reserved in `app_usage` before the server works, given back if it refuses or replays an idempotent answer.                         |
 | API requests                           | The same gate, for `Authorization: Bearer` calls only: per India month and per UTC day, whichever the plan has.                                                               |
 | PDF size, envelope size                | The gate (create, replace a draft's PDF), and the upload checks of the send flow and the template editor.                                                                     |
-| Members (with open invitations)        | `createInvitation` and `acceptInvitation`, with the workspace row locked.                                                                                                     |
-| Active templates                       | Create (editor and `POST /v1/templates`), duplicate and restore, with the workspace row locked.                                                                               |
+| Members (with open invitations)        | `createInvitation` and `acceptInvitation`, with the account row locked; unique people across the account.                                                                     |
+| Active templates                       | Create (editor and `POST /v1/templates`), duplicate and restore, with the account row locked.                                                                                 |
 | Webhooks                               | `createWebhook` and `setWebhookEnabled` (locked), test events and redeliveries (`assertWebhooksLive`), and `webhookTargetsFor`, which the sign server asks before every send. |
 | Rows per bulk send                     | `startBulkSendAction`, before a row is stored; it also refuses more rows than sends left this month, and each row is then counted by the gate as it is sent.                  |
 | Custom domain, badge                   | `updateSigningSettings`; `getBrand` always shows the badge where the plan requires it.                                                                                        |
-| Workspaces per owner                   | `createWorkspace`, and `assertCanOwn` when someone is made an owner or accepts an owner's invitation, with the person's row locked.                                           |
+| Workspaces on the account              | `createWorkspace` (onboarding and "New workspace" both use it), with the account row locked. `newWorkspaceBlock` shows the upgrade prompt before the form.                    |
 | Own eSign provider account             | `assertOwnEsignAccount`, when the account is saved and each time it is about to be used.                                                                                      |
 
 The gate matches on the path the router will see: percent-escapes decoded (`routedPath`),
@@ -557,8 +602,8 @@ usage and what to do. The API answers `403` (`429` for API requests) with
 `details: { limit, used, max, plan, upgradeUrl, resetsAt? }`; a server action returns the same
 details as `limit` next to the message, for the upgrade prompt.
 
-**A workspace over its limits** (an existing Free workspace when the limits changed, or one
-that left Cloud) keeps everything it has. Its members stay members, its templates stay usable
+**An account over its limits** (an existing Free account when the limits changed or became
+shared, or one that left Cloud) keeps everything it has, in every workspace. Its members stay members, its templates stay usable
 and editable, its envelopes and files stay. It cannot add to what is over: no new invitation
 or member, no new, duplicated or restored template, until it is back under the limit. Webhooks
 are not part of Free, so its endpoints stay listed and can be edited, turned off or removed,
@@ -581,7 +626,7 @@ marks the order paid.
 **Terms, not mandates.** A Cloud term is one month or one year (twelve calendar months,
 charged as `CLOUD_ANNUAL_MONTHS`), paid up front. Nothing is charged automatically, so the
 whole flow works with test keys and needs no stored payment method. `app_subscriptions` holds
-one row per workspace: the term, its start and end, the extra members of this term and of the
+one row per account: the term, its start and end, the extra members of this term and of the
 next, and a status of `active`, `grace` or `ended`.
 
 | Step                 | Rule (`src/server/billing/subscriptions.ts`)                                                                                                                                                                                                                                                                                             |
@@ -590,14 +635,14 @@ next, and a status of `active`, `grace` or `ended`.
 | Next term            | Can be paid in the last 7 days or in the grace days. It starts where the paid term ends, whenever it is paid.                                                                                                                                                                                                                            |
 | Extra members        | Mid-term: the term price of a member times the days left over the days in the term, half a paisa rounded up (`proratedPrice`). Effective at once and included in later terms. The order names the term it was priced for and adds nothing to any other.                                                                                  |
 | Fewer members        | `renewal_seats` only; the current term keeps what was paid for. No refunds. Never fewer than the members and open invitations beyond the included ones; people have to be removed first.                                                                                                                                                 |
-| Cancel               | `cancel_at_period_end`; Cloud stays until the term ends, then the workspace is Free. Can be undone until then.                                                                                                                                                                                                                           |
-| Not renewed          | `grace` for `CLOUD_GRACE_DAYS` (7), then `ended`: `plan = 'free'`, `extra_seats = 0`. Nothing is deleted; the rules for a workspace over the Free limits apply.                                                                                                                                                                          |
-| Set by the operator  | `app_workspaces.plan_source` is `operator` after `plan:set` and `billing` after a payment. A paid plan the operator set is never sold, renewed, lowered or ended here, whatever term the workspace still has.                                                                                                                            |
+| Cancel               | `cancel_at_period_end`; Cloud stays until the term ends, then the account is Free. Can be undone until then.                                                                                                                                                                                                                             |
+| Not renewed          | `grace` for `CLOUD_GRACE_DAYS` (7), then `ended`: `plan = 'free'`, `extra_seats = 0`. Nothing is deleted; the rules for an account over the Free limits apply to all its workspaces.                                                                                                                                                     |
+| Set by the operator  | `app_accounts.plan_source` is `operator` after `plan:set` and `billing` after a payment. A paid plan the operator set is never sold, renewed, lowered or ended here, whatever term the account still has.                                                                                                                                |
 | Order too old        | A payment made more than `ORDER_PAYMENT_WINDOW_MINUTES` (30) after its order was opened delivers nothing: `paid_unapplied`, no invoice, a notice to the operator to refund it. The same goes for a second first-term order, a renewal of a term that is no longer the current one, and an order opened with test keys on a live install. |
 | Refund, lost dispute | The order becomes `refunded`; unused credits, the extra members or the term are taken back (`registerReversal`), a renewal by restoring the term before it. Partial refunds and new disputes only notify the operator.                                                                                                                   |
 
 If a term starts with fewer extra members than people (someone accepted an invitation
-between the check and the payment), the workspace is over its member limit and the usual rule
+between the check and the payment), the account is over its member limit and the usual rule
 applies: everyone stays, and nobody can be added until it is back under.
 
 Dates are calendar months in India time (`addMonths` in `src/lib/billing/terms.ts`): a term
@@ -644,8 +689,8 @@ the server README); the app decides whose provider account is used and what it c
 - Credits apply exactly when `PLAN_MODE=hosted`. A self-hosted install with Leegality keys in
   its environment signs without credits.
 
-**Settings, Aadhaar eSign** (`esign.manage`: admins and owners) switches the mode, saves or
-removes the workspace's own credentials and tests them with one read-only call. Credentials
+**Settings, Aadhaar eSign** (the account owner; admins see it read only) switches the mode,
+saves or removes the account's own credentials and tests them with one read-only call. Credentials
 are sealed with `sealSecret` (AES-256-GCM under `SECRETS_KEY`, bound to the workspace and the
 purpose) and only `{ configured, keyHint, environment }` ever reaches the browser. Mode and
 credentials cannot change while an eSign is open, because its callback is verified with the
@@ -688,7 +733,8 @@ runs unless Razorpay keys and the seller's details are set; pages then show "com
 - **Audit log** (`audit.ts`). `app_audit_log` records billing detail changes, orders, captured
   payments, invoices, credit grants, eSign settings and credential changes, and every eSign
   start and end, with ids and amounts only.
-- **Access.** Billing pages and actions need `billing.manage` (admins and owners) in the named
+- **Access.** Billing pages and actions are for the owner of the account the workspace is on
+  (`accountAction`); `billing.manage` (admins and owners) only decides who sees the tab, in the named
   workspace; invoices of another workspace answer 404. Order creation, confirmation and the
   webhook are rate limited per process.
 

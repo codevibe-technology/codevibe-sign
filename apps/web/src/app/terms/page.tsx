@@ -36,10 +36,12 @@ export default async function TermsPage() {
       </LegalSection>
       <LegalSection title="Plans and limits">
         <p>
-          The Free plan is free and has the limits shown in Settings under Plan and usage. When a
-          limit is reached, new sends are refused until the count starts again or the workspace
-          moves to another plan; nothing already sent is affected. We may change the Free
-          plan&rsquo;s limits, and will tell workspace owners by email before a lower limit applies.
+          A plan belongs to your account and covers every workspace you create. The Free plan is
+          free, includes one workspace, and has the limits shown in Settings under Plan and usage;
+          they are counted across your workspaces together. When a limit is reached, new sends are
+          refused until the count starts again or the account moves to another plan; nothing already
+          sent is affected. We may change the Free plan&rsquo;s limits, and will tell account owners
+          by email before a lower limit applies.
         </p>
       </LegalSection>
       <LegalSection title="Your documents">
@@ -71,9 +73,9 @@ export default async function TermsPage() {
         </p>
         <ul>
           <li>
-            The Cloud plan is paid for a term in advance. It is not renewed or charged
-            automatically. You can cancel at any time; the plan stays on until the end of the term
-            paid for, and that term is not refunded.
+            The Cloud plan is paid for a term in advance, once for an account and all its
+            workspaces. It is not renewed or charged automatically. You can cancel at any time; the
+            plan stays on until the end of the term paid for, and that term is not refunded.
           </li>
           <li>
             Aadhaar eSign credits are used one for each completed eSign. An eSign that is declined,

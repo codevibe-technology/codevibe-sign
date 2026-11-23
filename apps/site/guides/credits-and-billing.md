@@ -9,7 +9,10 @@ This page is about the hosted app at [sign.codevibe.in](https://sign.codevibe.in
 self-hosted install has no credits and no billing pages; see
 [Self-host with Docker](/getting-started/docker).
 
-Admins and owners find everything here under **Settings, Billing**.
+Billing belongs to your account: one set of billing details, one wallet of credits and one
+list of invoices for all the workspaces you created. The account owner finds everything here
+under **Settings, Billing**, in any of those workspaces. Admins of a workspace see who manages
+it instead.
 
 ## Billing details come first
 
@@ -51,7 +54,7 @@ owed. The next credits you buy pay for it first, and Aadhaar eSign starts again 
 
 Credits do not expire. This is the current policy.
 
-A Cloud workspace that connects its own Leegality account uses no credits; see
+A Cloud account that connects its own Leegality account uses no credits; see
 [Aadhaar eSign with Leegality](/guides/aadhaar-leegality#your-own-leegality-account).
 
 ## GST tax invoices

@@ -253,16 +253,24 @@ Then in a browser:
 4. On **Verify**, upload the sealed copy: it should say the seal is valid.
 5. **Settings → Plan and usage** shows the Free plan with its meters (hosted mode).
 
-## 8. Changing a workspace's plan
+## 8. Changing an account's plan
 
 ```sh
-docker compose exec -e PLAN_CHANGED_BY="ops:$USER" web node ops/plan-set.mjs <workspace-slug> cloud
+docker compose exec -e PLAN_CHANGED_BY="ops:$USER" web node ops/plan-set.mjs <workspace-slug or owner-email> cloud
 ```
 
 The plan is `free`, `cloud` or `unlimited`. Each change is recorded in `app_plan_changes` with
 who made it. In a source checkout the same command is
-`pnpm --filter web plan:set <workspace-slug> <plan>`.
+`pnpm --filter web plan:set <workspace-slug or owner-email> <plan>`.
 Use the workspace's current address; an old one is not accepted here.
+
+A plan belongs to an account: the person who created the workspace, and every workspace they
+created. The command finds the account from one of its workspaces or from its owner's email
+address, moves all of its workspaces together and prints which ones. Upgrading to this
+version gives every existing workspace an account (its creator's, or its earliest owner's);
+someone who owns several workspaces gets one account holding all of them, on the highest plan
+among them. On the hosted Free plan an account includes one workspace: people who already
+have more keep them all, and cannot create another until they move to Cloud.
 
 ## 9. Backups
 
@@ -467,7 +475,7 @@ in `app_audit_log`.
   `ORDER_PAYMENT_WINDOW_MINUTES` after its order was opened, counted to the moment the payer
   paid, not to when the news reached the server. A later payment, a payment for extra members
   priced for a term that has since ended or been renewed, a second payment for the same first
-  term, and a payment for a workspace whose plan you have since set by hand are all kept as
+  term, and a payment for an account whose plan you have since set by hand are all kept as
   `paid_unapplied`: nothing is added, no invoice is issued and the buyer is told a refund is
   coming. **Refund it from the Razorpay dashboard** (Payments, the payment id in the email,
   Refund), or apply it by hand.
@@ -506,7 +514,7 @@ docker compose cp ./signature.png web:/data/branding/signature.png
 
 ### A workspace's own Leegality account
 
-On the Cloud plan, and on any self-hosted install, an admin can enter the workspace's own
+On the Cloud plan, and on any self-hosted install, the account owner can enter the account's own
 Leegality account under **Settings, Aadhaar eSign** instead of using yours. They set the same
 two URLs in their own Leegality workflow (the page shows them), and Leegality bills them
 directly. Nothing in `.env` is needed for this except `SECRETS_KEY`, which encrypts what they

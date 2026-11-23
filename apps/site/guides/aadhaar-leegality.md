@@ -76,7 +76,8 @@ In a PDF reader the Aadhaar signature shows as valid for the part of the file it
 
 ## Two ways to pay for it
 
-**Settings, Aadhaar eSign** is where an admin or owner chooses.
+**Settings, Aadhaar eSign** is where the account owner chooses, once for all the workspaces on
+their account. Admins of a workspace can see the choice but not change it.
 
 ### The install's account, with prepaid credits
 

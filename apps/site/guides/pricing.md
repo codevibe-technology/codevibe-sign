@@ -37,12 +37,32 @@ sent is affected: people can still sign and every sealed copy stays downloadable
   with an API key counts, including one that ends in an error. Past the count the API answers
   `429` with the code `PLAN_LIMIT`, a `Retry-After` header and the time the count starts again.
 
+## Accounts and workspaces
+
+A plan belongs to your account, not to one workspace. Your account holds every workspace you
+create, and one subscription, one set of billing details and one wallet of eSign credits
+cover all of them.
+
+- **Free** includes one workspace. **Cloud** has as many as you need under one subscription.
+- Limits are counted across your workspaces together: members, active templates, envelopes a
+  month, API requests and stored documents.
+- A person who is in several of your workspaces counts as one member.
+- Being invited into someone else's workspace is always possible. It takes a place on their
+  account, not on yours.
+- Only you, the account owner, can change the plan, pay, see invoices and set up Aadhaar
+  eSign. Admins of your workspaces can see the plan and usage.
+- A workspace stays on the account of the person who created it, and they stay an owner of it.
+
+If you already had more than one Free workspace when this changed, you keep all of them and
+everything in them. You cannot create another until you move to Cloud, and the Free limits now
+apply to your workspaces together.
+
 ## Cloud
 
 | What                      | Price                               |
 | ------------------------- | ----------------------------------- |
-| One workspace, one month  | Rs 999                              |
-| One workspace, one year   | Rs 9,990 (ten months, two are free) |
+| Your account, one month   | Rs 999                              |
+| Your account, one year    | Rs 9,990 (ten months, two are free) |
 | Each member beyond the 25 | Rs 99 a month                       |
 
 Prices do not include GST at 18%. Every payment gets a GST tax invoice from Codevibe Technology
@@ -50,7 +70,7 @@ Private Limited by email, and all invoices are listed under Settings, Billing.
 
 ### How paying works
 
-- An admin or owner upgrades from **Settings, Plan and usage**. Add your billing details first;
+- The account owner upgrades from **Settings, Plan and usage**, in any of their workspaces. Add your billing details first;
   they are printed on the invoice. Cloud starts as soon as the payment is confirmed.
 - You pay for each term up front by card, UPI or net banking. Nothing is charged automatically
   and there is no payment mandate.
@@ -68,19 +88,20 @@ the same page; the current term keeps what was paid for.
 
 ### If a term is not renewed
 
-The workspace stays on Cloud for 7 more days. If the term is paid in that time, it continues
-from the day the last one ended. After that the workspace moves to the Free plan:
+Your workspaces stay on Cloud for 7 more days. If the term is paid in that time, it continues
+from the day the last one ended. After that the account moves to the Free plan:
 
 - Nothing is deleted. Documents, templates, members and envelopes in progress all stay.
-- The Free limits apply to anything new. A workspace that is over a Free limit keeps what it
-  has but cannot add more until it is under the limit.
+- The Free limits apply to anything new. An account that is over a Free limit keeps what it
+  has, in every workspace, but cannot add more until it is under the limit. That includes
+  workspaces: you keep them all and cannot create another.
 - Webhooks are paused, and a connected eSign provider account is not used.
 - Moving back to Cloud restores everything as it was.
 
 ### Cancelling
 
 Cancel at any time from the same page. Cloud stays on until the end of the term you paid for,
-then the workspace moves to the Free plan as above. The term already paid for is not refunded.
+then the account moves to the Free plan as above. The term already paid for is not refunded.
 You can undo the cancellation any time before the term ends.
 
 ## Aadhaar eSign
@@ -93,8 +114,8 @@ eSign with prepaid credits, bought in packs from Settings, Billing.
 - A credit is held when a signer starts and used only when the eSign completes. One that is
   declined, fails or runs out of time costs nothing.
 - Credits do not expire.
-- A Cloud workspace can connect its own Leegality account instead; Leegality then bills it
-  directly and no credits are used.
+- On Cloud you can connect your own Leegality account instead, once for all your workspaces;
+  Leegality then bills you directly and no credits are used.
 
 See [Aadhaar eSign with Leegality](/guides/aadhaar-leegality) and
 [Credits and billing](/guides/credits-and-billing).
