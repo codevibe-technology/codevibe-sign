@@ -337,8 +337,9 @@ export function StepReview({
           <p>
             When everyone has signed, the PDF is sealed against changes and a certificate with the
             full audit trail is added.{' '}
-            {actors.length > 1 ? 'Everyone on the envelope' : 'The recipient'} gets a link to the
-            signed copy.
+            {actors.length > 1 ? 'Everyone on the envelope gets' : 'The recipient gets'} an email
+            with the signed PDF and its audit trail attached, or download links when the files are
+            too large to attach.
           </p>
         </div>
         <p className="flex items-center gap-2 px-1 text-[12.5px] text-muted">
