@@ -601,7 +601,7 @@ export function aadhaarIssues(envelope: Envelope): ValidationIssue[] {
     });
   }
   const signer = aadhaar[0]!;
-  issues.push(...aadhaarBoxIssues(envelope, signer));
+  if (signer.role === 'signer') issues.push(...aadhaarFieldIssues(envelope, signer));
   const others = envelope.recipients.filter((r) => isActor(r) && r.id !== signer.id);
   if (others.length > 0 && envelope.routing !== 'sequential') {
     issues.push({
@@ -617,43 +617,26 @@ export function aadhaarIssues(envelope: Envelope): ValidationIssue[] {
   return issues;
 }
 
+/** Field types that only stood for "the signature goes here" for an Aadhaar eSign signer. */
+const AADHAAR_SIGNATURE_MARKS: readonly Field['type'][] = ['aadhaar', 'signature', 'initials'];
+
 /**
- * An Aadhaar eSign signer signs at the provider and draws nothing, so they have one required
- * `aadhaar` box, where the signature goes, and no signature or initials fields. Nobody else
- * may have an `aadhaar` box.
+ * An Aadhaar eSign signer signs the whole file at the eSign provider, which places the
+ * signature where its own workflow says. So they have no fields here: the file the provider
+ * signs is exactly what the sender approved, with the values of the signers before them.
  */
-function aadhaarBoxIssues(envelope: Envelope, signer: Recipient): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  const own = envelope.fields.filter((f) => f.recipientId === signer.id);
-  const boxes = own.filter((f) => f.type === 'aadhaar');
-  if (signer.role === 'signer' && boxes.length === 0) {
-    issues.push({
-      path: `recipients.${signer.id}.fields`,
-      message: `Place the Aadhaar eSign box for ${signer.name}; their signature goes there`,
-    });
-  }
-  for (const box of boxes.slice(1)) {
-    issues.push({
-      path: `fields.${box.id}`,
-      message: `${signer.name} signs once with Aadhaar eSign; keep one Aadhaar eSign box`,
-    });
-  }
-  for (const box of boxes.filter((f) => !f.required)) {
-    issues.push({
-      path: `fields.${box.id}.required`,
-      message: 'The Aadhaar eSign box must be required',
-    });
-  }
-  for (const field of own.filter((f) => f.type === 'signature' || f.type === 'initials')) {
-    issues.push({
+function aadhaarFieldIssues(envelope: Envelope, signer: Recipient): ValidationIssue[] {
+  return envelope.fields
+    .filter((f) => f.recipientId === signer.id)
+    .map((field) => ({
       path: `fields.${field.id}`,
-      message: `${signer.name} signs with Aadhaar eSign and draws nothing; remove this ${field.type} field`,
-    });
-  }
-  return issues;
+      message: AADHAAR_SIGNATURE_MARKS.includes(field.type)
+        ? `${signer.name} signs with Aadhaar eSign; the provider places the signature, so remove this ${field.type === 'aadhaar' ? 'Aadhaar eSign box' : `${field.type} field`}`
+        : `${signer.name} signs with Aadhaar eSign and fills in nothing here; remove this ${field.type.replace('_', ' ')} field or give it to a signer before them`,
+    }));
 }
 
-/** An `aadhaar` box given to a recipient who does not sign with Aadhaar eSign. */
+/** An `aadhaar` field given to a recipient who does not sign with Aadhaar eSign. */
 function strayAadhaarBoxes(envelope: Envelope): ValidationIssue[] {
   return envelope.fields
     .filter((f) => f.type === 'aadhaar')
@@ -665,25 +648,25 @@ function strayAadhaarBoxes(envelope: Envelope): ValidationIssue[] {
 }
 
 /**
- * Before the `aadhaar` box existed, an Aadhaar eSign signer was given a signature field.
- * When that is all they have (one signature field, no initials, no box), the signature
- * field becomes their required box, so envelopes built that way still send.
+ * Removes the fields that marked where an Aadhaar eSign signer signs: an `aadhaar` box, or
+ * the signature and initials fields envelopes and templates gave them before. The provider
+ * places the signature itself, so these carry nothing. Other fields are left for
+ * `validateForSend` to refuse, since dropping them would lose what the sender asked for.
  */
-export function adoptAadhaarBox(envelope: Envelope): Envelope {
-  const signer = envelope.recipients.find((r) => r.auth === 'aadhaar' && r.role === 'signer');
-  if (!signer) return envelope;
-  const own = envelope.fields.filter((f) => f.recipientId === signer.id);
-  const signatures = own.filter((f) => f.type === 'signature');
-  const legacy =
-    signatures.length === 1 && !own.some((f) => f.type === 'initials' || f.type === 'aadhaar');
-  if (!legacy) return envelope;
-  const id = signatures[0]!.id;
+export function dropAadhaarSignatureFields(envelope: Envelope): Envelope {
+  const signers = new Set(
+    envelope.recipients.filter((r) => r.auth === 'aadhaar' && r.role === 'signer').map((r) => r.id),
+  );
+  const dropped = new Set(
+    envelope.fields
+      .filter((f) => signers.has(f.recipientId) && AADHAAR_SIGNATURE_MARKS.includes(f.type))
+      .map((f) => f.id),
+  );
+  if (dropped.size === 0) return envelope;
   return {
     ...envelope,
-    fields: envelope.fields.map((f) =>
-      f.id === id ? { ...f, type: 'aadhaar', required: true } : f,
-    ),
-    values: envelope.values.filter((v) => v.fieldId !== id),
+    fields: envelope.fields.filter((f) => !dropped.has(f.id)),
+    values: envelope.values.filter((v) => !dropped.has(v.fieldId)),
   };
 }
 

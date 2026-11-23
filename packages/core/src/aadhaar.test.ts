@@ -3,11 +3,10 @@ import {
   addDocument,
   addField,
   aadhaarIssues,
-  adoptAadhaarBox,
-  removeField,
+  dropAadhaarSignatureFields,
   validateForSend,
 } from './builder';
-import type { Envelope } from './types';
+import type { Field } from './types';
 import { deps, ready, SHA, T0, valuesFor } from './test/fixtures';
 import { recordSeal, send, submit } from './workflow';
 
@@ -123,81 +122,55 @@ describe('recordSeal with extra event data', () => {
   });
 });
 
-describe('the Aadhaar eSign box', () => {
-  const boxOf = (envelope: Envelope, recipientId: string) =>
-    envelope.fields.find((f) => f.recipientId === recipientId && f.type === 'aadhaar')!;
+describe('an Aadhaar eSign signer has no fields', () => {
   const rect = { x: 300, y: 600, width: 180, height: 60 };
-
-  it('stands in for the signature field of an Aadhaar signer', () => {
-    const { envelope, ids } = ready({ recipients: [asha, ravi] });
-    expect(boxOf(envelope, ids[1]!).required).toBe(true);
-    expect(envelope.fields.some((f) => f.recipientId === ids[1] && f.type === 'signature')).toBe(
-      false,
-    );
-    expect(validateForSend(envelope, now)).toEqual([]);
-  });
-
-  it('blocks sending until it is placed', () => {
-    const { envelope, ids } = ready({ recipients: [asha, ravi] });
-    const without = removeField(envelope, boxOf(envelope, ids[1]!).id);
-    expect(validateForSend(without, now)).toContainEqual({
-      path: `recipients.${ids[1]}.fields`,
-      message: 'Place the Aadhaar eSign box for Ravi; their signature goes there',
-    });
-    expect(() => send(without, deps())).toThrowError(/Place the Aadhaar eSign box/);
-  });
-
-  it('refuses a drawn signature or initials next to it', () => {
-    const start = ready({ recipients: [ravi] });
+  const withField = (type: Field['type'], recipients = [asha, ravi]) => {
+    const start = ready({ recipients });
+    const signer = start.ids.at(-1)!;
     const added = addField(
       start.envelope,
-      {
-        documentId: start.documentId,
-        recipientId: start.ids[0]!,
-        type: 'initials',
-        page: 0,
-        rect,
-      },
-      { ...deps(), ids: start.gen },
-    );
-    const initials = added.envelope.fields.at(-1)!;
-    expect(validateForSend(added.envelope, now).map((i) => i.path)).toEqual([
-      `fields.${initials.id}`,
-    ]);
-  });
-
-  it('allows one box only, and it must be required', () => {
-    const start = ready({ recipients: [ravi] });
-    const second = addField(
-      start.envelope,
-      {
-        documentId: start.documentId,
-        recipientId: start.ids[0]!,
-        type: 'aadhaar',
-        page: 0,
-        rect,
-        required: false,
-      },
+      { documentId: start.documentId, recipientId: signer, type, page: 0, rect },
       { ...deps(), ids: start.gen },
     ).envelope;
-    const extra = second.fields.at(-1)!;
-    expect(validateForSend(second, now).map((i) => i.path)).toEqual([
-      `fields.${extra.id}`,
-      `fields.${extra.id}.required`,
-    ]);
+    return { envelope: added, field: added.fields.at(-1)!, ids: start.ids };
+  };
+
+  it('sends with no field for the Aadhaar signer', () => {
+    const { envelope, ids } = ready({ recipients: [asha, ravi] });
+    expect(envelope.fields.filter((f) => f.recipientId === ids[1])).toEqual([]);
+    expect(validateForSend(envelope, now)).toEqual([]);
+    expect(send(envelope, deps()).envelope.status).toBe('sent');
   });
 
-  it('belongs only to a signer who uses Aadhaar eSign', () => {
+  it.each(['aadhaar', 'signature', 'initials'] as const)(
+    'refuses a %s field, which the provider replaces',
+    (type) => {
+      const { envelope, field } = withField(type);
+      expect(validateForSend(envelope, now)).toEqual([
+        {
+          path: `fields.${field.id}`,
+          message: expect.stringMatching(/^Ravi signs with Aadhaar eSign; the provider places/),
+        },
+      ]);
+    },
+  );
+
+  it.each(['date_signed', 'name', 'text', 'checkbox'] as const)(
+    'refuses a %s field and says to give it to an earlier signer',
+    (type) => {
+      const { envelope, field } = withField(type);
+      expect(validateForSend(envelope, now)).toContainEqual({
+        path: `fields.${field.id}`,
+        message: expect.stringMatching(/fills in nothing here; .*give it to a signer before them/),
+      });
+    },
+  );
+
+  it('still refuses an Aadhaar eSign box for anyone else', () => {
     const start = ready({ recipients: [asha] });
     const added = addField(
       start.envelope,
-      {
-        documentId: start.documentId,
-        recipientId: start.ids[0]!,
-        type: 'aadhaar',
-        page: 0,
-        rect,
-      },
+      { documentId: start.documentId, recipientId: start.ids[0]!, type: 'aadhaar', page: 0, rect },
       { ...deps(), ids: start.gen },
     ).envelope;
     expect(validateForSend(added, now)).toContainEqual({
@@ -206,61 +179,65 @@ describe('the Aadhaar eSign box', () => {
     });
   });
 
-  it('takes no value and is not asked for when the signer submits', () => {
-    const { envelope, ids } = ready({ recipients: [ravi] });
+  it('still completes an envelope sent earlier with an Aadhaar eSign box', () => {
+    const { envelope, ids, documentId } = ready({ recipients: [ravi] });
     const sent = send(envelope, deps()).envelope;
-    const box = boxOf(sent, ids[0]!);
+    const box: Field = {
+      id: 'box',
+      documentId,
+      recipientId: ids[0]!,
+      type: 'aadhaar',
+      page: 0,
+      rect,
+      required: true,
+    };
+    const earlier = { ...sent, fields: [...sent.fields, box] };
     expect(() =>
-      submit(sent, { recipientId: ids[0]!, values: [{ fieldId: box.id, value: 'x' }] }, deps()),
+      submit(earlier, { recipientId: ids[0]!, values: [{ fieldId: 'box', value: 'x' }] }, deps()),
     ).toThrowError(/takes no value/);
-    const done = submit(sent, { recipientId: ids[0]!, values: [] }, deps());
+    const done = submit(earlier, { recipientId: ids[0]!, values: [] }, deps());
     expect(done.envelope.status).toBe('completed');
-    expect(done.envelope.values.some((v) => v.fieldId === box.id)).toBe(false);
   });
 });
 
-describe('adoptAadhaarBox', () => {
-  const legacy = () => {
+describe('dropAadhaarSignatureFields', () => {
+  const rect = { x: 50, y: 50, width: 100, height: 40 };
+  const build = (types: Field['type'][]) => {
     const start = ready({ recipients: [asha, ravi] });
-    const box = start.envelope.fields.find((f) => f.type === 'aadhaar')!;
-    const envelope: Envelope = {
-      ...start.envelope,
-      fields: start.envelope.fields.map((f) =>
-        f.id === box.id ? { ...f, type: 'signature' as const } : f,
-      ),
-    };
-    return { envelope, box, ids: start.ids };
+    let envelope = start.envelope;
+    for (const type of types) {
+      envelope = addField(
+        envelope,
+        { documentId: start.documentId, recipientId: start.ids[1]!, type, page: 0, rect },
+        { ...deps(), ids: start.gen },
+      ).envelope;
+    }
+    return { envelope, ids: start.ids };
   };
 
-  it('turns the lone signature field of an Aadhaar signer into the box', () => {
-    const { envelope, box } = legacy();
-    expect(validateForSend(envelope, now)).not.toEqual([]);
-    const adopted = adoptAadhaarBox(envelope);
-    expect(adopted.fields.find((f) => f.id === box.id)).toMatchObject({
-      type: 'aadhaar',
-      required: true,
-    });
-    expect(validateForSend(adopted, now)).toEqual([]);
+  it('drops the box and the signature and initials fields of the Aadhaar signer', () => {
+    const { envelope, ids } = build(['aadhaar', 'signature', 'initials']);
+    const dropped = dropAadhaarSignatureFields(envelope);
+    expect(dropped.fields.filter((f) => f.recipientId === ids[1])).toEqual([]);
+    expect(validateForSend(dropped, now)).toEqual([]);
   });
 
-  it('leaves the other signers and envelopes without an Aadhaar signer alone', () => {
-    const { envelope, ids } = legacy();
-    const adopted = adoptAadhaarBox(envelope);
-    expect(adopted.fields.filter((f) => f.recipientId === ids[0])).toEqual(
+  it('keeps other fields of the Aadhaar signer, so sending still says what to fix', () => {
+    const { envelope, ids } = build(['signature', 'text']);
+    const dropped = dropAadhaarSignatureFields(envelope);
+    expect(dropped.fields.filter((f) => f.recipientId === ids[1]).map((f) => f.type)).toEqual([
+      'text',
+    ]);
+    expect(validateForSend(dropped, now)).toHaveLength(1);
+  });
+
+  it('leaves the other signers and envelopes without an Aadhaar signer as they are', () => {
+    const { envelope, ids } = build(['signature']);
+    const dropped = dropAadhaarSignatureFields(envelope);
+    expect(dropped.fields.filter((f) => f.recipientId === ids[0])).toEqual(
       envelope.fields.filter((f) => f.recipientId === ids[0]),
     );
     const plain = ready().envelope;
-    expect(adoptAadhaarBox(plain)).toBe(plain);
-  });
-
-  it('changes nothing when the signer has a box already or several signature fields', () => {
-    const current = ready({ recipients: [ravi] }).envelope;
-    expect(adoptAadhaarBox(current)).toBe(current);
-    const { envelope, box } = legacy();
-    const twice: Envelope = {
-      ...envelope,
-      fields: [...envelope.fields, { ...envelope.fields.find((f) => f.id === box.id)!, id: 'f2' }],
-    };
-    expect(adoptAadhaarBox(twice)).toBe(twice);
+    expect(dropAadhaarSignatureFields(plain)).toBe(plain);
   });
 });

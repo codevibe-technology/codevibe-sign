@@ -60,8 +60,8 @@ export interface ReadyOptions {
 }
 
 /**
- * A draft ready to send. Signers get a required signature field (an Aadhaar eSign box when
- * they sign with Aadhaar) and an optional text field; approvers get no fields. Returns recipient ids in input order.
+ * A draft ready to send. Signers get a required signature field and an optional text field;
+ * an Aadhaar eSign signer and approvers get no fields. Returns recipient ids in input order.
  */
 export function ready(options: ReadyOptions = {}): {
   envelope: Envelope;
@@ -80,14 +80,14 @@ export function ready(options: ReadyOptions = {}): {
     const added = addRecipient(envelope, input, start);
     envelope = added.envelope;
     ids.push(added.recipient.id);
-    if ((input.role ?? 'signer') === 'signer') {
+    if ((input.role ?? 'signer') === 'signer' && input.auth !== 'aadhaar') {
       const rect = { x: 50, y: 600, width: 200, height: 50 };
       envelope = addField(
         envelope,
         {
           documentId: start.documentId,
           recipientId: added.recipient.id,
-          type: input.auth === 'aadhaar' ? 'aadhaar' : 'signature',
+          type: 'signature',
           page: 1,
           rect,
         },

@@ -32,8 +32,9 @@ export type RecipientStatus =
 export type AuthMethod = 'email_link' | 'email_otp' | 'sms_otp' | 'aadhaar';
 
 /**
- * `aadhaar` marks where an Aadhaar eSign signer signs. It takes no value: the signer signs
- * the whole file at the eSign provider, and only a recipient with `auth: 'aadhaar'` has one.
+ * `aadhaar` is read on envelopes sent while an Aadhaar eSign signer had a box marking where
+ * they sign. It takes no value and is no longer placed: the eSign provider puts the signature
+ * where its workflow says, and an Aadhaar eSign signer has no fields.
  */
 export type FieldType =
   | 'signature'
@@ -99,7 +100,10 @@ export interface RecipientEsign {
   /** The provider's name, for example `leegality`. */
   provider: string;
   status: 'pending' | 'signed' | 'declined' | 'expired' | 'failed';
-  /** The signer's name as the provider reported it. */
+  /**
+   * The signer's name from the subject of their eSign certificate in the signed file, or as
+   * the provider reported it when the file carried none that could be read.
+   */
   signerName?: string;
   signedAt?: IsoDateTime;
   /** The server's reference for the eSign request that was signed. */
