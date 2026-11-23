@@ -25,9 +25,10 @@ not count.
 
 ## Send from a template
 
-Press **Use** on the template, fill in each role's name and email (and mobile number where
-the role uses SMS codes), then **Send now**. The envelope works like any other: see
+Press **Use** on the template, fill in each role's name and email, then **Send now**. The envelope works like any other: see
 [Send a document](/app/send#follow-it).
+
+<HelpClip name="template-send" caption="Sending the offer letter template to a new joiner." />
 
 To send the same template to many people at once, use [Bulk send](/app/bulk-send).
 

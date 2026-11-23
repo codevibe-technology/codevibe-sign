@@ -6,17 +6,29 @@ description: Put your logo, colour and font on Codevibe Sign's signing page and 
 # Brand and white-label
 
 Owners and admins set the brand under **Settings, Brand**. It applies to the signing page,
-the emails recipients get and the certificate page. A preview shows each change before you
-save.
+the emails recipients get and the certificate page. The **Preview** next to the form shows
+each change before you save.
 
 ## Look
 
-- **Logo**: PNG, JPEG or WebP, up to 512 KB.
+- **Logo**: **Upload logo**, then **Replace logo** or **Remove**. PNG, JPEG or WebP, up to
+  512 KB. Its shape decides how the header of the signing page shows it:
+
+  - a **wide logo**, at least twice as wide as it is tall, already carries your name, so it
+    stands on its own;
+  - a **square logo** is a mark, so the workspace name is shown next to it;
+  - with **no logo**, the first letter of the workspace name in the brand colour stands in for
+    the mark, with the name next to it.
+
+  The preview says which of these applies to the logo you uploaded.
+
 - **Brand colour**: buttons and accents. The text colour on top of it is chosen for you so it
   stays readable.
 - **Font**: Inter, Space Grotesk, the system font or a serif.
 
 Press **Save brand**.
+
+<HelpClip name="brand" caption="Uploading a square mark, then a wide logo, and changing the brand colour." />
 
 ## Emails
 

@@ -86,13 +86,18 @@ Private Limited by email, and all invoices are listed under Settings, Billing.
 
 ### How paying works
 
-- The account owner upgrades from **Settings, Plan and usage**, in any of their workspaces. Add your billing details first;
-  they are printed on the invoice. Cloud starts as soon as the payment is confirmed.
+- The account owner, or a billing admin, upgrades from **Settings, Plan and usage**, in any of
+  the account's workspaces. Add your billing details under **Settings, Billing** first; they
+  are printed on the invoice. Under **Pay for**, choose **One month** or **One year**, add
+  extra members if you need them, then press **Upgrade to Cloud** and pay. Cloud starts as soon
+  as the payment is confirmed: the page then shows how long the account is paid up to.
 - You pay for each term up front by card, UPI or net banking. Nothing is charged automatically
   and there is no payment mandate.
 - The next term can be paid in the last 7 days of the current one. It always starts where the
   paid term ends, so paying early does not lose you any days.
 - We email a reminder 7, 3 and 1 days before a term ends.
+
+<HelpClip name="upgrade-cloud" caption="Upgrading an account from Free to Cloud for one month." />
 
 ### Extra members
 

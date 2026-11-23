@@ -29,17 +29,26 @@ its record off from the envelope page, and a workspace can turn records off alto
 **Settings > Workspace**; the link then answers "not available" and new certificates carry no
 QR code.
 
+<HelpClip name="public-record" caption="The QR code on the certificate page opens the public record of the signing." />
+
 A PDF reader that checks digital signatures also reports whether the file changed after
 sealing; see [How the seal works in PDF readers](./seal-in-pdf-readers).
 
 ## On the verify page
 
-Anyone can drop a sealed PDF on the public page at `/verify` of the install that sealed it,
-[sign.codevibe.in/verify](https://sign.codevibe.in/verify) for the cloud. No account is needed.
-It shows whether the seal is intact and was made by that install, the signers and their times,
-and whether the audit chain still matches. The file is checked in memory on the server and not
-stored. The page also shows the seal certificate's fingerprint and serves the certificate at
-`/verify/certificate`.
+Anyone can check a sealed PDF on the public page at `/verify` of the install that sealed it,
+[sign.codevibe.in/verify](https://sign.codevibe.in/verify) for the cloud. No account is needed:
+drop the file on **Drop a signed PDF here** or press **Choose a file**. **Seal is valid** means
+the seal is intact and was made by that install; the page then lists who took part and when,
+and the audit trail with whether its chain still matches. A file changed after sealing shows
+**Not verified**. The file is checked in memory on the server and not stored. Check the signed
+PDF itself, the one with the certificate as its last page.
+
+With no file at hand, paste the record link under **Open the record from the certificate
+page** and press **Open record**. The page also shows the seal certificate's fingerprint, with
+**Download the certificate (.crt)**, served at `/verify/certificate`.
+
+<HelpClip name="verify" caption="Checking a signed PDF on the verify page, then a copy that was changed after sealing." />
 
 To produce a sealed PDF as evidence in an Indian court, see
 [Electronic evidence (section 63 BSA)](./section-63-certificate).

@@ -6,7 +6,8 @@ description: What Codevibe Sign is, the ways to run it, and the order to read th
 # Start here
 
 Codevibe Sign sends a PDF to the people who need to sign it, in the order you choose, and gives
-everyone back one sealed file with a certificate page and an audit trail that anyone can check.
+everyone back one sealed PDF with a certificate page, plus its audit trail as a second PDF.
+Anyone can check the seal.
 It is open source: use it on [sign.codevibe.in](https://sign.codevibe.in), run it on your own
 server, or build it into your product.
 
@@ -27,7 +28,8 @@ neither.
 Read these in order. Each page ends with a link to the next.
 
 1. [Create your account and sign in](/app/account). No card, no password needed to start.
-2. [Send a document](/app/send). Upload a PDF, add the signers, place their fields, send.
+2. [Send a document](/app/send). Upload a PDF, add the signers, place their fields, preview
+   what they see, send.
 3. [Sign a document](/app/sign). What your signers see, so you can answer their questions.
 4. [Verify a sealed PDF](/guides/verify-pdf). Check the finished file, or let anyone check it.
 5. [Invite your team](/admin/team-and-roles). Give each person the role that fits them.

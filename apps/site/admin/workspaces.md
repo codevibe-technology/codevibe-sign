@@ -39,15 +39,18 @@ If it is taken, the app suggests one that is free.
 
 ### Change it
 
-Owners and admins open **Settings, Workspace**, press **Change address** and enter the
-**New address**.
+Owners and admins open **Settings, Workspace** and press **Change address**. In
+**Change the workspace address**, type the **New address**; it shows **Available** once it is
+free. Press **Change address**.
 
 - Links in emails already sent keep working.
-- Old `/dashboard/<old address>` links lead to the new one. They are listed under
-  **Old addresses that still lead here**.
+- Old `/dashboard/<old address>` links lead to the new one. The workspace settings list them
+  under the address, for example "Old address that still leads here: /dashboard/acme-hr".
 - API keys, webhooks and signing links are not affected; they use the workspace's id.
 - No other workspace can take the old address for 90 days.
 - An address can be changed 5 times in 30 days.
+
+<HelpClip name="workspace-address" caption="Changing the workspace address; the old one keeps leading here." />
 
 ## Name and time zone
 

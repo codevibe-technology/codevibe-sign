@@ -31,8 +31,11 @@ workspace can cancel an open offer. See [Team and roles](/admin/team-and-roles).
    admin.
 4. Press **Transfer workspace**, read what moves and what stays, then **Send transfer offer**.
 
-They get an email and a notice in the app. While the offer is open you can
-**Cancel transfer**.
+The confirmation lists what moves with the workspace and what stays
+with you, and the offer expires in 7 days. They get an email and a notice in the app. While the
+offer is open, the card shows who it went to and when it expires, with **Cancel transfer**.
+
+<HelpClip name="workspace-transfer" caption="Offering the workspace to a new owner who was invited to it." />
 
 ## Accept it (new owner)
 

@@ -1,6 +1,6 @@
 ---
 title: Sign a document
-description: What a recipient sees when they sign with Codevibe Sign, from the emailed link and one-time code to drawing, typing or uploading a signature in any Indian script, declining and downloading their copy.
+description: What a recipient sees when they sign with Codevibe Sign, from the emailed link and one-time code to Start, adopting a signature in any Indian script, declining with a reason and downloading their copy.
 ---
 
 # Sign a document
@@ -10,18 +10,30 @@ their recipients see. No account is needed to sign.
 
 ## Steps
 
+The page shows the sender's workspace at the top left and **Secured by codevibe sign** at the
+top right. On a phone the same steps fit the screen, and dialogs open as sheets from the
+bottom.
+
 1. **Open the link** in the email. It is private to you and stops working when the envelope
    expires, is withdrawn or is done.
-2. **Agree to sign electronically**, then **Continue to the document**.
-3. **Confirm it is you.** Press **Send me a code** and enter the 6-digit code from your email
-   or text messages. A code works for 10 minutes and allows 5 tries; **Send a new code** gets
-   another. Some senders skip this step.
-4. **Fill in your fields.** The page takes you from one to the next.
-5. **Finish and sign**, or **Approve** if you were asked to approve.
+2. **Confirm it is you**, if the sender asked for a code: press **Send me a code**, enter the
+   6-digit code from your email and press **Confirm**. A code works for 10 minutes and allows
+   5 tries; **Send a new code** gets another.
+3. **Agree to sign electronically**: tick the box, then **Continue to the document**. The page
+   first tells you how many pages there are and how many fields to fill.
+4. **Fill in your fields.** Press **Start** and the page takes you to the first highlighted
+   field; **Next field** moves on to the one after. **Date signed** fills itself in.
+5. Press **Finish and sign**, then **Finish and sign** again in **Ready to sign?** You cannot
+   change it afterwards. If you were asked to approve, the buttons say **Approve** instead.
+
+<HelpClip name="guided-signing" caption="Signing on a computer: the code, the consent, Start, adopting a signature and Finish and sign." />
+
+<HelpClip name="sign-phone" phone caption="Signing on a phone with the code from the email." />
 
 ## Your signature
 
-Choose how to make it:
+The first time you reach a signature field, **Adopt your signature** opens. Choose how to make
+it:
 
 - **Draw** with a finger, pen or mouse.
 - **Type** your name and pick a style: **Flowing**, **Casual** or **Formal**. Names in
@@ -31,10 +43,17 @@ Choose how to make it:
 - **Upload** a picture of your signature: PNG, JPEG or WebP under 5 MB. The background is
   removed.
 
+Pick an ink colour if you like, then press **Adopt and sign**. Your other signature boxes take
+the same signature with one tap. Initials work the same way under **Adopt your initials**.
+
 ## Decline
 
-If something is wrong, choose **Decline**, give a reason and press **Decline to sign**. The
-sender sees the reason and can send a corrected document.
+If something is wrong, press **Decline**. In **Decline to sign**, pick a reason such as
+**Something in the document needs to change** or **The details about me are wrong**, add to it
+in your own words, and press **Decline**. The sender sees the reason and can send a corrected
+document.
+
+<HelpClip name="decline" caption="Declining with a reason the sender will see." />
 
 ## Aadhaar eSign
 
@@ -46,9 +65,10 @@ linked to your Aadhaar, then come back here. If it fails or runs out of time, pr
 
 ## Afterwards
 
-The thank-you page offers **Download your copy**, with the certificate as its last page, and
-**Download the audit trail (PDF)**. When everyone has signed, you also get both by email,
-attached or as download links that work for 30 days.
+The thank-you page says whether others still have to sign. Once everyone has, it offers
+**Download your copy**, one sealed PDF with the signing certificate as its last page, and
+**Download the audit trail (PDF)**. You also get both by email, attached or as download links
+that work for 30 days.
 
 If the link shows a message instead of the document:
 

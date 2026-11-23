@@ -14,6 +14,8 @@ Everyone in a workspace has one role. Owners and admins manage the team under
 2. Under **Invite people**, enter the **Email**, a **Name (optional)** and the **Role**.
 3. Press **Send invite**.
 
+<HelpClip name="team-invite" caption="Inviting someone as a billing admin." />
+
 They get an email with a link that works for 7 days. Inviting the same address again
 replaces the earlier invitation. Open invitations are listed under **Waiting to join**,
 where **Withdraw** cancels one.

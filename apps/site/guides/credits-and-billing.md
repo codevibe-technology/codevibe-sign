@@ -28,9 +28,13 @@ price of one eSign on your plan, the pack total, the GST and the amount to pay b
 is charged. If the price is not published yet it says "Price coming soon" and nothing can be
 bought.
 
-Payment is by card, UPI or net banking through Razorpay. The credits are added as soon as the
-payment is confirmed, which usually takes a few seconds. If you close the window early, the
-payment is still confirmed in the background and the credits appear on the page.
+Under **Buy a pack**, pick a pack of credits; the page adds the GST and shows the
+**Amount to pay**. Press **Pay** with that amount: payment is by card, UPI or net banking
+through Razorpay. The credits are added as soon as the payment is confirmed, which usually
+takes a few seconds, and the page says so with a link to the invoice. If you close the window
+early, the payment is still confirmed in the background and the credits appear on the page.
+
+<HelpClip name="buy-credits" caption="Buying a pack of 50 Aadhaar eSign credits." />
 
 ### When a credit is used
 
