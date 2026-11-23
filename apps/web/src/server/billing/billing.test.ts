@@ -41,7 +41,7 @@ describe('billingConfig', () => {
       seller: null,
       leegality: null,
       gstPercent: 18,
-      sac: '998319',
+      sac: '997331',
       series: 'CV-{FY}',
       creditNoteSeries: 'CVCN-{FY}',
       proformaSeries: 'CVPI-{FY}',

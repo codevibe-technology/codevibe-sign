@@ -393,7 +393,7 @@ cd /opt/codevibe-sign/src/deploy     # the folder with compose.yml
 | `INVOICE_LOGO_PATH`, `INVOICE_SIGNATURE_PATH`                            | none                     | PNG or JPEG files inside the container, up to 1 MB (see "Logo and signature").                                                                                                                                |
 | `INVOICE_SERIES`                                                         | `CV-{FY}`                | Invoice numbers. `{FY}` is the financial year as six digits: `CV-2026270001`. At most 16 characters.                                                                                                          |
 | `CREDIT_NOTE_SERIES`, `PROFORMA_SERIES`                                  | `CVCN-{FY}`, `CVPI-{FY}` | Kept for credit notes and proforma invoices, so their numbers never collide.                                                                                                                                  |
-| `INVOICE_SAC`                                                            | `998319`                 | The SAC code printed on invoices. Confirm it with your accountant.                                                                                                                                            |
+| `INVOICE_SAC`                                                            | `997331`                 | The SAC code printed on invoices: licensing services for the right to use computer software.                                                                                                                  |
 | `GST_PERCENT`                                                            | `18`                     | GST added on top of every price.                                                                                                                                                                              |
 | `LEEGALITY_API_KEY`, `LEEGALITY_PRIVATE_SALT`, `LEEGALITY_WORKFLOW_ID`   | none                     | The operator's Leegality account, set together: the Auth Token, the Private Salt and the Workflow ID.                                                                                                         |
 | `LEEGALITY_BASE_URL`                                                     | the sandbox              | `https://sandbox.leegality.com/api` or `https://app1.leegality.com/api`.                                                                                                                                      |
@@ -551,10 +551,8 @@ enter. Their credentials cannot be read back from the app, by them or by you.
   time of purchase, and credits stay in the account's wallet when the plan changes. An account
   can therefore buy a pack while on Cloud and use it after going back to Free. Decide whether
   that is acceptable, or whether credits should carry the plan they were bought on.
-- **SAC code.** `INVOICE_SAC` defaults to `998319` (other information technology services).
-  `997331` (licensing services for the right to use computer software) is the other candidate
-  commonly used for software sold as a service. Both are taxed at 18%; ask your chartered
-  accountant which to print, and set it before the first live invoice.
+- **SAC code.** `INVOICE_SAC` defaults to `997331` (licensing services for the right to use
+  computer software), taxed at 18%. Set another code only if your accountant asks for one.
 
 ### Self-hosted installs
 

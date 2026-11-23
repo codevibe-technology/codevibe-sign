@@ -922,7 +922,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         'Acme Traders Private Limited',
         '06-HARYANA',
         'Aadhaar eSign credits × 10 @ Rs. 35',
-        'SAC: 998319',
+        'SAC: 997331',
         'Rs. 350.00',
         'CGST 9.0%',
         'SGST 9.0%',

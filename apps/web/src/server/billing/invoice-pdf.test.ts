@@ -59,7 +59,7 @@ function invoice(buyer: BillingDetails, overrides: Partial<InvoiceDocument> = {}
     seller,
     buyer,
     lines,
-    sac: '998319',
+    sac: '997331',
     tax: computeTax({
       taxablePaise: 175_000,
       gstPercent: 18,
@@ -121,7 +121,7 @@ describe('invoice page', () => {
       '29-KARNATAKA',
       'Rate / Item',
       'Aadhaar eSign credits',
-      'SAC: 998319',
+      'SAC: 997331',
       'Total Items / Qty : 1 / 50',
       'Taxable Amount',
       'IGST 18.0%',

@@ -356,7 +356,7 @@ export function billingConfig(source: Source = process.env): BillingConfig {
       'BILLING_LIVE is on but LEEGALITY_BASE_URL is the sandbox. Aadhaar eSign stays off until the production URL is set.',
     );
   }
-  const sac = read(source, 'INVOICE_SAC') ?? '998319';
+  const sac = read(source, 'INVOICE_SAC') ?? '997331';
   if (!/^\d{4,8}$/.test(sac)) fail('INVOICE_SAC', 'must be a SAC code of 4 to 8 digits');
   const operatorEmail = read(source, 'OPERATOR_EMAIL') ?? null;
   if (operatorEmail && !z.email().safeParse(operatorEmail).success) {
