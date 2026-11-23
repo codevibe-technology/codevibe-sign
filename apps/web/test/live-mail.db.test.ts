@@ -190,7 +190,7 @@ describe.skipIf(!url)('live updates and the mail log against PostgreSQL', () => 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.subject).toBe('Declined: Offer letter');
     expect(sent[0]!.text).toContain('Their reason: Clause 4');
-    expect(sent[0]!.text).toContain(`https://sign.example.com/w/${ws.a}/envelopes/env_d`);
+    expect(sent[0]!.text).toContain(`https://sign.example.com/dashboard/${ws.a}/envelopes/env_d`);
     expect(sent[0]!.meta).toMatchObject({ kind: 'decline_notice', envelopeId: 'env_d' });
     await mailSenderOnDecline(deps, {
       workspaceId: ws.b,

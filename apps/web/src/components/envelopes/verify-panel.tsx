@@ -121,7 +121,7 @@ export function VerifyPanel({ workspaceId, slug }: { workspaceId: string; slug: 
           {outcome.envelope ? (
             <div className="border-t border-line px-5 py-3">
               <Button asChild size="sm" variant="secondary">
-                <Link href={`/w/${slug}/envelopes/${outcome.envelope.envelopeId}`}>
+                <Link href={`/dashboard/${slug}/envelopes/${outcome.envelope.envelopeId}`}>
                   <ExternalLink aria-hidden className="h-4 w-4" />
                   Open “{outcome.envelope.title}”
                 </Link>

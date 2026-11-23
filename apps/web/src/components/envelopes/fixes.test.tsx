@@ -235,7 +235,7 @@ describe('recall and revise buttons', () => {
       note: 'Wrong date',
     });
     await waitFor(() =>
-      expect(mocks.push).toHaveBeenCalledWith('/w/acme/envelopes/new?draft=env_copy'),
+      expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/envelopes/new?draft=env_copy'),
     );
   });
 
@@ -245,7 +245,7 @@ describe('recall and revise buttons', () => {
     render(<ReviseButton slug="acme" workspaceId="ws_1" envelopeId="env_1" />);
     await user.click(screen.getByRole('button', { name: 'Revise and resend' }));
     await waitFor(() =>
-      expect(mocks.push).toHaveBeenCalledWith('/w/acme/envelopes/new?draft=env_rev'),
+      expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/envelopes/new?draft=env_rev'),
     );
   });
 });

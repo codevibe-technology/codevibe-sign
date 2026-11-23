@@ -6,7 +6,7 @@ import { createApiKey, revokeApiKey } from '../api-keys';
 import { db } from '../db';
 import { workspaceAction } from './action';
 
-const refresh = (slug: string) => revalidatePath(`/w/${slug}/settings/api-keys`);
+const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/settings/api-keys`);
 
 export const createApiKeyAction = workspaceAction(
   'apiKeys.manage',

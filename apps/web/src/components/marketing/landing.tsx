@@ -26,8 +26,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { formatBytes, type PlanLimits } from '@/lib/plans';
 import { CONTACT_EMAIL, GITHUB_URL, SELF_HOST_DOCS, VERIFY_URL } from './links';
+import { APP_HOME } from '@/lib/safe-next';
 import { SiteFooter } from './site-footer';
-import { SiteHeader } from './site-header';
+import { SiteHeader, type SiteViewer } from './site-header';
 
 const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
   {
@@ -270,10 +271,22 @@ function HeroVisual() {
 }
 
 /** The public home page of the hosted cloud, for visitors who are not signed in. */
-export function Landing({ free, cloud }: { free: PlanLimits; cloud: PlanLimits }) {
+export function Landing({
+  free,
+  cloud,
+  viewer = null,
+}: {
+  free: PlanLimits;
+  cloud: PlanLimits;
+  /** The signed-in visitor, who is offered their dashboard instead of "Start free". */
+  viewer?: SiteViewer | null;
+}) {
+  const start = viewer
+    ? { href: APP_HOME, label: 'Go to dashboard' }
+    : { href: '/sign-in', label: 'Start free' };
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
-      <SiteHeader />
+      <SiteHeader viewer={viewer} />
       <main id="main" className="flex-1">
         <section className="relative overflow-hidden bg-header px-4 pt-14 pb-20 text-header-ink sm:px-6 sm:pt-20 sm:pb-28">
           <div
@@ -295,8 +308,8 @@ export function Landing({ free, cloud }: { free: PlanLimits; cloud: PlanLimits }
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild className="h-12 px-6 text-base">
-                  <Link href="/sign-in">
-                    Start free <ArrowRight aria-hidden className="h-4 w-4" />
+                  <Link href={start.href}>
+                    {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
                   </Link>
                 </Button>
                 <Button
@@ -463,7 +476,7 @@ docker compose up -d`}</code>
               lines={planLines(free)}
               action={
                 <Button asChild className="w-full">
-                  <Link href="/sign-in">Start free</Link>
+                  <Link href={start.href}>{start.label}</Link>
                 </Button>
               }
               highlight

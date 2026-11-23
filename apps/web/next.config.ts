@@ -21,6 +21,13 @@ const config: NextConfig = {
     serverActions: { bodySizeLimit: '21mb' },
     proxyClientMaxBodySize: '21mb',
   },
+  // The app used to live under /w; links in old emails and bookmarks still arrive there.
+  async redirects() {
+    return [
+      { source: '/w', destination: '/dashboard', permanent: true },
+      { source: '/w/:path*', destination: '/dashboard/:path*', permanent: true },
+    ];
+  },
   async headers() {
     return headerRules({ development: process.env.NODE_ENV === 'development' });
   },

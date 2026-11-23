@@ -11,7 +11,7 @@ export default function NotFound() {
       description="It may have moved, or you may not have access to it. Check the link, or go back to your workspace."
       action={
         <Button asChild>
-          <Link href="/">Go to my workspace</Link>
+          <Link href="/dashboard">Go to my dashboard</Link>
         </Button>
       }
     />

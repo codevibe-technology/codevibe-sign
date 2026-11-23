@@ -21,7 +21,7 @@ export default async function BulkSendPage({
   const sql = db();
   const template = await getTemplate(sql, workspace.id, id);
   if (!template) notFound();
-  if (template.archivedAt) redirect(`/w/${slug}/templates?view=archived`);
+  if (template.archivedAt) redirect(`/dashboard/${slug}/templates?view=archived`);
   const earlier = await listBulkSends(sql, workspace.id, { templateId: template.id, limit: 5 });
   return (
     <>

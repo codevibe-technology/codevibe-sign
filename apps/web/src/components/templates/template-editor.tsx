@@ -67,7 +67,8 @@ export function TemplateEditor({ slug, workspaceId, initial }: TemplateEditorPro
   );
   const recipients = useMemo(() => rolesAsRecipients(state.roles), [state.roles]);
   const documentUrl = useCallback(
-    (documentId: string) => `/w/${slug}/templates/${state.templateId}/documents/${documentId}`,
+    (documentId: string) =>
+      `/dashboard/${slug}/templates/${state.templateId}/documents/${documentId}`,
     [slug, state.templateId],
   );
 
@@ -122,7 +123,7 @@ export function TemplateEditor({ slug, workspaceId, initial }: TemplateEditorPro
       toast.success(
         editing ? 'Template saved.' : 'Template created. Send it whenever you need it.',
       );
-      router.push(`/w/${slug}/templates`);
+      router.push(`/dashboard/${slug}/templates`);
       router.refresh();
     } finally {
       setSaving(false);
@@ -171,7 +172,7 @@ export function TemplateEditor({ slug, workspaceId, initial }: TemplateEditorPro
             </Button>
           ) : null}
           <Button asChild variant="ghost">
-            <Link href={`/w/${slug}/templates`}>Cancel</Link>
+            <Link href={`/dashboard/${slug}/templates`}>Cancel</Link>
           </Button>
         </div>
       </div>

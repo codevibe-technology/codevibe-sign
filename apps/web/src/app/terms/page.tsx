@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { LegalPage, LegalSection } from '@/components/marketing/legal-page';
 import { CONTACT_EMAIL, GITHUB_URL } from '@/components/marketing/links';
+import { siteViewer } from '@/server/auth/session';
 import { isHosted } from '@/server/plans';
 
 export const metadata: Metadata = {
@@ -11,10 +12,11 @@ export const metadata: Metadata = {
   alternates: { canonical: '/terms' },
 };
 
-export default function TermsPage() {
+export default async function TermsPage() {
   if (!isHosted()) notFound();
   return (
     <LegalPage
+      viewer={await siteViewer()}
       title="Terms"
       updated="20 November 2026"
       intro={

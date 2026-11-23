@@ -17,7 +17,7 @@ export function AcceptInvitation({ token }: { token: string }) {
           const result = await acceptInvitationAction({ token });
           if (result.ok) {
             toast.success('Welcome aboard');
-            router.push(`/w/${result.data.workspaceSlug}`);
+            router.push(`/dashboard/${result.data.workspaceSlug}`);
           } else toast.error(result.error);
         })
       }

@@ -98,7 +98,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
 
   const documentUrl = useCallback(
     (documentId: string) =>
-      `/w/${slug}/envelopes/${state.envelopeId}/documents/${documentId}?version=original`,
+      `/dashboard/${slug}/envelopes/${state.envelopeId}/documents/${documentId}?version=original`,
     [slug, state.envelopeId],
   );
 
@@ -236,7 +236,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
           ? `Sent. ${first.name} gets the signing link now.`
           : 'Sent. Everyone gets their signing link now.',
       );
-      router.push(`/w/${slug}/envelopes/${id}`);
+      router.push(`/dashboard/${slug}/envelopes/${id}`);
       router.refresh();
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'The envelope could not be sent.';
@@ -318,7 +318,7 @@ export function SendFlow({ slug, workspaceId, me, initial, initialStep, revision
           />
         </div>
         <Button asChild variant="ghost">
-          <Link href={`/w/${slug}/envelopes`}>{state.envelopeId ? 'Close' : 'Cancel'}</Link>
+          <Link href={`/dashboard/${slug}/envelopes`}>{state.envelopeId ? 'Close' : 'Cancel'}</Link>
         </Button>
       </div>
 

@@ -16,7 +16,7 @@ export function CreateWorkspaceForm() {
     event.preventDefault();
     start(async () => {
       const result = await createWorkspaceAction({ name });
-      if (result.ok) router.push(`/w/${result.data.slug}`);
+      if (result.ok) router.push(`/dashboard/${result.data.slug}`);
       else setError(result.error);
     });
   }

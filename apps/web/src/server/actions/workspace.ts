@@ -44,7 +44,7 @@ export const dismissStartHereAction = workspaceAction(
   z.object({}),
   async (ctx) => {
     await dismissStartHere(db(), ctx.workspace.id);
-    revalidatePath(`/w/${ctx.workspace.slug}`);
+    revalidatePath(`/dashboard/${ctx.workspace.slug}`);
   },
 );
 
@@ -53,7 +53,7 @@ export const renameWorkspaceAction = workspaceAction(
   z.object({ name }),
   async (ctx, input) => {
     const renamed = await renameWorkspace(db(), ctx.workspace.id, input.name);
-    revalidatePath(`/w/${ctx.workspace.slug}`, 'layout');
+    revalidatePath(`/dashboard/${ctx.workspace.slug}`, 'layout');
     return { name: renamed };
   },
 );
@@ -63,7 +63,7 @@ export const setWorkspaceTimeZoneAction = workspaceAction(
   z.object({ timeZone: z.string({ error: 'Pick a time zone from the list' }).max(64) }),
   async (ctx, input) => {
     const timeZone = await setWorkspaceTimeZone(db(), ctx.workspace.id, input.timeZone);
-    revalidatePath(`/w/${ctx.workspace.slug}/settings/workspace`);
+    revalidatePath(`/dashboard/${ctx.workspace.slug}/settings/workspace`);
     return { timeZone };
   },
 );

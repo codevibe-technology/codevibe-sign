@@ -32,7 +32,7 @@ export default function ErrorPage({
         <div className="flex flex-wrap justify-center gap-3">
           <Button onClick={reset}>Try again</Button>
           <Button variant="secondary" asChild>
-            <Link href="/">Go to my workspace</Link>
+            <Link href="/dashboard">Go to my dashboard</Link>
           </Button>
         </div>
       }

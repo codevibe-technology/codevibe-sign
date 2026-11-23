@@ -63,7 +63,7 @@ export function WorkspaceSwitcher({
           {workspaces.map((workspace) => (
             <DropdownMenu.Item key={workspace.id} asChild>
               <Link
-                href={`/w/${workspace.slug}`}
+                href={`/dashboard/${workspace.slug}`}
                 className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2"
               >
                 <WorkspaceAvatar name={workspace.name} />

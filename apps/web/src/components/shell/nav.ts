@@ -16,11 +16,11 @@ export interface NavItem {
 }
 
 export const workspaceNav = (slug: string): NavItem[] => [
-  { label: 'Dashboard', href: `/w/${slug}`, icon: LayoutDashboard, exact: true },
-  { label: 'Envelopes', href: `/w/${slug}/envelopes`, icon: FileSignature },
-  { label: 'Templates', href: `/w/${slug}/templates`, icon: LayoutTemplate },
-  { label: 'Verify', href: `/w/${slug}/verify`, icon: ShieldCheck },
-  { label: 'Settings', href: `/w/${slug}/settings`, icon: Settings },
+  { label: 'Dashboard', href: `/dashboard/${slug}`, icon: LayoutDashboard, exact: true },
+  { label: 'Envelopes', href: `/dashboard/${slug}/envelopes`, icon: FileSignature },
+  { label: 'Templates', href: `/dashboard/${slug}/templates`, icon: LayoutTemplate },
+  { label: 'Verify', href: `/dashboard/${slug}/verify`, icon: ShieldCheck },
+  { label: 'Settings', href: `/dashboard/${slug}/settings`, icon: Settings },
 ];
 
 export const isActive = (item: NavItem, pathname: string) =>

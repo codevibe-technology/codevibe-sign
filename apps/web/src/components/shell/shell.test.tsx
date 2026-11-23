@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const nav = vi.hoisted(() => ({ pathname: '/w/acme' }));
+const nav = vi.hoisted(() => ({ pathname: '/dashboard/acme' }));
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -19,7 +19,7 @@ const legal = { id: 'ws_2', slug: 'legal', name: 'Acme Legal' };
 const asha = { name: 'Asha Rao', email: 'asha@example.com' };
 
 beforeEach(() => {
-  nav.pathname = '/w/acme';
+  nav.pathname = '/dashboard/acme';
 });
 
 describe('Sidebar', () => {
@@ -27,16 +27,16 @@ describe('Sidebar', () => {
     render(<Sidebar current={acme} workspaces={[acme]} canCreate user={asha} />);
     const links = within(screen.getByRole('navigation', { name: 'Main' })).getAllByRole('link');
     expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
-      ['Dashboard', '/w/acme'],
-      ['Envelopes', '/w/acme/envelopes'],
-      ['Templates', '/w/acme/templates'],
-      ['Verify', '/w/acme/verify'],
-      ['Settings', '/w/acme/settings'],
+      ['Dashboard', '/dashboard/acme'],
+      ['Envelopes', '/dashboard/acme/envelopes'],
+      ['Templates', '/dashboard/acme/templates'],
+      ['Verify', '/dashboard/acme/verify'],
+      ['Settings', '/dashboard/acme/settings'],
     ]);
   });
 
   it('marks only the section being viewed', () => {
-    nav.pathname = '/w/acme/settings/brand';
+    nav.pathname = '/dashboard/acme/settings/brand';
     render(<Sidebar current={acme} workspaces={[acme]} canCreate user={asha} />);
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
@@ -51,7 +51,7 @@ describe('Sidebar', () => {
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: /Acme Legal/ })).toHaveAttribute(
       'href',
-      '/w/legal',
+      '/dashboard/legal',
     );
     expect(within(menu).getByRole('menuitem', { name: /New workspace/ })).toHaveAttribute(
       'href',

@@ -68,7 +68,7 @@ export function WebhooksPanel({
             {webhooks.map((w) => (
               <li key={w.id}>
                 <Link
-                  href={`/w/${slug}/settings/webhooks/${w.id}`}
+                  href={`/dashboard/${slug}/settings/webhooks/${w.id}`}
                   className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2/60"
                 >
                   <span
@@ -131,7 +131,7 @@ export function WebhooksPanel({
         secret={secret}
         onClose={() => {
           setSecret(null);
-          if (createdId) router.push(`/w/${slug}/settings/webhooks/${createdId}`);
+          if (createdId) router.push(`/dashboard/${slug}/settings/webhooks/${createdId}`);
         }}
       />
     </>

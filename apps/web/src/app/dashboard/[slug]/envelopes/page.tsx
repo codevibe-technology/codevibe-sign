@@ -39,7 +39,7 @@ export default async function EnvelopesPage({
         action={
           canWrite ? (
             <Button asChild>
-              <Link href={`/w/${slug}/envelopes/new`}>
+              <Link href={`/dashboard/${slug}/envelopes/new`}>
                 <Send aria-hidden className="h-4 w-4" />
                 Send a document
               </Link>

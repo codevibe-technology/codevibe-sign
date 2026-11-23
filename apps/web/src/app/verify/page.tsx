@@ -8,6 +8,7 @@ import { Wordmark } from '@/components/shell/brand-mark';
 import { PublicVerifyPanel } from '@/components/verify/public-verify-panel';
 import { TRUST_GUIDE } from '@/components/marketing/links';
 import { groupFingerprint, installSealCertificate } from '@/server/pdf';
+import { siteViewer } from '@/server/auth/session';
 import { isHosted } from '@/server/plans';
 
 export const dynamic = 'force-dynamic';
@@ -36,13 +37,14 @@ function seal() {
 }
 
 /** The public page anyone can use to check a sealed PDF, signed in or not. */
-export default function PublicVerifyPage() {
+export default async function PublicVerifyPage() {
   const hosted = isHosted();
+  const viewer = hosted ? await siteViewer() : null;
   const certificate = seal();
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
       {hosted ? (
-        <SiteHeader />
+        <SiteHeader viewer={viewer} />
       ) : (
         <header className="border-b border-white/10 bg-header text-header-ink">
           <div className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">

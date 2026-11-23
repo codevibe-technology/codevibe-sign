@@ -17,7 +17,7 @@ export default async function SendTemplatePage({
   const { user, workspace } = await requireWorkspace(slug, 'envelopes.write');
   const template = await getTemplate(db(), workspace.id, id);
   if (!template) notFound();
-  if (template.archivedAt) redirect(`/w/${slug}/templates?view=archived`);
+  if (template.archivedAt) redirect(`/dashboard/${slug}/templates?view=archived`);
   return (
     <>
       <PageHeader

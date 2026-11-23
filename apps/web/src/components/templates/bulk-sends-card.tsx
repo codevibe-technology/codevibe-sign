@@ -22,7 +22,7 @@ export function BulkSendsCard({
         {bulks.map((b) => (
           <li key={b.id}>
             <Link
-              href={`/w/${slug}/templates/bulk/${b.id}`}
+              href={`/dashboard/${slug}/templates/bulk/${b.id}`}
               className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2/60"
             >
               <div className="min-w-0 flex-1">

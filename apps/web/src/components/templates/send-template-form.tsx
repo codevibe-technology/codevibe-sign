@@ -89,7 +89,7 @@ export function SendTemplateForm({
           ? `Sent. ${people[first.id]?.name.trim()} gets the signing link now.`
           : 'Sent. Everyone gets their signing link now.',
       );
-      router.push(`/w/${slug}/envelopes/${result.data.envelopeId}`);
+      router.push(`/dashboard/${slug}/envelopes/${result.data.envelopeId}`);
       router.refresh();
     } finally {
       setSending(false);
@@ -214,7 +214,7 @@ export function SendTemplateForm({
         </Card>
         <div className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-end gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
           <Button asChild variant="ghost">
-            <Link href={`/w/${slug}/templates`}>Cancel</Link>
+            <Link href={`/dashboard/${slug}/templates`}>Cancel</Link>
           </Button>
           <Button type="submit" pending={sending}>
             {sending ? (

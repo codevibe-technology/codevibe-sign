@@ -71,7 +71,7 @@ export function TemplatesList({
         action={
           canWrite ? (
             <Button asChild>
-              <Link href={`/w/${slug}/templates/new`}>Create a template</Link>
+              <Link href={`/dashboard/${slug}/templates/new`}>Create a template</Link>
             </Button>
           ) : undefined
         }
@@ -121,13 +121,13 @@ export function TemplatesList({
               {canWrite && !archived ? (
                 <>
                   <Button asChild variant="secondary" size="sm">
-                    <Link href={`/w/${slug}/templates/${t.id}/bulk`}>
+                    <Link href={`/dashboard/${slug}/templates/${t.id}/bulk`}>
                       <Users aria-hidden className="h-4 w-4" />
                       Bulk send
                     </Link>
                   </Button>
                   <Button asChild size="sm">
-                    <Link href={`/w/${slug}/templates/${t.id}/send`}>
+                    <Link href={`/dashboard/${slug}/templates/${t.id}/send`}>
                       <Send aria-hidden className="h-4 w-4" />
                       Use
                     </Link>
@@ -150,7 +150,7 @@ export function TemplatesList({
                     >
                       {archived ? null : (
                         <DropdownMenu.Item asChild>
-                          <Link href={`/w/${slug}/templates/${t.id}/edit`} className={item}>
+                          <Link href={`/dashboard/${slug}/templates/${t.id}/edit`} className={item}>
                             <PenLine aria-hidden className="h-4 w-4" /> Edit
                           </Link>
                         </DropdownMenu.Item>

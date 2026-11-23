@@ -31,7 +31,7 @@ export default async function BulkSendProgressPage({
   return (
     <>
       <Link
-        href={`/w/${slug}/templates`}
+        href={`/dashboard/${slug}/templates`}
         className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden className="h-4 w-4" /> Templates

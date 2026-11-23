@@ -10,14 +10,14 @@ export interface WorkspaceAccess extends Membership {
 }
 
 /**
- * For pages under `/w/[slug]`: the signed-in member and their role. Anyone else gets a 404, so
+ * For pages under `/dashboard/[slug]`: the signed-in member and their role. Anyone else gets a 404, so
  * a workspace's existence is not revealed to people outside it.
  */
 export async function requireWorkspace(
   slug: string,
   permission: Permission = 'envelopes.read',
 ): Promise<WorkspaceAccess> {
-  const user = await requireUser(`/w/${slug}`);
+  const user = await requireUser(`/dashboard/${slug}`);
   const membership = await findMembership(db(), user.id, { slug });
   if (!membership || !can(membership.role, permission)) notFound();
   return { ...membership, user };

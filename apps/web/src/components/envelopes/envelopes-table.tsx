@@ -158,8 +158,8 @@ export function EnvelopesTable({
 
   const href = (e: EnvelopeSummary) =>
     e.status === 'draft' && canWrite
-      ? `/w/${slug}/envelopes/new?draft=${e.id}`
-      : `/w/${slug}/envelopes/${e.id}`;
+      ? `/dashboard/${slug}/envelopes/new?draft=${e.id}`
+      : `/dashboard/${slug}/envelopes/${e.id}`;
 
   return (
     <div>
@@ -289,7 +289,7 @@ export function EnvelopesTable({
             action={
               canWrite ? (
                 <Button asChild>
-                  <Link href={`/w/${slug}/envelopes/new`}>
+                  <Link href={`/dashboard/${slug}/envelopes/new`}>
                     <Send aria-hidden className="h-4 w-4" />
                     Send a document
                   </Link>
@@ -474,13 +474,13 @@ function RowActions({
           className="z-50 w-56 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
         >
           <DropdownMenu.Item asChild>
-            <Link href={`/w/${slug}/envelopes/${e.id}`} className={item}>
+            <Link href={`/dashboard/${slug}/envelopes/${e.id}`} className={item}>
               <Eye aria-hidden className="h-4 w-4" /> Open details
             </Link>
           </DropdownMenu.Item>
           {e.status === 'draft' && canWrite ? (
             <DropdownMenu.Item asChild>
-              <Link href={`/w/${slug}/envelopes/new?draft=${e.id}`} className={item}>
+              <Link href={`/dashboard/${slug}/envelopes/new?draft=${e.id}`} className={item}>
                 <PenLine aria-hidden className="h-4 w-4" /> Continue editing
               </Link>
             </DropdownMenu.Item>
@@ -488,7 +488,7 @@ function RowActions({
           {e.status === 'completed' && e.documents[0] ? (
             <DropdownMenu.Item asChild>
               <a
-                href={`/w/${slug}/envelopes/${e.id}/documents/${e.documents[0].id}?version=sealed`}
+                href={`/dashboard/${slug}/envelopes/${e.id}/documents/${e.documents[0].id}?version=sealed`}
                 className={item}
               >
                 <Download aria-hidden className="h-4 w-4" /> Download signed PDF

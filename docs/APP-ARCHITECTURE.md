@@ -146,7 +146,7 @@ A workspace always keeps at least one owner. Permissions live in one table in
 
 - `src/proxy.ts` (Next 16's request proxy) only redirects visitors without a session cookie
   away from app pages. It is a convenience, never the check.
-- Every page and layout under `/w/[slug]` calls `requireWorkspace(slug)`, which loads the
+- Every page and layout under `/dashboard/[slug]` calls `requireWorkspace(slug)`, which loads the
   session, the workspace and the membership in one query and calls `notFound()` when any is
   missing.
 - Every server action goes through `workspaceAction(permission, schema, handler)` or
@@ -291,7 +291,7 @@ plus the envelope's default title, message, expiry, reminders and signing order.
 `app_templates` with its PDFs in the file store under
 `templates/<workspaceId>/<templateId>/<documentId>.pdf`.
 
-- **Editor** (`/w/[slug]/templates/new`, `/[id]/edit`): Documents, Roles, Fields, Details. It
+- **Editor** (`/dashboard/[slug]/templates/new`, `/[id]/edit`): Documents, Roles, Fields, Details. It
   reuses the send flow's documents step, field placer and stepper; roles stand in for
   recipients. Each picked PDF is checked and kept under `staged/<workspaceId>/<random>.pdf`
   (`stageTemplateDocumentAction`); saving moves the staged files into the template, so no
@@ -309,7 +309,7 @@ plus the envelope's default title, message, expiry, reminders and signing order.
 
 ## Bulk send
 
-`/w/[slug]/templates/[id]/bulk` takes a CSV of up to 500 rows (1 MB). Columns are
+`/dashboard/[slug]/templates/[id]/bulk` takes a CSV of up to 500 rows (1 MB). Columns are
 `<Role> name`, `<Role> email`, `<Role> phone` and `meta.<key>`, read with
 `@codevibe_technology/sign-templates`' `parseBulkCsv`; a role without columns gets one person
 for every row, typed in on the page. The page shows each problem with its row and column and

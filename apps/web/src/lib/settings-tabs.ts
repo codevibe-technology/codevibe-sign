@@ -2,7 +2,7 @@ import { can, type Role } from './roles';
 
 /** The settings sections a role can open, in order. `plans` adds Plan and usage (hosted cloud). */
 export function settingsTabs(slug: string, role: Role, options: { plans?: boolean } = {}) {
-  const base = `/w/${slug}/settings`;
+  const base = `/dashboard/${slug}/settings`;
   const admin = can(role, 'workspace.manage');
   return [
     ...(admin

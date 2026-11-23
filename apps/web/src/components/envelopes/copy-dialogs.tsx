@@ -10,7 +10,7 @@ import { Field, Textarea } from '@/components/ui/field';
 import { recallEnvelopeAction, reviseEnvelopeAction } from '@/server/actions/envelopes';
 
 const draftHref = (slug: string, draftId: string) =>
-  `/w/${slug}/envelopes/new?draft=${encodeURIComponent(draftId)}`;
+  `/dashboard/${slug}/envelopes/new?draft=${encodeURIComponent(draftId)}`;
 
 /**
  * Recall and edit: voids the sent envelope and opens a draft copy in the send flow. Anyone who

@@ -19,9 +19,13 @@ const THEME_ITEMS: { value: Theme; label: string; icon: typeof Sun }[] = [
 export function UserMenu({
   user,
   personalHref,
+  side = 'right',
 }: {
   user: { name: string; email: string };
-  personalHref: string;
+  /** Left out on the public pages, which belong to no workspace. */
+  personalHref?: string;
+  /** Where the menu opens: beside the sidebar, or below a top bar. */
+  side?: 'right' | 'bottom';
 }) {
   const router = useRouter();
   const item =
@@ -49,9 +53,9 @@ export function UserMenu({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          side="right"
+          side={side}
           align="end"
-          sideOffset={12}
+          sideOffset={side === 'right' ? 12 : 8}
           className="z-50 w-64 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
         >
           <div className="px-2 py-2">
@@ -59,11 +63,13 @@ export function UserMenu({
             <p className="truncate text-xs text-muted">{user.email}</p>
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
-          <DropdownMenu.Item asChild>
-            <Link href={personalHref} className={item}>
-              <UserRound aria-hidden className="h-4 w-4" /> Personal settings
-            </Link>
-          </DropdownMenu.Item>
+          {personalHref ? (
+            <DropdownMenu.Item asChild>
+              <Link href={personalHref} className={item}>
+                <UserRound aria-hidden className="h-4 w-4" /> Personal settings
+              </Link>
+            </DropdownMenu.Item>
+          ) : null}
           <DropdownMenu.Label className="eyebrow px-2 pt-2 pb-1">Theme</DropdownMenu.Label>
           {THEME_ITEMS.map(({ value, label, icon: Icon }) => (
             <DropdownMenu.Item key={value} className={item} onSelect={() => void setTheme(value)}>

@@ -336,7 +336,7 @@ describe('step 3 and 4: fields, review and send', () => {
     await user.selectOptions(screen.getByLabelText('Expires after'), '14');
     await next(user);
 
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/w/acme/envelopes/env_1'));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/envelopes/env_1'));
     const patch = calls.filter((c) => c.method === 'PATCH').at(-1)!;
     expect(patch.url).toBe('/api/v1/envelopes/env_1');
     expect(patch.body).toMatchObject({

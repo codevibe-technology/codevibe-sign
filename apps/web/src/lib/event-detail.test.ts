@@ -109,12 +109,12 @@ describe('mail for revisions', () => {
       declinedBy: 'Satyam Patel',
       role: 'approver',
       reason: 'The <notice> period is wrong',
-      url: 'https://sign.example.com/w/acme/envelopes/env_1',
+      url: 'https://sign.example.com/dashboard/acme/envelopes/env_1',
     });
     expect(mail.subject).toBe('Declined: Offer letter');
     expect(mail.text).toContain('Satyam Patel (approver) declined “Offer letter”.');
     expect(mail.text).toContain('Their reason: The <notice> period is wrong');
     expect(mail.html).toContain('The &lt;notice&gt; period is wrong');
-    expect(mail.text).toContain('https://sign.example.com/w/acme/envelopes/env_1');
+    expect(mail.text).toContain('https://sign.example.com/dashboard/acme/envelopes/env_1');
   });
 });

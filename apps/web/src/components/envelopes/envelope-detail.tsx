@@ -80,7 +80,7 @@ export function DocumentsCard({
   checks: Record<string, SealCheck | null>;
 }) {
   const completed = envelope.status === 'completed';
-  const base = `/w/${slug}/envelopes/${envelope.id}/documents`;
+  const base = `/dashboard/${slug}/envelopes/${envelope.id}/documents`;
   return (
     <Card>
       <CardHeader
@@ -299,7 +299,7 @@ export function Timeline({
                       {detail.link.prefix}{' '}
                       {slug ? (
                         <Link
-                          href={`/w/${slug}/envelopes/${encodeURIComponent(detail.link.envelopeId)}`}
+                          href={`/dashboard/${slug}/envelopes/${encodeURIComponent(detail.link.envelopeId)}`}
                           className="font-medium text-primary hover:underline"
                         >
                           {detail.link.title}

@@ -60,7 +60,7 @@ try {
     signIn.status === 200 && (await signIn.text()).includes('Email me a sign-in link'),
     'sign-in page renders',
   );
-  const guarded = await get('/w/anything');
+  const guarded = await get('/dashboard/anything');
   check(
     [307, 308].includes(guarded.status) && guarded.headers.get('location')?.includes('/sign-in'),
     'workspace pages need a session',
@@ -119,8 +119,8 @@ try {
     const res = await get(path, { headers: { cookie } });
     return res.status === 200 && (await res.text()).includes(text);
   };
-  check(await page(`/w/${slug}/templates`, 'No templates yet'), 'the templates page renders');
-  check(await page(`/w/${slug}/templates/new`, 'New template'), 'the template editor renders');
+  check(await page(`/dashboard/${slug}/templates`, 'No templates yet'), 'the templates page renders');
+  check(await page(`/dashboard/${slug}/templates/new`, 'New template'), 'the template editor renders');
   const templateId = `tpl_${randomBytes(10).toString('hex')}`;
   const definition = {
     title: '',
@@ -137,15 +137,15 @@ try {
   await sql`insert into app_templates (id, workspace_id, name, definition)
     values (${templateId}, ${workspaceId}, 'Smoke template', ${sql.json(definition)})`;
   check(
-    await page(`/w/${slug}/templates/${templateId}/send`, 'Send: Smoke template'),
+    await page(`/dashboard/${slug}/templates/${templateId}/send`, 'Send: Smoke template'),
     'sending from a template renders',
   );
   check(
-    await page(`/w/${slug}/templates/${templateId}/bulk`, 'Sample CSV'),
+    await page(`/dashboard/${slug}/templates/${templateId}/bulk`, 'Sample CSV'),
     'bulk send from a template renders',
   );
   check(
-    await page(`/w/${slug}/settings/webhooks`, 'No endpoints yet'),
+    await page(`/dashboard/${slug}/settings/webhooks`, 'No endpoints yet'),
     'the webhooks settings render',
   );
 

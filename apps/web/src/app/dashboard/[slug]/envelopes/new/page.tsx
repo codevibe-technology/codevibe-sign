@@ -28,7 +28,7 @@ export default async function NewEnvelopePage({
     if (err instanceof AppError && err.code === 'NOT_FOUND') notFound();
     throw err;
   });
-  if (envelope.status !== 'draft') redirect(`/w/${slug}/envelopes/${envelope.id}`);
+  if (envelope.status !== 'draft') redirect(`/dashboard/${slug}/envelopes/${envelope.id}`);
   const initial = stateFromEnvelope(envelope);
   const revision = await revisionNote(api, draft);
   if (revision) initial.settings.changeNote ??= '';

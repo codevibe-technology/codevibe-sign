@@ -52,7 +52,7 @@ export function MailLogPanel({
   rows: MailLogRow[];
   envelopeId: string | null;
 }) {
-  const base = `/w/${slug}/settings/email-log`;
+  const base = `/dashboard/${slug}/settings/email-log`;
   return (
     <Card>
       <CardHeader
@@ -110,7 +110,7 @@ export function MailLogPanel({
                     : ''}
                   {row.envelopeId ? (
                     <Link
-                      href={`/w/${slug}/envelopes/${row.envelopeId}`}
+                      href={`/dashboard/${slug}/envelopes/${row.envelopeId}`}
                       className="text-primary underline underline-offset-2"
                     >
                       Open envelope

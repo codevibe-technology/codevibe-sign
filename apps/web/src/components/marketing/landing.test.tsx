@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
+vi.mock('@/lib/auth-client', () => ({ authClient: { signOut: vi.fn() } }));
+vi.mock('@/server/actions/personal', () => ({ updatePreferencesAction: vi.fn() }));
+
 import { CLOUD_PLAN_LIMITS, FREE_PLAN_LIMITS } from '@/lib/plans';
-import { Landing } from './landing';
-import { LegalPage, LegalSection } from './legal-page';
+const { Landing } = await import('./landing');
+const { LegalPage, LegalSection } = await import('./legal-page');
 
 describe('Landing', () => {
   it('leads with the promise and the two ways in', () => {
@@ -29,6 +34,42 @@ describe('Landing', () => {
       'href',
       '/verify',
     );
+  });
+
+  it('offers a signed-in visitor their dashboard instead of the ways in', () => {
+    render(
+      <Landing
+        free={FREE_PLAN_LIMITS}
+        cloud={CLOUD_PLAN_LIMITS}
+        viewer={{ name: 'Asha Rao', email: 'asha@example.com' }}
+      />,
+    );
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
+    expect(within(header).getByRole('button', { name: 'Account menu' })).toHaveTextContent('A');
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Start free/ })).toBeNull();
+    const toDashboard = screen.getAllByRole('link', { name: /Go to dashboard/ });
+    expect(toDashboard).toHaveLength(2);
+    for (const link of toDashboard) expect(link).toHaveAttribute('href', '/dashboard');
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Send documents for signature in minutes' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the ways in to everyone else', () => {
+    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} viewer={null} />);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/sign-in',
+    );
+    expect(within(header).getByRole('link', { name: 'Start free' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Account menu' })).toBeNull();
   });
 
   it('has every section, reachable from the header', () => {

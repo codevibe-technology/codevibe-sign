@@ -78,7 +78,7 @@ describe('WebhooksPanel', () => {
       />,
     );
     const [first, second] = screen.getAllByRole('link');
-    expect(first).toHaveAttribute('href', '/w/acme/settings/webhooks/wh_1');
+    expect(first).toHaveAttribute('href', '/dashboard/acme/settings/webhooks/wh_1');
     expect(
       within(first!).getByText(/HR system · envelope.completed, envelope.declined/),
     ).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('WebhooksPanel', () => {
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByText('whsec_shown_once')).toBeNull();
-    expect(mocks.push).toHaveBeenCalledWith('/w/acme/settings/webhooks/wh_9');
+    expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/settings/webhooks/wh_9');
   });
 
   it('puts a refused URL next to the field and can subscribe to everything', async () => {
@@ -248,7 +248,9 @@ describe('WebhookDetail', () => {
       ),
     );
     await user.click(screen.getByRole('button', { name: 'Remove' }));
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/w/acme/settings/webhooks'));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/settings/webhooks'),
+    );
   });
 
   it('says when no delivery failed', () => {

@@ -102,7 +102,7 @@ export function BulkSendForm({
         return;
       }
       toast.success(`Sending ${result.data.count} envelopes. You can leave this page.`);
-      router.push(`/w/${slug}/templates/bulk/${result.data.bulkId}`);
+      router.push(`/dashboard/${slug}/templates/bulk/${result.data.bulkId}`);
     } finally {
       setStarting(false);
     }

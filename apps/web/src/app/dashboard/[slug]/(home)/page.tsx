@@ -74,7 +74,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const sendButton = canSend ? (
     <Button asChild>
-      <Link href={`/w/${slug}/envelopes/new`}>
+      <Link href={`/dashboard/${slug}/envelopes/new`}>
         <Send aria-hidden className="h-4 w-4" />
         Send a document
       </Link>
@@ -94,7 +94,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
       {sample ? (
         <StartHereCard
           workspaceId={workspace.id}
-          href={`/w/${slug}/envelopes/new?draft=${encodeURIComponent(sample)}`}
+          href={`/dashboard/${slug}/envelopes/new?draft=${encodeURIComponent(sample)}`}
         />
       ) : null}
 
@@ -105,7 +105,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         {STATS.map(({ key, label, icon: Icon, bar, iconTone }) => (
           <Link
             key={key}
-            href={`/w/${slug}/envelopes?status=${key}`}
+            href={`/dashboard/${slug}/envelopes?status=${key}`}
             className="group rounded-xl last:col-span-2 lg:last:col-span-1"
           >
             <Card className="relative h-full overflow-hidden px-4 pt-4 pb-3.5 transition-[border-color,box-shadow] group-hover:border-line-strong group-hover:shadow-[0_8px_24px_rgb(13_27_42/0.08)] sm:px-5">
@@ -164,7 +164,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                       </span>
                       <div className="min-w-0 flex-1">
                         <Link
-                          href={`/w/${slug}/envelopes/${item.envelopeId}`}
+                          href={`/dashboard/${slug}/envelopes/${item.envelopeId}`}
                           className="block truncate font-semibold hover:underline"
                         >
                           {item.title}
@@ -205,7 +205,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                 description="The latest steps across the workspace."
                 action={
                   <Button asChild variant="ghost" size="sm">
-                    <Link href={`/w/${slug}/envelopes`}>All envelopes</Link>
+                    <Link href={`/dashboard/${slug}/envelopes`}>All envelopes</Link>
                   </Button>
                 }
               />
@@ -228,7 +228,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                           {actionLabel(item.action)}
                           {' · '}
                           <Link
-                            href={`/w/${slug}/envelopes/${item.envelopeId}`}
+                            href={`/dashboard/${slug}/envelopes/${item.envelopeId}`}
                             className="font-medium text-primary hover:underline"
                           >
                             {item.title}
@@ -273,7 +273,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                 </ol>
                 <div className="px-5 pb-5">
                   <Button asChild className="w-full">
-                    <Link href={`/w/${slug}/envelopes/new`}>
+                    <Link href={`/dashboard/${slug}/envelopes/new`}>
                       <Send aria-hidden className="h-4 w-4" />
                       Start
                     </Link>
@@ -292,7 +292,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                     Check it is exactly the document this workspace sealed.
                   </p>
                   <Link
-                    href={`/w/${slug}/verify`}
+                    href={`/dashboard/${slug}/verify`}
                     className="mt-2 inline-block font-semibold text-primary hover:underline"
                   >
                     Verify a document
@@ -303,7 +303,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
             {counts.voided > 0 ? (
               <p className="flex items-center gap-2 text-sm text-muted">
                 <Ban aria-hidden className="h-4 w-4" />
-                <Link href={`/w/${slug}/envelopes?status=voided`} className="hover:underline">
+                <Link
+                  href={`/dashboard/${slug}/envelopes?status=voided`}
+                  className="hover:underline"
+                >
                   {counts.voided} voided
                 </Link>
               </p>

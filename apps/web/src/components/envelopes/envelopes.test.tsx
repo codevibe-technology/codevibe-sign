@@ -138,7 +138,7 @@ describe('EnvelopesTable', () => {
     expect(rows[0]).toHaveTextContent('1 of 2');
     expect(within(rows[2]!).getByRole('link', { name: 'Contract draft' })).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/new?draft=env_3',
+      '/dashboard/acme/envelopes/new?draft=env_3',
     );
   });
 
@@ -235,7 +235,7 @@ describe('EnvelopesTable', () => {
     expect(screen.queryAllByRole('checkbox')).toEqual([]);
     expect(screen.getByRole('link', { name: 'Contract draft' })).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/env_3',
+      '/dashboard/acme/envelopes/env_3',
     );
     await user.click(screen.getByRole('button', { name: 'Actions for Offer letter' }));
     const menu = await screen.findByRole('menu');
@@ -255,7 +255,7 @@ describe('EnvelopesTable', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for Appraisal' }));
     expect(await screen.findByRole('menuitem', { name: 'Download signed PDF' })).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/env_2/documents/doc_1?version=sealed',
+      '/dashboard/acme/envelopes/env_2/documents/doc_1?version=sealed',
     );
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Actions for Offer letter' }));
@@ -272,7 +272,7 @@ describe('EnvelopesTable', () => {
     expect(screen.getByText('No envelopes yet')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Send a document' })).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/new',
+      '/dashboard/acme/envelopes/new',
     );
   });
 });
@@ -306,7 +306,7 @@ describe('VerifyPanel', () => {
     expect(status).toHaveTextContent('Acme seal');
     expect(within(status).getByRole('link', { name: /Offer letter/ })).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/env_1',
+      '/dashboard/acme/envelopes/env_1',
     );
     expect((mocks.verifyDocumentAction.mock.calls[0]![0] as FormData).get('workspaceId')).toBe(
       'ws_1',
@@ -472,7 +472,7 @@ describe('envelope detail', () => {
   it('renders the certificate and the seal state', () => {
     render(
       <CertificateCard
-        downloadHref="/w/acme/envelopes/env_1/certificate"
+        downloadHref="/dashboard/acme/envelopes/env_1/certificate"
         certificate={{
           envelopeId: 'env_1',
           title: 'Offer letter',
@@ -514,7 +514,7 @@ describe('envelope detail', () => {
     expect(screen.getByText(/203\.0\.113\.9/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'JSON' })).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/env_1/certificate',
+      '/dashboard/acme/envelopes/env_1/certificate',
     );
     const { rerender } = render(<SealBadge check={null} />);
     expect(screen.getByText('Sealing in progress')).toBeTruthy();

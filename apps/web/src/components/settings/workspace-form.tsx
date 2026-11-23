@@ -41,7 +41,7 @@ export function WorkspaceForm({
             )}
           </Field>
           <Field label="Address" hint="Fixed when the workspace was created.">
-            {(props) => <Input {...props} readOnly value={`/w/${workspace.slug}`} />}
+            {(props) => <Input {...props} readOnly value={`/dashboard/${workspace.slug}`} />}
           </Field>
         </CardBody>
         <CardFooter>

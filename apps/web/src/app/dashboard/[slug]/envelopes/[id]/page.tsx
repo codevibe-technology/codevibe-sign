@@ -72,7 +72,7 @@ export default async function EnvelopePage({
   return (
     <>
       <Link
-        href={`/w/${slug}/envelopes`}
+        href={`/dashboard/${slug}/envelopes`}
         className="mb-3 inline-flex items-center gap-1.5 font-mono text-[11px] font-medium tracking-[0.1em] text-muted uppercase hover:text-primary"
       >
         <ArrowLeft aria-hidden className="h-3.5 w-3.5" />
@@ -106,7 +106,7 @@ export default async function EnvelopePage({
         <div className="flex flex-wrap gap-2">
           {envelope.status === 'draft' && canWrite ? (
             <Button asChild>
-              <Link href={`/w/${slug}/envelopes/new?draft=${envelope.id}`}>
+              <Link href={`/dashboard/${slug}/envelopes/new?draft=${envelope.id}`}>
                 <PenLine aria-hidden className="h-4 w-4" />
                 Continue editing
               </Link>
@@ -157,7 +157,7 @@ export default async function EnvelopePage({
           {can(role, 'workspace.manage') ? (
             <p className="-mt-3 text-right text-sm">
               <Link
-                href={`/w/${slug}/settings/email-log?envelope=${encodeURIComponent(envelope.id)}`}
+                href={`/dashboard/${slug}/settings/email-log?envelope=${encodeURIComponent(envelope.id)}`}
                 className="font-medium text-primary hover:underline"
               >
                 Emails for this envelope
@@ -167,7 +167,7 @@ export default async function EnvelopePage({
           <DocumentsCard slug={slug} envelope={envelope} checks={checks} />
           <CertificateCard
             certificate={certificate}
-            downloadHref={`/w/${slug}/envelopes/${envelope.id}/certificate`}
+            downloadHref={`/dashboard/${slug}/envelopes/${envelope.id}/certificate`}
           />
         </div>
         <div className="min-w-0 lg:col-span-2">

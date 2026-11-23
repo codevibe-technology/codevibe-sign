@@ -37,7 +37,7 @@ const person = z.object({
   phone: z.string().max(40),
 });
 const people = z.record(z.string().max(100), person);
-const refresh = (slug: string) => revalidatePath(`/w/${slug}/templates`, 'layout');
+const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/templates`, 'layout');
 
 /** Checks a PDF and keeps it until the template is saved. */
 export const stageTemplateDocumentAction = workspaceAction(
@@ -149,7 +149,7 @@ export const sendTemplateAction = workspaceAction(
           message: input.message,
         },
       );
-      revalidatePath(`/w/${ctx.workspace.slug}`, 'layout');
+      revalidatePath(`/dashboard/${ctx.workspace.slug}`, 'layout');
       return { envelopeId: envelope.id };
     } catch (err) {
       if (err instanceof AppError)

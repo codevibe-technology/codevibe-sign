@@ -23,7 +23,7 @@ const endpoint = {
   description: z.string().max(1000),
   events: z.array(z.string().max(100)).max(50),
 };
-const refresh = (slug: string) => revalidatePath(`/w/${slug}/settings/webhooks`, 'layout');
+const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/settings/webhooks`, 'layout');
 
 export const createWebhookAction = workspaceAction(
   'webhooks.manage',

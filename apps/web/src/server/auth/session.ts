@@ -27,3 +27,9 @@ export async function requireUser(returnTo?: string): Promise<SessionUser> {
   }
   return user;
 }
+
+/** The signed-in visitor of a public page, for its header; null for everyone else. */
+export async function siteViewer(): Promise<{ name: string; email: string } | null> {
+  const user = await getSessionUser();
+  return user ? { name: user.name, email: user.email } : null;
+}

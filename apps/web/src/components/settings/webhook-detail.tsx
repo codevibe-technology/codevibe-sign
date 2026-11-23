@@ -103,12 +103,12 @@ export function WebhookDetail({
     else toast.error(message.text);
   };
 
-  const base = `/w/${slug}/settings/webhooks/${webhook.id}`;
+  const base = `/dashboard/${slug}/settings/webhooks/${webhook.id}`;
 
   return (
     <>
       <Link
-        href={`/w/${slug}/settings/webhooks`}
+        href={`/dashboard/${slug}/settings/webhooks`}
         className="text-sm font-semibold text-muted hover:text-ink"
       >
         ← All endpoints
@@ -210,7 +210,7 @@ export function WebhookDetail({
                 () => deleteWebhookAction({ workspaceId, webhookId: webhook.id }),
                 () => {
                   toast.success('Endpoint removed.');
-                  router.push(`/w/${slug}/settings/webhooks`);
+                  router.push(`/dashboard/${slug}/settings/webhooks`);
                 },
               );
             }}

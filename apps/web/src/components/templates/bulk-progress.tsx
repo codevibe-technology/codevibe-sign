@@ -207,7 +207,7 @@ export function BulkProgress({
                 <BulkRowPill status={row.status} />
                 {row.envelopeId ? (
                   <Link
-                    href={`/w/${slug}/envelopes/${row.envelopeId}`}
+                    href={`/dashboard/${slug}/envelopes/${row.envelopeId}`}
                     className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
                   >
                     Envelope <ExternalLink aria-hidden className="h-3.5 w-3.5" />

@@ -3,7 +3,7 @@ import { safeNext } from './safe-next';
 
 describe('safeNext', () => {
   it('keeps paths on this site', () => {
-    expect(safeNext('/w/acme/settings')).toBe('/w/acme/settings');
+    expect(safeNext('/dashboard/acme/settings')).toBe('/dashboard/acme/settings');
     expect(safeNext(['/invite/abc', '/x'])).toBe('/invite/abc');
   });
 
@@ -15,8 +15,13 @@ describe('safeNext', () => {
       'w/acme',
       '',
     ]) {
-      expect(safeNext(value), value).toBe('/');
+      expect(safeNext(value), value).toBe('/dashboard');
     }
-    expect(safeNext(undefined)).toBe('/');
+    expect(safeNext(undefined)).toBe('/dashboard');
+  });
+
+  it('never lands on the public home page', () => {
+    expect(safeNext('/')).toBe('/dashboard');
+    expect(safeNext(['/'])).toBe('/dashboard');
   });
 });

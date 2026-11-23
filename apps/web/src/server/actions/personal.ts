@@ -20,7 +20,7 @@ export const updatePreferencesAction = userAction(
       sameSite: 'lax',
       maxAge: 365 * 24 * 60 * 60,
     });
-    revalidatePath('/w/[slug]', 'layout');
+    revalidatePath('/dashboard/[slug]', 'layout');
     return saved;
   },
 );

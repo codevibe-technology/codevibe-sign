@@ -16,7 +16,7 @@ vi.mock('@/server/templates', () => ({
     docId === 'd1' ? pdf : null,
 }));
 
-const { GET } = await import('@/app/w/[slug]/templates/[id]/documents/[docId]/route');
+const { GET } = await import('@/app/dashboard/[slug]/templates/[id]/documents/[docId]/route');
 const get = (slug: string, id: string, docId: string) =>
   GET(new Request('http://x/'), { params: Promise.resolve({ slug, id, docId }) });
 

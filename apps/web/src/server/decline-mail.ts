@@ -38,7 +38,7 @@ export async function mailSenderOnDecline(
     declinedBy: decliner.name,
     role: decliner.role,
     reason: decliner.declineReason ?? null,
-    url: `${deps.appUrl}/w/${sender.slug}/envelopes/${encodeURIComponent(envelope.id)}`,
+    url: `${deps.appUrl}/dashboard/${sender.slug}/envelopes/${encodeURIComponent(envelope.id)}`,
   });
   await deps.mailer.send({
     to: sender.email,

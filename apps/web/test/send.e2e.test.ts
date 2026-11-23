@@ -237,9 +237,9 @@ describe('send, sign, seal and verify through the app', () => {
     expect(events.chainValid).toBe(true);
 
     state.user = people.vic;
-    const documentRoute = await import('@/app/w/[slug]/envelopes/[id]/documents/[docId]/route');
+    const documentRoute = await import('@/app/dashboard/[slug]/envelopes/[id]/documents/[docId]/route');
     const download = await documentRoute.GET(
-      new Request(`${APP_URL}/w/acme/envelopes/${draft.id}/documents/x?version=sealed`),
+      new Request(`${APP_URL}/dashboard/acme/envelopes/${draft.id}/documents/x?version=sealed`),
       { params: Promise.resolve({ slug: 'acme', id: draft.id, docId: done.documents[0]!.id }) },
     );
     expect(download.status).toBe(200);
@@ -257,7 +257,7 @@ describe('send, sign, seal and verify through the app', () => {
 
     state.user = { ...people.vic, id: 'u_stranger' };
     const outside = await documentRoute.GET(
-      new Request(`${APP_URL}/w/acme/envelopes/${draft.id}/documents/x?version=sealed`),
+      new Request(`${APP_URL}/dashboard/acme/envelopes/${draft.id}/documents/x?version=sealed`),
       { params: Promise.resolve({ slug: 'acme', id: draft.id, docId: done.documents[0]!.id }) },
     );
     expect(outside.status).toBe(404);

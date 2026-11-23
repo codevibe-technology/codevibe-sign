@@ -49,7 +49,7 @@ export default async function TemplatesPage({
         action={
           canWrite ? (
             <Button asChild>
-              <Link href={`/w/${slug}/templates/new`}>
+              <Link href={`/dashboard/${slug}/templates/new`}>
                 <Plus aria-hidden className="h-4 w-4" />
                 New template
               </Link>
@@ -59,14 +59,14 @@ export default async function TemplatesPage({
       />
       <nav aria-label="Template lists" className="mb-4 flex gap-1">
         <Link
-          href={`/w/${slug}/templates`}
+          href={`/dashboard/${slug}/templates`}
           className={tab(!archived)}
           aria-current={archived ? undefined : 'page'}
         >
           Active <span className="font-mono text-[11px] opacity-70">{counts.active}</span>
         </Link>
         <Link
-          href={`/w/${slug}/templates?view=archived`}
+          href={`/dashboard/${slug}/templates?view=archived`}
           className={tab(archived)}
           aria-current={archived ? 'page' : undefined}
         >

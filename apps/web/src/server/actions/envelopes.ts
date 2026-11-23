@@ -69,7 +69,7 @@ export const voidEnvelopesAction = workspaceAction(
         ids.length === 1 ? failed[0]!.error : `None could be voided. ${failed[0]!.error}`,
       );
     }
-    revalidatePath(`/w/${ctx.workspace.slug}`, 'layout');
+    revalidatePath(`/dashboard/${ctx.workspace.slug}`, 'layout');
     return { voided, failed };
   },
 );
@@ -91,7 +91,7 @@ export const remindAction = workspaceAction(
       }
     }
     const envelope = await api.remind(input.envelopeId, input.recipientId);
-    revalidatePath(`/w/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
+    revalidatePath(`/dashboard/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
     return { reminded: envelope.recipients.filter((r) => r.lastRemindedAt).length };
   },
 );
@@ -122,7 +122,7 @@ export const shareLinkAction = workspaceAction(
   async (ctx, input) => {
     const api = signApi(userPrincipal(ctx.user.id, ctx.workspace.id, false, actor(ctx)));
     const { url } = await api.shareLink(input.envelopeId, input.recipientId);
-    revalidatePath(`/w/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
+    revalidatePath(`/dashboard/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
     return { url };
   },
 );
@@ -149,7 +149,7 @@ export const correctRecipientAction = workspaceAction(
       ...(input.phone !== undefined ? { phone: input.phone } : {}),
       ...(input.resend ? { resend: true } : {}),
     });
-    revalidatePath(`/w/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
+    revalidatePath(`/dashboard/${ctx.workspace.slug}/envelopes/${input.envelopeId}`);
     const after = envelope.recipients.find((r) => r.id === input.recipientId);
     const invited =
       after?.notifiedAt !== before?.notifiedAt || after?.lastRemindedAt !== before?.lastRemindedAt;
@@ -173,7 +173,7 @@ async function copyToDraft(
     envelopeId: draft.id,
     userId: ctx.user.id,
   });
-  revalidatePath(`/w/${ctx.workspace.slug}`, 'layout');
+  revalidatePath(`/dashboard/${ctx.workspace.slug}`, 'layout');
   return { draftId: draft.id };
 }
 

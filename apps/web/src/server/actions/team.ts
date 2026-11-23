@@ -13,7 +13,7 @@ import { userAction, workspaceAction } from './action';
 
 const role = z.enum(ROLES, { error: 'Pick a role' });
 const id = z.string().min(1).max(64);
-const refresh = (slug: string) => revalidatePath(`/w/${slug}/settings/team`);
+const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/settings/team`);
 
 export const inviteMemberAction = workspaceAction(
   'team.manage',

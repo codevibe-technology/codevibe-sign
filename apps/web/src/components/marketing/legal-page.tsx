@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react';
 import { SiteFooter } from './site-footer';
-import { SiteHeader } from './site-header';
+import { SiteHeader, type SiteViewer } from './site-header';
 
 /** A plain reading page for the terms and the privacy notice. */
 export function LegalPage({
   title,
   updated,
   intro,
+  viewer = null,
   children,
 }: {
   title: string;
   updated: string;
   intro: ReactNode;
+  viewer?: SiteViewer | null;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
-      <SiteHeader />
+      <SiteHeader viewer={viewer} />
       <main id="main" className="flex-1 px-4 py-12 sm:px-6 sm:py-16">
         <article className="mx-auto max-w-2xl">
           <p className="text-sm font-semibold text-primary">Codevibe Sign cloud</p>

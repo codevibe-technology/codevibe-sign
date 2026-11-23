@@ -31,7 +31,7 @@ export function Sidebar({
   return (
     <div className="flex h-full w-[84px] flex-col items-center border-r border-white/5 bg-nav py-3 text-nav-ink">
       <Link
-        href={`/w/${current.slug}`}
+        href={`/dashboard/${current.slug}`}
         onClick={onNavigate}
         aria-label="Codevibe Sign home"
         className="mb-3 rounded-md"
@@ -77,7 +77,7 @@ export function Sidebar({
           <BookOpen aria-hidden strokeWidth={1.8} className="h-5 w-5" />
           <span>Docs</span>
         </a>
-        <UserMenu user={user} personalHref={`/w/${current.slug}/settings/personal`} />
+        <UserMenu user={user} personalHref={`/dashboard/${current.slug}/settings/personal`} />
       </div>
     </div>
   );

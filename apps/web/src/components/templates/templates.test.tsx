@@ -143,7 +143,7 @@ describe('TemplatesList', () => {
     );
     expect(screen.getByRole('link', { name: 'Create a template' })).toHaveAttribute(
       'href',
-      '/w/acme/templates/new',
+      '/dashboard/acme/templates/new',
     );
     unmount();
     render(<TemplatesList slug="acme" workspaceId="ws_1" templates={[]} archived canWrite />);
@@ -165,11 +165,11 @@ describe('TemplatesList', () => {
     expect(within(row).getByText(/1 document · 3 pages/)).toBeInTheDocument();
     expect(within(row).getByRole('link', { name: /Use/ })).toHaveAttribute(
       'href',
-      '/w/acme/templates/tpl_1/send',
+      '/dashboard/acme/templates/tpl_1/send',
     );
     expect(within(row).getByRole('link', { name: /Bulk send/ })).toHaveAttribute(
       'href',
-      '/w/acme/templates/tpl_1/bulk',
+      '/dashboard/acme/templates/tpl_1/bulk',
     );
   });
 
@@ -259,7 +259,7 @@ describe('TemplateEditor', () => {
     expect(input.definition).toMatchObject({ name: 'Offer letter', routing: 'sequential' });
     expect(input.definition.roles).toEqual([expect.objectContaining({ name: 'Employee' })]);
     expect(input.definition.fields).toHaveLength(1);
-    expect(mocks.push).toHaveBeenCalledWith('/w/acme/templates');
+    expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/templates');
   });
 
   it('edits a saved template from any step and shows server problems on their step', async () => {
@@ -344,7 +344,7 @@ describe('SendTemplateForm', () => {
       message: 'Welcome aboard',
     });
     expect(mocks.toast.success).toHaveBeenCalledWith('Sent. Ravi Kumar gets the signing link now.');
-    expect(mocks.push).toHaveBeenCalledWith('/w/acme/envelopes/env_1');
+    expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/envelopes/env_1');
   });
 
   it('puts a refusal from the server next to the right person', async () => {
@@ -410,7 +410,7 @@ describe('BulkSendForm', () => {
       fixed: { r_hr: { name: 'Meera', email: 'hr@example.com', phone: '' } },
       skipProblems: true,
     });
-    expect(mocks.push).toHaveBeenCalledWith('/w/acme/templates/bulk/bulk_1');
+    expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme/templates/bulk/bulk_1');
   });
 
   it('refuses files that are not CSV and blocks unknown columns', async () => {
@@ -491,7 +491,7 @@ describe('BulkProgress', () => {
     expect(screen.getByText('Bad email')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Envelope/ })[0]).toHaveAttribute(
       'href',
-      '/w/acme/envelopes/env_2',
+      '/dashboard/acme/envelopes/env_2',
     );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);

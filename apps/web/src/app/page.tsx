@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { Landing } from '@/components/marketing/landing';
 import { limitsFor } from '@/lib/plans';
+import { APP_HOME } from '@/lib/safe-next';
 import { getSessionUser } from '@/server/auth/session';
-import { db } from '@/server/db';
 import { env } from '@/server/env';
 import { planSettings } from '@/server/plans';
-import { listWorkspacesForUser } from '@/server/workspaces';
 
 const TITLE = 'Codevibe Sign: send documents for signature in minutes';
 const DESCRIPTION =
@@ -33,16 +32,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Signed-in people go to their workspace. On the hosted cloud, everyone else gets the public
- * home page; a self-hosted install sends them to sign-in.
+ * The public home page, for everyone on the hosted cloud: someone signed in sees it too, with
+ * a way to their dashboard in place of the sign-in buttons. A self-hosted install has no
+ * public site, so it goes to the dashboard or to sign-in.
  */
 export default async function Home() {
   const user = await getSessionUser();
-  if (user) {
-    const [first] = await listWorkspacesForUser(db(), user.id);
-    redirect(first ? `/w/${first.workspace.slug}` : '/onboarding');
-  }
   const settings = planSettings();
-  if (settings.mode !== 'hosted') redirect('/sign-in');
-  return <Landing free={limitsFor('free', settings)} cloud={limitsFor('cloud', settings)} />;
+  if (settings.mode !== 'hosted') redirect(user ? APP_HOME : '/sign-in');
+  return (
+    <Landing
+      free={limitsFor('free', settings)}
+      cloud={limitsFor('cloud', settings)}
+      viewer={user ? { name: user.name, email: user.email } : null}
+    />
+  );
 }

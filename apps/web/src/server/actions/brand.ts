@@ -16,7 +16,7 @@ import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { workspaceAction } from './action';
 
-const refresh = (slug: string) => revalidatePath(`/w/${slug}/settings/brand`);
+const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/settings/brand`);
 
 export const updateBrandAction = workspaceAction(
   'brand.manage',
