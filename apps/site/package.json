@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
-    "@types/node": "22.19.1",
+    "@types/node": "26.6.6",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "vitepress": "1.6.4"
