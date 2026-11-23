@@ -200,10 +200,8 @@ export function initialsOnEveryPage(input: PresetInput): Field[] {
 }
 
 /** "Signature on last page": a signature box near the bottom-left corner of the last page. */
-export function signatureOnLastPage(
-  input: PresetInput,
-  type: 'signature' | 'aadhaar' = 'signature',
-): Field[] {
+export function signatureOnLastPage(input: PresetInput): Field[] {
+  const type = 'signature';
   const last = input.pages.length - 1;
   const page = input.pages[last];
   if (!page) return [];
@@ -221,9 +219,4 @@ export function signatureOnLastPage(
       required: true,
     },
   ];
-}
-
-/** The Aadhaar eSign box of an Aadhaar eSign signer, where "Signature on last page" puts one. */
-export function aadhaarBoxOnLastPage(input: PresetInput): Field[] {
-  return signatureOnLastPage(input, 'aadhaar');
 }

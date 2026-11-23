@@ -58,10 +58,7 @@ export interface SigningViewLabels extends ViewerLabels {
   reuseInitials: string;
   finish: string;
   submitting: string;
-  /** On the Aadhaar eSign box, which the signer does not fill: they sign it at the provider. */
-  aadhaarBox: string;
-  aadhaarBoxNote: string;
-  /** In the bar when the Aadhaar eSign box is all the signer has. */
+  /** In the bar for an Aadhaar eSign signer, who fills in nothing and signs at the provider. */
   aadhaarOnly: string;
   decline: string;
   declineTitle: string;
@@ -114,9 +111,7 @@ export const defaultSigningViewLabels: SigningViewLabels = {
   reuseInitials: 'Your other initials boxes take these initials with one tap.',
   finish: 'Finish',
   submitting: 'Sending…',
-  aadhaarBox: 'Aadhaar eSign',
-  aadhaarBoxNote: 'You sign here with Aadhaar eSign after you finish',
-  aadhaarOnly: 'Nothing to fill in. Read the document, then continue.',
+  aadhaarOnly: 'Nothing to fill in. Read the document, then continue to Aadhaar eSign.',
   decline: 'Decline',
   declineTitle: 'Decline to sign',
   declineReason: 'Tell the sender why you are declining',
@@ -151,8 +146,9 @@ export interface SigningViewProps {
   documents: ViewerDocument[];
   /** Fields of the envelope; only those of `recipient` are shown and collected. */
   fields: Field[];
-  /** Only `id` and `name` are used, so the server's signer view can be passed as is. */
-  recipient: Pick<Recipient, 'id' | 'name'>;
+  /** `id`, `name` and `auth` are used, so the server's signer view can be passed as is. */
+  /** With `auth: 'aadhaar'`, the bar says there is nothing to fill in when that is so. */
+  recipient: Pick<Recipient, 'id' | 'name'> & Partial<Pick<Recipient, 'auth'>>;
   /** Values already saved for this recipient, for example from a previous visit. */
   initialValues?: FieldValue[];
   onSubmit: (values: FieldValue[]) => void | Promise<void>;
@@ -202,10 +198,9 @@ export function SigningView({
       ),
     [allFields, recipient.id, documents],
   );
-  // The Aadhaar eSign box is shown where it sits but takes nothing here: the signer signs
-  // it at the eSign provider once they finish.
+  // An Aadhaar eSign box, on an envelope sent while it existed, takes nothing and is not
+  // shown: the eSign provider places the signature where its workflow says.
   const fields = useMemo(() => own.filter((f) => f.type !== 'aadhaar'), [own]);
-  const esignBoxes = useMemo(() => own.filter((f) => f.type === 'aadhaar'), [own]);
 
   const [values, setValues] = useState<FieldValues>(() => {
     const start = prefillValues(fields, recipient, today ?? new Date());
@@ -558,36 +553,8 @@ export function SigningView({
       (f) => started && f.id === current && !hasValue(f, values[f.id]) && f.type !== 'date_signed',
     );
     const at = flagged && pointsToPixels(flagged.rect, ctx.scale);
-    const boxes = esignBoxes.filter(
-      (f) => f.documentId === ctx.documentId && f.page === ctx.pageIndex,
-    );
     return (
       <>
-        {boxes.map((f) => {
-          const box = pointsToPixels(f.rect, ctx.scale);
-          return (
-            <div
-              key={f.id}
-              className="cvs-field cvs-field--esign"
-              data-type="aadhaar"
-              data-required
-              role="note"
-              aria-label={`${labels.aadhaarBox}: ${labels.aadhaarBoxNote}`}
-              style={
-                {
-                  left: box.left,
-                  top: box.top,
-                  width: box.width,
-                  height: box.height,
-                  '--cvs-field-font': `${Math.max(9, Math.min(box.height * 0.3, 15))}px`,
-                } as CSSProperties
-              }
-            >
-              <span className="cvs-esign-title">{labels.aadhaarBox}</span>
-              <span className="cvs-esign-note">{labels.aadhaarBoxNote}</span>
-            </div>
-          );
-        })}
         {onPage.map((f) => renderField(f, ctx))}
         {flagged && at && (
           <>
@@ -650,7 +617,7 @@ export function SigningView({
       >
         <div className="cvs-progress-block" data-done={pending === 0 || undefined}>
           <p className="cvs-progress" id={`${id}-progress`} aria-live="polite">
-            {required.length === 0 && esignBoxes.length > 0
+            {required.length === 0 && recipient.auth === 'aadhaar'
               ? labels.aadhaarOnly
               : labels.progress(done, required.length)}
           </p>

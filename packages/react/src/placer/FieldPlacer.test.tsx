@@ -485,44 +485,31 @@ describe('FieldPlacer editing tools', () => {
       { ...recipient('r2', 'Ravi Kumar', 2), auth: 'aadhaar' as const },
     ];
 
-    it('offers the Aadhaar eSign box instead of a signature or initials', () => {
-      const { last } = setup({ recipients: withAadhaar });
-      expect(screen.queryByRole('button', { name: 'Aadhaar eSign' })).toBeNull();
+    it('offers nothing to place and says the eSign provider places the signature', () => {
+      setup({ recipients: withAadhaar });
       fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
-      expect(screen.queryByRole('button', { name: 'Signature' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Initials' })).toBeNull();
+      for (const name of ['Signature', 'Initials', 'Aadhaar eSign', 'Date signed', 'Text']) {
+        expect(screen.queryByRole('button', { name })).toBeNull();
+      }
       expect(screen.queryByRole('button', { name: 'Initials on every page' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Signature on last page' })).toBeNull();
       expect(
-        screen.getByText(/Ravi Kumar signs with Aadhaar eSign and draws nothing/),
-      ).toBeVisible();
-      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar eSign' }));
-      expect(last()).toEqual([
-        expect.objectContaining({
-          type: 'aadhaar',
-          recipientId: 'r2',
-          rect: expect.objectContaining({ width: 200, height: 64 }),
-          required: true,
-        }),
-      ]);
-      expect(screen.getByRole('button', { name: 'Date signed' })).toBeInTheDocument();
+        screen.getByText(/The eSign provider places the signature where its workflow says/),
+      ).toHaveTextContent(
+        'Ravi Kumar signs with Aadhaar eSign. The eSign provider places the signature where its workflow says, so you place no box and Ravi Kumar fills in nothing here.',
+      );
     });
 
-    it('puts the box on the last page and asks for it in the summary', () => {
-      const { last } = setup({
-        recipients: withAadhaar,
-        documents: [{ id: 'doc', source: letterSource(3) }],
-      });
+    it('asks for no signature for them in the summary', () => {
+      setup({ recipients: withAadhaar, documents: [{ id: 'doc', source: letterSource(3) }] });
       const summary = screen.getByRole('region', { name: 'Fields summary' });
-      expect(within(summary).getByText('No Aadhaar eSign box yet.')).toBeInTheDocument();
-      fireEvent.click(
-        within(summary).getByRole('button', { name: 'Add the Aadhaar eSign box for Ravi Kumar' }),
-      );
-      expect(last()).toEqual([
-        expect.objectContaining({ type: 'aadhaar', recipientId: 'r2', page: 2 }),
-      ]);
-      fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar eSign box on last page' }));
-      expect(last().filter((f) => f.type === 'aadhaar')).toHaveLength(2);
+      expect(
+        within(summary).getByText(
+          'Aadhaar eSign: no fields. The eSign provider places the signature.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(summary).queryByText(/Add a signature for Ravi Kumar/)).toBeNull();
+      expect(within(summary).getByText(/Add a signature for Asha Rao/)).toBeInTheDocument();
     });
   });
 });

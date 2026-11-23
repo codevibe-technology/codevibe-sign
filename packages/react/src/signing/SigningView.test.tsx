@@ -396,28 +396,23 @@ describe('SigningView with many signature boxes', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the Aadhaar eSign box as a note and finishes without a value for it', async () => {
-    const { onSubmit } = setup({
-      fields: [
-        field('box', 'aadhaar', 'r1', { y: 600, width: 200, height: 64 }),
-        field('city', 'text', 'r1', { y: 200 }),
-      ],
-    });
-    const box = screen.getByRole('note', { name: /^Aadhaar eSign:/ });
-    expect(box).toHaveTextContent('You sign here with Aadhaar eSign after you finish');
-    expect(screen.queryByRole('button', { name: /Signature/ })).toBeNull();
-    expect(screen.getByText('0 of 1 required fields done')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Text, required' }), {
-      target: { value: 'Pune' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
-    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
-    expect(onSubmit.mock.calls[0]![0]).toEqual([{ fieldId: 'city', value: 'Pune' }]);
+  it('says there is nothing to fill in for an Aadhaar eSign signer', () => {
+    setup({ fields: [], recipient: { ...asha, auth: 'aadhaar' } });
+    expect(
+      screen.getByText('Nothing to fill in. Read the document, then continue to Aadhaar eSign.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/required fields done/)).toBeNull();
   });
 
-  it('says there is nothing to fill in when the Aadhaar eSign box is all there is', () => {
-    setup({ fields: [field('box', 'aadhaar', 'r1', { y: 600, width: 200, height: 64 })] });
-    expect(screen.getByText('Nothing to fill in. Read the document, then continue.')).toBeTruthy();
-    expect(screen.queryByText(/required fields done/)).toBeNull();
+  it('does not show the Aadhaar eSign box of an envelope sent while it existed', async () => {
+    const { onSubmit } = setup({
+      fields: [field('box', 'aadhaar', 'r1', { y: 600, width: 200, height: 64 })],
+      recipient: { ...asha, auth: 'aadhaar' },
+    });
+    expect(screen.queryByRole('note', { name: /Aadhaar eSign/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Signature/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0]![0]).toEqual([]);
   });
 });

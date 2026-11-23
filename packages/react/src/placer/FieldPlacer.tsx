@@ -79,9 +79,10 @@ export interface FieldPlacerLabels extends ViewerLabels {
   presets: string;
   initialsEveryPage: string;
   signatureLastPage: string;
-  /** The "Signature on last page" preset for a signer who signs with Aadhaar eSign. */
-  aadhaarLastPage: string;
-  /** Under the field tray while an Aadhaar eSign signer is picked. */
+  /**
+   * In place of the field tray while an Aadhaar eSign signer is picked: they get no fields,
+   * because the eSign provider places their signature.
+   */
   aadhaarHint: (name: string) => string;
   placeFromTags: (count: number) => string;
   tagsPlaced: (placed: number, unmatched: number) => string;
@@ -109,8 +110,8 @@ export interface FieldPlacerLabels extends ViewerLabels {
   summaryCounts: (required: number, optional: number) => string;
   noSignature: string;
   addSignatureFor: (name: string) => string;
-  noAadhaarBox: string;
-  addAadhaarBoxFor: (name: string) => string;
+  /** In the summary, for an Aadhaar eSign signer. */
+  aadhaarSummary: string;
   showField: string;
   fieldLabel: string;
   fieldLabelHint: string;
@@ -177,9 +178,8 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   presets: 'Quick add',
   initialsEveryPage: 'Initials on every page',
   signatureLastPage: 'Signature on last page',
-  aadhaarLastPage: 'Aadhaar eSign box on last page',
   aadhaarHint: (name) =>
-    `${name} signs with Aadhaar eSign and draws nothing. Place one Aadhaar eSign box where the signature belongs.`,
+    `${name} signs with Aadhaar eSign. The eSign provider places the signature where its workflow says, so you place no box and ${name} fills in nothing here.`,
   placeFromTags: (count) => `Place fields from tags (found ${count})`,
   tagsPlaced: (placed, unmatched) =>
     unmatched === 0
@@ -217,8 +217,7 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   },
   noSignature: 'No signature field yet.',
   addSignatureFor: (name) => `Add a signature for ${name}`,
-  noAadhaarBox: 'No Aadhaar eSign box yet.',
-  addAadhaarBoxFor: (name) => `Add the Aadhaar eSign box for ${name}`,
+  aadhaarSummary: 'Aadhaar eSign: no fields. The eSign provider places the signature.',
   showField: 'Show it',
   fieldLabel: 'Label',
   fieldLabelHint: 'The name the signer sees on this field.',
@@ -259,12 +258,7 @@ interface TrayItem {
 const TRAY: { group: keyof FieldPlacerLabels['trayGroups']; items: TrayItem[] }[] = [
   {
     group: 'signature',
-    items: [
-      { type: 'signature' },
-      { type: 'initials' },
-      { type: 'aadhaar' },
-      { type: 'date_signed' },
-    ],
+    items: [{ type: 'signature' }, { type: 'initials' }, { type: 'date_signed' }],
   },
   {
     group: 'details',
@@ -928,16 +922,13 @@ export function FieldPlacer({
     gesture.current = null;
     const added = Object.entries(pageSizes).flatMap(([documentId, pages]) =>
       pages.length > 0
-        ? signatureOnLastPage(
-            {
-              documentId,
-              recipientId: recipient.id,
-              pages,
-              createId: makeId,
-              ...(fieldSizes ? { sizes: fieldSizes } : {}),
-            },
-            recipient.auth === 'aadhaar' ? 'aadhaar' : 'signature',
-          )
+        ? signatureOnLastPage({
+            documentId,
+            recipientId: recipient.id,
+            pages,
+            createId: makeId,
+            ...(fieldSizes ? { sizes: fieldSizes } : {}),
+          })
         : [],
     );
     placement.addFields(added);
@@ -1089,11 +1080,8 @@ export function FieldPlacer({
   const activeColor = recipientColorIndex(signers, placement.recipientId ?? '');
   const active = signers.find((r) => r.id === placement.recipientId);
   const aadhaarActive = active?.auth === 'aadhaar';
-  // An Aadhaar eSign signer gets the Aadhaar eSign box instead of drawn signatures; nobody
-  // else is offered the box.
-  const offered = fieldTypes.filter((type) =>
-    aadhaarActive ? type !== 'signature' && type !== 'initials' : type !== 'aadhaar',
-  );
+  // An Aadhaar eSign signer is offered nothing to place, and nobody is offered the box.
+  const offered: FieldType[] = aadhaarActive ? [] : fieldTypes.filter((t) => t !== 'aadhaar');
   const noSigners = signers.length === 0;
   const zoomPercent = Math.round(zoom * 100);
   const zoomChoices = ZOOM_STEPS.includes(zoom)
@@ -1185,49 +1173,55 @@ export function FieldPlacer({
             );
           })}
         </div>
-        <p className="cvs-hint" id={`${id}-palette-hint`}>
+        <p
+          className={aadhaarActive ? 'cvs-hint cvs-hint--esign' : 'cvs-hint'}
+          id={`${id}-palette-hint`}
+          role={aadhaarActive ? 'note' : undefined}
+        >
           {aadhaarActive && active ? labels.aadhaarHint(active.name) : labels.paletteHint}
         </p>
 
-        <h3 className="cvs-panel-title">{labels.presets}</h3>
-        <div className="cvs-presets" role="group" aria-label={labels.presets}>
-          {!aadhaarActive && (
-            <button
-              type="button"
-              className="cvs-button cvs-button--quiet"
-              disabled={noSigners || previewing}
-              onClick={() => {
-                gesture.current = null;
-                placement.addInitialsEveryPage();
-              }}
-            >
-              <Icon name="initials" />
-              {labels.initialsEveryPage}
-            </button>
-          )}
-          <button
-            type="button"
-            className="cvs-button cvs-button--quiet"
-            disabled={noSigners || previewing}
-            onClick={() => {
-              gesture.current = null;
-              placement.addSignatureLastPage();
-            }}
-          >
-            <Icon name={aadhaarActive ? 'aadhaar' : 'signature'} />
-            {aadhaarActive ? labels.aadhaarLastPage : labels.signatureLastPage}
-          </button>
-          {tagCount > 0 && !tagsUsed && (
-            <button
-              type="button"
-              className="cvs-button cvs-button--primary"
-              disabled={noSigners || previewing}
-              onClick={placeFromTags}
-            >
-              {labels.placeFromTags(tagCount)}
-            </button>
-          )}
-        </div>
+        {!aadhaarActive && (
+          <>
+            <h3 className="cvs-panel-title">{labels.presets}</h3>
+            <div className="cvs-presets" role="group" aria-label={labels.presets}>
+              <button
+                type="button"
+                className="cvs-button cvs-button--quiet"
+                disabled={noSigners || previewing}
+                onClick={() => {
+                  gesture.current = null;
+                  placement.addInitialsEveryPage();
+                }}
+              >
+                <Icon name="initials" />
+                {labels.initialsEveryPage}
+              </button>
+              <button
+                type="button"
+                className="cvs-button cvs-button--quiet"
+                disabled={noSigners || previewing}
+                onClick={() => {
+                  gesture.current = null;
+                  placement.addSignatureLastPage();
+                }}
+              >
+                <Icon name="signature" />
+                {labels.signatureLastPage}
+              </button>
+              {tagCount > 0 && !tagsUsed && (
+                <button
+                  type="button"
+                  className="cvs-button cvs-button--primary"
+                  disabled={noSigners || previewing}
+                  onClick={placeFromTags}
+                >
+                  {labels.placeFromTags(tagCount)}
+                </button>
+              )}
+            </div>
+          </>
+        )}
         <p className={notice?.error ? 'cvs-error' : 'cvs-hint'} role="status">
           {notice?.text}
         </p>

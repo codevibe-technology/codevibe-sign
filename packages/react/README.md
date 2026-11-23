@@ -263,9 +263,11 @@ When pdf.js can read the document's text, tags such as `{{signature:1}}` are fou
 "Place fields from tags" covers each with a field. The number is the recipient's place in
 the signing order. Types: `signature`, `initials`, `date`, `name`, `text`, `checkbox`.
 
-For a recipient with `auth: 'aadhaar'` the placer offers the **Aadhaar eSign** box instead of
-signature and initials, and `SigningView` shows that box as a note the signer does not fill:
-they sign it at the eSign provider.
+A recipient with `auth: 'aadhaar'` has no fields: the eSign provider places their signature
+where its own workflow says. While such a signer is picked the placer offers nothing to
+place and says so (`aadhaarHint`), the summary notes it (`aadhaarSummary`) and asks for no
+signature. Pass `recipient.auth` to `SigningView` and its bar says there is nothing to fill
+in (`aadhaarOnly`); an `aadhaar` box of an envelope sent while it existed is not shown.
 
 With the same text, a signature or initials field that covers page text gets a dashed
 outline and an "Over text" badge, and the side panel says how many do. It is a warning

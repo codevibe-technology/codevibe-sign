@@ -389,9 +389,9 @@ export function FieldsSummary({
         {recipients.map((r) => {
           const own = fields.filter((f) => f.recipientId === r.id);
           const required = own.filter((f) => f.required).length;
-          const aadhaar = r.auth === 'aadhaar';
+          const aadhaar = r.auth === 'aadhaar' && r.role === 'signer';
           const missingSignature =
-            r.role === 'signer' && !own.some((f) => f.type === (aadhaar ? 'aadhaar' : 'signature'));
+            r.role === 'signer' && !aadhaar && !own.some((f) => f.type === 'signature');
           const color = recipientColorIndex(recipients, r.id);
           return (
             <li key={r.id} className="cvs-summary-row" data-cvs-color={color}>
@@ -414,12 +414,18 @@ export function FieldsSummary({
                   </button>
                 )}
               </div>
+              {aadhaar && (
+                <p className="cvs-summary-note">
+                  <Icon name="aadhaar" />
+                  <span>{labels.aadhaarSummary}</span>
+                </p>
+              )}
               {missingSignature && (
                 <div className="cvs-summary-warning">
                   <Icon name="warning" />
-                  <span>{aadhaar ? labels.noAadhaarBox : labels.noSignature}</span>
+                  <span>{labels.noSignature}</span>
                   <button type="button" className="cvs-link" onClick={() => onAddSignature(r)}>
-                    {aadhaar ? labels.addAadhaarBoxFor(r.name) : labels.addSignatureFor(r.name)}
+                    {labels.addSignatureFor(r.name)}
                   </button>
                 </div>
               )}
