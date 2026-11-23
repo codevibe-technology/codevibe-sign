@@ -160,9 +160,10 @@ What a PDF reader shows for the seal is explained in [How the seal works in PDF 
 <!-- plans:end -->
 
 - **Free** is a workspace on sign.codevibe.in at no charge.
-- **Cloud** is Rs 999 a month for a workspace, or Rs 9,990 for a year (ten months), plus 18% GST.
-  Members beyond the 25 included are Rs 99 each a month. You pay for each term up front from
-  Settings, Plan and usage, and get a GST tax invoice; nothing is charged automatically.
+- **Cloud** is Rs 999 a month for your account, with as many workspaces as you need, or
+  Rs 9,990 for a year (ten months), plus 18% GST. Members beyond the 25 included are Rs 99 each
+  a month. You pay for each term up front from Settings, Plan and usage, and get a GST tax
+  invoice; nothing is charged automatically.
 - **Self-hosted** is the same app on your own server with Docker: free, with no usage limits,
   and your documents never leave your server. If you want it installed for you, installation
   help is Rs 1,999 plus GST, done within 4 working hours: see
@@ -392,7 +393,7 @@ For most business documents, yes: a contract formed by electronic means is valid
 <details>
 <summary><b>Is it really free?</b></summary>
 
-Yes. The Free cloud plan costs nothing and needs no card. Self-hosting is free with no limits on envelopes, members or storage. The cloud runs the same code you can download; nothing is held back for a paid edition.
+Yes. The Free cloud plan costs nothing and needs no card; Cloud, for teams that send every day, is paid (see [Plans](#plans)), and Aadhaar eSign is paid per completed eSign. Self-hosting is free with no limits on envelopes, members or storage. The cloud runs the same code you can download; nothing is held back for a paid edition.
 
 </details>
 

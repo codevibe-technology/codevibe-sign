@@ -20,11 +20,29 @@ the minor version and says so in its first line.
   `codevibe-sign-server` command (`start` and `start --memory`), the Docker image and the
   `deploy/` set-up for the whole web app.
 - **The libraries** `sign-core`, `sign-pdf`, `sign-client`, `sign-react`, `sign-templates` and
-  `sign-aadhaar` (Apache-2.0). `sign-aadhaar` is a standalone library for now; the server and
-  the web app do not call it yet.
+  `sign-aadhaar` (Apache-2.0). The server and the web app use `sign-aadhaar` for Aadhaar eSign
+  through Leegality.
 - **Workspaces** in the server: envelopes, API keys and webhooks belong to a workspace, each
   with its own mail templates, sender details and time zone for signed documents.
 - **Webhooks** with a delivery log, test deliveries and redelivery.
+
+### Aadhaar eSign
+
+- A sender can ask one signer, who signs last, to sign with Aadhaar eSign through Leegality.
+  The signer confirms with an Aadhaar OTP; the provider's signed file is kept byte for byte,
+  the seal is added after it, and the signing certificate is a separate sealed PDF.
+- On sign.codevibe.in each completed eSign is paid with prepaid credits, and an eSign that is
+  not completed costs nothing. On Cloud you can connect your own Leegality account instead;
+  self-hosted installs use their own account.
+
+### Plans
+
+- Plans belong to the account. Free has one workspace; Cloud has as many as you need under one
+  subscription. Limits on members, templates and API requests count across your workspaces.
+- Cloud is Rs 999 a month, or Rs 9,990 for a year, plus GST, with 25 members included and
+  Rs 99 a month for each member beyond them. Each term is paid up front with a GST tax invoice;
+  nothing is charged automatically.
+- Self-hosting stays free and unlimited. Installation help is Rs 1,999 plus GST.
 
 ### In the API
 
