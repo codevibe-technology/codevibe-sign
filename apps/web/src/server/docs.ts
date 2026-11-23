@@ -11,6 +11,8 @@ const TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.webm': 'video/webm',
+  '.mp4': 'video/mp4',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
@@ -66,10 +68,39 @@ export function cleanDocsPath(segments: string[]): string | null {
 }
 
 /**
- * Serves the built docs site; assets are fingerprinted, so they are cached for a year. A page
- * asked for by its `.html` file is sent on to its clean address, keeping `search`.
+ * The bytes a `Range: bytes=…` header asks for, as an inclusive `[start, end]`, null when it
+ * asks for something else (the whole file is sent then), or `'unsatisfiable'` when it starts
+ * past the end. Only a single range is honoured: video players ask for one at a time.
  */
-export async function serveDocs(segments: string[], head = false, search = ''): Promise<Response> {
+export function byteRange(
+  header: string | null | undefined,
+  size: number,
+): [number, number] | 'unsatisfiable' | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header?.trim() ?? '');
+  if (!match || (match[1] === '' && match[2] === '')) return null;
+  if (match[1] === '') {
+    const suffix = Number(match[2]);
+    if (suffix === 0) return 'unsatisfiable';
+    return [Math.max(0, size - suffix), size - 1];
+  }
+  const start = Number(match[1]);
+  const end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
+  if (start >= size) return 'unsatisfiable';
+  if (end < start) return null;
+  return [start, end];
+}
+
+/**
+ * Serves the built docs site; assets are fingerprinted, so they are cached for a year. A page
+ * asked for by its `.html` file is sent on to its clean address, keeping `search`. A `range`
+ * header gets the part it asks for, which Safari needs before it plays a video.
+ */
+export async function serveDocs(
+  segments: string[],
+  head = false,
+  search = '',
+  range: string | null = null,
+): Promise<Response> {
   const root = docsDir();
   const file = await resolveDocsFile(root, segments);
   const clean = file ? cleanDocsPath(segments) : null;
@@ -91,15 +122,36 @@ export async function serveDocs(segments: string[], head = false, search = ''): 
     });
   }
   const immutable = segments[0] === 'assets';
+  const headers: Record<string, string> = {
+    'content-type': TYPES[extname(path)] ?? 'application/octet-stream',
+    'content-length': String(body.byteLength),
+    'accept-ranges': 'bytes',
+    'cache-control':
+      immutable && file
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=0, must-revalidate',
+  };
+  const part = file ? byteRange(range, body.byteLength) : null;
+  if (part === 'unsatisfiable') {
+    return new Response(null, {
+      status: 416,
+      headers: { 'content-range': `bytes */${body.byteLength}`, 'accept-ranges': 'bytes' },
+    });
+  }
+  if (part) {
+    const [start, end] = part;
+    const slice = body.subarray(start, end + 1);
+    return new Response(head ? null : (slice as BodyInit), {
+      status: 206,
+      headers: {
+        ...headers,
+        'content-length': String(slice.byteLength),
+        'content-range': `bytes ${start}-${end}/${body.byteLength}`,
+      },
+    });
+  }
   return new Response(head ? null : (body as BodyInit), {
     status: file ? 200 : 404,
-    headers: {
-      'content-type': TYPES[extname(path)] ?? 'application/octet-stream',
-      'content-length': String(body.byteLength),
-      'cache-control':
-        immutable && file
-          ? 'public, max-age=31536000, immutable'
-          : 'public, max-age=0, must-revalidate',
-    },
+    headers,
   });
 }

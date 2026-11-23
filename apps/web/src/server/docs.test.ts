@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanDocsPath, resolveDocsFile, serveDocs } from './docs';
+import { byteRange, cleanDocsPath, resolveDocsFile, serveDocs } from './docs';
 
 describe('docs files', () => {
   let root: string;
@@ -17,6 +17,8 @@ describe('docs files', () => {
     writeFileSync(join(root, 'guides', 'webhooks.html'), 'hooks');
     writeFileSync(join(root, 'assets', 'app.abc.js'), 'js');
     writeFileSync(join(root, 'openapi.json'), '{}');
+    mkdirSync(join(root, 'clips'));
+    writeFileSync(join(root, 'clips', 'send.mp4'), '0123456789');
     writeFileSync(join(root, 'codevibe-sign-seal.crt'), 'cert');
     writeFileSync(join(root, 'section-63-certificate-template.md'), '# Template');
     vi.stubEnv('DOCS_DIR', root);
@@ -96,5 +98,44 @@ describe('docs files', () => {
     expect(head.status).toBe(200);
     expect(head.headers.get('content-length')).toBe('13');
     expect(await head.text()).toBe('');
+  });
+
+  it('serves clips with their video type and the part a range asks for', async () => {
+    const whole = await serveDocs(['clips', 'send.mp4']);
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get('content-type')).toBe('video/mp4');
+    expect(whole.headers.get('accept-ranges')).toBe('bytes');
+
+    const part = await serveDocs(['clips', 'send.mp4'], false, '', 'bytes=2-5');
+    expect(part.status).toBe(206);
+    expect(part.headers.get('content-range')).toBe('bytes 2-5/10');
+    expect(part.headers.get('content-length')).toBe('4');
+    expect(await part.text()).toBe('2345');
+
+    const past = await serveDocs(['clips', 'send.mp4'], false, '', 'bytes=20-');
+    expect(past.status).toBe(416);
+    expect(past.headers.get('content-range')).toBe('bytes */10');
+  });
+});
+
+describe('byte ranges', () => {
+  it('reads open, closed and suffix ranges', () => {
+    expect(byteRange('bytes=0-', 10)).toEqual([0, 9]);
+    expect(byteRange('bytes=0-1', 10)).toEqual([0, 1]);
+    expect(byteRange('bytes=4-99', 10)).toEqual([4, 9]);
+    expect(byteRange('bytes=-3', 10)).toEqual([7, 9]);
+  });
+
+  it('sends the whole file for anything it does not handle', () => {
+    expect(byteRange(null, 10)).toBeNull();
+    expect(byteRange('bytes=-', 10)).toBeNull();
+    expect(byteRange('bytes=0-1,4-5', 10)).toBeNull();
+    expect(byteRange('items=0-1', 10)).toBeNull();
+    expect(byteRange('bytes=5-2', 10)).toBeNull();
+  });
+
+  it('refuses a range that starts past the end', () => {
+    expect(byteRange('bytes=10-', 10)).toBe('unsatisfiable');
+    expect(byteRange('bytes=-0', 10)).toBe('unsatisfiable');
   });
 });
