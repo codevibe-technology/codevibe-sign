@@ -27,11 +27,17 @@ export const PRICING_PATH = '/#pricing';
 /** The page where a workspace changes its plan. */
 export const planPagePath = (slug: string) => `/dashboard/${slug}/settings/plan`;
 
-/** What a plan allows. `null` means no limit. */
+/**
+ * What a plan allows. `null` means no limit. A plan belongs to an account, and every count
+ * here is taken across all the workspaces of that account.
+ */
 export interface PlanLimits {
   /** Envelopes sent per calendar month (UTC), bulk-sent ones included. */
   envelopesPerMonth: number | null;
-  /** Members plus open invitations. On Cloud, extra members a workspace pays for are added. */
+  /**
+   * People in the account's workspaces, each counted once, plus open invitations. On Cloud,
+   * extra members the account pays for are added.
+   */
   members: number | null;
   /** Templates that are not archived. */
   activeTemplates: number | null;
@@ -47,14 +53,14 @@ export interface PlanLimits {
   fileBytes: number | null;
   /** All the PDFs of one envelope. */
   envelopeBytes: number | null;
-  /** Every document uploaded to the workspace, for envelopes and templates. */
+  /** Every document uploaded to the account's workspaces, for envelopes and templates. */
   storageBytes: number | null;
-  /** Workspaces on this plan one person may own. */
+  /** Workspaces the account may hold. */
   ownedWorkspaces: number | null;
   customDomain: boolean;
   /** The "Secured by Codevibe Sign" badge cannot be turned off. */
   badgeRequired: boolean;
-  /** Aadhaar eSign through the workspace's own eSign provider account. */
+  /** Aadhaar eSign through the account's own eSign provider account. */
   ownEsignAccount: boolean;
 }
 
@@ -183,8 +189,8 @@ export interface PlanSettings {
 }
 
 /**
- * The limits a workspace on `plan` works within. Self-hosted installs have none. `extraSeats`
- * are the members a Cloud workspace pays for on top of the included ones.
+ * The limits an account on `plan` works within. Self-hosted installs have none. `extraSeats`
+ * are the members a Cloud account pays for on top of the included ones.
  */
 export function limitsFor(plan: Plan, settings: PlanSettings, extraSeats = 0): PlanLimits {
   if (settings.mode === 'self-hosted') return UNLIMITED_LIMITS;
@@ -263,8 +269,9 @@ export interface Meter {
 
 /** The limits that have a running count, as the Plan and usage page shows them. */
 export const METERS: readonly Meter[] = [
+  { key: 'ownedWorkspaces', label: 'Workspaces', unit: 'count', period: 'total' },
   { key: 'envelopesPerMonth', label: 'Envelopes sent this month', unit: 'count', period: 'month' },
-  { key: 'members', label: 'Members and open invitations', unit: 'count', period: 'total' },
+  { key: 'members', label: 'People and open invitations', unit: 'count', period: 'total' },
   { key: 'activeTemplates', label: 'Active templates', unit: 'count', period: 'total' },
   { key: 'webhooks', label: 'Webhook endpoints', unit: 'count', period: 'total' },
   {
@@ -314,6 +321,16 @@ export function planFeatures(settings: PlanSettings): PlanFeature[] {
   const fair = (text: string) => `${text} (fair use)`;
   return [
     {
+      key: 'ownedWorkspaces',
+      label: 'Workspaces',
+      free: amount(free.ownedWorkspaces, 'workspace'),
+      cloud:
+        cloud.ownedWorkspaces === null
+          ? 'Unlimited workspaces, one subscription'
+          : amount(cloud.ownedWorkspaces, 'workspace'),
+      selfHosted: NO_LIMIT,
+    },
+    {
       key: 'envelopesPerMonth',
       label: 'Envelopes sent',
       free: `${amount(free.envelopesPerMonth, 'envelope')} a month`,
@@ -323,14 +340,14 @@ export function planFeatures(settings: PlanSettings): PlanFeature[] {
     {
       key: 'members',
       label: 'Members',
-      free: amount(free.members, 'member'),
-      cloud: `${amount(cloud.members, 'member')} included, more can be added`,
+      free: `${amount(free.members, 'member')} across your workspaces`,
+      cloud: `${amount(cloud.members, 'member')} included across your workspaces, more can be added`,
       selfHosted: NO_LIMIT,
     },
     {
       key: 'activeTemplates',
       label: 'Active templates',
-      free: amount(free.activeTemplates, 'template'),
+      free: `${amount(free.activeTemplates, 'template')} across your workspaces`,
       cloud: amount(cloud.activeTemplates, 'template'),
       selfHosted: NO_LIMIT,
     },
@@ -344,7 +361,7 @@ export function planFeatures(settings: PlanSettings): PlanFeature[] {
     {
       key: 'apiRequestsPerMonth',
       label: 'API requests',
-      free: `${amount(free.apiRequestsPerMonth, 'request')} a month`,
+      free: `${amount(free.apiRequestsPerMonth, 'request')} a month across your workspaces`,
       cloud:
         cloud.apiRequestsPerDay === null
           ? NO_LIMIT

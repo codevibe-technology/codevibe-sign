@@ -5,20 +5,21 @@ same audit trail; the plans differ in limits and in who runs the server.
 
 <!-- plans:start -->
 
-|                                         | Free                               | Cloud                                                | Self-hosted                          |
-| --------------------------------------- | ---------------------------------- | ---------------------------------------------------- | ------------------------------------ |
-| Envelopes sent                          | 10 envelopes a month               | Unlimited                                            | Unlimited                            |
-| Members                                 | 2 members                          | 25 members included, more can be added               | Unlimited                            |
-| Active templates                        | 2 templates                        | Unlimited                                            | Unlimited                            |
-| Bulk send                               | Up to 10 rows in one send          | Up to 500 rows in one send (fair use)                | Unlimited                            |
-| API requests                            | 100 requests a month               | Unlimited, up to 10,000 requests a day (fair use)    | Unlimited                            |
-| Webhooks                                | Not included                       | Up to 10 endpoints (fair use)                        | Included                             |
-| PDF size                                | 10 MB a file, 25 MB an envelope    | 25 MB a file, 100 MB an envelope                     | Set by you                           |
-| Stored documents                        | 200 MB                             | 20 GB (fair use)                                     | Your own disk                        |
-| Your own signing domain                 | Not included                       | Included                                             | Included                             |
-| "Secured by Codevibe Sign" badge        | Always shown                       | Optional                                             | Optional                             |
-| Aadhaar eSign                           | Pay per eSign with prepaid credits | Pay per eSign with prepaid credits, at a lower price | With your own eSign provider account |
-| Connect your own eSign provider account | Not included                       | Included                                             | Included                             |
+|                                         | Free                                        | Cloud                                                         | Self-hosted                          |
+| --------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- | ------------------------------------ |
+| Workspaces                              | 1 workspace                                 | Unlimited workspaces, one subscription                        | Unlimited                            |
+| Envelopes sent                          | 10 envelopes a month                        | Unlimited                                                     | Unlimited                            |
+| Members                                 | 2 members across your workspaces            | 25 members included across your workspaces, more can be added | Unlimited                            |
+| Active templates                        | 2 templates across your workspaces          | Unlimited                                                     | Unlimited                            |
+| Bulk send                               | Up to 10 rows in one send                   | Up to 500 rows in one send (fair use)                         | Unlimited                            |
+| API requests                            | 100 requests a month across your workspaces | Unlimited, up to 10,000 requests a day (fair use)             | Unlimited                            |
+| Webhooks                                | Not included                                | Up to 10 endpoints (fair use)                                 | Included                             |
+| PDF size                                | 10 MB a file, 25 MB an envelope             | 25 MB a file, 100 MB an envelope                              | Set by you                           |
+| Stored documents                        | 200 MB                                      | 20 GB (fair use)                                              | Your own disk                        |
+| Your own signing domain                 | Not included                                | Included                                                      | Included                             |
+| "Secured by Codevibe Sign" badge        | Always shown                                | Optional                                                      | Optional                             |
+| Aadhaar eSign                           | Pay per eSign with prepaid credits          | Pay per eSign with prepaid credits, at a lower price          | With your own eSign provider account |
+| Connect your own eSign provider account | Not included                                | Included                                                      | Included                             |
 
 <!-- plans:end -->
 

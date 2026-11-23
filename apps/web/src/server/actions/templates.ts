@@ -15,7 +15,7 @@ import { db } from '../db';
 import { recordSender } from '../envelopes';
 import { AppError } from '../errors';
 import { inspectUpload } from '../pdf';
-import { assertSendsLeft, assertWithin, usageOf, workspacePlan } from '../plans';
+import { assertSendsLeft, assertWithin, accountUsageOf, workspacePlan } from '../plans';
 import { appRuntime } from '../runtime';
 import { signRequest } from '../sign/client';
 import { roleField, sendFromTemplate } from '../template-send';
@@ -203,8 +203,8 @@ export const startBulkSendAction = workspaceAction(
     }
     const plan = await workspacePlan(sql, ctx.workspace.id);
     assertWithin(plan, 'bulkRows', preview.ready.length, 'csv');
-    if (plan.limits.envelopesPerMonth !== null) {
-      const sent = await usageOf(sql, ctx.workspace.id, 'envelopes_sent');
+    if (plan.accountId && plan.limits.envelopesPerMonth !== null) {
+      const sent = await accountUsageOf(sql, plan.accountId, 'envelopes_sent');
       assertSendsLeft(plan, sent, preview.ready.length);
     }
     const bulkId = await createBulkSend(sql, {

@@ -12,7 +12,13 @@ import {
 } from '@/lib/webhooks';
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
-import { assertRoom, assertWebhooksIncluded, lockedPlan, workspacePlan } from './plans';
+import {
+  assertRoom,
+  assertWebhooksIncluded,
+  countWebhooks,
+  lockedPlan,
+  workspacePlan,
+} from './plans';
 import { userLabel } from './profile';
 
 type Sql = postgres.Sql;
@@ -102,7 +108,7 @@ export async function createWebhook(
     const [count] = await tx<{ n: number }[]>`
       select count(*)::int as n from app_webhooks where workspace_id = ${input.workspaceId}`;
     const used = count?.n ?? 0;
-    assertRoom(plan, 'webhooks', used);
+    if (plan) assertRoom(plan, 'webhooks', await countWebhooks(tx, plan.accountId));
     if (used >= MAX_WEBHOOKS) {
       throw new AppError(
         'CONFLICT',

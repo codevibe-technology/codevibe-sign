@@ -16,7 +16,14 @@ import {
 } from '@/lib/templates';
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
-import { assertRoom, assertWithin, lockedPlan, reserveUsage, workspacePlan } from './plans';
+import {
+  assertRoom,
+  assertWithin,
+  countActiveTemplates,
+  lockedPlan,
+  reserveUsage,
+  workspacePlan,
+} from './plans';
 import { userLabel } from './profile';
 
 type Sql = postgres.Sql;
@@ -216,24 +223,18 @@ const SELECT = (sql: Sql) => sql`
     t.updated_at as "updatedAt", t.archived_at as "archivedAt"
   from app_templates t left join auth_users u on u.id = t.created_by`;
 
-async function activeTemplates(sql: Sql | postgres.TransactionSql, workspaceId: string) {
-  const [row] = await sql<{ n: number }[]>`select count(*)::int as n from app_templates
-    where workspace_id = ${workspaceId} and archived_at is null`;
-  return row?.n ?? 0;
-}
-
 /** Refuses early, before any file is copied, when the plan has no room for another template. */
 async function precheckRoom(sql: Sql, workspaceId: string) {
   const plan = await workspacePlan(sql, workspaceId);
-  if (plan.limits.activeTemplates !== null) {
-    assertRoom(plan, 'activeTemplates', await activeTemplates(sql, workspaceId));
+  if (plan.accountId && plan.limits.activeTemplates !== null) {
+    assertRoom(plan, 'activeTemplates', await countActiveTemplates(sql, plan.accountId));
   }
 }
 
 /**
  * Inserts a template under the plan: the count of active templates, the size of its PDFs and
- * the workspace's stored bytes are checked with the workspace locked, so they hold under
- * concurrent saves. The template's files are removed again when it is refused.
+ * the account's stored bytes are checked with the account locked, so they hold under
+ * concurrent saves in any of its workspaces. The template's files are removed again when it is refused.
  */
 export async function insertTemplate(
   sql: Sql,
@@ -253,7 +254,7 @@ export async function insertTemplate(
     await sql.begin(async (tx) => {
       const plan = await lockedPlan(tx, row.workspaceId);
       if (plan) {
-        assertRoom(plan, 'activeTemplates', await activeTemplates(tx, row.workspaceId));
+        assertRoom(plan, 'activeTemplates', await countActiveTemplates(tx, plan.accountId));
         assertWithin(plan, 'envelopeBytes', bytes, 'documents');
         await reserveUsage(tx, { id: row.workspaceId, ...plan }, 'storage_bytes', bytes);
       }
@@ -375,7 +376,9 @@ export async function setTemplateArchived(
     ? await flipArchived(sql, workspaceId, id, archived)
     : await sql.begin(async (tx) => {
         const plan = await lockedPlan(tx, workspaceId);
-        if (plan) assertRoom(plan, 'activeTemplates', await activeTemplates(tx, workspaceId));
+        if (plan) {
+          assertRoom(plan, 'activeTemplates', await countActiveTemplates(tx, plan.accountId));
+        }
         return flipArchived(tx, workspaceId, id, archived);
       });
   if (!changed) {

@@ -1,12 +1,19 @@
 import 'server-only';
 import type postgres from 'postgres';
-import { PLAN_NAMES, limitsFor, upgradeHint, type Plan, type PlanSettings } from '@/lib/plans';
+import { limitsFor, type Plan, type PlanSettings } from '@/lib/plans';
 import { isTimeZone } from '@/lib/preferences';
 import { suggestAddress } from '@/lib/workspace-address';
 import type { Role } from '@/lib/roles';
 import { randomId } from './crypto';
 import { AppError } from './errors';
-import { PlanLimitError, assertRoom, planSettings } from './plans';
+import { accountOfUser, accountWorkspaces, lockAccountOfUser, setAccountPlan } from './accounts';
+import {
+  assertRoom,
+  countAccountWorkspaces,
+  limitError,
+  planSettings,
+  type PlanLimitError,
+} from './plans';
 import {
   assertAddressFree,
   claimAddress,
@@ -47,38 +54,41 @@ export function cleanWorkspaceName(name: string): string {
 /**
  * Creates a workspace with `userId` as its owner and default brand settings, atomically. The
  * address is `slug` when given (refused with a field error when it is not free) or one made
- * from the name. In hosted mode it starts on the Free plan, and a person may own only so many
- * Free workspaces; the user's row is locked while they are counted, so two tabs cannot both
- * create one.
+ * from the name. The workspace joins the person's account, which is created with them when
+ * they have none: on the Free plan in hosted mode. An account holds only as many workspaces
+ * as its plan includes; its row is locked while they are counted, so two tabs cannot both
+ * create one. `plan` puts the account on that plan first, for the operator and for tests.
  */
 export async function createWorkspace(
   sql: postgres.Sql,
   input: { name: string; userId: string; slug?: string | undefined; plan?: Plan },
   settings: PlanSettings = planSettings(),
-): Promise<Workspace & { plan: Plan }> {
+): Promise<Workspace & { plan: Plan; accountId: string }> {
   const name = cleanWorkspaceName(input.name);
-  const plan = input.plan ?? (settings.mode === 'hosted' ? 'free' : 'unlimited');
+  const starting = input.plan ?? (settings.mode === 'hosted' ? 'free' : 'unlimited');
   try {
     return await sql.begin(async (tx) => {
-      const max = limitsFor(plan, settings).ownedWorkspaces;
-      if (max !== null) {
-        await tx`select 1 from auth_users where id = ${input.userId} for update`;
-        const [owned] = await tx<{ n: number }[]>`
-          select count(*)::int as n from app_members m join app_workspaces w on w.id = m.workspace_id
-          where m.user_id = ${input.userId} and m.role = 'owner' and w.plan = ${plan}`;
-        assertRoom({ plan, limits: limitsFor(plan, settings) }, 'ownedWorkspaces', owned?.n ?? 0);
+      const account = await lockAccountOfUser(tx, input.userId, starting);
+      if (input.plan && account.plan !== input.plan) {
+        await setAccountPlan(tx, account.id, { plan: input.plan, source: account.planSource });
+      }
+      const plan = input.plan ?? account.plan;
+      const limits = limitsFor(plan, settings, account.extraSeats);
+      if (limits.ownedWorkspaces !== null) {
+        const held = await countAccountWorkspaces(tx, account.id);
+        assertRoom({ plan, limits, accountId: account.id }, 'ownedWorkspaces', held, 1, 'name');
       }
       const slug = input.slug ?? (await addressFromName(tx, name));
       await lockAddresses(tx, [slug]);
       await assertAddressFree(tx, slug, null);
       await claimAddress(tx, slug);
       const id = randomId('ws');
-      await tx`insert into app_workspaces (id, slug, name, created_by, plan)
-        values (${id}, ${slug}, ${name}, ${input.userId}, ${plan})`;
+      await tx`insert into app_workspaces (id, slug, name, created_by, plan, account_id)
+        values (${id}, ${slug}, ${name}, ${input.userId}, ${plan}, ${account.id})`;
       await tx`insert into app_members (workspace_id, user_id, role)
         values (${id}, ${input.userId}, 'owner')`;
       await tx`insert into app_brand_settings (workspace_id) values (${id})`;
-      return { id, slug, name, plan };
+      return { id, slug, name, plan, accountId: account.id };
     });
   } catch (err) {
     if (isSlugConflict(err)) {
@@ -89,41 +99,27 @@ export async function createWorkspace(
 }
 
 /**
- * Refuses to make `userId` an owner of a workspace when its plan lets a person own only so
- * many and they already do. Creating a workspace is counted the same way, so becoming an
- * owner by promotion or by an owner's invitation cannot get around it. The user's row is
- * locked while the count is taken.
+ * Why the person cannot create another workspace now, for the page that would offer it: their
+ * account already holds as many as its plan includes. Null when they can. The check that
+ * counts is the one in `createWorkspace`; this only saves them filling in the form.
  */
-export async function assertCanOwn(
-  tx: postgres.TransactionSql,
-  input: { userId: string; workspaceId: string; field?: string },
+export async function newWorkspaceBlock(
+  sql: Sql,
+  userId: string,
   settings: PlanSettings = planSettings(),
-): Promise<void> {
-  if (settings.mode === 'self-hosted') return;
-  const [workspace] = await tx<{ plan: Plan }[]>`
-    select plan from app_workspaces where id = ${input.workspaceId}`;
-  if (!workspace) return;
-  const max = limitsFor(workspace.plan, settings).ownedWorkspaces;
-  if (max === null) return;
-  await tx`select 1 from auth_users where id = ${input.userId} for update`;
-  const [owned] = await tx<{ n: number }[]>`
-    select count(*)::int as n from app_members m join app_workspaces w on w.id = m.workspace_id
-    where m.user_id = ${input.userId} and m.role = 'owner' and w.plan = ${workspace.plan}
-      and w.id <> ${input.workspaceId}`;
-  const used = owned?.n ?? 0;
-  if (used < max) return;
-  const name = PLAN_NAMES[workspace.plan];
-  throw new PlanLimitError({
-    limit: 'ownedWorkspaces',
-    used,
-    max,
-    plan: workspace.plan,
-    ...(input.field ? { field: input.field } : {}),
-    message: `This person already owns ${used === 1 ? `a ${name} workspace` : `${used} ${name} workspaces`}, and each person can own ${max}. Give them another role here, or ${lowerFirst(upgradeHint(workspace.plan))}`,
-  });
+): Promise<{ error: PlanLimitError; slug: string | null } | null> {
+  if (settings.mode === 'self-hosted') return null;
+  const account = await accountOfUser(sql, userId);
+  if (!account) return null;
+  const limits = limitsFor(account.plan, settings, account.extraSeats);
+  if (limits.ownedWorkspaces === null) return null;
+  const held = await accountWorkspaces(sql, account.id);
+  if (held.length < limits.ownedWorkspaces) return null;
+  return {
+    error: limitError('ownedWorkspaces', held.length, limits.ownedWorkspaces, account.plan),
+    slug: held[0]?.slug ?? null,
+  };
 }
-
-const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 /** The address the name suggests, or the first free one numbered after it. */
 async function addressFromName(tx: postgres.TransactionSql, name: string): Promise<string> {

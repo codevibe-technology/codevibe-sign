@@ -175,11 +175,13 @@ describe('the plan comparison', () => {
   const row = (key: string) => rows.find((r) => r.key === key)!;
 
   it('is written from the limits', () => {
-    expect(row('members').free).toBe('2 members');
-    expect(row('members').cloud).toBe('25 members included, more can be added');
-    expect(row('activeTemplates').free).toBe('2 templates');
+    expect(row('members').free).toBe('2 members across your workspaces');
+    expect(row('members').cloud).toBe(
+      '25 members included across your workspaces, more can be added',
+    );
+    expect(row('activeTemplates').free).toBe('2 templates across your workspaces');
     expect(row('bulkRows').free).toBe('Up to 10 rows in one send');
-    expect(row('apiRequestsPerMonth').free).toBe('100 requests a month');
+    expect(row('apiRequestsPerMonth').free).toBe('100 requests a month across your workspaces');
     expect(row('webhooks').free).toBe('Not included');
     expect(row('ownEsignAccount').free).toBe('Not included');
     expect(row('ownEsignAccount').cloud).toBe('Included');
@@ -188,7 +190,7 @@ describe('the plan comparison', () => {
 
   it('follows an operator override', () => {
     const custom = planFeatures({ mode: 'hosted', freeOverrides: { members: 4 } });
-    expect(custom.find((r) => r.key === 'members')?.free).toBe('4 members');
+    expect(custom.find((r) => r.key === 'members')?.free).toBe('4 members across your workspaces');
   });
 
   it('describes the hosted plans even on a self-hosted install', () => {
@@ -204,7 +206,7 @@ describe('the plan comparison', () => {
     const table = planTableMarkdown(hosted);
     expect(table.split('\n')).toHaveLength(rows.length + 2);
     expect(table).toContain(
-      '| Members | 2 members | 25 members included, more can be added | Unlimited |',
+      '| Members | 2 members across your workspaces | 25 members included across your workspaces, more can be added | Unlimited |',
     );
     expect(PLAN_TABLE_START).not.toBe(PLAN_TABLE_END);
   });

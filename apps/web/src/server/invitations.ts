@@ -4,9 +4,8 @@ import { z } from 'zod';
 import { canManageRole, type Role } from '@/lib/roles';
 import { randomId, randomSecret, sha256Hex } from './crypto';
 import { AppError } from './errors';
-import { assertRoom, countSeats, lockedPlan } from './plans';
+import { assertRoom, countSeats, isAccountPerson, lockedPlan } from './plans';
 import { cleanPersonName, userLabel } from './profile';
-import { assertCanOwn } from './workspaces';
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -79,8 +78,10 @@ export async function createInvitation(
     await tx`update app_invitations set revoked_at = ${now}
       where workspace_id = ${input.workspaceId} and lower(email) = ${email}
         and accepted_at is null and revoked_at is null`;
-    if (plan) {
-      const seats = await countSeats(tx, input.workspaceId, now);
+    // Someone already in, or already invited to, one of the account's workspaces takes no
+    // further place.
+    if (plan && !(await isAccountPerson(tx, plan.accountId, { email }, now))) {
+      const seats = await countSeats(tx, plan.accountId, now);
       assertRoom(plan, 'members', seats.members + seats.invited, 1, 'email');
     }
     await tx`insert into app_invitations
@@ -146,7 +147,8 @@ export function invitationState(invitation: InvitationDetails, now = new Date())
 
 /**
  * Adds the signed-in user to the invitation's workspace. The invitation must be open and
- * addressed to the user's own email, and it can be used once.
+ * addressed to the user's own email, and it can be used once. The place it takes is counted
+ * against the account of that workspace, never the account of the person joining.
  */
 export async function acceptInvitation(
   sql: postgres.Sql,
@@ -172,14 +174,9 @@ export async function acceptInvitation(
       throw new AppError('NOT_FOUND', 'This invitation is no longer valid. Ask for a new one');
     }
     const plan = await lockedPlan(tx, invitation.workspaceId);
-    if (plan) {
-      const [count] = await tx<{ members: number; joined: boolean }[]>`
-        select count(*)::int as members, bool_or(user_id = ${user.id}) as joined
-        from app_members where workspace_id = ${invitation.workspaceId}`;
-      if (!count?.joined) assertRoom(plan, 'members', count?.members ?? 0);
-    }
-    if (invitation.role === 'owner') {
-      await assertCanOwn(tx, { userId: user.id, workspaceId: invitation.workspaceId });
+    if (plan && !(await isAccountPerson(tx, plan.accountId, { userId: user.id }))) {
+      const seats = await countSeats(tx, plan.accountId, now);
+      assertRoom(plan, 'members', seats.members);
     }
     await tx`insert into app_members (workspace_id, user_id, role)
       values (${invitation.workspaceId}, ${user.id}, ${invitation.role})

@@ -2,13 +2,15 @@ import { existsSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import postgres from 'postgres';
 import { PLANS } from '../src/lib/plans';
-import { setWorkspacePlan } from '../src/server/plan-admin';
+import { setAccountPlanByName } from '../src/server/plan-admin';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
-const [slug, plan] = process.argv.slice(2);
-if (!slug || !plan) {
-  console.error(`Usage: pnpm --filter web plan:set <workspace-slug> <${PLANS.join('|')}>`);
+const [target, plan] = process.argv.slice(2);
+if (!target || !plan) {
+  console.error(
+    `Usage: pnpm --filter web plan:set <workspace-slug or owner-email> <${PLANS.join('|')}>`,
+  );
   process.exit(1);
 }
 const url = process.env.DATABASE_URL;
@@ -20,12 +22,14 @@ if (!url) {
 const sql = postgres(url, { max: 1, onnotice: () => {} });
 try {
   const changedBy = process.env.PLAN_CHANGED_BY?.trim() || `script:${userInfo().username}`;
-  const change = await setWorkspacePlan(sql, { slug, plan, changedBy });
+  const change = await setAccountPlanByName(sql, { target, plan, changedBy });
+  const who = `Account ${change.accountId} (${change.owner ?? 'no owner'})`;
   console.log(
     change.from === change.to
-      ? `${change.slug} is already on ${change.to}; recorded by ${changedBy}.`
-      : `${change.slug}: ${change.from} -> ${change.to}, recorded by ${changedBy}.`,
+      ? `${who} is already on ${change.to}; recorded by ${changedBy}.`
+      : `${who}: ${change.from} -> ${change.to}, recorded by ${changedBy}.`,
   );
+  console.log(`Workspaces on this account: ${change.workspaces.join(', ') || 'none'}.`);
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
   process.exitCode = 1;

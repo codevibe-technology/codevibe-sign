@@ -146,6 +146,11 @@ export const startingPlan = (settings: PlanSettings = planSettings()): Plan =>
 export interface WorkspacePlan {
   plan: Plan;
   limits: PlanLimits;
+  /**
+   * The account the workspace belongs to, whose plan this is and across whose workspaces every
+   * count is taken. Null on a self-hosted install, where nothing is counted.
+   */
+  accountId: string | null;
 }
 
 async function readPlan(
@@ -154,36 +159,40 @@ async function readPlan(
   lock: boolean,
   settings: PlanSettings,
 ): Promise<WorkspacePlan> {
-  const [row] = await sql<{ plan: string; extra_seats: number }[]>`
-    select plan, extra_seats from app_workspaces where id = ${workspaceId}
-    ${lock ? sql`for update` : sql``}`;
+  const [row] = await sql<{ id: string; plan: string; extra_seats: number }[]>`
+    select a.id, a.plan, a.extra_seats
+    from app_accounts a join app_workspaces w on w.account_id = a.id
+    where w.id = ${workspaceId}
+    ${lock ? sql`for update of a` : sql``}`;
   if (!row) throw new AppError('NOT_FOUND', 'Workspace not found');
   const plan = isPlan(row.plan) ? row.plan : 'free';
-  return { plan, limits: limitsFor(plan, settings, row.extra_seats) };
+  return { plan, limits: limitsFor(plan, settings, row.extra_seats), accountId: row.id };
 }
 
+/** The plan of the account a workspace belongs to. */
 export async function workspacePlan(
   sql: Sql,
   workspaceId: string,
   settings: PlanSettings = planSettings(),
 ): Promise<WorkspacePlan> {
   if (settings.mode === 'self-hosted')
-    return { plan: 'unlimited', limits: limitsFor('unlimited', settings) };
+    return { plan: 'unlimited', limits: limitsFor('unlimited', settings), accountId: null };
   return readPlan(sql, workspaceId, false, settings);
 }
 
 /**
- * The workspace's plan, read with its row locked for the rest of the transaction. Adding a
- * member, template or webhook counts and inserts under this lock, so two requests at once
- * cannot both take the last place.
+ * The plan of a workspace's account, read with the account's row locked for the rest of the
+ * transaction. Adding a member, template or webhook counts and inserts under this lock, so
+ * two requests at once, in the same workspace or in two workspaces of one account, cannot
+ * both take the last place.
  */
 export async function lockedPlan(
   tx: postgres.TransactionSql,
   workspaceId: string,
   settings: PlanSettings = planSettings(),
-): Promise<WorkspacePlan | null> {
+): Promise<(WorkspacePlan & { accountId: string }) | null> {
   if (settings.mode === 'self-hosted') return null;
-  return readPlan(tx, workspaceId, true, settings);
+  return (await readPlan(tx, workspaceId, true, settings)) as WorkspacePlan & { accountId: string };
 }
 
 export interface Entitlements extends WorkspacePlan {
@@ -255,27 +264,27 @@ function countMessage(key: CountedLimit, used: number, max: number, plan: Plan, 
   const hint = upgradeHint(plan);
   switch (key) {
     case 'envelopesPerMonth':
-      return `This workspace has sent ${used} of the ${plural(max, 'envelope')} the ${name} plan allows each month. ${hint} The count starts again on ${formatDay(resetsAt('month', now)!)}.`;
+      return `Your workspaces have sent ${used} of the ${plural(max, 'envelope')} the ${name} plan allows each month. ${hint} The count starts again on ${formatDay(resetsAt('month', now)!)}.`;
     case 'members':
-      return `This workspace has ${plural(used, 'member')} and open invitations, and the ${name} plan allows ${max}. Remove someone or cancel an invitation, or ${lower(hint)}`;
+      return `This account has ${plural(used, 'member')} and open invitations across its workspaces, and the ${name} plan allows ${max}. Remove someone or cancel an invitation, or ${lower(hint)}`;
     case 'activeTemplates':
-      return `This workspace has ${plural(used, 'active template')}, and the ${name} plan allows ${max}. Archive a template you no longer use, or ${lower(hint)}`;
+      return `This account has ${plural(used, 'active template')} across its workspaces, and the ${name} plan allows ${max}. Archive a template you no longer use, or ${lower(hint)}`;
     case 'webhooks':
-      return `This workspace has ${plural(used, 'webhook endpoint')}, and the ${name} plan allows ${max}. Remove one first, or ${lower(hint)}`;
+      return `This account has ${plural(used, 'webhook endpoint')} across its workspaces, and the ${name} plan allows ${max}. Remove one first, or ${lower(hint)}`;
     case 'bulkRows':
       return `This file has ${plural(used, 'row')}, and the ${name} plan sends up to ${max} in one bulk send. Split it into files of ${max} rows, or ${lower(hint)}`;
     case 'apiRequestsPerMonth':
-      return `This workspace has made ${used} of the ${plural(max, 'API request')} the ${name} plan allows each month. The count starts again on ${formatReset('ist-month', resetsAt('ist-month', now)!)}. For more, ${lower(hint)}`;
+      return `Your workspaces have made ${used} of the ${plural(max, 'API request')} the ${name} plan allows each month. The count starts again on ${formatReset('ist-month', resetsAt('ist-month', now)!)}. For more, ${lower(hint)}`;
     case 'apiRequestsPerDay':
-      return `This workspace has made ${used} of the ${plural(max, 'API request')} the ${name} plan allows each day. Try again after 00:00 UTC, or ${lower(hint)}`;
+      return `Your workspaces have made ${used} of the ${plural(max, 'API request')} the ${name} plan allows each day. Try again after 00:00 UTC, or ${lower(hint)}`;
     case 'fileBytes':
       return `This PDF is ${size(used, max)}, and the ${name} plan takes files up to ${formatBytes(max)}. Compress or split it, or ${lower(hint)}`;
     case 'envelopeBytes':
       return `These PDFs add up to ${size(used, max)}, and the ${name} plan takes up to ${formatBytes(max)} in one envelope. Send fewer or smaller files, or ${lower(hint)}`;
     case 'storageBytes':
-      return `This workspace stores ${formatBytes(used)} of documents, and the ${name} plan holds ${formatBytes(max)}, so these files do not fit. ${hint}`;
+      return `Your workspaces store ${formatBytes(used)} of documents, and the ${name} plan holds ${formatBytes(max)}, so these files do not fit. ${hint}`;
     case 'ownedWorkspaces':
-      return `You already own ${plural(used, `${name} workspace`)}, and each person can own ${max}. Use the one you have, ask to be invited to another, or ${lower(hint)}`;
+      return `Your account already has ${plural(used, 'workspace')}, and the ${name} plan includes ${max}. Use the one you have, or ${lower(hint)} Being invited to someone else's workspace is always possible.`;
   }
 }
 
@@ -402,11 +411,19 @@ export interface Reservation {
   amount: number;
 }
 
+/** Runs `work` atomically: a new transaction, or a savepoint inside the caller's. */
+function atomic<T>(sql: Sql, work: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+  const run = 'savepoint' in sql ? sql.savepoint(work) : sql.begin(work);
+  return run as Promise<T>;
+}
+
 /**
- * Adds `amount` to a usage counter only while the total stays within the plan, in one
- * statement: the row lock taken by the upsert makes concurrent reservations queue, so the
- * limit holds however many requests arrive together. Throws `PlanLimitError` when there is no
- * room; returns what to hand to `releaseUsage` if the work then fails.
+ * Adds `amount` to a workspace's usage counter only while the total of its account stays
+ * within the plan. The counter is kept per workspace, for the breakdown; the check is on the
+ * sum over the account's workspaces, taken with the account's row locked, so the limit holds
+ * however many requests arrive together and whichever workspaces they come through. Throws
+ * `PlanLimitError` when there is no room; returns what to hand to `releaseUsage` if the work
+ * then fails.
  */
 export async function reserveUsage(
   sql: Sql,
@@ -419,23 +436,22 @@ export async function reserveUsage(
   const max = workspace.limits[key];
   const period = periodKey(METRIC_PERIOD[metric], now);
   const reservation = { workspaceId: workspace.id, metric, period, amount };
-  if (max === null) {
-    await sql`insert into app_usage (workspace_id, metric, period, used)
+  const add = (db: Sql) => db`insert into app_usage (workspace_id, metric, period, used)
       values (${workspace.id}, ${metric}, ${period}, ${amount})
       on conflict (workspace_id, metric, period)
       do update set used = app_usage.used + excluded.used, updated_at = now()`;
+  const accountId = workspace.accountId;
+  if (max === null || accountId === null) {
+    await add(sql);
     return reservation;
   }
-  const rows = await sql<{ used: string }[]>`
-    insert into app_usage (workspace_id, metric, period, used)
-    select ${workspace.id}, ${metric}, ${period}, ${amount} where ${amount}::bigint <= ${max}::bigint
-    on conflict (workspace_id, metric, period)
-    do update set used = app_usage.used + excluded.used, updated_at = now()
-      where app_usage.used + excluded.used <= ${max}::bigint
-    returning used`;
-  if (rows.length > 0) return reservation;
-  const used = await usageOf(sql, workspace.id, metric, now);
-  throw limitError(key, used, max, workspace.plan, now);
+  return atomic(sql, async (tx) => {
+    await tx`select 1 from app_accounts where id = ${accountId} for update`;
+    const used = await accountUsageOf(tx, accountId, metric, now);
+    if (used + amount > max) throw limitError(key, used, max, workspace.plan, now);
+    await add(tx);
+    return reservation;
+  });
 }
 
 /** Gives back a reservation whose work did not happen. */
@@ -470,14 +486,96 @@ export async function usageOf(
   return Number(row?.used ?? 0);
 }
 
-/** Members plus invitations that can still be accepted. */
-export async function countSeats(sql: Sql, workspaceId: string, now = new Date()) {
+/** A usage counter summed over every workspace of an account: what a limit is checked against. */
+export async function accountUsageOf(
+  sql: Sql,
+  accountId: string,
+  metric: UsageMetric,
+  now = new Date(),
+): Promise<number> {
+  const [row] = await sql<{ used: string }[]>`
+    select coalesce(sum(u.used), 0) as used
+    from app_usage u join app_workspaces w on w.id = u.workspace_id
+    where w.account_id = ${accountId} and u.metric = ${metric}
+      and u.period = ${periodKey(METRIC_PERIOD[metric], now)}`;
+  return Number(row?.used ?? 0);
+}
+
+/**
+ * The people of an account: everyone who is a member of any of its workspaces, each counted
+ * once, plus open invitations to addresses that are not one of them yet (an address invited to
+ * two workspaces counts once too).
+ */
+export async function countSeats(sql: Sql, accountId: string, now = new Date()) {
   const [row] = await sql<{ members: number; invited: number }[]>`
+    with people as (
+      select distinct m.user_id
+      from app_members m join app_workspaces w on w.id = m.workspace_id
+      where w.account_id = ${accountId}
+    )
     select
-      (select count(*)::int from app_members where workspace_id = ${workspaceId}) as members,
-      (select count(*)::int from app_invitations where workspace_id = ${workspaceId}
-        and accepted_at is null and revoked_at is null and expires_at > ${now}) as invited`;
+      (select count(*)::int from people) as members,
+      (select count(distinct lower(i.email))::int
+        from app_invitations i join app_workspaces w on w.id = i.workspace_id
+        where w.account_id = ${accountId}
+          and i.accepted_at is null and i.revoked_at is null and i.expires_at > ${now}
+          and not exists (
+            select 1 from people p join auth_users u on u.id = p.user_id
+            where lower(u.email) = lower(i.email)
+          )) as invited`;
   return { members: row?.members ?? 0, invited: row?.invited ?? 0 };
+}
+
+/**
+ * Whether a person, by id or by email address, already counts as one of the account's people:
+ * a member of one of its workspaces or, for an address, someone with an open invitation to
+ * one. Adding them to another workspace of the account takes no further place.
+ */
+export async function isAccountPerson(
+  sql: Sql,
+  accountId: string,
+  who: { userId: string } | { email: string },
+  now = new Date(),
+): Promise<boolean> {
+  if ('email' in who) {
+    const [invited] = await sql`
+      select 1 from app_invitations i join app_workspaces w on w.id = i.workspace_id
+      where w.account_id = ${accountId} and lower(i.email) = ${who.email.toLowerCase()}
+        and i.accepted_at is null and i.revoked_at is null and i.expires_at > ${now}
+      limit 1`;
+    if (invited) return true;
+  }
+  const [row] = await sql`
+    select 1 from app_members m
+    join app_workspaces w on w.id = m.workspace_id
+    join auth_users u on u.id = m.user_id
+    where w.account_id = ${accountId}
+      and ${'userId' in who ? sql`u.id = ${who.userId}` : sql`lower(u.email) = ${who.email.toLowerCase()}`}
+    limit 1`;
+  return Boolean(row);
+}
+
+/** Templates that are not archived, in every workspace of the account. */
+export async function countActiveTemplates(sql: Sql, accountId: string): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    select count(*)::int as n from app_templates t join app_workspaces w on w.id = t.workspace_id
+    where w.account_id = ${accountId} and t.archived_at is null`;
+  return row?.n ?? 0;
+}
+
+/** Webhook endpoints in every workspace of the account. */
+export async function countWebhooks(sql: Sql, accountId: string): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    select count(*)::int as n from app_webhooks h join app_workspaces w on w.id = h.workspace_id
+    where w.account_id = ${accountId}`;
+  return row?.n ?? 0;
+}
+
+/** Workspaces that belong to the account. */
+export async function countAccountWorkspaces(sql: Sql, accountId: string): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    select count(*)::int as n from app_workspaces where account_id = ${accountId}`;
+  return row?.n ?? 0;
 }
 
 export interface UsageLine {
@@ -491,44 +589,105 @@ export interface UsageLine {
   resetsAt: string | null;
 }
 
-/** Every meter of the Plan and usage page, counted in the database. */
+/** What one workspace adds to its account's usage, for the breakdown on Plan and usage. */
+export interface WorkspaceUsage {
+  id: string;
+  slug: string;
+  name: string;
+  members: number;
+  activeTemplates: number;
+  envelopes: number;
+  apiRequests: number;
+  storageBytes: number;
+  storageText: string;
+  esigns: number;
+}
+
+/**
+ * Every meter of the Plan and usage page, counted in the database over the whole account,
+ * and what each of its workspaces adds.
+ */
 export async function usageReport(
   sql: Sql,
   workspaceId: string,
   settings: PlanSettings = planSettings(),
   now = new Date(),
-): Promise<WorkspacePlan & { lines: UsageLine[] }> {
-  const workspace = await workspacePlan(sql, workspaceId, settings);
-  const [counts] = await sql<{ templates: number; webhooks: number }[]>`
-    select
-      (select count(*)::int from app_templates
-        where workspace_id = ${workspaceId} and archived_at is null) as templates,
-      (select count(*)::int from app_webhooks where workspace_id = ${workspaceId}) as webhooks`;
-  const seats = await countSeats(sql, workspaceId, now);
+): Promise<WorkspacePlan & { lines: UsageLine[]; workspaces: WorkspaceUsage[] }> {
+  const account = await readPlan(sql, workspaceId, false, settings);
+  const selfHosted = settings.mode === 'self-hosted';
+  const workspace: WorkspacePlan = selfHosted ? { ...account, plan: 'unlimited' } : account;
+  const limits = selfHosted ? limitsFor('unlimited', settings) : account.limits;
+  const accountId = account.accountId!;
+  const apiMetric: UsageMetric =
+    limits.apiRequestsPerMonth === null && limits.apiRequestsPerDay !== null
+      ? 'api_requests'
+      : 'api_requests_month';
+  const rows = await sql<
+    {
+      id: string;
+      slug: string;
+      name: string;
+      members: number;
+      templates: number;
+      envelopes: string;
+      api: string;
+      storage: string;
+      esigns: number;
+    }[]
+  >`
+    select w.id, w.slug, w.name,
+      (select count(*)::int from app_members m where m.workspace_id = w.id) as members,
+      (select count(*)::int from app_templates t
+        where t.workspace_id = w.id and t.archived_at is null) as templates,
+      coalesce((select used from app_usage u where u.workspace_id = w.id
+        and u.metric = 'envelopes_sent'
+        and u.period = ${periodKey(METRIC_PERIOD.envelopes_sent, now)}), 0) as envelopes,
+      coalesce((select used from app_usage u where u.workspace_id = w.id
+        and u.metric = ${apiMetric}
+        and u.period = ${periodKey(METRIC_PERIOD[apiMetric], now)}), 0) as api,
+      coalesce((select used from app_usage u where u.workspace_id = w.id
+        and u.metric = 'storage_bytes' and u.period = 'total'), 0) as storage,
+      (select count(*)::int from app_esign_usage e
+        where e.workspace_id = w.id and e.outcome = 'signed'
+          and e.started_at >= date_trunc('month', ${now}::timestamptz)) as esigns
+    from app_workspaces w where w.account_id = ${accountId}
+    order by w.created_at, w.id`;
+  const workspaces = rows.map(
+    (row): WorkspaceUsage => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      members: row.members,
+      activeTemplates: row.templates,
+      envelopes: Number(row.envelopes),
+      apiRequests: Number(row.api),
+      storageBytes: Number(row.storage),
+      storageText: formatBytes(Number(row.storage)),
+      esigns: row.esigns,
+    }),
+  );
+  const seats = await countSeats(sql, accountId, now);
   const used: Partial<Record<CountedLimit, number>> = {
-    envelopesPerMonth: await usageOf(sql, workspaceId, 'envelopes_sent', now),
+    ownedWorkspaces: workspaces.length,
+    envelopesPerMonth: await accountUsageOf(sql, accountId, 'envelopes_sent', now),
     members: seats.members + seats.invited,
-    activeTemplates: counts?.templates ?? 0,
-    webhooks: counts?.webhooks ?? 0,
-    apiRequestsPerMonth: await usageOf(sql, workspaceId, 'api_requests_month', now),
-    apiRequestsPerDay: await usageOf(sql, workspaceId, 'api_requests', now),
-    storageBytes: await usageOf(sql, workspaceId, 'storage_bytes', now),
+    activeTemplates: await countActiveTemplates(sql, accountId),
+    webhooks: await countWebhooks(sql, accountId),
+    apiRequestsPerMonth: await accountUsageOf(sql, accountId, 'api_requests_month', now),
+    apiRequestsPerDay: await accountUsageOf(sql, accountId, 'api_requests', now),
+    storageBytes: await accountUsageOf(sql, accountId, 'storage_bytes', now),
   };
   // A plan counts API requests by the month or under a daily ceiling, never both.
   const shown = METERS.filter((meter) => {
     if (meter.key === 'apiRequestsPerDay')
-      return !(
-        workspace.limits.apiRequestsPerDay === null && workspace.limits.apiRequestsPerMonth !== null
-      );
+      return !(limits.apiRequestsPerDay === null && limits.apiRequestsPerMonth !== null);
     if (meter.key === 'apiRequestsPerMonth')
-      return !(
-        workspace.limits.apiRequestsPerMonth === null && workspace.limits.apiRequestsPerDay !== null
-      );
+      return !(limits.apiRequestsPerMonth === null && limits.apiRequestsPerDay !== null);
     return true;
   });
   const lines = shown.map((meter): UsageLine => {
     const value = used[meter.key] ?? 0;
-    const max = workspace.limits[meter.key];
+    const max = limits[meter.key];
     const reset = resetsAt(meter.period, now);
     return {
       key: meter.key,
@@ -541,5 +700,5 @@ export async function usageReport(
       resetsAt: reset ? formatReset(meter.period, reset) : null,
     };
   });
-  return { ...workspace, lines };
+  return { ...workspace, limits, lines, workspaces };
 }

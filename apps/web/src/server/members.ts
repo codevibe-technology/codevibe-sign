@@ -3,7 +3,6 @@ import type postgres from 'postgres';
 import { canManageRole, type Role } from '@/lib/roles';
 import { AppError } from './errors';
 import { userLabel } from './profile';
-import { assertCanOwn } from './workspaces';
 
 export interface Member {
   userId: string;
@@ -22,6 +21,14 @@ export async function listMembers(sql: postgres.Sql, workspaceId: string): Promi
     order by array_position(array['owner','admin','member','viewer'], m.role),
       lower(${userLabel(sql)})`;
 }
+
+/**
+ * A workspace belongs to the account of the person who created it: their plan pays for it.
+ * That person stays an owner of it, so the workspace is never left on an account nobody in it
+ * can manage.
+ */
+const ACCOUNT_HOLDER_STAYS =
+  "This workspace is on this person's plan, so they stay an owner of it.";
 
 interface Change {
   workspaceId: string;
@@ -47,7 +54,10 @@ async function lockTarget(tx: postgres.TransactionSql, change: Change) {
     throw new AppError('FORBIDDEN', 'Only an owner can change another owner');
   }
   const lastOwner = target.role === 'owner' && owners.length === 1;
-  return { target, lastOwner };
+  const [account] = await tx`
+    select 1 from app_workspaces w join app_accounts a on a.id = w.account_id
+    where w.id = ${change.workspaceId} and a.owner_user_id = ${change.userId}`;
+  return { target, lastOwner, holdsAccount: Boolean(account) };
 }
 
 export async function changeRole(sql: postgres.Sql, change: Change & { role: Role }) {
@@ -55,17 +65,11 @@ export async function changeRole(sql: postgres.Sql, change: Change & { role: Rol
     throw new AppError('FORBIDDEN', 'Only an owner can make someone an owner', 'role');
   }
   await sql.begin(async (tx) => {
-    const { target, lastOwner } = await lockTarget(tx, change);
+    const { target, lastOwner, holdsAccount } = await lockTarget(tx, change);
     if (target.role === change.role) return;
+    if (holdsAccount) throw new AppError('CONFLICT', ACCOUNT_HOLDER_STAYS, 'role');
     if (lastOwner) {
       throw new AppError('CONFLICT', 'Make someone else an owner first', 'role');
-    }
-    if (change.role === 'owner') {
-      await assertCanOwn(tx, {
-        userId: change.userId,
-        workspaceId: change.workspaceId,
-        field: 'role',
-      });
     }
     await tx`update app_members set role = ${change.role}
       where workspace_id = ${change.workspaceId} and user_id = ${change.userId}`;
@@ -76,10 +80,11 @@ export async function changeRole(sql: postgres.Sql, change: Change & { role: Rol
 export async function removeMember(sql: postgres.Sql, change: Change) {
   await sql.begin(async (tx) => {
     const leaving = change.actor.userId === change.userId;
-    const { lastOwner } = await lockTarget(
+    const { lastOwner, holdsAccount } = await lockTarget(
       tx,
       leaving ? { ...change, actor: { ...change.actor, role: 'owner' } } : change,
     );
+    if (holdsAccount) throw new AppError('CONFLICT', ACCOUNT_HOLDER_STAYS);
     if (lastOwner) {
       throw new AppError(
         'CONFLICT',

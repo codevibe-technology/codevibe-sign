@@ -343,11 +343,75 @@ create index app_public_records_workspace_idx on app_public_records (workspace_i
 `,
   },
   {
-    name: '0013_billing',
+    name: '0013_accounts',
+    sql: `
+create table app_accounts (
+  id text primary key,
+  owner_user_id text unique references auth_users (id) on delete restrict,
+  plan text not null default 'unlimited' check (plan in ('free', 'cloud', 'unlimited')),
+  plan_source text not null default 'operator' check (plan_source in ('operator', 'billing')),
+  extra_seats integer not null default 0 check (extra_seats >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table app_workspaces add column account_id text references app_accounts (id) on delete restrict;
+
+create temporary table tmp_workspace_owner on commit drop as
+select
+  w.id as workspace_id,
+  case w.plan when 'unlimited' then 2 when 'cloud' then 1 else 0 end as plan_rank,
+  coalesce(
+    (
+      select m.user_id from app_members m where m.workspace_id = w.id
+      order by
+        (m.role = 'owner' and m.user_id = w.created_by) desc,
+        case m.role when 'owner' then 0 when 'admin' then 1 when 'member' then 2 else 3 end,
+        m.created_at, m.user_id
+      limit 1
+    ),
+    (select u.id from auth_users u where u.id = w.created_by)
+  ) as user_id
+from app_workspaces w;
+
+insert into app_accounts (id, owner_user_id, plan)
+select
+  'acct_' || substr(md5(user_id || clock_timestamp()::text || random()::text), 1, 20),
+  user_id,
+  case max(plan_rank) when 2 then 'unlimited' when 1 then 'cloud' else 'free' end
+from tmp_workspace_owner where user_id is not null group by user_id;
+
+update app_workspaces w set account_id = a.id
+from tmp_workspace_owner t join app_accounts a on a.owner_user_id = t.user_id
+where t.workspace_id = w.id;
+
+insert into app_accounts (id, owner_user_id, plan)
+select 'acct_' || substr(md5('orphan' || w.id), 1, 20), null, w.plan
+from app_workspaces w where w.account_id is null;
+
+update app_workspaces w set account_id = 'acct_' || substr(md5('orphan' || w.id), 1, 20)
+where w.account_id is null;
+
+-- The per-workspace plan is no longer read. It is kept equal to the account's, so a build from
+-- before accounts still finds a sensible plan if the install is rolled back.
+update app_workspaces w set plan = a.plan
+from app_accounts a where a.id = w.account_id and w.plan <> a.plan;
+
+alter table app_workspaces alter column account_id set not null;
+create index app_workspaces_account_idx on app_workspaces (account_id);
+
+alter table app_plan_changes add column account_id text references app_accounts (id) on delete cascade;
+alter table app_plan_changes alter column workspace_id drop not null;
+create index app_plan_changes_account_idx on app_plan_changes (account_id, created_at desc);
+`,
+  },
+  {
+    name: '0014_billing',
     sql: `
 create table app_audit_log (
   id text primary key,
   workspace_id text references app_workspaces (id) on delete set null,
+  account_id text references app_accounts (id) on delete set null,
   actor_id text references auth_users (id) on delete set null,
   action text not null,
   target text,
@@ -356,9 +420,10 @@ create table app_audit_log (
   created_at timestamptz not null default now()
 );
 create index app_audit_log_workspace_idx on app_audit_log (workspace_id, created_at desc);
+create index app_audit_log_account_idx on app_audit_log (account_id, created_at desc);
 
 create table app_billing_details (
-  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  account_id text primary key references app_accounts (id) on delete cascade,
   legal_name text not null,
   gstin text,
   address_line1 text not null,
@@ -373,7 +438,7 @@ create table app_billing_details (
 
 create table app_billing_orders (
   id text primary key,
-  workspace_id text references app_workspaces (id) on delete set null,
+  account_id text references app_accounts (id) on delete set null,
   kind text not null,
   payload jsonb not null default '{}',
   lines jsonb not null,
@@ -395,7 +460,7 @@ create table app_billing_orders (
   paid_at timestamptz,
   updated_at timestamptz not null default now()
 );
-create index app_billing_orders_workspace_idx on app_billing_orders (workspace_id, created_at desc);
+create index app_billing_orders_account_idx on app_billing_orders (account_id, created_at desc);
 
 create table app_invoice_counters (
   prefix text primary key,
@@ -406,7 +471,7 @@ create table app_invoices (
   id text primary key,
   number text not null unique,
   order_id text not null unique references app_billing_orders (id),
-  workspace_id text references app_workspaces (id) on delete set null,
+  account_id text references app_accounts (id) on delete set null,
   issued_at timestamptz not null,
   file_key text,
   emailed_at timestamptz,
@@ -414,7 +479,7 @@ create table app_invoices (
   claimed_at timestamptz,
   last_error text
 );
-create index app_invoices_workspace_idx on app_invoices (workspace_id, issued_at desc);
+create index app_invoices_account_idx on app_invoices (account_id, issued_at desc);
 create index app_invoices_unfinished_idx on app_invoices (issued_at) where emailed_at is null;
 
 create table app_razorpay_events (
@@ -424,7 +489,7 @@ create table app_razorpay_events (
 );
 
 create table app_esign_credits (
-  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  account_id text primary key references app_accounts (id) on delete cascade,
   available integer not null default 0 check (available >= 0),
   reserved integer not null default 0 check (reserved >= 0),
   updated_at timestamptz not null default now()
@@ -432,65 +497,23 @@ create table app_esign_credits (
 
 create table app_esign_credit_ledger (
   id text primary key,
-  workspace_id text not null references app_workspaces (id) on delete cascade,
+  account_id text not null references app_accounts (id) on delete cascade,
   kind text not null check (kind in ('grant', 'reserve', 'consume', 'release')),
   credits integer not null check (credits > 0),
   ref text not null,
   reason text,
   created_at timestamptz not null default now(),
-  unique (workspace_id, kind, ref)
+  unique (account_id, kind, ref)
 );
-create index app_esign_credit_ledger_workspace_idx
-  on app_esign_credit_ledger (workspace_id, created_at desc);
-`,
-  },
-  {
-    name: '0014_plan_v2',
-    sql: `
-alter table app_workspaces add column if not exists extra_seats integer not null default 0
-  check (extra_seats >= 0);
-`,
-  },
-  {
-    name: '0016_esign_settings',
-    sql: `
-create table app_esign_settings (
-  workspace_id text primary key references app_workspaces(id) on delete cascade,
-  mode text not null default 'platform' check (mode in ('platform', 'own')),
-  own_api_key text,
-  own_private_salt text,
-  own_workflow_id text,
-  own_environment text check (own_environment in ('sandbox', 'production')),
-  own_key_hint text,
-  own_saved_at timestamptz,
-  own_tested_at timestamptz,
-  own_test_ok boolean,
-  version integer not null default 0,
-  updated_by text references auth_users(id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table app_esign_usage (
-  ref text primary key,
-  workspace_id text not null references app_workspaces(id) on delete cascade,
-  envelope_id text not null,
-  recipient_id text not null,
-  mode text not null check (mode in ('platform', 'own')),
-  billed boolean not null,
-  outcome text check (outcome in ('signed', 'declined', 'expired', 'failed')),
-  unbilled boolean not null default false,
-  started_at timestamptz not null default now(),
-  ended_at timestamptz
-);
-create index app_esign_usage_workspace on app_esign_usage (workspace_id, started_at desc);
+create index app_esign_credit_ledger_account_idx
+  on app_esign_credit_ledger (account_id, created_at desc);
 `,
   },
   {
     name: '0015_subscriptions',
     sql: `
 create table app_subscriptions (
-  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  account_id text primary key references app_accounts (id) on delete cascade,
   term text not null check (term in ('month', 'year')),
   seats integer not null default 0 check (seats >= 0),
   renewal_seats integer not null default 0 check (renewal_seats >= 0),
@@ -526,6 +549,42 @@ create index app_install_bookings_unnotified_idx on app_install_bookings (paid_a
 `,
   },
   {
+    name: '0016_esign_settings',
+    sql: `
+create table app_esign_settings (
+  account_id text primary key references app_accounts (id) on delete cascade,
+  mode text not null default 'platform' check (mode in ('platform', 'own')),
+  own_api_key text,
+  own_private_salt text,
+  own_workflow_id text,
+  own_environment text check (own_environment in ('sandbox', 'production')),
+  own_key_hint text,
+  own_saved_at timestamptz,
+  own_tested_at timestamptz,
+  own_test_ok boolean,
+  version integer not null default 0,
+  updated_by text references auth_users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table app_esign_usage (
+  ref text primary key,
+  account_id text not null references app_accounts (id) on delete cascade,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  envelope_id text not null,
+  recipient_id text not null,
+  mode text not null check (mode in ('platform', 'own')),
+  billed boolean not null,
+  outcome text check (outcome in ('signed', 'declined', 'expired', 'failed')),
+  unbilled boolean not null default false,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+create index app_esign_usage_account on app_esign_usage (account_id, started_at desc);
+`,
+  },
+  {
     name: '0017_invoice_payment_method',
     sql: `
 alter table app_billing_orders add column payment_method text;
@@ -544,7 +603,7 @@ create table app_operator_notices (
   id text primary key,
   kind text not null,
   order_id text references app_billing_orders (id) on delete set null,
-  workspace_id text references app_workspaces (id) on delete set null,
+  account_id text references app_accounts (id) on delete set null,
   data jsonb not null default '{}',
   created_at timestamptz not null default now(),
   sent_at timestamptz,
@@ -561,11 +620,6 @@ alter table app_esign_credit_ledger add column mode text check (mode in ('test',
 update app_esign_credit_ledger l set mode = o.mode
   from app_billing_orders o where l.kind = 'grant' and l.ref = o.id;
 
-alter table app_workspaces add column plan_source text not null default 'operator'
-  check (plan_source in ('operator', 'billing'));
-update app_workspaces w set plan_source = 'billing'
-  from app_subscriptions s where s.workspace_id = w.id and s.status <> 'ended';
-
 alter table app_subscriptions add column order_id text references app_billing_orders (id);
 alter table app_subscriptions add column prior jsonb;
 `,
@@ -575,7 +629,7 @@ alter table app_subscriptions add column prior jsonb;
     sql: `
 alter table app_esign_usage add column owed_settled_at timestamptz;
 alter table app_esign_usage add column sandbox boolean not null default false;
-create index app_esign_usage_owed on app_esign_usage (workspace_id)
+create index app_esign_usage_owed on app_esign_usage (account_id)
   where unbilled and owed_settled_at is null;
 `,
   },
