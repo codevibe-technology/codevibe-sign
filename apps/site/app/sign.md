@@ -38,16 +38,17 @@ sender sees the reason and can send a corrected document.
 
 ## Aadhaar eSign
 
-If the sender asked for Aadhaar eSign, the last step is **Continue to Aadhaar eSign**. You
+If the sender asked for Aadhaar eSign, you do not draw a signature: the **Aadhaar eSign** box
+on the page shows where it goes. The last step is **Continue to Aadhaar eSign**. You
 review the document on Leegality's page and confirm with the OTP sent to the mobile number
 linked to your Aadhaar, then come back here. If it fails or runs out of time, press
 **Try again**. Codevibe Sign never sees your Aadhaar number.
 
 ## Afterwards
 
-The thank-you page offers **Download your copy** and **Download the signing certificate**.
-When everyone has signed, you also get the sealed PDF by email, attached or as a download link
-that works for 30 days.
+The thank-you page offers **Download your copy**, with the certificate as its last page, and
+**Download the audit trail (PDF)**. When everyone has signed, you also get both by email,
+attached or as download links that work for 30 days.
 
 If the link shows a message instead of the document:
 

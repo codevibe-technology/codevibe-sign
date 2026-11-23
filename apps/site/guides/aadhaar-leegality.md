@@ -27,9 +27,41 @@ The first version keeps to four rules, and the send flow points at the field tha
 
 The reason for "one" and "last" is in [what the signed file contains](#what-the-signed-file-contains).
 
+### Place the Aadhaar eSign box
+
+An Aadhaar eSign signer signs only with Aadhaar: they do not draw or type a signature. So in
+the **Fields** step, with that signer picked, the field tray offers **Aadhaar eSign** instead
+of **Signature** and **Initials**. Drag one Aadhaar eSign box to where the signature belongs,
+or use **Aadhaar eSign box on last page**. The box is required, and the envelope cannot be sent
+until it is placed: the send flow says "Place the Aadhaar eSign box for ..." and points at
+the signer. One box per signer; a second box, or a signature or initials field for that
+signer, is refused with a message saying what to remove.
+
+The other fields stay available for that signer, because they are filled in on the signing
+page before the signer goes to Leegality: date signed, name, text and checkbox. Their values
+are drawn on the file that the Aadhaar eSign then covers.
+
+On the document, the box carries "Aadhaar eSign", the signer's name and "Signed with Aadhaar
+OTP via Leegality". It is drawn on the file before it goes to Leegality, so it is part of what
+the signer signs.
+
+#### Where Leegality puts its own signature mark
+
+Leegality's create-request API (v3.0, the one Codevibe Sign uses) has no field for the
+position of a signature: the position comes from the workflow, and without coordinates in
+the workflow Leegality puts the mark at the bottom left of every page
+([Create an e-signing request](https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request),
+[Signature coordinates](https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate)).
+So Codevibe Sign marks the place with the box above, and Leegality's own appearance of the
+digital signature goes where your workflow places it. To put both in the same spot, give the
+invitee custom coordinates in the workflow that match the box. Only Leegality's v4 Pack API
+takes positions per request; Codevibe Sign does not use it yet.
+
 ## What the signer does
 
-1. They open their signing link, agree to sign electronically and fill their fields as usual.
+1. They open their signing link, agree to sign electronically and fill any other fields the
+   sender gave them. They draw nothing: the Aadhaar eSign box shows where their signature
+   goes.
 2. They choose **Continue to Aadhaar eSign** and are taken to Leegality's page. There they
    review the document and confirm with an OTP sent to the mobile number linked to their
    Aadhaar.
@@ -45,24 +77,32 @@ certificate, and the certificate's SHA-256.
 
 ## What the signed file contains
 
-- **The Aadhaar signature, untouched.** The server draws every field value on the document
-  first, then sends that file to Leegality. The file Leegality returns is kept byte for byte.
-- **The Codevibe Sign seal, added after it.** The seal is written as an incremental update at
-  the end of the file. A PDF reader shows two signatures: the signer's Aadhaar signature and
-  the seal, which covers the whole file.
-- **The signing certificate as a separate PDF.** Nothing but another signature may follow an
-  Aadhaar signature: adding a page would make readers report the document as changed after
-  signing. So the certificate, which is normally the last page, is its own sealed file here. It
-  is offered next to the document on the envelope page, on the signer's thank-you page, in the
-  completed email and on the public record page.
+One file, as with any other envelope: the pages, then the signing certificate page.
 
-That rule is also why the Aadhaar signer acts last: field values drawn after the Aadhaar
-signature would break it.
+- **The certificate page goes on before the Aadhaar eSign.** When the signer starts, the server
+  draws every field value and the Aadhaar eSign box on the document, adds the certificate page
+  (the record link and QR code, the envelope, the sender and every signer so far, with the
+  Aadhaar signer marked "With the Aadhaar eSign on this file") and sends that file to
+  Leegality. The Aadhaar signature therefore covers the certificate too.
+- **The Aadhaar signature, untouched.** The file Leegality returns is kept byte for byte.
+- **The Codevibe Sign seal, added after it.** The seal is written as an incremental update at
+  the end of the file. A PDF reader shows two signatures, the signer's Aadhaar signature and
+  the seal over the whole file, and no change to the pages after the Aadhaar signature.
+- **The audit trail, as its own PDF.** What exists only after signing (the exact time of the
+  Aadhaar eSign, the name and the issuer of the signer's eSign certificate, the head of the
+  audit chain) cannot be written into a file that is already signed. It is in the audit trail
+  PDF, which goes with the completed email, and on the envelope page, the thank-you page and the
+  public record page.
+
+Nothing but another signature may follow an Aadhaar signature, which is why the Aadhaar signer
+acts last: anything drawn after the Aadhaar signature would break it.
 
 If the provider's file forbids any further signature, Codevibe Sign does not force one. It keeps
-the provider's file exactly as it came, records its SHA-256 in the audit trail, and says so
-when the file is verified ("sealed by the eSign provider only"). The certificate is still a
-separate sealed PDF.
+the provider's file, certificate page included, exactly as it came, records its SHA-256 in the
+audit trail, and says so when the file is verified ("sealed by the eSign provider only").
+
+An Aadhaar eSign started before the certificate page went into the signed file has its
+certificate as a separate sealed PDF, offered next to the document as before.
 
 ### Verify it
 
@@ -144,8 +184,13 @@ answers `409` with [`ESIGN_UNAVAILABLE`](/http-api/errors#esign-unavailable) and
 
 Audit events to expect: `recipient.esign_started`, then `recipient.signed` with
 `data.method: "aadhaar_esign"`, or `recipient.esign_failed` with `data.reason`. The recipient
-carries `esign: { provider, status }`. The certificate is downloaded with
-`GET /v1/envelopes/{id}/documents/{documentId}?version=certificate`.
+carries `esign: { provider, status }`.
+
+Give the Aadhaar signer one field of type `aadhaar` (required, with its `page` and `rect`)
+and no `signature` or `initials` fields. A request that gives them one `signature` field and
+nothing else to sign with still works: that field becomes the Aadhaar eSign box when the
+envelope is sent. The sealed file is downloaded as usual with `version=sealed`, and the audit
+trail PDF with `GET /v1/envelopes/{id}/audit-trail`.
 
 If you run `@codevibe_technology/sign-server` yourself, pass a provider in the `esign` option;
 see the [server reference](/api/server).

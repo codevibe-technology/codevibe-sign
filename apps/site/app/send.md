@@ -45,7 +45,13 @@ Once recipients are added the envelope is saved as a draft and every change save
 
 Pick a recipient, then place their fields on the pages: **Signature**, **Initials**,
 **Date signed**, **Name**, **Text** and **Checkbox**. Every signer needs at least one required
-signature. To repeat a field on many pages, or place initials on every page at once, see
+signature.
+
+A signer who uses Aadhaar eSign draws nothing, so for them the tray offers **Aadhaar eSign**
+instead of **Signature** and **Initials**. Place one Aadhaar eSign box where their signature
+goes; **Send** stays blocked until it is there. Date signed, name, text and checkbox fields
+can still be given to them. See
+[Place the Aadhaar eSign box](/guides/aadhaar-leegality#place-the-aadhaar-esign-box). To repeat a field on many pages, or place initials on every page at once, see
 [Fields across pages and tags](/guides/field-tags).
 
 ## 4. Review & send {#review}
@@ -94,9 +100,11 @@ On the envelope page:
 ## Download the result
 
 When it is completed, the **Documents** card offers the **Signed PDF** (sealed, with the
-certificate as its last page), the **Certificate** on its own and the **Original**. Every
-recipient also gets the sealed copy by email: attached when it is up to 10 MB, otherwise as a
-personal download link that works for 30 days.
+certificate as its last page) and the **Original**, and the **Certificate** card offers the
+**Audit trail (PDF)**: every event with its time in your workspace's time zone and in UTC, who
+acted, the network address it came from, how each person signed and the document hashes.
+Every recipient also gets the sealed copy and the audit trail PDF by email: attached when
+together they are up to 10 MB, otherwise as personal download links that work for 30 days.
 
 ## Next
 

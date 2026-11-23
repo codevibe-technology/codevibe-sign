@@ -24,6 +24,7 @@ Sender API key required.
 <ul>
 <li><a href="#list-envelope-events"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/events</code></a></li>
 <li><a href="#get-certificate"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/certificate</code></a></li>
+<li><a href="#get-audit-trail-pdf"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/audit-trail</code></a></li>
 </ul>
 </nav>
 
@@ -430,6 +431,146 @@ func main() {
     }
   ]
 }
+```
+
+:::
+
+</div>
+
+</div>
+</section>
+
+<section class="api-op" aria-labelledby="get-audit-trail-pdf">
+<div class="api-op__main">
+
+## Audit trail as a PDF {#get-audit-trail-pdf}
+
+<p class="api-route"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/audit-trail</code></p>
+
+The envelope's audit trail as a PDF, the same file the completed-copy email carries:
+the envelope, the SHA-256 of each document before and after signing, each recipient
+with the method they used (an Aadhaar eSign names its provider), and every event with
+its time in the workspace's time zone and UTC, who acted and the network address it
+came from, then the head of the hash chain.
+
+<p class="api-auth"><span class="api-auth__label">Auth</span> Sender API key, as <code>Authorization: Bearer &lt;key&gt;</code></p>
+
+### Path parameters {#get-audit-trail-pdf-path}
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">id</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
+
+The envelope id.
+
+</div>
+
+</div>
+
+### Returns {#get-audit-trail-pdf-returns}
+
+**200 OK**. The PDF file. A string.
+
+- `Content-Disposition`: `attachment; filename="<name>-original.pdf"` or `...-sealed.pdf`.
+
+### Errors {#get-audit-trail-pdf-errors}
+
+| Status | When |
+| ------ | ---- |
+| 401 | `UNAUTHORIZED`: the API key is missing or not valid. |
+| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND` or `NOT_FOUND`. |
+| 409 | `INVALID_STATE`: not allowed in the envelope's status (`details.status`). `NOT_YOUR_TURN`: sequential routing, an earlier recipient has not acted. `CONFLICT`: another request changed the envelope, or one with the same `Idempotency-Key` is still running; try again. |
+
+</div>
+<div class="api-op__aside">
+
+<div class="api-panel" data-label="Request">
+
+::: code-group
+
+```sh [curl]
+curl https://sign.codevibe.in/api/v1/envelopes/7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37/audit-trail \
+  -H "Authorization: Bearer $SIGN_API_KEY" \
+  -o document.pdf
+```
+
+```ts check [Node.js]
+import { writeFile } from 'node:fs/promises';
+
+const response = await fetch('https://sign.codevibe.in/api/v1/envelopes/7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37/audit-trail', {
+  headers: {
+    Authorization: `Bearer ${process.env.SIGN_API_KEY}`,
+  },
+});
+await writeFile('document.pdf', new Uint8Array(await response.arrayBuffer()));
+```
+
+```python [Python]
+import os
+
+import requests
+
+response = requests.get(
+    "https://sign.codevibe.in/api/v1/envelopes/7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37/audit-trail",
+    headers={
+        "Authorization": f"Bearer {os.environ['SIGN_API_KEY']}",
+    },
+    timeout=30,
+)
+
+response.raise_for_status()
+with open("document.pdf", "wb") as file:
+    file.write(response.content)
+```
+
+```go [Go]
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	req, err := http.NewRequest("GET", "https://sign.codevibe.in/api/v1/envelopes/7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37/audit-trail", nil)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("SIGN_API_KEY"))
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer res.Body.Close()
+	file, err := os.Create("document.pdf")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	if _, err := io.Copy(file, res.Body); err != nil {
+		panic(err)
+	}
+	fmt.Println(res.Status)
+}
+```
+
+:::
+
+<ApiTryIt operation="getAuditTrailPdf" />
+
+</div>
+
+<div class="api-panel" data-label="Response">
+
+::: code-group
+
+```text [200 OK]
+Content-Type: application/pdf
+
+%PDF-1.7 ... (the PDF bytes)
 ```
 
 :::

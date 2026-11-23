@@ -211,7 +211,13 @@ This recipient's fields only.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code></p>
+`aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
+signer has exactly one, required, and no `signature` or `initials` fields; nobody else
+can have one. It takes no value: the signer signs the whole file at the eSign provider.
+A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
+sign with is still accepted: that field becomes the box when the envelope is sent.
+
+<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code></p>
 
 </div>
 <div class="api-field">
@@ -302,7 +308,7 @@ Values already entered in this recipient's fields.
 <p class="api-field__head"><code class="api-field__name">value</code> <span class="api-field__type">string</span></p>
 
 Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or
-`false`. Date: an ISO date.
+`false`. Date: an ISO date. An `aadhaar` box takes no value; leave it out.
 
 </div>
 
@@ -620,9 +626,9 @@ The document id, from `documents[].id`.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">file</code> <span class="api-field__type">string</span></p>
 
-`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.
+`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt, `audit-trail` for the envelope's audit trail as a PDF once it is complete. Leave out for the signed document.
 
-<p class="api-field__meta">One of <code>certificate</code></p>
+<p class="api-field__meta">One of <code>certificate</code> <code>audit-trail</code></p>
 
 </div>
 
@@ -782,9 +788,9 @@ The signed value from the download link in the completed-copy email.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">file</code> <span class="api-field__type">string</span></p>
 
-`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.
+`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt, `audit-trail` for the envelope's audit trail as a PDF. Leave out for the signed document.
 
-<p class="api-field__meta">One of <code>certificate</code></p>
+<p class="api-field__meta">One of <code>certificate</code> <code>audit-trail</code></p>
 
 </div>
 
@@ -1791,7 +1797,7 @@ The signer agrees to sign electronically.
 <p class="api-field__head"><code class="api-field__name">value</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
 
 Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or
-`false`. Date: an ISO date.
+`false`. Date: an ISO date. An `aadhaar` box takes no value; leave it out.
 
 </div>
 
@@ -2343,7 +2349,7 @@ The signer agrees to sign electronically.
 <p class="api-field__head"><code class="api-field__name">value</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
 
 Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or
-`false`. Date: an ISO date.
+`false`. Date: an ISO date. An `aadhaar` box takes no value; leave it out.
 
 </div>
 

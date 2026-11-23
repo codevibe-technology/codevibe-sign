@@ -259,7 +259,13 @@ The role whose person fills the field in.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code></p>
+`aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
+signer has exactly one, required, and no `signature` or `initials` fields; nobody else
+can have one. It takes no value: the signer signs the whole file at the eSign provider.
+A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
+sign with is still accepted: that field becomes the box when the envelope is sent.
+
+<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code></p>
 
 </div>
 <div class="api-field">
@@ -835,7 +841,13 @@ The document's `key` or `id`. Optional when the template has one document.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code><span aria-hidden="true"> · </span>Default <code>signature</code></p>
+`aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
+signer has exactly one, required, and no `signature` or `initials` fields; nobody else
+can have one. It takes no value: the signer signs the whole file at the eSign provider.
+A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
+sign with is still accepted: that field becomes the box when the envelope is sent.
+
+<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code><span aria-hidden="true"> · </span>Default <code>signature</code></p>
 
 </div>
 <div class="api-field">
@@ -1724,7 +1736,13 @@ The document's `key` or `id`. Optional when the template has one document.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code><span aria-hidden="true"> · </span>Default <code>signature</code></p>
+`aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
+signer has exactly one, required, and no `signature` or `initials` fields; nobody else
+can have one. It takes no value: the signer signs the whole file at the eSign provider.
+A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
+sign with is still accepted: that field becomes the box when the envelope is sent.
+
+<p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code><span aria-hidden="true"> · </span>Default <code>signature</code></p>
 
 </div>
 <div class="api-field">

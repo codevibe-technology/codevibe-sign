@@ -61,6 +61,7 @@ The hash-chained audit log of an envelope and the signing certificate built from
 <ul class="api-index">
 <li><a href="/docs/http-api/reference/audit-trail#list-envelope-events"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/events</code><span>Audit log</span></a></li>
 <li><a href="/docs/http-api/reference/audit-trail#get-certificate"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/certificate</code><span>Signing certificate</span></a></li>
+<li><a href="/docs/http-api/reference/audit-trail#get-audit-trail-pdf"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/audit-trail</code><span>Audit trail as a PDF</span></a></li>
 </ul>
 
 ## Templates {#templates}

@@ -131,6 +131,9 @@ step is available on its own as `sanitizePdf(bytes)`.
   that still does not fit is cut with an ellipsis. `name` falls back to the recipient's
   name and `date_signed` to the recipient's `actedAt`. Dates print as `19 Nov 2026`.
 - `checkbox`: `'true'` or `'false'`; a box is drawn, with a tick when checked.
+- `aadhaar`: no value. A framed box with "Aadhaar eSign", the recipient's name and "Signed
+  with Aadhaar OTP via `esignProvider`" is drawn on the file sent to the eSign provider; the
+  digital signature itself is the provider's.
 
 Boxes that run off the page are trimmed to it.
 
@@ -141,6 +144,7 @@ Boxes that run off the page are trimmed to it.
 | `timeZone`      | `UTC`   | IANA zone used to turn a `date_signed` timestamp into a date. |
 | `formatDate`    | none    | `(isoValue) => string` for `date_signed` text.                |
 | `maxImageBytes` | 1 MB    | Largest signature image.                                      |
+| `esignProvider` | none    | Provider an `aadhaar` box names, such as `Leegality`.         |
 | `maxBytes`      | 25 MB   | Largest input PDF.                                            |
 
 Errors: `REQUIRED_FIELDS_MISSING` (`details.fieldIds`), `INVALID_FIELD_VALUE` (bad image,
@@ -150,8 +154,8 @@ checkbox value), `RECIPIENT_NOT_FOUND`, `VALIDATION`
 ### `appendCertificate(pdfBytes, data, options?) → Promise<Uint8Array>`
 
 Appends an A4 page titled "Signing certificate". `data` is
-`{ envelope, document, events, timeZone?, generatedAt?, sender?, recordUrl?, note? }` using
-core's types. The page shows:
+`{ envelope, document, events, timeZone?, generatedAt?, sender?, recordUrl?, note?, esign? }`
+using core's types. The page shows:
 
 - the envelope title, document name and page count, envelope id, status and when it was
   completed;
@@ -176,6 +180,13 @@ continues on further pages with its header repeated.
 
 `options`: `font` (as above) and `maxBytes`.
 
+`esign: { recipientId, provider, sandbox? }` draws the certificate for the file an Aadhaar
+eSign signer is about to sign, so the provider's signature covers it: the status reads
+"Completed by the Aadhaar eSign of ... on this file", that signer's row names the method
+(`Aadhaar eSign (via Leegality)`) and says the time is in the digital signature, the chain
+head is left out, and the closing line says the file is signed with Aadhaar eSign and then
+sealed.
+
 ### `certificatePdf(data, options?) → Promise<Uint8Array>`
 
 The same certificate as a PDF of its own, without the document: for someone who should see
@@ -185,9 +196,16 @@ put the certificates of several documents in one file. `options`: `font`.
 ### `auditTrailPdf(data, options?) → Promise<Uint8Array>`
 
 The audit trail as a PDF. `data` is `{ envelope, events, timeZone?, generatedAt?, recordUrl? }`.
-Every event is listed with its number, time, what happened and who did it, above the head of
-the hash chain. IP addresses and browser details are left out and an email address named in
-an event is masked. `options`: `font`.
+A small Codevibe Sign logo sits at the top. Then the envelope (status, when it was sent and
+completed, the head of the hash chain), each document with the SHA-256 of the original and of
+the signed file, each recipient with their role, method and status, and every event with its
+number, its time in `timeZone` and in UTC, what happened, who did it and, for a signature,
+how it was given (`Aadhaar eSign (via Leegality)` with the name on the eSign certificate).
+Browser details are left out and an email address named in an event is masked.
+
+`options`: `font`, and `networkAddresses: true` to print the network address of each event
+where one was recorded. Leave it off for a file anyone with a link can open, such as the
+public record; the server turns it on for the parties' own copy.
 
 ### `seal(pdfBytes, options) → Promise<Uint8Array>`
 

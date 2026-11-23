@@ -48,7 +48,11 @@ On the Cloud plan (and on self-hosted installs) you can use your own Leegality a
 instead. Leegality then bills you directly and no credits are used. On Free the option shows
 **See the Cloud plan**.
 
-1. In Leegality, publish a workflow with Aadhaar eSign as the signature type.
+1. In Leegality, publish a workflow with Aadhaar eSign as the signature type. Leegality places
+   its own signature mark where the workflow says (bottom left of every page when the workflow
+   has no coordinates); give the invitee coordinates that match where your senders put the
+   Aadhaar eSign box. See
+   [where Leegality puts its own signature mark](/guides/aadhaar-leegality#where-leegality-puts-its-own-signature-mark).
 2. Copy the **Webhook and error webhook** URL and the **Redirect URL** from this page into the
    workflow.
 3. Choose **Use your own Leegality account** and enter the **Environment** (Production or
@@ -58,6 +62,14 @@ instead. Leegality then bills you directly and no credits are used. On Free the 
 The details are encrypted and never shown again. If the account moves back to Free, the saved
 account is kept but not used until it is on Cloud again or switches to credits. The detailed
 steps are in [Aadhaar eSign with Leegality](/guides/aadhaar-leegality#your-own-leegality-account).
+
+## What senders see
+
+A signer who uses Aadhaar eSign gets an **Aadhaar eSign** box in the send flow instead of a
+signature or initials field, and the envelope cannot be sent until the box is placed. The
+signed result is one PDF, with the certificate page under the Aadhaar signature, and the
+completed email carries the audit trail as a second PDF. See
+[Place the Aadhaar eSign box](/guides/aadhaar-leegality#place-the-aadhaar-esign-box).
 
 ## Recent eSigns
 

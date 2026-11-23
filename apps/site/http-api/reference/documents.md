@@ -128,8 +128,10 @@ Size of each page in PDF points, in page order.
 <p class="api-route"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/documents/{docId}</code></p>
 
 The sealed PDF once the envelope is complete, otherwise the original. Ask for one of
-them with `version`. A document signed with Aadhaar eSign cannot take a certificate
-page, so its signing certificate is a sealed file of its own: `version=certificate`.
+them with `version`. A document signed with Aadhaar eSign is one file too: the
+certificate page goes on before the signer signs, so the Aadhaar eSign and the seal
+cover it. Only an Aadhaar eSign started before that change has its certificate as a
+sealed file of its own: `version=certificate`.
 
 <p class="api-auth"><span class="api-auth__label">Auth</span> Sender API key, as <code>Authorization: Bearer &lt;key&gt;</code></p>
 

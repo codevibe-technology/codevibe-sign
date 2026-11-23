@@ -41,8 +41,9 @@ Envelope ──< Document ──< Field >── Recipient
   `order` used in sequential routing, an authentication method (`email_link`,
   `email_otp`, `sms_otp`, `aadhaar`) and a status.
 - **Field**: a placed box on a page, in PDF points with a top-left origin:
-  `signature`, `initials`, `date_signed`, `name`, `text`, `checkbox`. Each field
-  belongs to one recipient and may be required.
+  `signature`, `initials`, `date_signed`, `name`, `text`, `checkbox`, and `aadhaar`, the
+  box where an Aadhaar eSign signer signs (it takes no value). Each field belongs to one
+  recipient and may be required.
 - **AuditEvent**: every action, append-only, chained by SHA-256 (`hash = sha256(prevHash + canonical(event))`).
   The chain head is printed on the certificate page and the chain can be verified offline.
 
@@ -89,21 +90,29 @@ has not changed since sealing. Signer intent is proven by the audit trail.
 ### After an Aadhaar eSign
 
 A recipient with `auth: 'aadhaar'` signs at an eSign provider, which puts its own digital
-signature on the file. Nothing but another signature can be added to a signed PDF without
-breaking that signature, so such an envelope is sealed differently:
+signature on the file. They draw nothing: in place of signature and initials fields they have
+one `aadhaar` box, which marks where the signature goes. Nothing but another signature can be
+added to a signed PDF without breaking that signature, so such an envelope is sealed
+differently, and still ends as one file:
 
-1. When the signer starts, the server draws every field value on the document and sends
-   that file to the provider. This is why the Aadhaar signer acts last, and why the
-   envelope holds one document and one Aadhaar signer.
+1. When the signer starts, the server draws every field value and the Aadhaar eSign box on
+   the document, appends the certificate page (written for a signature still to come: that
+   signer's row says they sign with Aadhaar eSign on this file) and sends that file to the
+   provider. This is why the Aadhaar signer acts last, and why the envelope holds one
+   document and one Aadhaar signer.
 2. The provider's signed file is stored as it came. The seal is added after it as an
    incremental update that changes none of its bytes, so the provider's signature and the
    seal are both valid; `verify` accepts the seal over earlier signatures and reports them.
-3. The certificate cannot be a page of that file, so it is a sealed one-page PDF of its
-   own, stored and sent next to the signed document. It names the signer's method as
-   "Aadhaar eSign (via Leegality)".
-4. If the provider locked the file against any further signature, it is kept exactly as
-   the provider signed it, without the seal, and recognised by the SHA-256 recorded in the
-   audit trail.
+3. What exists only after signing, the time of the eSign and the signer's certificate, is in
+   the digital signature and in the audit trail PDF that goes with the completed copy.
+4. If the provider locked the file against any further signature, it is kept exactly as the
+   provider signed it, certificate page included, without the seal, and recognised by the
+   SHA-256 recorded in the audit trail.
+
+The provider's API (Leegality v3.0) takes the position of its own signature mark from the
+provider's workflow, not from the request, so the request's `signaturePositions` (the box)
+are not sent. An eSign started before the certificate page went into the signed file keeps
+its certificate as a sealed one-page PDF of its own.
 
 The server keeps the signer name the provider reports and the subject, issuer and SHA-256
 of the signing certificate. It never receives an Aadhaar number.
