@@ -9,9 +9,11 @@ Use Aadhaar eSign where a law asks for a document to be signed in the statutory 
 (IT Act s.3A). For offer letters, policies and most business documents the built-in signature
 is usually enough; see [Legal](/legal).
 
-Aadhaar eSign is built into the web app and the server. The sender picks it for a signer, the
-signer confirms with an Aadhaar OTP on Leegality's page, and the finished file carries the
-Aadhaar signature and the Codevibe Sign seal together.
+Aadhaar eSign is built into the web app and the server, and follows Leegality's standard
+process. The sender picks it for a signer, the signer confirms with an Aadhaar OTP on
+Leegality's page, and Leegality places the signature where your Leegality workflow says. The
+signed file comes back with the Aadhaar signature and then the Codevibe Sign seal, and the
+certificate and audit trail come as a separate PDF.
 
 ## Send a document for Aadhaar eSign
 
@@ -25,84 +27,93 @@ The first version keeps to four rules, and the send flow points at the field tha
 - that signer acts last, after everyone else has signed or approved;
 - the signer has an email address or a 10-digit Indian mobile number.
 
-The reason for "one" and "last" is in [what the signed file contains](#what-the-signed-file-contains).
+The reason for "one" and "last" is in [what the parties receive](#what-the-parties-receive).
 
-### Place the Aadhaar eSign box
+### No box to place
 
-An Aadhaar eSign signer signs only with Aadhaar: they do not draw or type a signature. So in
-the **Fields** step, with that signer picked, the field tray offers **Aadhaar eSign** instead
-of **Signature** and **Initials**. Drag one Aadhaar eSign box to where the signature belongs,
-or use **Aadhaar eSign box on last page**. The box is required, and the envelope cannot be sent
-until it is placed: the send flow says "Place the Aadhaar eSign box for ..." and points at
-the signer. One box per signer; a second box, or a signature or initials field for that
-signer, is refused with a message saying what to remove.
+An Aadhaar eSign signer has no fields in Codevibe Sign. In the **Fields** step, with that
+signer picked, the field tray offers nothing and a note says: "Leegality places the Aadhaar
+signature where your Leegality workflow says (set the signature position in the workflow).
+You don't place a box." The same note is shown for that signer in **Recipients** and
+**Review**.
 
-The other fields stay available for that signer, because they are filled in on the signing
-page before the signer goes to Leegality: date signed, name, text and checkbox. Their values
-are drawn on the file that the Aadhaar eSign then covers.
+This keeps the file Leegality signs exactly what you approved: the document, with the fields
+of the signers before them filled in and flattened, and nothing added for the Aadhaar signer.
+Put any date, text or checkbox you need on an earlier signer; one given to the Aadhaar signer
+is refused with a message saying what to change.
 
-On the document, the box carries "Aadhaar eSign", the signer's name and "Signed with Aadhaar
-OTP via Leegality". It is drawn on the file before it goes to Leegality, so it is part of what
-the signer signs.
-
-#### Where Leegality puts its own signature mark
+### Set the signature position
 
 Leegality's create-request API (v3.0, the one Codevibe Sign uses) has no field for the
-position of a signature: the position comes from the workflow, and without coordinates in
-the workflow Leegality puts the mark at the bottom left of every page
+position of a signature: it comes from the workflow
 ([Create an e-signing request](https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request),
 [Signature coordinates](https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate)).
-So Codevibe Sign marks the place with the box above, and Leegality's own appearance of the
-digital signature goes where your workflow places it. To put both in the same spot, give the
-invitee custom coordinates in the workflow that match the box. Only Leegality's v4 Pack API
-takes positions per request; Codevibe Sign does not use it yet.
+Without coordinates, Leegality puts the signature at the bottom left of every page.
+
+To choose the place, in the Leegality dashboard:
+
+1. Open the workflow whose ID is in **Settings, Aadhaar eSign** (with prepaid credits, the
+   install's operator keeps this workflow).
+2. In the invitee's signature settings, choose **Custom Coordinates**, click where the
+   signature should go on the page and pick the invitee in the signature box.
+3. Choose **All** to put it on every page, or leave it on the page you clicked. **Clear
+   Coordinates** goes back to the default.
+4. Save and publish the workflow. Requests started after that use the new position.
+
+The position is fixed per workflow, so documents with the same layout work best with one
+workflow. Leave room for it in your document, for example an empty "Signature" area at the
+foot of the last page.
 
 ## What the signer does
 
-1. They open their signing link, agree to sign electronically and fill any other fields the
-   sender gave them. They draw nothing: the Aadhaar eSign box shows where their signature
-   goes.
+1. They open their signing link, agree to sign electronically and read the document. There is
+   nothing to fill in or draw.
 2. They choose **Continue to Aadhaar eSign** and are taken to Leegality's page. There they
    review the document and confirm with an OTP sent to the mobile number linked to their
    Aadhaar.
 3. They come back to Codevibe Sign, which waits for Leegality's confirmation and then shows the
-   usual thank-you page with their copy to download.
+   thank-you page with **Signed document (Aadhaar eSign)** and **Certificate and audit trail**
+   to download.
 
 If the signer declines at Leegality, the envelope is declined. If the eSign fails or runs out of
 time, nothing is signed and the signer can try again from the same link.
 
-Codevibe Sign never sees or stores the Aadhaar number. It keeps what Leegality and the
-signature itself return: the signer's name, the name of the authority that issued the signing
-certificate, and the certificate's SHA-256.
+Codevibe Sign never sees or stores the Aadhaar number. It keeps what the signature itself
+says: the signer's name on their eSign certificate, the authority that issued it (for example
+Protean eGov Technologies, under the CCA) and the certificate's SHA-256. The name on the
+certificate is the one shown everywhere; the name Leegality reports, which can come from the
+workflow, is kept only as a note. When the certificate names someone other than the recipient
+(beyond case, spacing or a middle initial), the audit trail records "Aadhaar name differs from
+recipient name" and the envelope page shows it to the sender. The envelope still completes.
 
-## What the signed file contains
+## What the parties receive
 
-One file, as with any other envelope: the pages, then the signing certificate page.
+- **Signed document (Aadhaar eSign).** The file Leegality signed, kept byte for byte, with the
+  Codevibe Sign seal added after it as one more signature. The seal is invisible and adds or
+  changes no page, so the document has exactly the pages you sent.
+- **Certificate and audit trail**, one sealed PDF named "<title> (certificate and audit
+  trail).pdf": the signing certificate page (the envelope, the sender, every signer and how they
+  signed, the name and issuer of the Aadhaar signer's eSign certificate and the time of the
+  signature, the SHA-256 of the original and of the signed document, the record QR code), then
+  every event of the audit trail.
+- **Leegality's audit trail**, when Leegality hands it over: kept as further evidence, on the
+  envelope page for the sender, and attached to the completed email when it is small.
 
-- **The certificate page goes on before the Aadhaar eSign.** When the signer starts, the server
-  draws every field value and the Aadhaar eSign box on the document, adds the certificate page
-  (the record link and QR code, the envelope, the sender and every signer so far, with the
-  Aadhaar signer marked "With the Aadhaar eSign on this file") and sends that file to
-  Leegality. The Aadhaar signature therefore covers the certificate too.
-- **The Aadhaar signature, untouched.** The file Leegality returns is kept byte for byte.
-- **The Codevibe Sign seal, added after it.** The seal is written as an incremental update at
-  the end of the file. A PDF reader shows two signatures, the signer's Aadhaar signature and
-  the seal over the whole file, and no change to the pages after the Aadhaar signature.
-- **The audit trail, as its own PDF.** What exists only after signing (the exact time of the
-  Aadhaar eSign, the name and the issuer of the signer's eSign certificate, the head of the
-  audit chain) cannot be written into a file that is already signed. It is in the audit trail
-  PDF, which goes with the completed email, and on the envelope page, the thank-you page and the
-  public record page.
+The completed email carries the first two, as attachments or download links. The envelope page,
+the thank-you page and the public record page offer them too; the public record page never
+offers the signed document itself.
 
-Nothing but another signature may follow an Aadhaar signature, which is why the Aadhaar signer
-acts last: anything drawn after the Aadhaar signature would break it.
+Nothing but another signature may follow an Aadhaar signature, which is why the certificate is
+a separate file and the Aadhaar signer acts last: anything drawn after the Aadhaar signature
+would break it.
 
 If the provider's file forbids any further signature, Codevibe Sign does not force one. It keeps
-the provider's file, certificate page included, exactly as it came, records its SHA-256 in the
-audit trail, and says so when the file is verified ("sealed by the eSign provider only").
+the provider's file exactly as it came, records its SHA-256 in the audit trail, and says so when
+the file is verified ("sealed by the eSign provider only").
 
-An Aadhaar eSign started before the certificate page went into the signed file has its
-certificate as a separate sealed PDF, offered next to the document as before.
+An Aadhaar eSign started under the earlier flow, when Codevibe Sign put the certificate page in
+the file before signing, keeps that page in its signed file. To give such an envelope the
+standard files, void it and send it again.
 
 ### Verify it
 
@@ -110,8 +121,9 @@ Upload the file on the [verify page](/guides/verify-pdf), or use `POST /v1/verif
 names both signatures: the seal, and under "earlier signatures" the Aadhaar signature with the
 signer's name and the issuing authority. A change to any byte breaks one or both.
 
-In a PDF reader the Aadhaar signature shows as valid for the part of the file it covers, with
-"signature added" as the only later change. See
+In a PDF reader, such as Adobe Acrobat Reader, both signatures show as valid. The Aadhaar
+signature shows that the revision it signed has not been changed; the only later change is the
+seal, a signature added without touching any page. See
 [The seal in PDF readers](/guides/seal-in-pdf-readers) for what readers trust by default.
 
 ## Two ways to pay for it
@@ -142,7 +154,7 @@ Available on the Cloud plan and on self-hosted installs. Leegality bills you dir
 credits are used.
 
 1. In the Leegality dashboard, publish a workflow with Aadhaar eSign as the invitee's signature
-   type and the signature box placed.
+   type and the signature position set (see [Set the signature position](#set-the-signature-position)).
 2. In that workflow, under the invitee's custom URLs and webhooks, set the Webhook and Error
    Webhook to `https://<your app>/api/v1/esign/webhooks/leegality` (version 2.5) and the
    Redirect URL to `https://<your app>/sign?esign=return`. The settings page shows both with a
@@ -186,11 +198,13 @@ Audit events to expect: `recipient.esign_started`, then `recipient.signed` with
 `data.method: "aadhaar_esign"`, or `recipient.esign_failed` with `data.reason`. The recipient
 carries `esign: { provider, status }`.
 
-Give the Aadhaar signer one field of type `aadhaar` (required, with its `page` and `rect`)
-and no `signature` or `initials` fields. A request that gives them one `signature` field and
-nothing else to sign with still works: that field becomes the Aadhaar eSign box when the
-envelope is sent. The sealed file is downloaded as usual with `version=sealed`, and the audit
-trail PDF with `GET /v1/envelopes/{id}/audit-trail`.
+Give the Aadhaar signer no fields. For older clients, `signature`, `initials` and `aadhaar`
+fields given to that signer are dropped when the envelope is sent; any other field for them is
+refused with `400`. The signed document is downloaded with `version=sealed`, the certificate
+and audit trail with `version=certificate`, and Leegality's audit trail with
+`version=provider-audit-trail`. The `recipient.signed` event carries `signerName` from the
+eSign certificate and, when it differs, `providerSignerName`; a name that is not the
+recipient's adds a `recipient.esign_name_differs` event.
 
 If you run `@codevibe_technology/sign-server` yourself, pass a provider in the `esign` option;
 see the [server reference](/api/server).
@@ -206,7 +220,8 @@ Leegality's API runs a published workflow, and several settings live only there.
 Leegality dashboard, for the workflow you will pass as `profileId`:
 
 - choose Aadhaar eSign as the signature type for the invitee;
-- place the signature box (create one workflow per layout if you need several);
+- set the signature position with custom coordinates (create one workflow per layout if you
+  need several);
 - under the invitee's custom URLs and webhooks, set the Webhook and Error Webhook to your
   callback URL, choose webhook version 2.5, and set the Redirect URL.
 
@@ -245,7 +260,6 @@ const { providerRef, signUrl } = await esign.createRequest({
   recipient: { name: 'Asha Rao', email: 'asha@example.com' },
   documentBytes: pdf,
   documentName: 'Appointment letter.pdf',
-  signaturePositions: [{ page: 0, rect: { x: 72, y: 640, width: 160, height: 48 } }],
   callbackUrl: 'https://sign.example.com/hooks/leegality',
   redirectUrl: 'https://sign.example.com/done',
 });
@@ -270,7 +284,8 @@ const event = await esign.parseWebhook(request.headers, rawBody);
 
 if (event?.status === 'signed') {
   const signed = await esign.fetchSignedDocument(event.providerRef);
-  // Store the file and record the signature in the envelope's audit trail.
+  const trail = await esign.fetchAuditTrail?.(event.providerRef);
+  // Store both and record the signature in the envelope's audit trail.
   // To seal it afterwards use countersign() from sign-pdf, which keeps every signed byte.
 }
 ```
@@ -293,7 +308,8 @@ The full list of options is in the [API reference](/api/aadhaar).
 ## Other providers
 
 Leegality is the only provider today. eMudhra is planned as the second one. Both sit behind the
-`EsignProvider` interface (`createRequest`, `parseWebhook`, `fetchSignedDocument`), so you can
+`EsignProvider` interface (`createRequest`, `parseWebhook`, `fetchSignedDocument`, and
+optionally `fetchAuditTrail`), so you can
 add another provider yourself. Pull requests are welcome.
 
 ## Next
