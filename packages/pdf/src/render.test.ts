@@ -467,3 +467,24 @@ describe('renderFields: rules', () => {
     expect(shownText(await pageContent(output, 1))).toEqual(['Offer letter', 'x']);
   });
 });
+
+describe('renderFields: Aadhaar eSign box', () => {
+  it('draws the box with the signer and provider though it has no value', async () => {
+    const content = await render(
+      { size: A4 },
+      [field('aadhaar', { rect: { x: 300, y: 600, width: 200, height: 60 } })],
+      [],
+      { esignProvider: 'Leegality' },
+    );
+    const text = shownText(content);
+    expect(text).toContain('Aadhaar eSign');
+    expect(text).toContain('Shubh Kumar');
+    expect(text).toContain('Signed with Aadhaar OTP via Leegality');
+  });
+
+  it('names no provider when none is given, and never asks for a value', async () => {
+    const text = shownText(await render({ size: A4 }, [field('aadhaar')], []));
+    expect(text).toContain('Signed with Aadhaar OTP');
+    expect(text.join(' ')).not.toContain('via');
+  });
+});
