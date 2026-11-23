@@ -33,6 +33,8 @@ export interface RecipientAction {
 }
 
 export interface SubmitInput extends RecipientAction {
+  /** Extra facts for the signed or approved event, for example how an eSign provider signed. */
+  data?: Record<string, string | number | boolean>;
   values: FieldValue[];
 }
 
@@ -379,7 +381,7 @@ export function submit(
   t.event(signed ? 'recipient.signed' : 'recipient.approved', {
     recipientId: recipient.id,
     context: input.context,
-    data: { fields: values.length },
+    data: { ...input.data, fields: values.length },
   });
 
   if (currentRecipients(t.envelope).length === 0) complete(t);

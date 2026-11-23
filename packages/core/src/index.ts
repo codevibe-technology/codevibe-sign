@@ -5,6 +5,7 @@ export {
   addDocument,
   addField,
   addRecipient,
+  aadhaarIssues,
   assertReadyToSend,
   createEnvelope,
   DEFAULT_REMINDERS,

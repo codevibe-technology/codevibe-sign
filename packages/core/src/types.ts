@@ -161,6 +161,10 @@ export type AuditAction =
   | 'recipient.link_shared'
   /** The sender corrected the name or contact of a recipient who had not acted yet. */
   | 'recipient.corrected'
+  /** The recipient was sent to the eSign provider; `data.provider` names it. */
+  | 'recipient.esign_started'
+  /** An eSign did not finish; `data.reason` says why. The recipient may start again. */
+  | 'recipient.esign_failed'
   | 'document.sealed';
 
 export interface AuditContext {
@@ -219,6 +223,7 @@ export type SignErrorCode =
   | 'PDF_ALREADY_SIGNED'
   | 'SEAL_FAILED'
   | 'PROVIDER_ERROR'
+  | 'ESIGN_UNAVAILABLE'
   | 'WEBHOOK_INVALID'
   | 'VALIDATION';
 

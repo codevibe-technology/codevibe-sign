@@ -574,6 +574,48 @@ function valueIssues(envelope: Envelope): ValidationIssue[] {
   return issues;
 }
 
+/**
+ * An Aadhaar eSign is a signature over the finished file, and nothing but another signature
+ * can be added after it. So one signer may use it, on a single document, and they sign last.
+ */
+export function aadhaarIssues(envelope: Envelope): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const aadhaar = envelope.recipients.filter((r) => r.auth === 'aadhaar');
+  if (aadhaar.length === 0) return issues;
+  for (const recipient of aadhaar.filter((r) => r.role !== 'signer')) {
+    issues.push({
+      path: `recipients.${recipient.id}.auth`,
+      message: `Aadhaar eSign is for signers; choose another way for ${recipient.name}`,
+    });
+  }
+  for (const recipient of aadhaar.slice(1)) {
+    issues.push({
+      path: `recipients.${recipient.id}.auth`,
+      message: 'Only one recipient of an envelope can sign with Aadhaar eSign',
+    });
+  }
+  if (envelope.documents.length > 1) {
+    issues.push({
+      path: 'documents',
+      message: 'An envelope signed with Aadhaar eSign can hold one document',
+    });
+  }
+  const signer = aadhaar[0]!;
+  const others = envelope.recipients.filter((r) => isActor(r) && r.id !== signer.id);
+  if (others.length > 0 && envelope.routing !== 'sequential') {
+    issues.push({
+      path: 'routing',
+      message: `${signer.name} signs with Aadhaar eSign and must sign last; use sequential routing`,
+    });
+  } else if (others.some((r) => r.order >= signer.order)) {
+    issues.push({
+      path: `recipients.${signer.id}.order`,
+      message: `${signer.name} signs with Aadhaar eSign and must be the last to act`,
+    });
+  }
+  return issues;
+}
+
 /** Everything that must hold before an envelope can be sent. Empty means ready. */
 export function validateForSend(envelope: Envelope, now: Date): ValidationIssue[] {
   const issues: ValidationIssue[] = [...titleIssues(envelope.title)];
@@ -601,7 +643,7 @@ export function validateForSend(envelope: Envelope, now: Date): ValidationIssue[
   for (const field of envelope.fields) {
     issues.push(...fieldIssues(envelope, field, `fields.${field.id}`));
   }
-  issues.push(...valueIssues(envelope));
+  issues.push(...valueIssues(envelope), ...aadhaarIssues(envelope));
   issues.push(...reminderIssues(envelope.reminders), ...expiryIssues(envelope.expiresAt, now));
   return issues;
 }
