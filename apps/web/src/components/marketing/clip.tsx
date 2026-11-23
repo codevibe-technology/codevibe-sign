@@ -30,6 +30,9 @@ const prefersReducedMotion = () =>
  * plays on a loop, and it pauses again when scrolled away. Visitors who ask for reduced motion see
  * the poster and start it themselves. The button pauses any clip, as moving content must be.
  *
+ * Given `active`, the clip is driven from outside instead: it plays only while active and on
+ * screen, and the owner draws the play and pause button.
+ *
  * The poster is an image over the video rather than the video's own poster, so the browser can
  * load it lazily like any other image.
  */
@@ -37,6 +40,8 @@ export function Clip({
   clip,
   describedBy,
   eager = false,
+  active,
+  prefetch = false,
   className,
 }: {
   clip: ClipSpec;
@@ -44,6 +49,10 @@ export function Clip({
   describedBy?: string;
   /** The clip in the first view: its poster loads at once, ahead of other images. */
   eager?: boolean;
+  /** Set by an owner that decides when the clip plays; the clip then has no button of its own. */
+  active?: boolean;
+  /** The next clip in line: fetch its metadata so it starts without a gap. */
+  prefetch?: boolean;
   className?: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -57,14 +66,14 @@ export function Clip({
     if (!video) return;
     // React does not write `muted` into the server HTML; browsers only autoplay muted video.
     video.muted = true;
-    if (reduced || typeof IntersectionObserver === 'undefined') {
+    if (reduced || active === false || typeof IntersectionObserver === 'undefined') {
       if (!video.paused) video.pause();
       return;
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          if (!pausedByVisitor.current) video.play().catch(() => {});
+          if (active || !pausedByVisitor.current) video.play().catch(() => {});
         } else if (!video.paused) {
           video.pause();
         }
@@ -73,7 +82,7 @@ export function Clip({
     );
     observer.observe(video);
     return () => observer.disconnect();
-  }, [reduced]);
+  }, [reduced, active]);
 
   const toggle = () => {
     const video = ref.current;
@@ -96,7 +105,7 @@ export function Clip({
         className="block h-auto w-full bg-surface-2"
         width={clip.width}
         height={clip.height}
-        preload="none"
+        preload={prefetch ? 'metadata' : 'none'}
         muted
         loop
         playsInline
@@ -122,19 +131,21 @@ export function Clip({
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={`${playing ? 'Pause' : 'Play'} the clip: ${clip.label}`}
-        aria-describedby={describedBy}
-        className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#0D1B2A]/80 text-white shadow-md backdrop-blur transition-opacity hover:bg-[#0D1B2A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        {playing ? (
-          <Pause aria-hidden className="h-4 w-4" />
-        ) : (
-          <Play aria-hidden className="h-4 w-4 translate-x-px" />
-        )}
-      </button>
+      {active === undefined ? (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={`${playing ? 'Pause' : 'Play'} the clip: ${clip.label}`}
+          aria-describedby={describedBy}
+          className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-md bg-[#0D1B2A]/85 text-white shadow-[0_2px_8px_rgb(13_27_42/0.3)] transition-colors hover:bg-[#0D1B2A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {playing ? (
+            <Pause aria-hidden className="h-4 w-4" />
+          ) : (
+            <Play aria-hidden className="h-4 w-4 translate-x-px" />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 }

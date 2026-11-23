@@ -138,4 +138,24 @@ describe('Clip', () => {
     await userEvent.click(button);
     expect(play).toHaveBeenCalledTimes(1);
   });
+
+  it('driven from outside, plays only while active and draws no button of its own', () => {
+    setReducedMotion(false);
+    const { container, rerender } = render(<Clip clip={CLIP} active={false} />);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(observed).toBeNull();
+    rerender(<Clip clip={CLIP} active />);
+    scrollTo(true);
+    expect(play).toHaveBeenCalledTimes(1);
+    rerender(<Clip clip={CLIP} active={false} />);
+    expect(pause).toHaveBeenCalled();
+    expect(container.querySelector('video')).toHaveAttribute('preload', 'none');
+  });
+
+  it('fetches only the metadata of the clip next in line', () => {
+    setReducedMotion(false);
+    const { container } = render(<Clip clip={CLIP} active={false} prefetch />);
+    expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata');
+    expect(play).not.toHaveBeenCalled();
+  });
 });
