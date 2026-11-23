@@ -3,6 +3,7 @@
 import { MailCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import { humanCheckHeaders, useHumanCheck } from '@/components/auth/human-check';
 import { PasswordInput } from '@/components/auth/password-input';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
@@ -29,13 +30,17 @@ export function SignInForm({
   google,
   failed,
   notice,
+  humanCheckKey = null,
 }: {
   next: string;
   google: boolean;
   failed: boolean;
   /** Something that just happened, for example a password that was reset. */
   notice?: string;
+  /** The Turnstile site key, when the install asks for a human check. */
+  humanCheckKey?: string | null;
 }) {
+  const human = useHumanCheck(humanCheckKey, 'sign-in');
   const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,14 +57,31 @@ export function SignInForm({
     setErrors({});
   }
 
+  /** The human check token (null when the check is off), or false once the reason is shown. */
+  async function humanToken(field: 'email' | 'password'): Promise<string | null | false> {
+    try {
+      return await human.token();
+    } catch (err) {
+      setErrors({ [field]: err instanceof Error ? err.message : String(err) });
+      return false;
+    }
+  }
+
   async function sendLink(address: string) {
     setPending(true);
+    const token = await humanToken('email');
+    if (token === false) {
+      setPending(false);
+      return;
+    }
     const { error } = await authClient.signIn.magicLink({
       email: address,
       callbackURL: next,
       newUserCallbackURL: next,
       errorCallbackURL: '/sign-in?error=link',
+      ...humanCheckHeaders(token),
     });
+    human.reset();
     setPending(false);
     if (error) setErrors({ email: error.message ?? 'We could not send the link. Try again.' });
     else setSentTo(address);
@@ -71,12 +93,22 @@ export function SignInForm({
       return;
     }
     setPending(true);
-    const { error } = await authClient.signIn.email({ email: address, password });
+    const token = await humanToken('password');
+    if (token === false) {
+      setPending(false);
+      return;
+    }
+    const { error } = await authClient.signIn.email({
+      email: address,
+      password,
+      ...humanCheckHeaders(token),
+    });
     if (!error) {
       // A full page load, so the next page is rendered with the new session.
       window.location.assign(next);
       return;
     }
+    human.reset();
     setPending(false);
     setErrors({
       password:
@@ -167,6 +199,7 @@ export function SignInForm({
             We will email you a link that signs you in. It works once and expires in 10 minutes.
           </p>
         )}
+        {human.widget}
         <Button type="submit" className="w-full" pending={pending}>
           {mode === 'password'
             ? pending

@@ -10,6 +10,7 @@ import { db } from '@/server/db';
 import { findInvitation, invitationState } from '@/server/invitations';
 import { hasAccount } from '@/server/auth/passwords';
 import { AcceptInvitation } from './accept-invitation';
+import { turnstileSiteKey } from '@/server/human-check';
 import { JoinForm } from './join-form';
 
 export const metadata: Metadata = { title: 'Invitation' };
@@ -60,6 +61,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           email={invitation.email}
           suggestedName={invitation.name ?? ''}
           signInHref={signIn}
+          humanCheckKey={turnstileSiteKey()}
         />
       </AuthFrame>
     );

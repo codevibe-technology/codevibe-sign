@@ -3,11 +3,21 @@
 import { MailCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import { humanCheckHeaders, useHumanCheck } from '@/components/auth/human-check';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { authClient } from '@/lib/auth-client';
+import { HUMAN_CHECK_CODE } from '@/lib/human-check';
 
-export function ForgotPasswordForm({ email: initial }: { email: string }) {
+export function ForgotPasswordForm({
+  email: initial,
+  humanCheckKey = null,
+}: {
+  email: string;
+  /** The Turnstile site key, when the install asks for a human check. */
+  humanCheckKey?: string | null;
+}) {
+  const human = useHumanCheck(humanCheckKey, 'forgot-password');
   const [email, setEmail] = useState(initial);
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -22,16 +32,28 @@ export function ForgotPasswordForm({ email: initial }: { email: string }) {
     }
     setPending(true);
     setError(undefined);
+    let token: string | null;
+    try {
+      token = await human.token();
+    } catch (err) {
+      setPending(false);
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    }
     const { error: failure } = await authClient.requestPasswordReset({
       email: address,
       redirectTo: '/reset-password',
+      ...humanCheckHeaders(token),
     });
+    human.reset();
     setPending(false);
     if (failure) {
       setError(
         failure.status === 429
           ? 'Too many requests. Wait a minute and try again.'
-          : 'We could not send the email. Try again in a moment.',
+          : failure.code === HUMAN_CHECK_CODE && failure.message
+            ? failure.message
+            : 'We could not send the email. Try again in a moment.',
       );
     } else setSentTo(address);
   }
@@ -71,6 +93,7 @@ export function ForgotPasswordForm({ email: initial }: { email: string }) {
           />
         )}
       </Field>
+      {human.widget}
       <Button type="submit" className="w-full" pending={pending}>
         {pending ? 'Sending…' : 'Email me a reset link'}
       </Button>

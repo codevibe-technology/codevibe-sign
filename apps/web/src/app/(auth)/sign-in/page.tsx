@@ -4,6 +4,7 @@ import { AuthFrame } from '@/components/shell/status-page';
 import { safeNext } from '@/lib/safe-next';
 import { getSessionUser } from '@/server/auth/session';
 import { env, googleEnabled } from '@/server/env';
+import { turnstileSiteKey } from '@/server/human-check';
 import { SignInForm } from './sign-in-form';
 
 export const metadata: Metadata = { title: 'Sign in' };
@@ -27,6 +28,7 @@ export default async function SignInPage({
         next={next}
         google={googleEnabled(env())}
         failed={params.error !== undefined}
+        humanCheckKey={turnstileSiteKey()}
         {...(params.reset !== undefined
           ? { notice: 'Your password was changed. Sign in with the new one.' }
           : {})}

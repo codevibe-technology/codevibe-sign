@@ -19,15 +19,16 @@ describe('contentSecurityPolicy', () => {
     expect(policy.get('form-action')).toEqual(["'self'"]);
     expect(policy.get('connect-src')).toEqual(["'self'"]);
     const foreign = policy.get('script-src')!.filter((source) => /^https?:|^\*/.test(source));
-    expect(foreign).toEqual(['https://checkout.razorpay.com']);
+    expect(foreign).toEqual(['https://checkout.razorpay.com', 'https://challenges.cloudflare.com']);
   });
 
-  it('lets Razorpay Checkout open its payment frame and nothing else', () => {
+  it('lets Razorpay Checkout and Turnstile open their frames and nothing else', () => {
     const policy = directives(contentSecurityPolicy({ development: false }));
     expect(policy.get('frame-src')).toEqual([
       "'self'",
       'https://api.razorpay.com',
       'https://checkout.razorpay.com',
+      'https://challenges.cloudflare.com',
     ]);
     expect(policy.get('connect-src')).toEqual(["'self'"]);
     expect(policy.get('img-src')!.some((source) => source.includes('razorpay'))).toBe(false);
@@ -60,6 +61,12 @@ describe('headerRules', () => {
     expect(valueFor('/:path*', 'Content-Security-Policy')).toContain("default-src 'self'");
     expect(valueFor('/:path*', 'X-Content-Type-Options')).toBe('nosniff');
     expect(valueFor('/:path*', 'X-Frame-Options')).toBe('DENY');
+    expect(valueFor('/:path*', 'Strict-Transport-Security')).toBe('max-age=31536000');
+  });
+
+  it('leaves HSTS out in development', () => {
+    const dev = headerRules({ development: true })[0]!.headers.map((header) => header.key);
+    expect(dev).not.toContain('Strict-Transport-Security');
   });
 
   it('sends no referrer at all from the signing link, page and API', () => {

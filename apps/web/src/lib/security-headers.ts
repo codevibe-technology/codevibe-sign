@@ -5,6 +5,7 @@ export interface HeaderRule {
 
 const RAZORPAY_CHECKOUT = 'https://checkout.razorpay.com';
 const RAZORPAY_API = 'https://api.razorpay.com';
+const TURNSTILE = 'https://challenges.cloudflare.com';
 
 /**
  * The Content-Security-Policy for every page. Scripts, styles, fonts, images and connections
@@ -12,7 +13,8 @@ const RAZORPAY_API = 'https://api.razorpay.com';
  * inline styles, so both stay allowed inline; what the policy stops is code or data being
  * loaded from, or sent to, anywhere else, and the app being framed. The docs under `/docs`
  * serve their own fonts too. Razorpay Checkout is the one outside script: it is loaded when
- * someone pays and runs its payment form in a frame on Razorpay's own origin.
+ * someone pays and runs its payment form in a frame on Razorpay's own origin. Cloudflare
+ * Turnstile, the optional human check on public forms, runs the same way from its own origin.
  */
 export function contentSecurityPolicy({ development }: { development: boolean }): string {
   const directives: [string, string[]][] = [
@@ -25,6 +27,7 @@ export function contentSecurityPolicy({ development }: { development: boolean })
         "'wasm-unsafe-eval'",
         ...(development ? ["'unsafe-eval'"] : []),
         RAZORPAY_CHECKOUT,
+        TURNSTILE,
       ],
     ],
     ['style-src', ["'self'", "'unsafe-inline'"]],
@@ -32,7 +35,7 @@ export function contentSecurityPolicy({ development }: { development: boolean })
     ['font-src', ["'self'", 'data:']],
     ['connect-src', ["'self'"]],
     ['worker-src', ["'self'", 'blob:']],
-    ['frame-src', ["'self'", RAZORPAY_API, RAZORPAY_CHECKOUT]],
+    ['frame-src', ["'self'", RAZORPAY_API, RAZORPAY_CHECKOUT, TURNSTILE]],
     ['object-src', ["'none'"]],
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'"]],
@@ -68,6 +71,10 @@ export function headerRules(options: { development: boolean }): HeaderRule[] {
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        // Browsers only take this over HTTPS, so a plain-HTTP install is not affected.
+        ...(options.development
+          ? []
+          : [{ key: 'Strict-Transport-Security', value: 'max-age=31536000' }]),
       ],
     },
     ...SECRET_LINK_PATHS.map((source) => ({

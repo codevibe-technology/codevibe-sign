@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import { humanCheckHeaders, useHumanCheck } from '@/components/auth/human-check';
 import { PasswordInput } from '@/components/auth/password-input';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
@@ -24,24 +25,39 @@ export function JoinForm({
   email,
   suggestedName = '',
   signInHref,
+  humanCheckKey = null,
 }: {
   token: string;
   email: string;
   suggestedName?: string;
   signInHref: string;
+  /** The Turnstile site key, when the install asks for a human check. */
+  humanCheckKey?: string | null;
 }) {
+  const human = useHumanCheck(humanCheckKey, 'join');
   const [name, setName] = useState(suggestedName);
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [pending, setPending] = useState(false);
 
   async function join(): Promise<Errors | null> {
+    let humanToken: string | null;
+    try {
+      humanToken = await human.token();
+    } catch (err) {
+      return { form: err instanceof Error ? err.message : String(err) };
+    }
     const created = await joinWithPasswordAction({ token, name, password });
     if (!created.ok) {
       const field = created.field === 'newPassword' ? 'password' : created.field;
       return { [field === 'name' || field === 'password' ? field : 'form']: created.error };
     }
-    const signedIn = await authClient.signIn.email({ email: created.data.email, password });
+    const signedIn = await authClient.signIn.email({
+      email: created.data.email,
+      password,
+      ...humanCheckHeaders(humanToken),
+    });
+    human.reset();
     if (signedIn.error) {
       return { form: 'Your account is ready. Sign in with your new password to accept.' };
     }
@@ -110,6 +126,7 @@ export function JoinForm({
           />
         )}
       </Field>
+      {human.widget}
       {errors.form ? (
         <p className="text-[13px] text-danger" role="alert">
           {errors.form}
