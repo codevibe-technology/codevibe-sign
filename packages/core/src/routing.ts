@@ -11,7 +11,7 @@ export function isFinal(envelopeOrStatus: Envelope | EnvelopeStatus): boolean {
   return FINAL_ENVELOPE_STATUSES.includes(status);
 }
 
-export function isActive(envelope: Envelope): boolean {
+export function isActive(envelope: Pick<Envelope, 'status'>): boolean {
   return envelope.status === 'sent' || envelope.status === 'in_progress';
 }
 
@@ -28,7 +28,9 @@ export function isExpiredAt(envelope: Envelope, now: Date): boolean {
  * Sequential routing: those who have not acted with the lowest order; equal orders act together.
  * Empty unless the envelope is sent or in progress.
  */
-export function currentRecipients(envelope: Envelope): Recipient[] {
+export function currentRecipients(
+  envelope: Pick<Envelope, 'status' | 'routing' | 'recipients'>,
+): Recipient[] {
   if (!isActive(envelope)) return [];
   const waiting = envelope.recipients.filter((r) => isActor(r) && !hasActed(r));
   if (envelope.routing === 'parallel' || waiting.length === 0) return waiting;
