@@ -1040,6 +1040,7 @@ const ACTIONS: Record<string, { entry: string; enforcedBy: string } | { free: st
   joinWithPasswordAction: { free: 'makes the account only; joining is acceptInvitationAction' },
   updatePreferencesAction: { free: 'the person, not a workspace' },
   updateNameAction: { free: 'the person, not a workspace' },
+  recordTourAction: { free: 'the person, not a workspace' },
   // api keys
   createApiKeyAction: { free: 'keys are free to make; each call is counted by api.requests' },
   revokeApiKeyAction: { free: 'removes' },

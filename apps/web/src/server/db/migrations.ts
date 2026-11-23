@@ -684,4 +684,19 @@ create index app_workspace_transfers_to_idx on app_workspace_transfers (lower(to
 alter table app_brand_settings add column logo_width integer, add column logo_height integer;
 `,
   },
+  {
+    name: '0023_user_tours',
+    sql: `
+create table app_user_tours (
+  user_id text not null references auth_users (id) on delete cascade,
+  tour text not null,
+  status text not null check (status in ('started', 'done', 'skipped')),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, tour)
+);
+-- People who were here before the tours already know their way around: theirs stay closed.
+insert into app_user_tours (user_id, tour, status)
+  select u.id, t.tour, 'skipped' from auth_users u cross join (values ('workspace'), ('send')) as t (tour);
+`,
+  },
 ];
