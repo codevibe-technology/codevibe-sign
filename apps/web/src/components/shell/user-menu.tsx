@@ -1,10 +1,11 @@
 'use client';
 
-import { LogOut, Monitor, Moon, Sun, UserRound } from 'lucide-react';
+import { Compass, LogOut, Monitor, Moon, Send, Sun, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DropdownMenu } from 'radix-ui';
 import { toast } from 'sonner';
+import { useTours } from '@/components/tour/tour-provider';
 import { authClient } from '@/lib/auth-client';
 import { hasName, initialOf } from '@/lib/person-name';
 import type { Theme } from '@/lib/preferences';
@@ -21,14 +22,18 @@ export function UserMenu({
   user,
   personalHref,
   side = 'right',
+  onNavigate,
 }: {
   user: { name: string; email: string };
   /** Left out on the public pages, which belong to no workspace. */
   personalHref?: string;
   /** Where the menu opens: beside the sidebar, or below a top bar. */
   side?: 'right' | 'bottom';
+  /** Closes the phone menu the account menu sits in. */
+  onNavigate?: () => void;
 }) {
   const router = useRouter();
+  const tours = useTours();
   const item =
     'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm outline-none data-[highlighted]:bg-surface-2';
 
@@ -68,10 +73,37 @@ export function UserMenu({
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
           {personalHref ? (
             <DropdownMenu.Item asChild>
-              <Link href={personalHref} className={item}>
+              <Link href={personalHref} className={item} onClick={onNavigate}>
                 <UserRound aria-hidden className="h-4 w-4" /> Personal settings
               </Link>
             </DropdownMenu.Item>
+          ) : null}
+          {tours ? (
+            <>
+              <DropdownMenu.Label className="eyebrow px-2 pt-2 pb-1">
+                Guided tours
+              </DropdownMenu.Label>
+              <DropdownMenu.Item
+                className={item}
+                onSelect={() => {
+                  onNavigate?.();
+                  tours.replay('workspace');
+                }}
+              >
+                <Compass aria-hidden className="h-4 w-4" /> Replay the workspace tour
+              </DropdownMenu.Item>
+              {tours.canSend ? (
+                <DropdownMenu.Item
+                  className={item}
+                  onSelect={() => {
+                    onNavigate?.();
+                    tours.replay('send');
+                  }}
+                >
+                  <Send aria-hidden className="h-4 w-4" /> Replay the sending tour
+                </DropdownMenu.Item>
+              ) : null}
+            </>
           ) : null}
           <DropdownMenu.Label className="eyebrow px-2 pt-2 pb-1">Theme</DropdownMenu.Label>
           {THEME_ITEMS.map(({ value, label, icon: Icon }) => (

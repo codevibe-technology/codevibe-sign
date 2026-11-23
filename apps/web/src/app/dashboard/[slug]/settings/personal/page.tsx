@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { NameForm } from '@/components/settings/name-form';
 import { PasswordForm } from '@/components/settings/password-form';
 import { PersonalForm } from '@/components/settings/personal-form';
+import { TourSettings } from '@/components/settings/tour-settings';
 import { requireWorkspace } from '@/server/auth/guards';
 import { hasPassword } from '@/server/auth/passwords';
 import { db } from '@/server/db';
@@ -22,6 +23,7 @@ export default async function PersonalSettings({ params }: { params: Promise<{ s
       <NameForm user={account} />
       <PersonalForm user={account} preferences={preferences} />
       <PasswordForm user={account} hasPassword={password} />
+      <TourSettings />
     </div>
   );
 }
