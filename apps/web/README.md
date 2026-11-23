@@ -63,6 +63,14 @@ a reason. The thank-you page offers **Download your copy** as soon as everyone h
 the copy is sealed. Links that are used, expired or withdrawn get a page that says why and what
 to do next. In development, open the link printed in the `dev` terminal.
 
+## Workspace address
+
+A workspace lives at `/dashboard/<address>`. The create form suggests the address from the
+name, lets you edit it and checks while you type whether it is free. Admins change it later
+under **Settings → Workspace → Change address**: old links and bookmarks redirect to the new
+address, and no other workspace can take the old one for 90 days. See
+[docs/APP-ARCHITECTURE.md](../../docs/APP-ARCHITECTURE.md#workspace-addresses).
+
 ## Brand
 
 **Settings → Brand** sets the logo, colour and font; the sender name and reply-to of the

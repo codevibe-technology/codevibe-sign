@@ -102,6 +102,36 @@ Rules the server enforces:
 - Idempotency keys and rate limits are scoped by workspace and principal.
 - A `readOnly` principal (the viewer role) may only use `GET` routes.
 
+### Workspace addresses
+
+A workspace lives at `/dashboard/<slug>`. People choose the slug when they create the
+workspace: the form suggests one from the name (Latin letters, with Hindi, Bengali, Gurmukhi,
+Gujarati, Odia, Tamil, Telugu, Kannada and Malayalam written out in Latin letters, and
+`workspace` when nothing can be) and says while they type whether it is free. The rules live
+in `src/lib/workspace-address.ts` and the browser and the server share them: 3 to 40
+characters, lower-case letters, digits and single inner hyphens, and none of the reserved words
+the app uses for its own pages (`dashboard`, `api`, `docs`, `settings`, `admin`, `new`,
+`sign`, `verify`, `www` and a few more).
+
+- `GET /api/workspaces/address?slug=…[&workspace=<id>]` answers `available`, `current`,
+  `taken` (with up to three free alternatives) or `invalid`, for signed-in people only, at most
+  120 checks per person and 300 per client address in ten minutes. A recently retired address
+  answers `taken` like one in use, so it reveals nothing about other workspaces.
+- Claiming an address (create or change) takes a transaction-level advisory lock per address,
+  then checks again, so two people cannot take the same one; the unique index on
+  `app_workspaces.slug` is the last guard, and its error comes back as a field error.
+- **Settings → Workspace** shows the address as fixed text. Admins and owners change it with
+  **Change address**, which runs the same live check and says what happens. The old slug goes
+  into `app_workspace_slug_history`; a member who opens any page under it is redirected with
+  `308` to the same page at the new address (`requireWorkspace`, and `workspaceNotFound` in
+  route handlers; the proxy passes the path in `x-cvs-path`). People outside the workspace
+  still get 404. Links in emails already sent keep working the same way.
+- No other workspace can take an old address for 90 days; after that it may, and the redirect
+  stops. A workspace can take back its own old address at any time. A workspace can change its
+  address five times in 30 days. Each change is recorded in `app_workspace_address_changes`.
+- API keys, webhooks, signing links, the live stream and every server action use the
+  workspace id, so none of them notice a change. The HTTP API never exposes the slug.
+
 ### Self-hosted, cloud
 
 - **Cloud**: anyone may sign up and create workspaces; a person can belong to many and switch
@@ -178,27 +208,29 @@ server's migrations, then the app's, each recorded and taken under an advisory l
 migrations are plain SQL in `src/server/db/migrations.ts`, append only, never edited once
 released.
 
-| Table                    | Holds                                                                                                    |
-| ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `auth_users`             | Person: name, email (unique, lower-case), avatar, email verified.                                        |
-| `auth_sessions`          | Better Auth sessions (token, expiry, IP, user agent).                                                    |
-| `auth_accounts`          | Linked sign-in methods (Google) and the password hash.                                                   |
-| `auth_verifications`     | Magic-link tokens.                                                                                       |
-| `app_workspaces`         | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                               |
-| `app_members`            | `(workspace_id, user_id)` primary key, `role`.                                                           |
-| `app_invitations`        | `workspace_id`, `email`, `role`, token SHA-256, expiry (7 days), accepted / revoked times.               |
-| `app_brand_settings`     | One row per workspace; see Branding.                                                                     |
-| `app_api_keys`           | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked.              |
-| `app_user_preferences`   | `user_id`: theme, timezone, language.                                                                    |
-| `app_templates`          | `workspace_id`, name, description, `definition` (roles, fields, documents, settings), archived time.     |
-| `app_bulk_sends`         | One bulk send: template, who started it, status (`sending`, `done`, `cancelled`), total, worker lease.   |
-| `app_bulk_send_rows`     | `(bulk_id, line)`: the people and metadata for one envelope, its status, envelope id or error.           |
-| `app_webhooks`           | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.              |
-| `app_webhook_deliveries` | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days. |
-| `app_usage`              | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.      |
-| `app_plan_changes`       | Who moved a workspace from one plan to another, and when.                                                |
-| `app_first_run`          | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.             |
-| `sign_*`                 | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                    |
+| Table                           | Holds                                                                                                    |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `auth_users`                    | Person: name, email (unique, lower-case), avatar, email verified.                                        |
+| `auth_sessions`                 | Better Auth sessions (token, expiry, IP, user agent).                                                    |
+| `auth_accounts`                 | Linked sign-in methods (Google) and the password hash.                                                   |
+| `auth_verifications`            | Magic-link tokens.                                                                                       |
+| `app_workspaces`                | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                               |
+| `app_workspace_slug_history`    | `slug` (primary key): an old address, the workspace it leads to and when it was given up.                |
+| `app_workspace_address_changes` | Who changed a workspace's address, from what to what, and when.                                          |
+| `app_members`                   | `(workspace_id, user_id)` primary key, `role`.                                                           |
+| `app_invitations`               | `workspace_id`, `email`, `role`, token SHA-256, expiry (7 days), accepted / revoked times.               |
+| `app_brand_settings`            | One row per workspace; see Branding.                                                                     |
+| `app_api_keys`                  | `workspace_id`, name, SHA-256 of the key, a display prefix, created by, last used, revoked.              |
+| `app_user_preferences`          | `user_id`: theme, timezone, language.                                                                    |
+| `app_templates`                 | `workspace_id`, name, description, `definition` (roles, fields, documents, settings), archived time.     |
+| `app_bulk_sends`                | One bulk send: template, who started it, status (`sending`, `done`, `cancelled`), total, worker lease.   |
+| `app_bulk_send_rows`            | `(bulk_id, line)`: the people and metadata for one envelope, its status, envelope id or error.           |
+| `app_webhooks`                  | `workspace_id`, URL (unique per workspace), description, events, signing secret, on or off.              |
+| `app_webhook_deliveries`        | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days. |
+| `app_usage`                     | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.      |
+| `app_plan_changes`              | Who moved a workspace from one plan to another, and when.                                                |
+| `app_first_run`                 | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.             |
+| `sign_*`                        | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                    |
 
 ### Time zones
 

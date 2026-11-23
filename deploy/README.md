@@ -237,7 +237,8 @@ Then in a browser:
 2. Create a workspace. The dashboard, at `/dashboard`, shows **Start here** with a sample
    agreement. Under **Settings → Personal** set a password, sign out, and sign in with it.
    Under **Settings → Workspace** check the time zone: it is `SIGN_TIME_ZONE` until you save
-   another.
+   another. The address shown there (`/dashboard/<slug>`) can be changed with **Change
+   address**; old links redirect to the new one.
 3. Open the sample, press **Send**, open the email, sign, and download the sealed copy.
 4. On **Verify**, upload the sealed copy: it should say the seal is valid.
 5. **Settings → Plan and usage** shows the Free plan with its meters (hosted mode).
@@ -251,6 +252,7 @@ docker compose exec -e PLAN_CHANGED_BY="ops:$USER" web node ops/plan-set.mjs <wo
 The plan is `free`, `cloud` or `unlimited`. Each change is recorded in `app_plan_changes` with
 who made it. In a source checkout the same command is
 `pnpm --filter web plan:set <workspace-slug> <plan>`.
+Use the workspace's current address; an old one is not accepted here.
 
 ## 9. Backups
 

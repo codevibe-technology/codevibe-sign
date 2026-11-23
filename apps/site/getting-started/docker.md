@@ -103,3 +103,7 @@ To turn a `.p12` file into the base64 value: `base64 -i seal.p12 | tr -d '\n'`.
   closes its database connections on `SIGTERM` and `SIGINT`, so rolling restarts are safe.
 - Behind a reverse proxy, set `TRUST_PROXY=true` so rate limits and the audit log see the
   client's address rather than the proxy's.
+- Each workspace lives at `/dashboard/<address>`. Admins can change the address under
+  **Settings → Workspace**; the old one keeps redirecting to the new one, and no other workspace
+  can take it for 90 days. API keys and webhooks use the workspace id and are not affected. If
+  your reverse proxy rewrites or caches paths under `/dashboard`, let `308` redirects through.
