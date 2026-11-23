@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Browser test of the clips on the home page: the hero clip and every step of the pinned story
-// must load and play, in Chrome, in Playwright's Chromium and in WebKit (Safari), with no media
-// error. It also checks that one key press moves the story exactly one step, that the page does
-// not shift as clips load, and the reduced-motion layout, where nothing plays on its own.
+// Browser test of the home page: the hero clip and the clip of each "How it works" step must
+// load and play, in Chrome, in Playwright's Chromium and in WebKit (Safari), with no media error.
+// It also checks that the page does not shift as clips load, that it has no accessibility
+// violations at desktop and phone widths, and the reduced-motion layout, where nothing plays on
+// its own.
 //
 // It drives an app that is already running in hosted mode (PLAN_MODE=hosted), so `/` is the
 // home page, and talks to nothing but that app:
@@ -27,7 +28,7 @@ const { chromium, webkit } = playwright.chromium ? playwright : playwright.defau
 
 const BASE = process.env.BASE ?? 'http://localhost:3000';
 const BROWSERS = (process.env.BROWSERS ?? 'chrome,chromium,webkit').split(',').filter(Boolean);
-const STEPS = 6;
+const STEPS = 3;
 
 const axeSource = (() => {
   try {
@@ -106,15 +107,8 @@ async function waitUntilPlaying(page, video, label) {
   return result.src;
 }
 
-const currentStep = (page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll('[data-story] ol[aria-label="Steps"] button')].findIndex(
-      (button) => button.getAttribute('aria-current') === 'step',
-    ),
-  );
-
-/** The clip on the pinned stage for the step on screen. */
-const stageVideo = (page) => page.locator('[data-story] [aria-hidden="false"] video');
+/** The clip of each step of "How it works", in order. */
+const stepVideos = (page) => page.locator('#how-it-works video');
 
 async function axe(page, label) {
   if (!axeSource) {
@@ -140,40 +134,27 @@ async function axe(page, label) {
   check(violations.length === 0, `${label}: no accessibility violations ${violations.join(', ')}`);
 }
 
-async function story(browser, name) {
+async function home(browser, name) {
   const { context, page } = await open(browser);
   try {
     const hero = page.locator('video').first();
     await waitUntilPlaying(page, hero, `${name}: the hero clip`);
-    await axe(page, `${name}: home page`);
-
-    // Bring the story to the top of the screen, where its stage pins and the first step sits.
-    await page.evaluate(() => {
-      const track = document.querySelector('[data-story] .story-track');
-      const stage = document.querySelector('[data-story] .story-stage');
-      const pinAt = parseFloat(window.getComputedStyle(stage).top) || 0;
-      window.scrollTo(0, Math.round(track.getBoundingClientRect().top + window.scrollY - pinAt));
-    });
-    await page.waitForTimeout(400);
-    check((await currentStep(page)) === 0, `${name}: the story starts on its first step`);
+    await axe(page, `${name}: home page, first view`);
 
     const files = [];
     for (let step = 0; step < STEPS; step++) {
-      if (step > 0) {
-        await page.keyboard.press('ArrowDown');
-        await page.waitForTimeout(900);
-        check(
-          (await currentStep(page)) === step,
-          `${name}: one key press moves the story to step ${step + 1}`,
-        );
-      }
-      files.push(await waitUntilPlaying(page, stageVideo(page), `${name}: story step ${step + 1}`));
+      const video = stepVideos(page).nth(step);
+      await video.scrollIntoViewIfNeeded();
+      files.push(await waitUntilPlaying(page, video, `${name}: step ${step + 1}`));
     }
     const errors = await mediaErrors(page);
     check(
       errors.length === 0,
       `${name}: no clip on the page has a media error ${errors.join(', ')}`,
     );
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(600);
+    await axe(page, `${name}: home page, scrolled through`);
     const shift = await page.evaluate(() => window.__shift);
     check(shift === 0, `${name}: nothing on the page shifts as the clips load (CLS ${shift})`);
     console.log(`  --  ${name}: played ${files.map((f) => f.split('/').pop()).join(', ')}`);
@@ -182,7 +163,7 @@ async function story(browser, name) {
   }
 }
 
-/** On a phone-sized screen with touch, tapping through the step list plays every clip. */
+/** On a phone-sized screen with touch, every step's clip plays and nothing overflows. */
 async function phone(browser, name) {
   const { context, page } = await open(browser, {
     viewport: { width: 390, height: 844 },
@@ -190,15 +171,18 @@ async function phone(browser, name) {
     isMobile: true,
   });
   try {
-    await page.locator('[data-story]').scrollIntoViewIfNeeded();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    check(overflow <= 0, `${name}, phone: the page is no wider than the screen`);
     for (let step = 0; step < STEPS; step++) {
-      await page.locator('[data-story] ol[aria-label="Steps"] button').nth(step).tap();
-      await page.waitForTimeout(700);
-      check((await currentStep(page)) === step, `${name}, phone: the story is on step ${step + 1}`);
-      await waitUntilPlaying(page, stageVideo(page), `${name}, phone: story step ${step + 1}`);
+      const video = stepVideos(page).nth(step);
+      await video.scrollIntoViewIfNeeded();
+      await waitUntilPlaying(page, video, `${name}, phone: step ${step + 1}`);
     }
     const errors = await mediaErrors(page);
     check(errors.length === 0, `${name}, phone: no clip has a media error ${errors.join(', ')}`);
+    await axe(page, `${name}, phone: home page`);
   } finally {
     await context.close();
   }
@@ -207,22 +191,20 @@ async function phone(browser, name) {
 async function reducedMotion(browser, name) {
   const { context, page } = await open(browser, { reducedMotion: 'reduce' });
   try {
-    const steps = page.locator('[data-story] .story-step');
-    check(
-      (await steps.count()) === STEPS,
-      `${name}, reduced motion: the steps sit one under another`,
-    );
-    await steps.nth(1).scrollIntoViewIfNeeded();
+    await stepVideos(page).nth(1).scrollIntoViewIfNeeded();
     await page.waitForTimeout(600);
     const playing = await page.evaluate(
       () => [...document.querySelectorAll('video')].filter((video) => !video.paused).length,
     );
     check(playing === 0, `${name}, reduced motion: no clip starts on its own`);
-    const button = steps.nth(1).getByRole('button', { name: /^Play the clip: / });
+    const button = page
+      .locator('#how-it-works')
+      .getByRole('button', { name: /^Play the clip: / })
+      .nth(1);
     await button.click();
     await waitUntilPlaying(
       page,
-      steps.nth(1).locator('video'),
+      stepVideos(page).nth(1),
       `${name}, reduced motion: step 2 on request`,
     );
     await axe(page, `${name}, reduced motion: home page`);
@@ -238,7 +220,7 @@ for (const name of BROWSERS) {
   console.log(`${name}`);
   const browser = await launch();
   try {
-    await story(browser, name);
+    await home(browser, name);
     await phone(browser, name);
     await reducedMotion(browser, name);
   } catch (error) {
