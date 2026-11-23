@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
 import { Field, Input, NativeSelect } from '@/components/ui/field';
 import { BRAND_FONTS, BRAND_FONT_LABELS, isHexColor, type BrandFont } from '@/lib/brand';
+import { isWideLogo } from '@/lib/logo-shape';
 import { removeLogoAction, updateBrandAction, uploadLogoAction } from '@/server/actions/brand';
 import { BrandPreview } from './brand-preview';
 import { useAction } from './use-action';
 
 export interface BrandValues {
   logoUrl: string | null;
+  logoWide: boolean;
   brandColor: string;
   font: BrandFont;
   senderName: string;
@@ -28,6 +30,7 @@ export function BrandForm({
   const [color, setColor] = useState(brand.brandColor);
   const [font, setFont] = useState<BrandFont>(brand.font);
   const [localLogo, setLocalLogo] = useState<string | null>(null);
+  const [localWide, setLocalWide] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const save = useAction();
   const logo = useAction();
@@ -42,7 +45,12 @@ export function BrandForm({
 
   function upload(selected: File | undefined) {
     if (!selected) return;
-    setLocalLogo(URL.createObjectURL(selected));
+    const url = URL.createObjectURL(selected);
+    setLocalLogo(url);
+    setLocalWide(false);
+    const probe = new Image();
+    probe.onload = () => setLocalWide(isWideLogo(probe.naturalWidth, probe.naturalHeight));
+    probe.src = url;
     const form = new FormData();
     form.set('workspaceId', workspace.id);
     form.set('logo', selected);
@@ -50,7 +58,9 @@ export function BrandForm({
     if (file.current) file.current.value = '';
   }
 
-  const shownLogo = logo.errors.logo ? brand.logoUrl : (localLogo ?? brand.logoUrl);
+  const local = !logo.errors.logo && localLogo !== null;
+  const shownLogo = local ? localLogo : brand.logoUrl;
+  const shownWide = local ? localWide : brand.logoWide;
 
   return (
     <form onSubmit={submit} noValidate>
@@ -143,6 +153,7 @@ export function BrandForm({
             <p className="mb-2 text-sm font-semibold">Preview</p>
             <BrandPreview
               logoUrl={shownLogo}
+              logoWide={shownWide}
               brandColor={previewColor}
               font={font}
               senderName={brand.senderName}

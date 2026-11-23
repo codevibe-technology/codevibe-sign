@@ -86,6 +86,7 @@ vi.mock('@codevibe_technology/sign-react', () => ({
 const brand: Brand = {
   workspaceId: WORKSPACE.id,
   logoUrl: null,
+  logoWide: false,
   brandColor: '#0F766E',
   font: 'inter',
   senderName: 'Acme HR',

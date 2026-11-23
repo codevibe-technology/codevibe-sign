@@ -27,8 +27,11 @@ export interface EmailLink {
 export type EmailHeader =
   /** The Codevibe Sign lockup, served by the app at `appUrl`. */
   | { kind: 'codevibe' }
-  /** A workspace's own uploaded logo, an absolute URL. */
-  | { kind: 'logo'; src: string; alt: string }
+  /**
+   * A workspace's own uploaded logo, an absolute URL. With `name`, the logo is a square mark
+   * and the name is set beside it; without, the logo is wide and carries the name itself.
+   */
+  | { kind: 'logo'; src: string; alt: string; name?: string }
   /** A workspace without a logo: its name, in its colour. */
   | { kind: 'name'; name: string };
 
@@ -114,8 +117,14 @@ function header(spec: EmailSpec): string {
       `<!--[if !mso]><!--><div class="cv-logo-dark" style="display:none;max-height:0;overflow:hidden">${img(LOCKUP.emailDark)}</div><!--<![endif]-->`
     );
   }
+  if (h.kind === 'logo' && h.name) {
+    return `<table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr>
+<td valign="middle" style="padding:0 12px 0 0"><img src="${escapeHtml(h.src)}" alt="" width="40" height="40" style="display:block;border:0;outline:none;width:40px;height:40px"></td>
+<td valign="middle" class="cv-ink" style="font-size:18px;line-height:24px;font-weight:700;color:${INK}">${escapeHtml(h.name)}</td>
+</tr></table>`;
+  }
   if (h.kind === 'logo') {
-    return `<img src="${escapeHtml(h.src)}" alt="${escapeHtml(h.alt)}" height="40" style="display:block;border:0;outline:none;height:40px;width:auto;max-width:200px">`;
+    return `<img src="${escapeHtml(h.src)}" alt="${escapeHtml(h.alt)}" height="32" style="display:block;border:0;outline:none;height:32px;width:auto;max-width:180px">`;
   }
   return `<span class="cv-ink" style="font-size:20px;line-height:28px;font-weight:700;color:${INK}">${escapeHtml(h.name)}</span>`;
 }

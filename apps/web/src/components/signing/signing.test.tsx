@@ -185,6 +185,26 @@ describe('signing page states', () => {
     expect(screen.queryByTestId('secured-badge')).toBeNull();
   });
 
+  it('shows a wide logo on its own and a square mark with the name beside it', () => {
+    const { rerender } = render(
+      <SigningShell brand={{ ...brand, logoWide: true } as never}>
+        <p>Body</p>
+      </SigningShell>,
+    );
+    const header = screen.getByRole('banner');
+    expect(within(header).getByTestId('brand-logo')).toHaveAttribute('data-shape', 'wide');
+    expect(within(header).getByRole('img', { name: 'Acme HR' })).toBeTruthy();
+    expect(within(header).queryByText('Acme HR')).toBeNull();
+    expect(screen.getByTestId('secured-badge')).toBeTruthy();
+    rerender(
+      <SigningShell brand={{ ...brand, logoWide: false } as never}>
+        <p>Body</p>
+      </SigningShell>,
+    );
+    expect(within(header).getByTestId('brand-logo')).toHaveAttribute('data-shape', 'mark');
+    expect(within(header).getByText('Acme HR')).toBeTruthy();
+  });
+
   it('shows an invalid link when the cookie is gone and there is no receipt', async () => {
     server({
       'GET /api/v1/sign/link': refused(401, 'TOKEN_INVALID'),

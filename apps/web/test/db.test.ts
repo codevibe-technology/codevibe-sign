@@ -428,6 +428,34 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       expect(await workspaceLogoUrls(sql, [a.id, b.id])).toEqual(new Map());
     });
 
+    it('keeps the logo size, to show a wide logo on its own', async () => {
+      const a = await createWorkspace(sql, { name: 'Logo shape', userId: users.asha.id });
+      const files = memoryFileStore();
+      const png = (width: number, height: number) => {
+        const bytes = new Uint8Array(33);
+        bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+        bytes.set(new TextEncoder().encode('IHDR'), 12);
+        new DataView(bytes.buffer).setUint32(16, width);
+        new DataView(bytes.buffer).setUint32(20, height);
+        return bytes;
+      };
+      await setLogo(sql, files, a.id, png(600, 150));
+      expect((await getBrand(sql, a.id)).logoWide).toBe(true);
+      expect((await getSigningBrand(sql, a.id))?.logoWide).toBe(true);
+      await setLogo(sql, files, a.id, png(200, 200));
+      expect((await getBrand(sql, a.id)).logoWide).toBe(false);
+
+      // A logo stored before its size was kept gets it when it is first served.
+      await setLogo(sql, files, a.id, png(800, 200));
+      await sql`update app_brand_settings set logo_width = null, logo_height = null
+        where workspace_id = ${a.id}`;
+      expect((await getBrand(sql, a.id)).logoWide).toBe(false);
+      await readLogo(sql, files, a.id);
+      expect((await getBrand(sql, a.id)).logoWide).toBe(true);
+      await removeLogo(sql, files, a.id);
+      expect((await getBrand(sql, a.id)).logoWide).toBe(false);
+    });
+
     it('saves email settings and template overrides', async () => {
       const a = await createWorkspace(sql, { name: 'Mail A', userId: users.asha.id });
       await updateEmailSettings(sql, a.id, {

@@ -221,5 +221,23 @@ describe('BrandPreview', () => {
     expect(screen.getByTestId('preview-header').style.color).toBe('rgb(13, 27, 42)');
     expect(screen.getByRole('img', { name: 'Acme logo' })).toHaveAttribute('src', '/logo.png');
     expect(screen.getByTestId('preview-header')).toHaveTextContent('Acme HR');
+    expect(screen.getByText(/A square logo is a mark/)).toBeTruthy();
+  });
+
+  it('shows a wide logo on its own, as the signing page will', () => {
+    render(
+      <BrandPreview
+        logoUrl="/wide.png"
+        logoWide
+        brandColor="#0D1B2A"
+        font="inter"
+        senderName="Acme HR"
+        workspaceName="Acme"
+      />,
+    );
+    const header = screen.getByTestId('preview-header');
+    expect(screen.getByRole('img', { name: 'Acme logo' })).toHaveAttribute('data-shape', 'wide');
+    expect(header).not.toHaveTextContent('Acme HR');
+    expect(screen.getByText(/A wide logo already shows your name/)).toBeTruthy();
   });
 });

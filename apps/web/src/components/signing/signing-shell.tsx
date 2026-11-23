@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Wordmark } from '@/components/shell/brand-mark';
 import { BRAND_FONT_STACKS, isHexColor, textOn } from '@/lib/brand';
 import type { SigningBrand } from '@/lib/signing';
+import { BrandLogo } from './brand-logo';
 
 /**
  * The frame of every signing screen: the sender's name and logo on a light header, their
@@ -56,31 +57,16 @@ export function SigningShell({
           }}
         />
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:h-16">
-          {brand?.logoUrl ? (
-            <img
-              src={brand.logoUrl}
-              alt=""
-              className="h-8 max-w-[132px] object-contain sm:h-9 sm:max-w-[160px]"
+          {brand ? (
+            <BrandLogo
+              name={brand.name}
+              logoUrl={brand.logoUrl}
+              logoWide={brand.logoWide ?? false}
+              color={color}
             />
-          ) : brand ? (
-            <span
-              aria-hidden
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[15px] font-bold"
-              style={{
-                background: color ?? 'var(--primary)',
-                color: color ? textOn(color) : 'var(--primary-ink)',
-              }}
-            >
-              {brand.name.slice(0, 1).toUpperCase()}
-            </span>
           ) : (
             <Wordmark surface="light" className="h-[24px] sm:h-[28px]" />
           )}
-          {brand ? (
-            <span className="min-w-0 truncate font-display text-[15px] font-semibold tracking-tight text-ink sm:text-base">
-              {brand.name}
-            </span>
-          ) : null}
           {showBadge ? (
             <span
               className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface-2 py-1 pr-3 pl-1.5 text-[12px] font-semibold text-ink"

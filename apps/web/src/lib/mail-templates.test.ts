@@ -33,6 +33,20 @@ describe('mail variables', () => {
 });
 
 describe('renderMail', () => {
+  it('shows a wide logo alone and a square mark with the company name beside it', () => {
+    const logo = 'https://sign.example.com/brand/ws_1/logo?v=1';
+    const wide = renderMail('invite', sampleInput('invite'), {
+      ...brand,
+      logoUrl: logo,
+      logoWide: true,
+    }).html;
+    expect(wide).toContain(`<img src="${logo}" alt="Acme HR" height="32"`);
+    expect(wide).not.toMatch(/font-weight:700;color:[^>]+>Acme HR<\/td>/);
+    const mark = renderMail('invite', sampleInput('invite'), { ...brand, logoUrl: logo }).html;
+    expect(mark).toContain(`<img src="${logo}" alt="" width="40" height="40"`);
+    expect(mark).toMatch(/font-weight:700;color:[^>]+>Acme HR<\/td>/);
+  });
+
   it('uses the defaults when nothing is overridden', () => {
     const mail = renderMail('invite', sampleInput('invite'), brand);
     expect(mail.subject).toBe('Acme HR asked you to sign "Offer letter"');

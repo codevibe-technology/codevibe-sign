@@ -27,6 +27,7 @@ export default async function BrandSettings({ params }: { params: Promise<{ slug
         workspace={workspace}
         brand={{
           logoUrl: brand.logoUrl,
+          logoWide: brand.logoWide,
           brandColor: brand.brandColor,
           font: brand.font,
           senderName: brand.senderName ?? '',

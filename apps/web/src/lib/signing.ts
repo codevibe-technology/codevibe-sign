@@ -75,6 +75,8 @@ export interface SigningReceipt {
 export interface SigningBrand {
   name: string;
   logoUrl: string | null;
+  /** The logo carries the name, so the name is not typed next to it. */
+  logoWide?: boolean;
   brandColor: string;
   font: BrandFont;
   showBadge: boolean;

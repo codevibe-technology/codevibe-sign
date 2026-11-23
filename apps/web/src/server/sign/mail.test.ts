@@ -6,6 +6,7 @@ import { createWorkspaceMail } from './mail';
 const brand: Brand = {
   workspaceId: 'ws_1',
   logoUrl: '/brand/ws_1/logo?v=1',
+  logoWide: false,
   brandColor: '#0F766E',
   font: 'inter',
   senderName: null,

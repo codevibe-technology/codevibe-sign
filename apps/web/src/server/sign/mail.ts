@@ -21,6 +21,7 @@ async function lookOf(deps: WorkspaceMailDeps, workspaceId: string) {
     company: brand.senderName ?? name,
     brandColor: brand.brandColor,
     logoUrl: brand.logoUrl ? `${deps.appUrl}${brand.logoUrl}` : null,
+    logoWide: brand.logoWide,
     showBadge: brand.showBadge,
     appUrl: deps.appUrl,
     org: deps.org ?? null,

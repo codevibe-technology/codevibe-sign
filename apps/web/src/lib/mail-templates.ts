@@ -86,12 +86,22 @@ export interface MailBrand {
   brandColor: string;
   /** Absolute URL, since mail clients have no base URL. */
   logoUrl: string | null;
+  /** The logo carries the name, so it is shown without the name beside it. */
+  logoWide?: boolean;
   showBadge: boolean;
   /** The public URL of the app: the Codevibe Sign logo and the footer links come from it. */
   appUrl: string;
   /** Who runs this install and where, for the footer. Shown only with the badge. */
   org?: string | null;
 }
+
+/** A wide logo stands alone; a square mark has the company's name beside it. */
+const logoHeader = (brand: MailBrand) => ({
+  kind: 'logo' as const,
+  src: brand.logoUrl!,
+  alt: brand.company,
+  ...(brand.logoWide ? {} : { name: brand.company }),
+});
 
 export interface MailInput {
   recipientName: string;
@@ -223,7 +233,7 @@ export function renderMail(
       ? `${brand.company}: "${input.title}" is waiting for you to ${action}.`
       : intro.split(/\n/)[0]!,
     header: brand.logoUrl
-      ? { kind: 'logo', src: brand.logoUrl, alt: brand.company }
+      ? logoHeader(brand)
       : brand.showBadge
         ? { kind: 'codevibe' }
         : { kind: 'name', name: brand.company },
@@ -319,7 +329,7 @@ export function codeMail(
     appUrl: brand.appUrl,
     preheader: `Your one-time code is ${input.code}. It expires in 10 minutes.`,
     header: brand.logoUrl
-      ? { kind: 'logo', src: brand.logoUrl, alt: brand.company }
+      ? logoHeader(brand)
       : brand.showBadge
         ? { kind: 'codevibe' }
         : { kind: 'name', name: brand.company },

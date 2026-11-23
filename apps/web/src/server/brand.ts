@@ -9,12 +9,15 @@ import {
   unknownVariables,
   type MailOverrides,
 } from '@/lib/mail-templates';
+import { imageSize, isWideLogo } from '@/lib/logo-shape';
 import { AppError } from './errors';
 import { assertBadgeOptional, assertCustomDomain, workspacePlan } from './plans';
 
 export interface Brand {
   workspaceId: string;
   logoUrl: string | null;
+  /** The logo carries the name (see `isWideLogo`), so it is shown without the name typed. */
+  logoWide: boolean;
   brandColor: string;
   font: BrandFont;
   senderName: string | null;
@@ -35,6 +38,8 @@ export const logoKey = (workspaceId: string) => `workspaces/${workspaceId}/brand
 interface Row {
   logo_content_type: string | null;
   logo_updated_at: Date | null;
+  logo_width: number | null;
+  logo_height: number | null;
   brand_color: string | null;
   font: BrandFont | null;
   sender_name: string | null;
@@ -75,6 +80,7 @@ export async function getBrand(sql: postgres.Sql, workspaceId: string): Promise<
       row?.logo_content_type && row.logo_updated_at
         ? logoUrlOf(workspaceId, row.logo_updated_at)
         : null,
+    logoWide: Boolean(row?.logo_content_type) && isWideLogo(row?.logo_width, row?.logo_height),
     brandColor: row?.brand_color ?? DEFAULT_BRAND_COLOR,
     font: row?.font ?? 'inter',
     senderName: row?.sender_name ?? null,
@@ -91,6 +97,7 @@ export async function getBrand(sql: postgres.Sql, workspaceId: string): Promise<
 export interface SigningBrand {
   name: string;
   logoUrl: string | null;
+  logoWide: boolean;
   brandColor: string;
   font: BrandFont;
   showBadge: boolean;
@@ -107,6 +114,7 @@ export async function getSigningBrand(
   return {
     name: brand.senderName ?? workspace.name,
     logoUrl: brand.logoUrl,
+    logoWide: brand.logoWide,
     brandColor: brand.brandColor,
     font: brand.font,
     showBadge: brand.showBadge,
@@ -317,18 +325,22 @@ export async function setLogo(
   }
   const type = sniffImage(bytes);
   if (!type) throw new AppError('VALIDATION', 'Use a PNG, JPEG or WebP image', 'logo');
+  const size = imageSize(bytes);
   await files.put(logoKey(workspaceId), bytes, type);
   await sql`
-    insert into app_brand_settings (workspace_id, logo_content_type, logo_updated_at)
-    values (${workspaceId}, ${type}, now())
+    insert into app_brand_settings
+      (workspace_id, logo_content_type, logo_updated_at, logo_width, logo_height)
+    values (${workspaceId}, ${type}, now(), ${size?.width ?? null}, ${size?.height ?? null})
     on conflict (workspace_id) do update set
       logo_content_type = excluded.logo_content_type,
-      logo_updated_at = excluded.logo_updated_at, updated_at = now()`;
+      logo_updated_at = excluded.logo_updated_at,
+      logo_width = excluded.logo_width, logo_height = excluded.logo_height,
+      updated_at = now()`;
 }
 
 export async function removeLogo(sql: postgres.Sql, files: FileStore, workspaceId: string) {
   await sql`update app_brand_settings set logo_content_type = null, logo_updated_at = null,
-    updated_at = now() where workspace_id = ${workspaceId}`;
+    logo_width = null, logo_height = null, updated_at = now() where workspace_id = ${workspaceId}`;
   await files.delete(logoKey(workspaceId));
 }
 
@@ -337,9 +349,16 @@ export async function readLogo(
   files: FileStore,
   workspaceId: string,
 ): Promise<{ bytes: Uint8Array; type: LogoType } | null> {
-  const [row] = await sql<{ logo_content_type: LogoType | null }[]>`
-    select logo_content_type from app_brand_settings where workspace_id = ${workspaceId}`;
+  const [row] = await sql<{ logo_content_type: LogoType | null; logo_width: number | null }[]>`
+    select logo_content_type, logo_width from app_brand_settings where workspace_id = ${workspaceId}`;
   if (!row?.logo_content_type) return null;
   const bytes = await files.get(logoKey(workspaceId));
-  return bytes ? { bytes, type: row.logo_content_type } : null;
+  if (!bytes) return null;
+  // Logos uploaded before their size was kept get it the first time they are served.
+  const size = row.logo_width === null ? imageSize(bytes) : null;
+  if (size) {
+    await sql`update app_brand_settings set logo_width = ${size.width},
+      logo_height = ${size.height} where workspace_id = ${workspaceId} and logo_width is null`;
+  }
+  return { bytes, type: row.logo_content_type };
 }

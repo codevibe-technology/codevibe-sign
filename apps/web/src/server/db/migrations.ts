@@ -678,4 +678,10 @@ create index app_workspace_transfers_to_idx on app_workspace_transfers (lower(to
   where status = 'pending';
 `,
   },
+  {
+    name: '0022_brand_logo_size',
+    sql: `
+alter table app_brand_settings add column logo_width integer, add column logo_height integer;
+`,
+  },
 ];
