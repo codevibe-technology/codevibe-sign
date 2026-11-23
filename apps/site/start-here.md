@@ -34,6 +34,18 @@ Read these in order. Each page ends with a link to the next.
 4. [Verify a sealed PDF](/guides/verify-pdf). Check the finished file, or let anyone check it.
 5. [Invite your team](/admin/team-and-roles). Give each person the role that fits them.
 
+## Guided tours
+
+The first time you open a new workspace, a short tour shows you around: the workspace
+switcher, sending, envelopes, templates, verify, settings and the docs. The first time you
+send a document, a second tour walks through each step of sending as you reach it. Skip
+either one at any time with **Skip tour**, **Close** or the Escape key; they do not come back
+on their own, on any device.
+
+To see one again, open your account menu (the round button at the bottom of the sidebar) and
+pick **Replay the workspace tour** or **Replay the sending tour**. Both are also in
+**Settings, Personal**, under **Guided tours**.
+
 ## Go further
 
 - **Use the app:** [templates](/app/templates), [bulk send](/app/bulk-send),
