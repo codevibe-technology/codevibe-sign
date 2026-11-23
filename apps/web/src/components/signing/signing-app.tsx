@@ -33,6 +33,7 @@ type Phase =
   | { kind: 'sign' }
   | { kind: 'esign_wait' }
   | { kind: 'esign_off' }
+  | { kind: 'esign_resume'; signUrl: string }
   | { kind: 'esign_closed' }
   | { kind: 'done'; name: string; approved: boolean };
 
@@ -192,7 +193,10 @@ export function SigningApp({
       }
       throw err;
     });
-    if (started) navigate(started.signUrl);
+    if (!started) return;
+    // The earlier request holds what was filled in then, so the signer chooses to go on.
+    if (started.resumed) setPhase({ kind: 'esign_resume', signUrl: started.signUrl });
+    else navigate(started.signUrl);
   }
 
   function leaveEsignReturn() {
@@ -285,6 +289,24 @@ export function SigningApp({
             The Aadhaar eSign was declined or the request was closed, so nothing was signed. The
             sender has been told. You can close this page.
           </p>
+        </SigningMessage>
+      );
+      break;
+    case 'esign_resume':
+      content = (
+        <SigningMessage
+          icon={<Fingerprint aria-hidden className="h-6 w-6" />}
+          title="Finish the Aadhaar eSign you already started"
+          tone="warning"
+        >
+          <p data-testid="esign-resume">
+            An Aadhaar eSign for this document is already open, and a new one cannot be started
+            right now. It has the details you filled in when you started it; anything you changed
+            since is not included.
+          </p>
+          <Button type="button" onClick={() => navigate(phase.signUrl)}>
+            Continue the eSign already started
+          </Button>
         </SigningMessage>
       );
       break;

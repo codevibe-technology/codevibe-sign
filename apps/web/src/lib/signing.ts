@@ -57,6 +57,8 @@ export interface EsignStatus {
 export interface EsignStart {
   signUrl: string;
   expiresAt: string;
+  /** An earlier request is still open and is the one to finish; see `esign_resume`. */
+  resumed?: boolean;
 }
 
 /** `GET /api/v1/sign/receipt`: where things stand after signing. */

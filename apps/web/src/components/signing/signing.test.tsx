@@ -482,6 +482,29 @@ describe('signing with Aadhaar eSign', () => {
     window.history.replaceState(null, '', '/sign');
   });
 
+  it('offers the eSign already open when a new one cannot be started', async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    server({
+      'GET /api/v1/sign/link': ok(aadhaar(off)),
+      [BRAND]: ok(brand),
+      'POST /api/v1/sign/link/view': ok({}),
+      'POST /api/v1/sign/link/esign': ok({
+        signUrl: 'https://sandbox.leegality.com/sign/earlier',
+        expiresAt: '2026-11-24T10:00:00.000Z',
+        resumed: true,
+      }),
+    });
+    render(<SigningApp smsAvailable={false} navigate={navigate} />);
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /continue|review/i }));
+    await user.click(await screen.findByRole('button', { name: 'Continue to Aadhaar eSign' }));
+    expect((await screen.findByTestId('esign-resume')).textContent).toMatch(/already open/);
+    expect(navigate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Continue the eSign already started' }));
+    expect(navigate).toHaveBeenCalledWith('https://sandbox.leegality.com/sign/earlier');
+  });
+
   it('hands the filled-in document to the provider and leaves for its page', async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
