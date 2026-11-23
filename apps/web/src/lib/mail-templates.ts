@@ -122,6 +122,8 @@ export interface MailInput {
   attached?: boolean;
   /** Completed: the audit trail goes with them, attached or as a download. */
   auditTrail?: boolean;
+  /** Completed: signed with Aadhaar eSign, the certificate and audit trail are one file. */
+  esign?: boolean;
   /** Completed without attachments: a personal download link per sealed document. */
   downloads?: { name: string; url: string }[];
   /** Cancelled: what happened to the envelope. */
@@ -189,7 +191,13 @@ export function renderMail(
   const downloads = kind === 'completed' && !input.attached ? (input.downloads ?? []) : [];
   if (kind === 'completed') {
     paragraphs.push(
-      input.attached
+      input.esign
+        ? input.attached
+          ? 'The document signed with Aadhaar eSign and its certificate and audit trail are attached. Keep them for your records.'
+          : downloads.length
+            ? 'The document signed with Aadhaar eSign and its certificate and audit trail could not be attached. Download them below and keep them for your records.'
+            : `The signed copy could not be attached. Ask ${brand.company} for a copy.`
+        : input.attached
         ? input.auditTrail
           ? 'The signed copy and its audit trail are attached. Keep them for your records.'
           : 'The signed copy is attached. Keep it for your records.'
