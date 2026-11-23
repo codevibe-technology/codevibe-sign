@@ -61,6 +61,8 @@ export interface SigningViewLabels extends ViewerLabels {
   /** On the Aadhaar eSign box, which the signer does not fill: they sign it at the provider. */
   aadhaarBox: string;
   aadhaarBoxNote: string;
+  /** In the bar when the Aadhaar eSign box is all the signer has. */
+  aadhaarOnly: string;
   decline: string;
   declineTitle: string;
   declineReason: string;
@@ -114,6 +116,7 @@ export const defaultSigningViewLabels: SigningViewLabels = {
   submitting: 'Sending…',
   aadhaarBox: 'Aadhaar eSign',
   aadhaarBoxNote: 'You sign here with Aadhaar eSign after you finish',
+  aadhaarOnly: 'Nothing to fill in. Read the document, then continue.',
   decline: 'Decline',
   declineTitle: 'Decline to sign',
   declineReason: 'Tell the sender why you are declining',
@@ -646,7 +649,9 @@ export function SigningView({
       >
         <div className="cvs-progress-block" data-done={pending === 0 || undefined}>
           <p className="cvs-progress" id={`${id}-progress`} aria-live="polite">
-            {labels.progress(done, required.length)}
+            {required.length === 0 && esignBoxes.length > 0
+              ? labels.aadhaarOnly
+              : labels.progress(done, required.length)}
           </p>
           {pending === 0 && required.length > 0 && (
             <p className="cvs-progress-done">{labels.allDone}</p>

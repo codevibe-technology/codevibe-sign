@@ -414,4 +414,10 @@ describe('SigningView with many signature boxes', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]![0]).toEqual([{ fieldId: 'city', value: 'Pune' }]);
   });
+
+  it('says there is nothing to fill in when the Aadhaar eSign box is all there is', () => {
+    setup({ fields: [field('box', 'aadhaar', 'r1', { y: 600, width: 200, height: 64 })] });
+    expect(screen.getByText('Nothing to fill in. Read the document, then continue.')).toBeTruthy();
+    expect(screen.queryByText(/required fields done/)).toBeNull();
+  });
 });
