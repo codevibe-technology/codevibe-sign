@@ -5,7 +5,7 @@ import { defineConfig } from 'tsup';
 const require = createRequire(import.meta.url);
 
 // One build per entry, so each declaration file only references the package it re-exports.
-const libraries = ['index', 'server', 'client', 'pdf', 'core'].map((name) => ({
+const libraries = ['index', 'client', 'pdf', 'core'].map((name) => ({
   entry: { [name]: `src/${name}.ts` },
   format: ['esm' as const, 'cjs' as const],
   dts: true,
@@ -14,8 +14,8 @@ const libraries = ['index', 'server', 'client', 'pdf', 'core'].map((name) => ({
 export default defineConfig([
   ...libraries,
   {
-    // The React components are bundled in, so `react` stays an optional peer and server-only
-    // installs never pull it in.
+    // The React components are bundled in, so `react` stays an optional peer and installs that
+    // never render a page do not pull it in.
     entry: { react: 'src/react.ts' },
     format: ['esm', 'cjs'],
     dts: { resolve: ['@codevibe_technology/sign-react'] },
@@ -33,7 +33,7 @@ export default defineConfig([
     entry: { cli: 'src/cli/main.ts' },
     format: ['esm'],
     platform: 'node',
-    target: 'node20',
+    target: 'node22',
     banner: { js: '#!/usr/bin/env node' },
   },
 ]);

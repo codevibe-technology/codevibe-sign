@@ -19,6 +19,9 @@
   "license": "AGPL-3.0-only",
   "author": "Codevibe Technology <hello@codevibe.in> (https://codevibe.in)",
   "type": "module",
+  "bin": {
+    "codevibe-sign-server": "dist/cli.js"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -47,7 +50,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "build": "rm -rf dist && tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p ."
   },

@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 describe('package entry points', () => {
-  it('exposes the server, client, pdf and core from the root', async () => {
+  it('exposes the client, pdf and core from the root', async () => {
     const root = await import('codevibe-sign');
     for (const name of [
-      'createSignServer',
-      'startSignServer',
-      'memoryStore',
       'createSignClient',
       'createSignerClient',
       'verifyWebhook',
@@ -27,7 +24,16 @@ describe('package entry points', () => {
     expect(typeof pdf.verify).toBe('function');
     const core = await import('codevibe-sign/core');
     expect(typeof core.verifyChain).toBe('function');
-    const server = await import('codevibe-sign/server');
-    expect(typeof server.configFromEnv).toBe('function');
+  });
+
+  it('carries no server code, which is licensed separately', async () => {
+    const root = await import('codevibe-sign');
+    for (const name of ['createSignServer', 'startSignServer', 'memoryStore', 'configFromEnv']) {
+      expect(name in root, name).toBe(false);
+    }
+    const manifest = await import('../package.json');
+    expect(Object.keys(manifest.exports)).not.toContain('./server');
+    const installed = { ...manifest.dependencies, ...manifest.peerDependencies };
+    expect(Object.keys(installed)).not.toContain('@codevibe_technology/sign-server');
   });
 });

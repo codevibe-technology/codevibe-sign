@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { createDevSeal } from '../dev-seal';
+import { createDevSeal } from '@codevibe_technology/sign-pdf';
 import { EXIT, fileProblem, painter, parse, rows, UsageError, type Command } from './io';
 
 const WARNING = `This certificate is self-signed, for development and testing only. Adobe Reader and

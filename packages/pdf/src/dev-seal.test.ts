@@ -1,7 +1,8 @@
-import { seal, sealCertificate, verify } from '@codevibe_technology/sign-pdf';
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createDevSeal } from './dev-seal';
+import { seal } from './seal';
+import { sealCertificate, verify } from './trust';
 
 describe('createDevSeal', () => {
   it('creates an RSA-2048 seal that seal() and verify() accept', async () => {

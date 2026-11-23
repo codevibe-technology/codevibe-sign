@@ -17,6 +17,8 @@ export type {
   Pkcs11SignerOptions,
   SealProvider,
 } from './signer';
+export { createDevSeal } from './dev-seal';
+export type { DevSeal, DevSealOptions } from './dev-seal';
 export { ALREADY_SIGNED_MESSAGE } from './signatures';
 export { verifySeal } from './verify';
 export type { SealSigner, SealVerification } from './verify';
