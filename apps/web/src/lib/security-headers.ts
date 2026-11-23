@@ -69,5 +69,13 @@ export function headerRules(options: { development: boolean }): HeaderRule[] {
       source,
       headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
     })),
+    {
+      // Public record pages: reachable by whoever holds the link, never listed or passed on.
+      source: '/r/:path*',
+      headers: [
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+        { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+      ],
+    },
   ];
 }

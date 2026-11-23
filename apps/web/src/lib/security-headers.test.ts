@@ -59,4 +59,11 @@ describe('headerRules', () => {
       expect(valueFor(source, 'Referrer-Policy')).toBe('no-referrer');
     }
   });
+
+  it('keeps public record pages out of search engines and out of referrers', () => {
+    expect(valueFor('/r/:path*', 'Referrer-Policy')).toBe('no-referrer');
+    expect(valueFor('/r/:path*', 'X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
+    const order = rules.map((rule) => rule.source);
+    expect(order.indexOf('/:path*')).toBeLessThan(order.indexOf('/r/:path*'));
+  });
 });
