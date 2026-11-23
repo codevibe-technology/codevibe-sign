@@ -241,6 +241,7 @@ const PRICING: PricingView = {
   cloudMonth: '₹999',
   cloudYear: '₹9,990',
   yearSaving: '2 months free',
+  yearSavingAmount: '₹1,998',
   extraMember: '₹99',
   includedMembers: 25,
   esignFree: '₹35 per eSign',

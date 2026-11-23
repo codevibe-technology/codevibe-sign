@@ -29,6 +29,8 @@ export interface PricingView {
   cloudYear: string;
   /** For example `2 months free`; null when a year costs twelve months. */
   yearSaving: string | null;
+  /** What a year saves against twelve monthly terms, for example `₹1,998`; null when nothing. */
+  yearSavingAmount: string | null;
   extraMember: string;
   includedMembers: number;
   esignFree: string;
@@ -52,6 +54,10 @@ export function pricingView(config: BillingConfig): PricingView {
     cloudYear: formatInr(prices.yearPaise),
     yearSaving:
       freeMonths > 0 ? `${freeMonths} ${freeMonths === 1 ? 'month' : 'months'} free` : null,
+    yearSavingAmount:
+      prices.monthPaise * 12 > prices.yearPaise
+        ? formatInr(prices.monthPaise * 12 - prices.yearPaise)
+        : null,
     extraMember: formatInr(prices.seatMonthPaise),
     includedMembers: prices.includedMembers,
     esignFree: esignPriceText(config, 'free'),
