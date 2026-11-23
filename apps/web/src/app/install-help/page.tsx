@@ -9,6 +9,7 @@ import { SiteHeader } from '@/components/marketing/site-header';
 import { INSTALL_HELP_HOURS } from '@/lib/billing/install-help';
 import { siteViewer } from '@/server/auth/session';
 import { currentPricing } from '@/server/billing/pricing';
+import { turnstileSiteKey } from '@/server/human-check';
 import { isHosted } from '@/server/plans';
 
 export const metadata: Metadata = {
@@ -109,6 +110,7 @@ export default async function InstallHelpPage() {
                   price={pricing.installHelp}
                   gstPercent={pricing.gstPercent}
                   testMode={pricing.testMode}
+                  humanCheckKey={turnstileSiteKey()}
                 />
               </>
             ) : (

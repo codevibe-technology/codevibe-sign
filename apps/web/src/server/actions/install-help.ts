@@ -14,23 +14,30 @@ import {
 import { confirmCheckout, unappliedMessage, type CheckoutSession } from '../billing/orders';
 import { billingDeps } from '../billing/runtime';
 import { isHosted } from '../plans';
-import { publicAction } from './action';
+import { requireHuman } from '../human-check';
+import { publicAction, type ActionResult } from './action';
 
 function assertHosted() {
   if (!isHosted()) throw new AppError('NOT_FOUND', 'Not found');
 }
 
-/** Books installation help: stores the request and opens its order. No account is needed. */
-export const bookInstallHelpAction = publicAction(
-  installBookingSchema,
-  async (booking): Promise<CheckoutSession> => {
+/**
+ * Books installation help: stores the request and opens its order. No account is needed, so
+ * the browser's human check token comes along and is checked before anything is stored.
+ */
+export const bookInstallHelpAction = async (
+  raw: unknown,
+  humanToken?: string | null,
+): Promise<ActionResult<CheckoutSession>> =>
+  publicAction(installBookingSchema, async (booking): Promise<CheckoutSession> => {
     assertHosted();
-    const ip = clientAddress(await headers());
+    const requestHeaders = await headers();
+    const ip = clientAddress(requestHeaders);
     await enforceBookingLimit(ip);
+    await requireHuman(humanToken, requestHeaders);
     const { checkout } = await createInstallBooking(db(), billingDeps(), { booking, ip });
     return checkout;
-  },
-);
+  })(raw);
 
 /**
  * Confirms the payment of a booking. What the browser sends only points at the payment; it

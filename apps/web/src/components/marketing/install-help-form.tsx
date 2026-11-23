@@ -3,6 +3,7 @@
 import { CircleCheck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
+import { useHumanCheck } from '@/components/auth/human-check';
 import { openCheckout } from '@/components/billing/razorpay-checkout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,12 +39,16 @@ export function InstallHelpForm({
   price,
   gstPercent,
   testMode,
+  humanCheckKey = null,
 }: {
   /** The price as text, before GST: `₹1,999`. */
   price: string;
   gstPercent: number;
   testMode: boolean;
+  /** The Turnstile site key, when the install asks for a human check. */
+  humanCheckKey?: string | null;
 }) {
+  const human = useHumanCheck(humanCheckKey, 'install-help');
   const [values, setValues] = useState<Values>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Values, string>>>({});
   const [busy, setBusy] = useState(false);
@@ -80,7 +85,8 @@ export function InstallHelpForm({
     }
     setBusy(true);
     try {
-      const opened = await bookInstallHelpAction(values);
+      const opened = await bookInstallHelpAction(values, await human.token());
+      human.reset();
       if (!opened.ok) {
         if (opened.field && opened.field in EMPTY) {
           const found = { [opened.field]: opened.error };
@@ -224,6 +230,7 @@ export function InstallHelpForm({
         </Field>
       </fieldset>
 
+      {human.widget}
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
         <p className="text-muted">
           <span className="font-display text-2xl font-bold text-ink">{price}</span> plus{' '}
