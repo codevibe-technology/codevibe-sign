@@ -355,7 +355,7 @@
                 {
                   "key": "version",
                   "value": "",
-                  "description": "`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).",
+                  "description": "`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file).",
                   "disabled": true
                 }
               ],
@@ -368,7 +368,7 @@
                 }
               ]
             },
-            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`."
+            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign cannot take a certificate\npage, so its signing certificate is a sealed file of its own: `version=certificate`."
           }
         },
         {
@@ -756,6 +756,14 @@
               "raw": "{{baseUrl}}/v1/sign/receipt/documents/:docId",
               "host": ["{{baseUrl}}"],
               "path": ["v1", "sign", "receipt", "documents", ":docId"],
+              "query": [
+                {
+                  "key": "file",
+                  "value": "",
+                  "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.",
+                  "disabled": true
+                }
+              ],
               "variable": [
                 {
                   "key": "docId",
@@ -782,6 +790,12 @@
                   "key": "c",
                   "value": "",
                   "description": "The signed value from the download link in the completed-copy email.",
+                  "disabled": true
+                },
+                {
+                  "key": "file",
+                  "value": "",
+                  "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.",
                   "disabled": true
                 }
               ],
@@ -1047,6 +1061,61 @@
           }
         },
         {
+          "name": "Follow an Aadhaar eSign",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/esign",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "esign"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Follow an Aadhaar eSign\n\nWhere the recipient's Aadhaar eSign stands. While it is `pending` the server also\nasks the provider, at most once every few seconds, so the page the signer comes\nback to moves on even when the provider's callback is late. Unlike the other signing\nroutes it still answers after the recipient has signed, and then hands out the\nreceipt for `GET /v1/sign/receipt`.",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Start an Aadhaar eSign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sign/:token/esign",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sign", ":token", "esign"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "description": "The signing token from the link (43 base64url characters), or `link` to use the\ntoken in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`."
+                }
+              ]
+            },
+            "description": "Start an Aadhaar eSign\n\nFor a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:\nthe recipient's field values and their consent. The server draws the values on the\ndocument, asks the eSign provider to sign that file and answers the provider's\nsigning page; send the signer there. The recipient becomes `signed` once the\nprovider reports the signature. Asking again while an attempt is open answers the\nsame page.",
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consent\": true,\n  \"values\": [\n    {\n      \"fieldId\": \"e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94\",\n      \"value\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
           "name": "Open a signing link",
           "request": {
             "method": "GET",
@@ -1064,6 +1133,33 @@
               ]
             },
             "description": "Open a signing link\n\nWhere signing links point. Stores the token in an HttpOnly, SameSite=Strict\n`cvsign_link` cookie (path `/v1/sign`, at most 24 hours) and redirects to the signing\npage, whose URL carries no token. The page then calls `/v1/sign/link/...` from the same\norigin. An unknown or used token clears the cookie and redirects all the same, adding\n`?state=` with the reason (`signed`, `completed`, `declined`, `voided`, `expired` or\n`invalid`) and, when the envelope is known, `&w=<workspaceId>` so the page can explain\nit in the sender's brand. This route only reads: opening a link does not mark the\ndocument as viewed.",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Provider callbacks",
+      "description": "Where an Aadhaar eSign provider reports what became of a signing request. Called by\nthe provider, never by your code. Each callback is verified with the credentials of\nthe workspace that started the request.",
+      "item": [
+        {
+          "name": "Receive an eSign provider's callback",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/esign/webhooks/:provider",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "esign", "webhooks", ":provider"],
+              "variable": [
+                {
+                  "key": "provider",
+                  "value": "{{provider}}",
+                  "description": "The eSign provider's name, for example `leegality`."
+                }
+              ]
+            },
+            "description": "Receive an eSign provider's callback\n\nSet this address as the webhook of your eSign provider account. The body names the\nsigning request; the server finds the workspace that started it and verifies the\nbody with that workspace's provider credentials before acting on it. Repeats change\nnothing. Bodies over 256 KB are refused.",
             "auth": { "type": "noauth" }
           }
         }

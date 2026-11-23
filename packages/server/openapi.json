@@ -61,6 +61,10 @@
       "name": "Signing",
       "description": "What the recipient's browser calls. `{token}` is the signing token from the link,\nor the literal `link` to use the token held in the `cvsign_link` cookie.\n"
     },
+    {
+      "name": "Provider callbacks",
+      "description": "Where an Aadhaar eSign provider reports what became of a signing request. Called by\nthe provider, never by your code. Each callback is verified with the credentials of\nthe workspace that started the request.\n"
+    },
     { "name": "Service", "description": "Health and this document." }
   ],
   "security": [{ "apiKey": [] }],
@@ -724,14 +728,14 @@
         "operationId": "downloadDocument",
         "tags": ["Documents"],
         "summary": "Download a PDF",
-        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`.\n",
+        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign cannot take a certificate\npage, so its signing certificate is a sealed file of its own: `version=certificate`.\n",
         "parameters": [
           {
             "name": "version",
             "in": "query",
             "required": false,
-            "description": "`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).",
-            "schema": { "type": "string", "enum": ["original", "sealed"] }
+            "description": "`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file).",
+            "schema": { "type": "string", "enum": ["original", "sealed", "certificate"] }
           }
         ],
         "responses": {
@@ -766,7 +770,9 @@
                   "signer": { "commonName": "Codevibe Sign Seal" },
                   "signedAt": "2026-03-02T09:14:31.000Z",
                   "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
-                  "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d"
+                  "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d",
+                  "seal": "operator",
+                  "earlierSignatures": []
                 }
               }
             }
@@ -1177,6 +1183,8 @@
                       "signer": null,
                       "signedAt": null,
                       "certificateSha256": null,
+                      "seal": "operator",
+                      "earlierSignatures": [],
                       "envelope": null
                     }
                   }
@@ -1210,7 +1218,16 @@
       }
     },
     "/v1/sign/receipt/documents/{docId}": {
-      "parameters": [{ "$ref": "#/components/parameters/DocumentId" }],
+      "parameters": [
+        { "$ref": "#/components/parameters/DocumentId" },
+        {
+          "name": "file",
+          "in": "query",
+          "required": false,
+          "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.",
+          "schema": { "type": "string", "enum": ["certificate"] }
+        }
+      ],
       "get": {
         "operationId": "getReceiptDocument",
         "tags": ["Signing"],
@@ -1235,6 +1252,13 @@
           "required": true,
           "description": "The signed value from the download link in the completed-copy email.",
           "schema": { "type": "string", "maxLength": 1024 }
+        },
+        {
+          "name": "file",
+          "in": "query",
+          "required": false,
+          "description": "`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.",
+          "schema": { "type": "string", "enum": ["certificate"] }
         }
       ],
       "get": {
@@ -1533,6 +1557,202 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/SignerUnauthorized" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/sign/{token}/esign": {
+      "parameters": [{ "$ref": "#/components/parameters/SigningToken" }],
+      "get": {
+        "operationId": "getEsignStatus",
+        "tags": ["Signing"],
+        "summary": "Follow an Aadhaar eSign",
+        "description": "Where the recipient's Aadhaar eSign stands. While it is `pending` the server also\nasks the provider, at most once every few seconds, so the page the signer comes\nback to moves on even when the provider's callback is late. Unlike the other signing\nroutes it still answers after the recipient has signed, and then hands out the\nreceipt for `GET /v1/sign/receipt`.\n",
+        "security": [{}, { "linkCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "The latest attempt, or `none` before the first.",
+            "headers": {
+              "X-Sign-Receipt": {
+                "description": "The receipt, once `status` is `signed`. Send it back as `X-Sign-Receipt`.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["status", "signUrl", "expiresAt"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["none", "pending", "signed", "declined", "expired", "failed"]
+                    },
+                    "signUrl": {
+                      "type": ["string", "null"],
+                      "format": "uri",
+                      "description": "The provider's signing page, while the attempt is open."
+                    },
+                    "expiresAt": {
+                      "type": ["string", "null"],
+                      "format": "date-time",
+                      "description": "When the server stops waiting for this attempt."
+                    }
+                  }
+                },
+                "example": {
+                  "status": "pending",
+                  "signUrl": "https://sandbox.leegality.com/sign/2c0c9c1e-7f0a-4a55-9a53-0f0d5b8e6a11",
+                  "expiresAt": "2026-03-03T09:10:00.000Z"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      },
+      "post": {
+        "operationId": "startEsign",
+        "tags": ["Signing"],
+        "summary": "Start an Aadhaar eSign",
+        "description": "For a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:\nthe recipient's field values and their consent. The server draws the values on the\ndocument, asks the eSign provider to sign that file and answers the provider's\nsigning page; send the signer there. The recipient becomes `signed` once the\nprovider reports the signature. Asking again while an attempt is open answers the\nsame page.\n",
+        "security": [{}, { "linkCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["consent", "values"],
+                "properties": {
+                  "consent": {
+                    "const": true,
+                    "description": "The signer agrees to sign electronically."
+                  },
+                  "values": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": { "$ref": "#/components/schemas/FieldValue" }
+                  }
+                }
+              },
+              "example": {
+                "consent": true,
+                "values": [
+                  {
+                    "fieldId": "e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94",
+                    "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to send the signer.",
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["signUrl", "expiresAt"],
+                  "properties": {
+                    "signUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The provider's signing page."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When the server stops waiting for this attempt."
+                    }
+                  }
+                },
+                "example": {
+                  "signUrl": "https://sandbox.leegality.com/sign/2c0c9c1e-7f0a-4a55-9a53-0f0d5b8e6a11",
+                  "expiresAt": "2026-03-03T09:10:00.000Z"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/SignerUnauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "410": { "$ref": "#/components/responses/Gone" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "422": { "$ref": "#/components/responses/Unprocessable" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "502": {
+            "description": "The eSign provider failed or could not be reached. Try again.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/v1/esign/webhooks/{provider}": {
+      "parameters": [
+        {
+          "name": "provider",
+          "in": "path",
+          "required": true,
+          "description": "The eSign provider's name, for example `leegality`.",
+          "schema": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,39}$" }
+        }
+      ],
+      "post": {
+        "operationId": "receiveEsignWebhook",
+        "tags": ["Provider callbacks"],
+        "summary": "Receive an eSign provider's callback",
+        "description": "Set this address as the webhook of your eSign provider account. The body names the\nsigning request; the server finds the workspace that started it and verifies the\nbody with that workspace's provider credentials before acting on it. Repeats change\nnothing. Bodies over 256 KB are refused.\n",
+        "security": [{}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "description": "The provider's own format." }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The callback was verified. It may have changed nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["ok"],
+                  "properties": { "ok": { "const": true } }
+                },
+                "example": { "ok": true }
+              }
+            }
+          },
+          "401": {
+            "description": "The callback could not be verified.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "404": {
+            "description": "No signing request matches the callback, or eSign is not set up.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "413": { "$ref": "#/components/responses/TooLarge" },
           "429": { "$ref": "#/components/responses/RateLimited" }
         }
       }
@@ -2113,6 +2333,8 @@
           "signer": { "commonName": "Codevibe Sign Seal", "organization": null },
           "signedAt": "2026-03-02T09:14:31.000Z",
           "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+          "seal": "operator",
+          "earlierSignatures": [],
           "envelope": {
             "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
             "title": "Offer letter",
@@ -2186,6 +2408,8 @@
           "signer": { "commonName": "Codevibe Sign Seal", "organization": null },
           "signedAt": "2026-03-02T09:14:31.000Z",
           "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+          "seal": "operator",
+          "earlierSignatures": [],
           "envelope": null
         }
       }
@@ -2207,6 +2431,7 @@
           "INVALID_STATE",
           "NOT_YOUR_TURN",
           "CONFLICT",
+          "ESIGN_UNAVAILABLE",
           "ENVELOPE_EXPIRED",
           "DOCUMENT_TOO_LARGE",
           "REQUIRED_FIELDS_MISSING",
@@ -2234,6 +2459,7 @@
           "INVALID_STATE": 409,
           "NOT_YOUR_TURN": 409,
           "CONFLICT": 409,
+          "ESIGN_UNAVAILABLE": 409,
           "ENVELOPE_EXPIRED": 410,
           "DOCUMENT_TOO_LARGE": 413,
           "REQUIRED_FIELDS_MISSING": 422,
@@ -2261,6 +2487,7 @@
           "INVALID_STATE": "Not allowed in the envelope's current status (`details.status`).",
           "NOT_YOUR_TURN": "Sequential routing, and an earlier recipient has not acted yet.",
           "CONFLICT": "Another request changed the envelope, or one with the same `Idempotency-Key` is still running. Try again.",
+          "ESIGN_UNAVAILABLE": "Aadhaar eSign cannot be used for this envelope right now (`details.reason`), for example because it is not set up.",
           "ENVELOPE_EXPIRED": "The envelope is past its expiry date.",
           "DOCUMENT_TOO_LARGE": "A PDF or the whole request is over the size limit (`details.maxBytes`).",
           "REQUIRED_FIELDS_MISSING": "Required fields were left empty.",
@@ -2364,6 +2591,8 @@
           "recipient.declined",
           "recipient.link_shared",
           "recipient.corrected",
+          "recipient.esign_started",
+          "recipient.esign_failed",
           "envelope.recalled",
           "envelope.revised",
           "document.sealed"
@@ -2450,7 +2679,52 @@
           "notifiedAt": { "$ref": "#/components/schemas/Timestamp" },
           "viewedAt": { "$ref": "#/components/schemas/Timestamp" },
           "remindersSent": { "type": "integer", "minimum": 0 },
-          "lastRemindedAt": { "$ref": "#/components/schemas/Timestamp" }
+          "lastRemindedAt": { "$ref": "#/components/schemas/Timestamp" },
+          "esign": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["provider", "status"],
+            "description": "Where the recipient's Aadhaar eSign stands, once they have started one. Only for `auth: aadhaar`.",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The eSign provider.",
+                "example": "leegality"
+              },
+              "status": { "$ref": "#/components/schemas/EsignStatus" },
+              "signerName": {
+                "type": "string",
+                "description": "The signer's name as the provider reported it."
+              },
+              "signedAt": { "$ref": "#/components/schemas/Timestamp" }
+            }
+          }
+        }
+      },
+      "EsignStatus": {
+        "type": "string",
+        "enum": ["pending", "signed", "declined", "expired", "failed"],
+        "description": "`pending`: the recipient is at the provider. `expired` and `failed`: the attempt ended without a signature and the recipient may start again."
+      },
+      "EarlierSignature": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["valid", "signerCommonName", "issuerCommonName", "signedAt"],
+        "description": "A digital signature made before the seal, for example an Aadhaar eSign by an eSign provider. Its certificate chain is not checked here.",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "The signature matches the bytes it covers."
+          },
+          "signerCommonName": {
+            "type": ["string", "null"],
+            "description": "Who the signing certificate was issued to."
+          },
+          "issuerCommonName": {
+            "type": ["string", "null"],
+            "description": "The authority that issued the signing certificate."
+          },
+          "signedAt": { "type": ["string", "null"], "format": "date-time" }
         }
       },
       "Field": {
@@ -2647,19 +2921,22 @@
           "signer",
           "signedAt",
           "certificateSha256",
-          "sha256"
+          "sha256",
+          "seal",
+          "earlierSignatures"
         ],
         "properties": {
           "documentId": { "$ref": "#/components/schemas/Id" },
           "valid": {
             "type": "boolean",
-            "description": "One trusted seal, cryptographically valid, covering every byte."
+            "description": "One trusted seal, cryptographically valid, covering every byte, over any signatures made before it; or a file recorded as kept exactly as an eSign provider signed it."
           },
           "reason": {
             "type": ["string", "null"],
             "enum": [
               "not_sealed",
               "signature_invalid",
+              "earlier_signature_invalid",
               "not_whole_document",
               "multiple_signatures",
               "untrusted_signer",
@@ -2683,6 +2960,16 @@
           "sha256": {
             "$ref": "#/components/schemas/Sha256",
             "description": "SHA-256 of the sealed file as stored."
+          },
+          "seal": {
+            "type": "string",
+            "enum": ["operator", "provider_only"],
+            "description": "`operator`: the file ends with this server's seal. `provider_only`: an eSign provider locked the file against further signatures, so it is kept as the provider signed it and recognised by its SHA-256 in the audit trail."
+          },
+          "earlierSignatures": {
+            "type": "array",
+            "description": "Signatures made before the seal, earliest first. Empty for most files.",
+            "items": { "$ref": "#/components/schemas/EarlierSignature" }
           }
         }
       },
@@ -2805,13 +3092,17 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["id", "name", "sealed"],
+              "required": ["id", "name", "sealed", "certificate"],
               "properties": {
                 "id": { "$ref": "#/components/schemas/Id" },
                 "name": { "type": "string" },
                 "sealed": {
                   "type": "boolean",
                   "description": "The signed copy is ready to download."
+                },
+                "certificate": {
+                  "type": "boolean",
+                  "description": "The signing certificate is a file of its own (`?file=certificate`), as for a document signed with Aadhaar eSign. Otherwise it is the last page of the signed copy."
                 }
               }
             }
@@ -2903,6 +3194,27 @@
             "type": "string",
             "description": "IANA time zone the signing date is printed in on the document, for example `Asia/Kolkata`: the workspace's own, or the server's. `UTC` when none is set.",
             "example": "Asia/Kolkata"
+          },
+          "esign": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["available", "provider", "status"],
+            "description": "Present only for a recipient who signs with Aadhaar eSign.",
+            "properties": {
+              "available": {
+                "type": "boolean",
+                "description": "The sender's workspace can start an Aadhaar eSign right now."
+              },
+              "provider": {
+                "type": ["string", "null"],
+                "description": "The eSign provider, once the recipient has started.",
+                "example": "leegality"
+              },
+              "status": {
+                "description": "Where the latest attempt stands; `null` before the first.",
+                "oneOf": [{ "$ref": "#/components/schemas/EsignStatus" }, { "type": "null" }]
+              }
+            }
           }
         }
       },
@@ -3576,6 +3888,8 @@
           "signer",
           "signedAt",
           "certificateSha256",
+          "seal",
+          "earlierSignatures",
           "envelope"
         ],
         "properties": {
@@ -3589,6 +3903,7 @@
               "not_sealed",
               "multiple_signatures",
               "signature_invalid",
+              "earlier_signature_invalid",
               "not_whole_document",
               "untrusted_signer",
               "unreadable",
@@ -3620,6 +3935,16 @@
           "certificateSha256": {
             "description": "SHA-256 of the certificate the seal was made with.",
             "oneOf": [{ "$ref": "#/components/schemas/Sha256" }, { "type": "null" }]
+          },
+          "seal": {
+            "type": "string",
+            "enum": ["operator", "provider_only"],
+            "description": "`operator`: the file ends with this server's seal. `provider_only`: an eSign provider locked the file against further signatures, so it is kept as the provider signed it and recognised by its SHA-256 in the audit trail."
+          },
+          "earlierSignatures": {
+            "type": "array",
+            "description": "Signatures made before the seal, earliest first. Empty for most files.",
+            "items": { "$ref": "#/components/schemas/EarlierSignature" }
           },
           "envelope": {
             "description": "The envelope of a valid file; `null` otherwise, or when it is no longer held.",

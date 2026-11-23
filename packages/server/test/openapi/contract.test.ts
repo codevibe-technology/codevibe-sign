@@ -5,7 +5,9 @@ import { Ajv2020, type ValidateFunction } from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { seal } from '@codevibe_technology/sign-pdf';
 import { defaultPdfEngine } from '../../src/engine';
+import { fakeEsignProvider } from '../../src/testing/fake-esign';
 import { API_KEY, harness, PNG, WEBHOOK_SECRET } from '../../src/testing/harness';
 import { makeP12, makePdf } from '../../src/testing/real-pdf';
 import { API_VERSION, deprecatedOperations } from '../../src/http/versioning';
@@ -167,11 +169,13 @@ describe('the OpenAPI document', () => {
 describe('a full run against the server', () => {
   let pdf: Uint8Array;
   let p12: Uint8Array;
+  let espP12: Uint8Array;
   const seen = new Set<string>();
 
   beforeAll(async () => {
     pdf = await makePdf(2);
     p12 = makeP12('Contract Test Seal', 'pass');
+    espP12 = makeP12('ASHA RAO', 'esp');
   });
 
   function checked(h: ReturnType<typeof harness>) {
@@ -211,10 +215,16 @@ describe('a full run against the server', () => {
   }
 
   it('answers every operation with a documented status and body', async () => {
+    let espSigned: Uint8Array | undefined;
+    const esign = fakeEsignProvider({
+      sign: async (bytes) =>
+        (espSigned ??= await seal(bytes, { p12: espP12, passphrase: 'esp', certify: false })),
+    });
     const h = harness({
       pdf: defaultPdfEngine,
       clock: { now: () => new Date() },
       sealer: { p12, passphrase: 'pass' },
+      esign: { provider: async () => esign },
     });
     const call = checked(h);
     const content = Buffer.from(pdf).toString('base64');
@@ -348,6 +358,76 @@ describe('a full run against the server', () => {
     expect(replaced.status).toBe(200);
     const revised = await call('POST', `/v1/envelopes/${second.json.id}/revise`);
     expect(revised.status).toBe(201);
+
+    const aadhaar = await call('POST', '/v1/envelopes', {
+      body: {
+        ...body,
+        send: true,
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha.esign@example.com', auth: 'aadhaar' },
+        ],
+        fields: body.fields.slice(0, 1),
+      },
+    });
+    expect(aadhaar.json.recipients[0].auth).toBe('aadhaar');
+    const esignToken = h.tokenFor('asha.esign@example.com');
+    expect((await call('GET', `/v1/sign/${esignToken}/esign`)).json.status).toBe('none');
+    const esignValues = [{ fieldId: aadhaar.json.fields[0].id as string, value: PNG }];
+    const startedEsign = await call('POST', `/v1/sign/${esignToken}/esign`, {
+      body: { consent: true, values: esignValues },
+    });
+    expect(startedEsign.json.signUrl).toMatch(/^https:/);
+    expect((await call('GET', `/v1/sign/${esignToken}`)).json.esign.status).toBe('pending');
+    const esignRef = esign.requests[0]!.ref;
+    const forged = await call('POST', '/v1/esign/webhooks/leegality', {
+      body: JSON.stringify({ documentId: esignRef, mac: 'forged', status: 'signed' }),
+    });
+    expect(forged.status).toBe(401);
+    expect(
+      (await call('POST', '/v1/esign/webhooks/leegality', { body: esign.webhook('x', 'signed') }))
+        .status,
+    ).toBe(404);
+    esign.finish(esignRef);
+    const reported = await call('POST', '/v1/esign/webhooks/leegality', {
+      body: esign.webhook(esignRef, 'signed'),
+    });
+    expect(reported.json).toEqual({ ok: true });
+    const esigned = await call('GET', `/v1/sign/${esignToken}/esign`);
+    expect(esigned.json.status).toBe('signed');
+    const esignReceipt = { 'x-sign-receipt': esigned.res.headers.get('x-sign-receipt')! };
+    const esignDoc = aadhaar.json.documents[0].id as string;
+    expect(
+      (await call('GET', '/v1/sign/receipt', { headers: esignReceipt })).json.documents,
+    ).toEqual([{ id: esignDoc, name: 'offer.pdf', sealed: true, certificate: true }]);
+    const page2 = await call('GET', `/v1/sign/receipt/documents/${esignDoc}?file=certificate`, {
+      headers: esignReceipt,
+    });
+    expect(page2.res.headers.get('content-type')).toBe('application/pdf');
+    const apart = await call(
+      'GET',
+      `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}?version=certificate`,
+    );
+    expect(apart.res.headers.get('content-type')).toBe('application/pdf');
+    const checkedEsign = await call(
+      'GET',
+      `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}/verification`,
+    );
+    expect(checkedEsign.json).toMatchObject({ valid: true, seal: 'operator' });
+    expect(checkedEsign.json.earlierSignatures).toHaveLength(1);
+    await call('GET', `/v1/envelopes/${aadhaar.json.id}`);
+    await call('GET', `/v1/envelopes/${aadhaar.json.id}/events`);
+    const blocked = await call('POST', '/v1/envelopes', {
+      body: {
+        ...body,
+        send: true,
+        recipients: [
+          { key: 'asha', name: 'Asha Rao', email: 'asha@example.com', auth: 'aadhaar' },
+          { key: 'ravi', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'aadhaar' },
+        ],
+        fields: body.fields.slice(0, 1),
+      },
+    });
+    expect(blocked.status).toBe(400);
 
     const form = new FormData();
     form.set(
