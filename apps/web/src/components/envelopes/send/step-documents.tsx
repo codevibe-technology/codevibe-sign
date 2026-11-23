@@ -1,9 +1,9 @@
 'use client';
 
-import { FileText, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react';
+import { CheckCircle2, Loader2, Lock, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { DocumentThumb } from '@/components/pdf/document-thumb';
 import {
   MAX_DOCUMENTS,
   MAX_PDF_BYTES,
@@ -122,7 +122,7 @@ export function StepDocuments({
   return (
     <div className="space-y-4">
       {locked ? (
-        <p className="flex items-start gap-2 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-muted">
+        <p className="flex items-start gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
           <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
           {onReplace
             ? 'The documents are saved with this draft. Replace a file with a new version if it changed; fields stay where they still fit.'
@@ -159,66 +159,75 @@ export function StepDocuments({
       ) : null}
 
       {documents.length > 0 || checking.length > 0 ? (
-        <Card>
-          <ul className="divide-y divide-line" aria-label="Documents">
-            {documents.map((d) => (
-              <li key={d.id} className="flex items-center gap-3 px-4 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
-                  <FileText aria-hidden className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{d.name}</p>
-                  <p className="text-sm text-muted">
-                    {d.pages.length} {d.pages.length === 1 ? 'page' : 'pages'}
-                    {d.size ? ` · ${size(d.size)}` : ''}
-                  </p>
-                </div>
-                {locked && onReplace ? (
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface-2">
-                    {replacing === d.id ? (
-                      <Loader2
-                        aria-hidden
-                        className="h-4 w-4 animate-spin motion-reduce:animate-none"
-                      />
-                    ) : (
-                      <RefreshCw aria-hidden className="h-4 w-4" />
-                    )}
-                    Replace
-                    <input
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      className="sr-only"
-                      aria-label={`Replace ${d.name}`}
-                      disabled={replacing !== null}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = '';
-                        if (file) void replace(d.id, file);
-                      }}
+        <ul className="grid gap-3 sm:grid-cols-2" aria-label="Documents">
+          {documents.map((d, i) => (
+            <li
+              key={d.id}
+              className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-3 pr-2 shadow-card"
+            >
+              <DocumentThumb bytes={d.bytes} width={56} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-ink">{d.name}</p>
+                <p className="mt-0.5 text-[13px] text-muted">
+                  {d.pages.length} {d.pages.length === 1 ? 'page' : 'pages'}
+                  {d.size ? ` · ${size(d.size)}` : ''}
+                </p>
+                <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11.5px] font-semibold text-success">
+                  <CheckCircle2 aria-hidden className="h-3 w-3" />
+                  {documents.length > 1 ? `Document ${i + 1} · ready` : 'Ready to sign'}
+                </p>
+              </div>
+              {locked && onReplace ? (
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface-2 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary">
+                  {replacing === d.id ? (
+                    <Loader2
+                      aria-hidden
+                      className="h-4 w-4 animate-spin motion-reduce:animate-none"
                     />
-                  </label>
-                ) : null}
-                {locked ? null : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove ${d.name}`}
-                    onClick={() => onChange((docs) => docs.filter((x) => x.id !== d.id))}
-                  >
-                    <Trash2 aria-hidden className="h-4 w-4" />
-                  </Button>
-                )}
-              </li>
-            ))}
-            {checking.map((name) => (
-              <li key={`checking-${name}`} className="flex items-center gap-3 px-4 py-3 text-muted">
-                <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
-                <span className="truncate">Checking {name}…</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
+                  ) : (
+                    <RefreshCw aria-hidden className="h-4 w-4" />
+                  )}
+                  Replace
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="sr-only"
+                    aria-label={`Replace ${d.name}`}
+                    disabled={replacing !== null}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) void replace(d.id, file);
+                    }}
+                  />
+                </label>
+              ) : null}
+              {locked ? null : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${d.name}`}
+                  className="hover:text-danger"
+                  onClick={() => onChange((docs) => docs.filter((x) => x.id !== d.id))}
+                >
+                  <Trash2 aria-hidden className="h-4 w-4" />
+                </Button>
+              )}
+            </li>
+          ))}
+          {checking.map((name) => (
+            <li
+              key={`checking-${name}`}
+              className="flex items-center gap-4 rounded-2xl border border-dashed border-line-strong bg-surface/70 p-3 text-muted"
+            >
+              <span className="flex h-[73px] w-14 items-center justify-center rounded-md bg-surface-2">
+                <Loader2 aria-hidden className="h-5 w-5 animate-spin motion-reduce:animate-none" />
+              </span>
+              <span className="truncate">Checking {name}…</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
     </div>
   );

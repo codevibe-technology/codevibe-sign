@@ -1,15 +1,27 @@
 'use client';
 
-import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2, UserRound } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Fingerprint,
+  GripVertical,
+  Link2,
+  ListOrdered,
+  MailCheck,
+  Plus,
+  Smartphone,
+  Trash2,
+  UserRound,
+  UsersRound,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import type { RoutingMode } from '@codevibe_technology/sign-core';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Field, Input, NativeSelect } from '@/components/ui/field';
 import { formatInr } from '@/lib/billing/money';
 import { cn } from '@/lib/cn';
-import { AUTH_OPTIONS, ROLE_OPTIONS } from '@/lib/envelopes';
+import { AUTH_LABELS, AUTH_OPTIONS, ROLE_OPTIONS } from '@/lib/envelopes';
 import {
   MAX_RECIPIENTS,
   moveItem,
@@ -50,23 +62,39 @@ function EsignNote({ esign }: { esign: EsignChoice | undefined }) {
   if (!esign.available) {
     return (
       <p
-        className="sm:col-span-2 rounded-lg bg-warning-soft px-3 py-2 text-[13px] text-ink"
+        className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-3.5 py-3 text-[13px] text-ink sm:col-span-2"
         data-testid="esign-unavailable"
       >
-        {esign.message} {settings}
+        <Fingerprint aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+        <span>
+          {esign.message} {settings}
+        </span>
       </p>
     );
   }
   if (!esign.creditsRequired) return null;
+  const low = esign.credits < 1;
   return (
-    <p
-      className="sm:col-span-2 rounded-lg bg-primary-soft px-3 py-2 text-[13px] text-ink"
+    <div
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary/25 bg-primary-soft px-3.5 py-3 text-[13px] text-ink sm:col-span-2"
       data-testid="esign-cost"
     >
-      Uses 1 credit when they finish signing
-      {esign.pricePaise === null ? '' : ` (${formatInr(esign.pricePaise)} per eSign)`}. This
-      workspace has {esign.credits} {esign.credits === 1 ? 'credit' : 'credits'} left. {settings}
-    </p>
+      <Fingerprint aria-hidden className="h-5 w-5 shrink-0 text-primary" />
+      <p className="min-w-0 flex-1">
+        Uses 1 credit when they finish signing
+        {esign.pricePaise === null ? '' : ` (${formatInr(esign.pricePaise)} per eSign)`}. This
+        workspace has {esign.credits} {esign.credits === 1 ? 'credit' : 'credits'} left.
+      </p>
+      <span
+        className={cn(
+          'rounded-full px-2.5 py-0.5 font-mono text-[11px] font-semibold',
+          low ? 'bg-danger text-white' : 'bg-surface text-primary',
+        )}
+      >
+        {esign.credits} {esign.credits === 1 ? 'credit' : 'credits'}
+      </span>
+      {settings}
+    </div>
   );
 }
 
@@ -86,6 +114,51 @@ export function RecipientDot({ index }: { index: number | null }) {
     />
   );
 }
+
+/** One or two capital letters for a recipient's avatar. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? [parts[0]!, parts[parts.length - 1]!] : parts;
+  return letters.map((p) => Array.from(p)[0]?.toUpperCase() ?? '').join('') || '?';
+}
+
+/** A recipient's initials in their placer colour; people who only get a copy are grey. */
+export function RecipientAvatar({
+  name,
+  index,
+  size = 'md',
+}: {
+  name: string;
+  index: number | null;
+  size?: 'xs' | 'md' | 'lg';
+}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-full font-display font-bold text-white',
+        size === 'xs' && 'h-5 w-5 text-[9.5px]',
+        size === 'md' && 'h-8 w-8 text-[12px]',
+        size === 'lg' && 'h-10 w-10 text-[13.5px]',
+        index === null && 'bg-muted',
+      )}
+      style={
+        index === null
+          ? undefined
+          : { background: `color-mix(in srgb, var(--cvs-recipient-${index}) 82%, black)` }
+      }
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+const AUTH_ICONS = {
+  email_otp: MailCheck,
+  sms_otp: Smartphone,
+  email_link: Link2,
+  aadhaar: Fingerprint,
+} as const;
 
 /**
  * Step 2: who signs, approves or gets a copy, how each proves who they are, and the order.
@@ -115,49 +188,58 @@ export function StepRecipients({
   const meAdded = recipients.some((r) => r.email.trim().toLowerCase() === me.email.toLowerCase());
 
   return (
-    <div className="space-y-4">
-      <Card className="p-4">
-        <fieldset>
-          <legend className="text-sm font-semibold">Signing order</legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {(
-              [
-                [
-                  'sequential',
-                  'One after another',
-                  'Each person gets the link when the one before has finished.',
-                ],
-                [
-                  'parallel',
-                  'Everyone at once',
-                  'All signers get the link now and sign in any order.',
-                ],
-              ] as const
-            ).map(([value, label, hint]) => (
-              <label
-                key={value}
-                className={cn(
-                  'flex cursor-pointer gap-3 rounded-lg border p-3 text-sm',
-                  routing === value ? 'border-primary bg-primary-soft' : 'border-line-strong',
-                )}
-              >
-                <input
-                  type="radio"
-                  name="routing"
-                  value={value}
-                  checked={routing === value}
-                  onChange={() => onRoutingChange(value)}
-                  className="mt-0.5 accent-[var(--primary)]"
-                />
-                <span>
-                  <span className="block font-semibold">{label}</span>
-                  <span className="text-muted">{hint}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      </Card>
+    <div className="space-y-6">
+      <fieldset className="grid gap-3 sm:grid-cols-2">
+        <legend className="mb-2 text-[13px] font-semibold text-ink">Signing order</legend>
+        {(
+          [
+            [
+              'sequential',
+              'One after another',
+              'Each person gets the link when the one before has finished.',
+              ListOrdered,
+            ],
+            [
+              'parallel',
+              'Everyone at once',
+              'All signers get the link now and sign in any order.',
+              UsersRound,
+            ],
+          ] as const
+        ).map(([value, label, hint, Icon]) => (
+          <label
+            key={value}
+            className={cn(
+              'flex cursor-pointer items-start gap-3 rounded-2xl border bg-surface p-4 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary',
+              routing === value
+                ? 'border-primary shadow-[inset_0_0_0_1px_var(--primary)]'
+                : 'border-line hover:border-line-strong',
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                routing === value ? 'bg-primary text-primary-ink' : 'bg-surface-2 text-muted',
+              )}
+            >
+              <Icon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-ink">{label}</span>
+              <span className="text-muted">{hint}</span>
+            </span>
+            <input
+              type="radio"
+              name="routing"
+              value={value}
+              checked={routing === value}
+              onChange={() => onRoutingChange(value)}
+              className="mt-1 h-4 w-4 accent-[var(--primary)]"
+            />
+          </label>
+        ))}
+      </fieldset>
 
       {problems.recipients ? (
         <p
@@ -168,10 +250,12 @@ export function StepRecipients({
         </p>
       ) : null}
 
-      <ol className="space-y-3" aria-label="Recipients">
+      <ol className="relative space-y-3" aria-label="Recipients">
         {recipients.map((r, i) => {
           const at = `recipients.${r.id}`;
           const color = colorIndex(recipients, r.id);
+          const label = r.name.trim() || `Recipient ${i + 1}`;
+          const AuthIcon = AUTH_ICONS[r.auth];
           return (
             <li
               key={r.id}
@@ -188,11 +272,19 @@ export function StepRecipients({
                 setDragging(null);
               }}
               className={cn(
-                'rounded-xl border bg-surface p-4 shadow-card transition-shadow',
+                'relative flex gap-2 rounded-2xl border bg-surface shadow-card transition-shadow sm:gap-3',
                 dragging === i ? 'border-primary ring-2 ring-primary/30' : 'border-line',
               )}
             >
-              <div className="mb-3 flex items-center gap-2">
+              <span
+                aria-hidden
+                className="w-1.5 shrink-0 rounded-l-2xl"
+                style={{
+                  background:
+                    color === null ? 'var(--line-strong)' : `var(--cvs-recipient-${color})`,
+                }}
+              />
+              <div className="flex shrink-0 flex-col items-center gap-1 pt-4">
                 <span
                   draggable
                   onDragStart={(e) => {
@@ -205,142 +297,183 @@ export function StepRecipients({
                 >
                   <GripVertical aria-hidden className="h-4 w-4" />
                 </span>
-                <span className="flex h-6 min-w-6 items-center justify-center rounded-[3px] bg-surface-2 px-1.5 font-mono text-[11px] font-semibold text-ink">
-                  {sequential ? i + 1 : '•'}
-                </span>
-                <RecipientDot index={color} />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {r.name.trim() || `Recipient ${i + 1}`}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Move ${r.name || `recipient ${i + 1}`} up`}
-                  disabled={i === 0}
-                  onClick={() => onChange((list) => moveItem(list, i, i - 1))}
-                >
-                  <ArrowUp aria-hidden className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Move ${r.name || `recipient ${i + 1}`} down`}
-                  disabled={i === recipients.length - 1}
-                  onClick={() => onChange((list) => moveItem(list, i, i + 1))}
-                >
-                  <ArrowDown aria-hidden className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Remove ${r.name || `recipient ${i + 1}`}`}
-                  onClick={() => onChange((list) => list.filter((x) => x.id !== r.id))}
-                >
-                  <Trash2 aria-hidden className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Name" error={problems[`${at}.name`]}>
-                  {(props) => (
-                    <Input
-                      {...props}
-                      value={r.name}
-                      autoComplete="off"
-                      placeholder="Asha Rao"
-                      onChange={(e) => update(r.id, { name: e.target.value })}
-                    />
-                  )}
-                </Field>
-                <Field label="Email" error={problems[`${at}.email`]}>
-                  {(props) => (
-                    <Input
-                      {...props}
-                      type="email"
-                      inputMode="email"
-                      autoComplete="off"
-                      value={r.email}
-                      placeholder="asha@example.com"
-                      onChange={(e) => update(r.id, { email: e.target.value })}
-                    />
-                  )}
-                </Field>
-                <Field label="Role" hint={ROLE_OPTIONS.find((o) => o.value === r.role)?.hint}>
-                  {(props) => (
-                    <NativeSelect
-                      {...props}
-                      value={r.role}
-                      onChange={(e) =>
-                        update(r.id, { role: e.target.value as DraftRecipient['role'] })
-                      }
-                    >
-                      {ROLE_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  )}
-                </Field>
-                {r.role === 'viewer' ? null : (
-                  <Field
-                    label="Identity check"
-                    hint={AUTH_HINTS[r.auth]}
-                    error={problems[`${at}.auth`]}
+                {sequential ? (
+                  <span
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-2 font-mono text-[11px] font-semibold text-ink"
+                    title={`Signs ${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'}`}
                   >
+                    {i + 1}
+                  </span>
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1 py-4 pr-3 sm:pr-4">
+                <div className="mb-3 flex items-center gap-3">
+                  <RecipientAvatar name={label} index={color} size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-ink">{label}</p>
+                    <p className="flex items-center gap-1.5 truncate text-[12.5px] text-muted">
+                      {ROLE_OPTIONS.find((o) => o.value === r.role)?.label}
+                      {r.role === 'viewer' ? null : (
+                        <>
+                          <span aria-hidden>·</span>
+                          <AuthIcon aria-hidden className="h-3.5 w-3.5" />
+                          {AUTH_LABELS[r.auth]}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Move ${r.name || `recipient ${i + 1}`} up`}
+                      disabled={i === 0}
+                      onClick={() => onChange((list) => moveItem(list, i, i - 1))}
+                    >
+                      <ArrowUp aria-hidden className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Move ${r.name || `recipient ${i + 1}`} down`}
+                      disabled={i === recipients.length - 1}
+                      onClick={() => onChange((list) => moveItem(list, i, i + 1))}
+                    >
+                      <ArrowDown aria-hidden className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${r.name || `recipient ${i + 1}`}`}
+                      className="hover:text-danger"
+                      onClick={() => onChange((list) => list.filter((x) => x.id !== r.id))}
+                    >
+                      <Trash2 aria-hidden className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Name" error={problems[`${at}.name`]}>
+                    {(props) => (
+                      <Input
+                        {...props}
+                        value={r.name}
+                        autoComplete="off"
+                        placeholder="Asha Rao"
+                        onChange={(e) => update(r.id, { name: e.target.value })}
+                      />
+                    )}
+                  </Field>
+                  <Field label="Email" error={problems[`${at}.email`]}>
+                    {(props) => (
+                      <Input
+                        {...props}
+                        type="email"
+                        inputMode="email"
+                        autoComplete="off"
+                        value={r.email}
+                        placeholder="asha@example.com"
+                        onChange={(e) => update(r.id, { email: e.target.value })}
+                      />
+                    )}
+                  </Field>
+                  <Field label="Role" hint={ROLE_OPTIONS.find((o) => o.value === r.role)?.hint}>
                     {(props) => (
                       <NativeSelect
                         {...props}
-                        value={r.auth}
+                        value={r.role}
                         onChange={(e) =>
-                          update(r.id, { auth: e.target.value as DraftRecipient['auth'] })
+                          update(r.id, { role: e.target.value as DraftRecipient['role'] })
                         }
                       >
-                        {AUTH_OPTIONS.map((o) => (
-                          <option
-                            key={o.value}
-                            value={o.value}
-                            disabled={
-                              o.value === 'aadhaar' &&
-                              r.auth !== 'aadhaar' &&
-                              esign?.available === false
-                            }
-                          >
-                            {o.value === 'aadhaar' && esign?.available === false
-                              ? `${o.label} (not available)`
-                              : o.label}
+                        {ROLE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
                           </option>
                         ))}
                       </NativeSelect>
                     )}
                   </Field>
-                )}
-                {r.auth === 'aadhaar' && r.role !== 'viewer' ? <EsignNote esign={esign} /> : null}
-                {r.auth === 'sms_otp' && r.role !== 'viewer' ? (
-                  <Field
-                    label="Mobile number"
-                    hint="With the country code, for example +919812345678."
-                    error={problems[`${at}.phone`]}
-                  >
-                    {(props) => (
-                      <Input
-                        {...props}
-                        type="tel"
-                        inputMode="tel"
-                        value={r.phone}
-                        placeholder="+91…"
-                        onChange={(e) => update(r.id, { phone: e.target.value })}
-                      />
-                    )}
-                  </Field>
-                ) : null}
+                  {r.role === 'viewer' ? null : (
+                    <Field
+                      label="Identity check"
+                      hint={AUTH_HINTS[r.auth]}
+                      error={problems[`${at}.auth`]}
+                    >
+                      {(props) => (
+                        <NativeSelect
+                          {...props}
+                          value={r.auth}
+                          onChange={(e) =>
+                            update(r.id, { auth: e.target.value as DraftRecipient['auth'] })
+                          }
+                        >
+                          {AUTH_OPTIONS.map((o) => (
+                            <option
+                              key={o.value}
+                              value={o.value}
+                              disabled={
+                                o.value === 'aadhaar' &&
+                                r.auth !== 'aadhaar' &&
+                                esign?.available === false
+                              }
+                            >
+                              {o.value === 'aadhaar' && esign?.available === false
+                                ? `${o.label} (not available)`
+                                : o.value === 'aadhaar' &&
+                                    esign?.creditsRequired &&
+                                    esign.pricePaise !== null
+                                  ? `${o.label} (${formatInr(esign.pricePaise)} each)`
+                                  : o.label}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      )}
+                    </Field>
+                  )}
+                  {r.auth === 'aadhaar' && r.role !== 'viewer' ? <EsignNote esign={esign} /> : null}
+                  {r.auth === 'sms_otp' && r.role !== 'viewer' ? (
+                    <Field
+                      label="Mobile number"
+                      hint="With the country code, for example +919812345678."
+                      error={problems[`${at}.phone`]}
+                    >
+                      {(props) => (
+                        <Input
+                          {...props}
+                          type="tel"
+                          inputMode="tel"
+                          value={r.phone}
+                          placeholder="+91…"
+                          onChange={(e) => update(r.id, { phone: e.target.value })}
+                        />
+                      )}
+                    </Field>
+                  ) : null}
+                </div>
               </div>
             </li>
           );
         })}
       </ol>
+
+      {recipients.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-line-strong bg-surface/60 px-6 py-10 text-center">
+          <span
+            aria-hidden
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary"
+          >
+            <UsersRound className="h-6 w-6" />
+          </span>
+          <p className="mt-3 font-semibold text-ink">Nobody added yet</p>
+          <p className="mt-1 text-sm text-muted">
+            Add the people who sign, approve or get a copy. You can add up to {MAX_RECIPIENTS}.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <Button

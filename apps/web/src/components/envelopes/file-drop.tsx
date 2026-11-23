@@ -42,22 +42,22 @@ export function FileDrop({
       }}
       data-testid="file-drop"
       className={cn(
-        'flex flex-col items-center rounded-xl border-[1.5px] border-dashed px-6 py-12 text-center transition-colors',
+        'flex flex-col items-center rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors sm:py-14',
         over
           ? 'border-primary bg-primary-soft'
-          : 'border-line-strong bg-surface hover:border-primary/60',
+          : 'border-line-strong bg-surface hover:border-primary/60 hover:bg-primary-soft/40',
         disabled && 'opacity-60',
       )}
     >
-      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-nav text-accent">
-        <Upload aria-hidden strokeWidth={1.8} className="h-6 w-6" />
+      <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[#0f9f8f] text-white shadow-[0_10px_24px_-10px_rgb(27_106_224/0.7)]">
+        <Upload aria-hidden strokeWidth={2} className="h-6 w-6" />
       </span>
-      <p className="font-display text-lg font-semibold">{title}</p>
+      <p className="font-display text-xl font-bold text-ink">{title}</p>
       <p className="mt-1 max-w-md text-sm text-muted">{hint}</p>
       <label
         htmlFor={id}
         className={cn(
-          'mt-5 inline-flex h-10 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-ink hover:bg-primary-hover focus-within:outline-2 focus-within:outline-primary',
+          'mt-5 inline-flex h-11 cursor-pointer items-center rounded-full bg-primary px-6 font-display text-sm font-semibold text-primary-ink shadow-[0_8px_18px_-8px_rgb(27_106_224/0.6)] hover:bg-primary-hover focus-within:outline-2 focus-within:outline-primary',
           disabled && 'pointer-events-none',
         )}
       >
