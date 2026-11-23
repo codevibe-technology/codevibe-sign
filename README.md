@@ -75,7 +75,7 @@ npm i codevibe-sign
 ## Features
 
 <p align="center">
-  <img src=".github/assets/whats-inside.png" alt="What's inside Codevibe Sign: a sealed PDF anyone can check, an audit trail that cannot be edited, signing order and signer checks, templates and bulk send, API, webhooks and React, and Aadhaar eSign" width="100%">
+  <img src=".github/assets/whats-inside.png" alt="What's inside Codevibe Sign: a sealed PDF with a one-page certificate and QR code, a public record and an audit trail, guided signing in order, templates and bulk send, API, webhooks and React, and Aadhaar eSign through Leegality" width="100%">
 </p>
 
 - 📄 **Envelopes** with several documents and recipients: signers, approvers and viewers.
@@ -98,7 +98,7 @@ npm i codevibe-sign
 ## How it works
 
 <p align="center">
-  <img src=".github/assets/how-it-works.png" alt="How Codevibe Sign works: send, sign in order, seal, verify" width="100%">
+  <img src=".github/assets/how-it-works.png" alt="How Codevibe Sign works: send with fields on one page, all pages or specific pages; sign in order with Start, Next and Finish; seal with a one-page certificate and a QR code; verify on the public record or the verify page" width="100%">
 </p>
 
 1. **Send.** The sender creates an envelope: documents, recipients, fields and routing. Each
