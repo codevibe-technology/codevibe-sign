@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName } from 'pdf-lib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe_technology/sign-core';
 import { countersign } from './countersign';
@@ -212,6 +212,31 @@ describe('countersign', () => {
     expect(await verify(appended, { trust: trust(), allowEarlierSignatures: true })).toMatchObject({
       valid: false,
       reason: 'not_whole_document',
+    });
+  });
+
+  it('reports a revision slipped in between the earlier signature and the seal', async () => {
+    const signed = Buffer.from(await thirdParty());
+    const previous = /startxref\s+(\d+)\s+%%EOF\s*$/.exec(signed.toString('latin1'))![1];
+    const padded = new Uint8Array(
+      Buffer.concat([signed, Buffer.from(`\n% added later\nstartxref\n${previous}\n%%EOF\n`)]),
+    );
+    const output = await countersign(padded, sealOptions());
+    const result = await verify(output, { trust: trust(), allowEarlierSignatures: true });
+    expect(result).toMatchObject({ valid: false, reason: 'content_between_signatures' });
+    expect(result.seal.valid).toBe(true);
+  });
+
+  it('does not take a /Size outside a trailer for an object count', async () => {
+    const doc = await PDFDocument.load(plain, { updateMetadata: false });
+    const params = doc.context.register(doc.context.obj({ Params: { Size: 8_000_000 } }));
+    doc.catalog.set(PDFName.of('CvsTestFile'), params);
+    const input = await doc.save({ useObjectStreams: false });
+    const signed = await signAsThirdParty(input, { identity: esp });
+    const output = await countersign(signed, sealOptions());
+    expect(Buffer.from(output).toString('latin1')).not.toMatch(/\b8\d{6} 0 obj/);
+    expect(await verify(output, { trust: trust(), allowEarlierSignatures: true })).toMatchObject({
+      valid: true,
     });
   });
 

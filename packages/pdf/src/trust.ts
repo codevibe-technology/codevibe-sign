@@ -45,6 +45,7 @@ export type VerifyFailure =
   | 'not_whole_document'
   | 'multiple_signatures'
   | 'earlier_signature_invalid'
+  | 'content_between_signatures'
   | 'untrusted_signer';
 
 export interface VerifyResult {
@@ -167,6 +168,8 @@ function chainsToRoot(
  * With `allowEarlierSignatures` the file may carry signatures made before the seal. The seal
  * must then be the latest signature and meet every condition above, and each earlier
  * signature must still match the bytes it covers (`earlier_signature_invalid` otherwise).
+ * The seal must also be the only thing added after the last of them
+ * (`content_between_signatures` otherwise).
  */
 export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise<VerifyResult> {
   const trust = options?.trust ?? {};
@@ -216,6 +219,10 @@ export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise
   if (!seal.coversWholeDocument) {
     return { ...base, reason: 'not_whole_document' };
   }
+  const before = earlier[earlier.length - 1];
+  if (before && !sealFollowsDirectly(bytes, before.coveredBytes)) {
+    return { ...base, reason: 'content_between_signatures' };
+  }
   if (fingerprints.has(certificateSha256)) {
     return { ...base, valid: true, trustedBy: 'certificate' };
   }
@@ -224,6 +231,24 @@ export async function verify(bytes: Uint8Array, options: VerifyOptions): Promise
     return { ...base, valid: true, trustedBy: 'root' };
   }
   return { ...base, reason: 'untrusted_signer' };
+}
+
+/**
+ * Whether everything after `from` is one incremental update: the seal's. A revision added
+ * between the last earlier signature and the seal would bring a second cross-reference
+ * section and end-of-file marker, and its content would sit under the seal unseen by the
+ * earlier signer.
+ */
+function sealFollowsDirectly(bytes: Uint8Array, from: number): boolean {
+  const tail = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    .subarray(from)
+    .toString('latin1');
+  const count = (pattern: RegExp) => [...tail.matchAll(pattern)].length;
+  return (
+    /^(\r\n|\r|\n)?\d+ \d+ obj\b/.test(tail) &&
+    count(/startxref/g) === 1 &&
+    count(/%%EOF/g) === 1
+  );
 }
 
 /**

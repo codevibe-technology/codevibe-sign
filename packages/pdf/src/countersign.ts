@@ -72,11 +72,29 @@ function lastSection(bytes: Buffer): LastSection {
   return refuse('The PDF has no readable cross-reference table.', 'unreadable');
 }
 
-/** The largest /Size any trailer of the file declares, so no listed object number is reused. */
+/**
+ * The largest /Size a trailer or a cross-reference stream of the file declares, so no listed
+ * object number is reused. A /Size anywhere else, such as the parameters of an embedded file,
+ * is not an object count and is ignored.
+ */
 function declaredSize(bytes: Buffer): number {
+  const text = bytes.toString('latin1');
   let size = 0;
-  for (const match of bytes.toString('latin1').matchAll(/\/Size\s+(\d{1,10})\b/g)) {
-    size = Math.max(size, Number(match[1]));
+  const take = (dictionary: string) => {
+    for (const match of dictionary.matchAll(/\/Size\s+(\d{1,10})\b/g)) {
+      size = Math.max(size, Number(match[1]));
+    }
+  };
+  for (const match of text.matchAll(/\btrailer\b/g)) {
+    const end = text.indexOf('startxref', match.index);
+    take(text.slice(match.index, end === -1 ? match.index + 4096 : end));
+  }
+  for (const match of text.matchAll(/\/Type\s*\/XRef\b/g)) {
+    const start = text.lastIndexOf(' obj', match.index);
+    const end = text.indexOf('stream', match.index);
+    if (start !== -1 && end !== -1 && end - start < 4096) {
+      take(text.slice(start, end));
+    }
   }
   return size;
 }
