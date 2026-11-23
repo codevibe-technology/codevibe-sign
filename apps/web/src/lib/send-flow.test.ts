@@ -145,6 +145,28 @@ describe('fields and settings', () => {
     expect(fieldProblems([asha, ravi], [signature('a')])).toEqual({});
   });
 
+  it('asks for one Aadhaar eSign box, and no drawn signature, from an Aadhaar signer', () => {
+    const asha = person({ id: 'a' });
+    const esigner = { ...asha, auth: 'aadhaar' as const };
+    expect(fieldProblems([esigner], [])).toEqual({
+      'fields.a':
+        'Place the Aadhaar eSign box for Asha Rao: pick them, then drag "Aadhaar eSign" to where the signature goes.',
+    });
+    expect(fieldProblems([esigner], [signature('a')])['fields.a']).toMatch(/Aadhaar eSign box/);
+    const box = signature('a', { id: 'box', type: 'aadhaar' });
+    expect(fieldProblems([esigner], [box])).toEqual({});
+    expect(fieldProblems([esigner], [box, signature('a', { id: 'x', type: 'initials' })])).toEqual({
+      'fields.a':
+        'Asha Rao signs with Aadhaar eSign and draws nothing. Delete their signature and initials fields.',
+    });
+    expect(fieldProblems([esigner], [box, { ...box, id: 'box2' }])['fields.a']).toMatch(
+      /Keep one Aadhaar eSign box/,
+    );
+    expect(fieldProblems([asha], [signature('a'), box])['fields.a']).toMatch(
+      /Only a signer who uses Aadhaar eSign/,
+    );
+  });
+
   it('checks the title, message and expiry', () => {
     expect(settingsProblems({ ...emptySettings(), title: '' }).title).toMatch(/email subject/);
     expect(settingsProblems({ ...emptySettings(), title: 'x'.repeat(201) }).title).toMatch(/200/);

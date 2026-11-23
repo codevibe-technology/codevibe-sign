@@ -103,6 +103,16 @@ export function DoneStep({
                 </li>
               ))}
             </ul>
+            {receipt.documents[0] ? (
+              <a
+                href={`${receiptDocumentUrl(receipt.documents[0].id)}?file=audit-trail`}
+                download
+                className="inline-block text-sm font-semibold text-primary hover:underline"
+                data-testid="audit-trail-download"
+              >
+                Download the audit trail (PDF)
+              </a>
+            ) : null}
             <p className="text-sm">We have emailed it to you as well.</p>
           </>
         ) : status === 'completed' ? (

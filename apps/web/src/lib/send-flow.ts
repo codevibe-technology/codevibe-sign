@@ -215,14 +215,38 @@ export function aadhaarProblems(
   return problems;
 }
 
-/** Every signer needs a required signature field; fields may only belong to signers. */
+/**
+ * Every signer needs a required signature field, or, signing with Aadhaar eSign, one Aadhaar
+ * eSign box and no drawn signature or initials. The server checks the same rules on send.
+ */
 export function fieldProblems(recipients: DraftRecipient[], fields: Field[]): Problems {
   const problems: Problems = {};
   for (const r of recipients.filter((x) => x.role === 'signer')) {
-    const has = fields.some((f) => f.recipientId === r.id && f.type === 'signature' && f.required);
-    if (!has) {
+    const name = r.name.trim() || 'this signer';
+    const own = fields.filter((f) => f.recipientId === r.id);
+    if (r.auth === 'aadhaar') {
+      const boxes = own.filter((f) => f.type === 'aadhaar');
+      const drawn = own.filter((f) => f.type === 'signature' || f.type === 'initials');
+      if (boxes.length === 0) {
+        problems[`fields.${r.id}`] =
+          `Place the Aadhaar eSign box for ${name}: pick them, then drag "Aadhaar eSign" to where the signature goes.`;
+      } else if (boxes.length > 1) {
+        problems[`fields.${r.id}`] =
+          `${name} signs once with Aadhaar eSign. Keep one Aadhaar eSign box and delete the others.`;
+      } else if (drawn.length > 0) {
+        problems[`fields.${r.id}`] =
+          `${name} signs with Aadhaar eSign and draws nothing. Delete their signature and initials fields.`;
+      }
+      continue;
+    }
+    if (own.some((f) => f.type === 'aadhaar')) {
       problems[`fields.${r.id}`] =
-        `Place a signature field for ${r.name.trim() || 'this signer'}: pick them, then drag "Signature" onto the page.`;
+        `Only a signer who uses Aadhaar eSign gets an Aadhaar eSign box. Delete the one given to ${name}.`;
+      continue;
+    }
+    if (!own.some((f) => f.type === 'signature' && f.required)) {
+      problems[`fields.${r.id}`] =
+        `Place a signature field for ${name}: pick them, then drag "Signature" onto the page.`;
     }
   }
   return problems;

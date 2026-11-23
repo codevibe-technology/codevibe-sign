@@ -74,7 +74,7 @@ export function createWorkspaceMail(deps: WorkspaceMailDeps) {
           look,
           overrides.reminder,
         ),
-      completed: ({ envelope, recipient, attached, downloads }) =>
+      completed: ({ envelope, recipient, attached, auditTrail, downloads }) =>
         renderMail(
           'completed',
           {
@@ -82,6 +82,7 @@ export function createWorkspaceMail(deps: WorkspaceMailDeps) {
             title: envelope.title,
             role: recipient.role,
             attached,
+            auditTrail: auditTrail === true,
             downloads,
           },
           look,

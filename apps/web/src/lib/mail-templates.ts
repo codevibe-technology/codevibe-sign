@@ -110,6 +110,8 @@ export interface MailInput {
   link?: string;
   /** Completed: the sealed files are attached. */
   attached?: boolean;
+  /** Completed: the audit trail goes with them, attached or as a download. */
+  auditTrail?: boolean;
   /** Completed without attachments: a personal download link per sealed document. */
   downloads?: { name: string; url: string }[];
   /** Cancelled: what happened to the envelope. */
@@ -178,9 +180,13 @@ export function renderMail(
   if (kind === 'completed') {
     paragraphs.push(
       input.attached
-        ? 'The signed copy is attached. Keep it for your records.'
+        ? input.auditTrail
+          ? 'The signed copy and its audit trail are attached. Keep them for your records.'
+          : 'The signed copy is attached. Keep it for your records.'
         : downloads.length
-          ? 'The signed copy could not be attached. Download it below and keep it for your records.'
+          ? input.auditTrail
+            ? 'The signed copy and its audit trail could not be attached. Download them below and keep them for your records.'
+            : 'The signed copy could not be attached. Download it below and keep it for your records.'
           : `The signed copy could not be attached. Ask ${brand.company} for a copy.`,
     );
   }
@@ -259,6 +265,7 @@ export function sampleInput(kind: MailKind): MailInput {
     expiresAt: kind === 'invite' || kind === 'reminder' ? '2026-12-31T00:00:00.000Z' : null,
     link: 'https://sign.example.com/api/sign/your-personal-link',
     attached: true,
+    auditTrail: true,
     envelopeStatus: 'voided',
   };
 }

@@ -170,7 +170,14 @@ export default async function EnvelopePage({
               </Link>
             </p>
           ) : null}
-          <DocumentsCard slug={slug} envelope={envelope} checks={checks} />
+          <DocumentsCard
+            slug={slug}
+            envelope={envelope}
+            checks={checks}
+            separateCertificates={events
+              .filter((e) => e.action === 'document.sealed' && e.data?.certificate === 'separate')
+              .map((e) => String(e.data?.documentId ?? ''))}
+          />
           {record && recordsOn && envelope.status === 'completed' ? (
             <PublicRecordCard
               workspaceId={workspace.id}
@@ -188,6 +195,7 @@ export default async function EnvelopePage({
             )}
             certificate={certificate}
             downloadHref={`/dashboard/${slug}/envelopes/${envelope.id}/certificate`}
+            auditTrailHref={`/dashboard/${slug}/envelopes/${envelope.id}/audit-trail`}
           />
         </div>
         <div className="min-w-0 lg:col-span-2">

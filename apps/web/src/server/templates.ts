@@ -45,7 +45,7 @@ const fieldSchema = z.object({
   id: z.string().min(1).max(100),
   documentId: z.string().min(1).max(100),
   recipientId: z.string().min(1).max(100),
-  type: z.enum(['signature', 'initials', 'date_signed', 'name', 'text', 'checkbox']),
+  type: z.enum(['signature', 'initials', 'date_signed', 'name', 'text', 'checkbox', 'aadhaar']),
   page: z.number().int().min(0).max(10_000),
   rect: z.object({
     x: z.number().min(0).max(100_000),

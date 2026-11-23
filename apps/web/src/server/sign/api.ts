@@ -155,6 +155,7 @@ export function signApi(principal: Principal) {
       ),
     events: async (id: string) =>
       json<{ events: AuditEvent[]; chainValid: boolean }>(await call(`${envelope(id)}/events`)),
+    auditTrail: (id: string) => call(`${envelope(id)}/audit-trail`),
     certificate: async (id: string) =>
       json<CertificateView>(await call(`${envelope(id)}/certificate`)),
     verification: async (id: string, documentId: string) =>

@@ -73,7 +73,25 @@ describe('renderMail', () => {
       intro: '',
     });
     expect(mail.subject).toBe('Completed: "Offer letter"');
-    expect(mail.text).toContain('The signed copy is attached.');
+    expect(mail.text).toContain('The signed copy and its audit trail are attached.');
+  });
+
+  it('says what the completed copy carries and where to get it otherwise', () => {
+    const base = sampleInput('completed');
+    const text = (input: Partial<typeof base>) =>
+      renderMail('completed', { ...base, ...input }, brand).text;
+    expect(text({ auditTrail: false })).toContain('The signed copy is attached.');
+    const links = text({
+      attached: false,
+      downloads: [
+        { name: 'offer.pdf', url: 'https://sign.example.com/c/1' },
+        { name: 'Offer letter (audit trail).pdf', url: 'https://sign.example.com/c/2' },
+      ],
+    });
+    expect(links).toContain(
+      'The signed copy and its audit trail could not be attached. Download them below',
+    );
+    expect(links).toContain('https://sign.example.com/c/2');
   });
 
   it('escapes everything that reaches the HTML', () => {

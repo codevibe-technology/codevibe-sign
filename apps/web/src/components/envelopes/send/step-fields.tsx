@@ -20,7 +20,8 @@ const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
 });
 
 /**
- * Step 3: drop signature, date and other fields on the pages, in each recipient's colour.
+ * Step 3: drop signature, date and other fields on the pages, in each recipient's colour. A
+ * signer who uses Aadhaar eSign is offered the Aadhaar eSign box instead of a signature.
  * `fill` takes all the room its parent gives it (the full-screen send flow); `card` sits in a
  * page as a bordered box (the template editor).
  */
@@ -94,7 +95,15 @@ export function StepFields({
             fields={fields}
             onChange={onChange}
             pdf={pdf}
-            fieldTypes={['signature', 'initials', 'date_signed', 'name', 'text', 'checkbox']}
+            fieldTypes={[
+              'signature',
+              'initials',
+              'aadhaar',
+              'date_signed',
+              'name',
+              'text',
+              'checkbox',
+            ]}
             {...(previewing !== undefined ? { previewing } : {})}
             {...(onPreviewingChange ? { onPreviewingChange } : {})}
           />

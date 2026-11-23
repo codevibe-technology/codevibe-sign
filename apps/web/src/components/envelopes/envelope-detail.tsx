@@ -81,10 +81,16 @@ export function DocumentsCard({
   slug,
   envelope,
   checks,
+  separateCertificates = [],
 }: {
   slug: string;
   envelope: Envelope;
   checks: Record<string, SealCheck | null>;
+  /**
+   * Documents whose certificate is a file of its own: an Aadhaar eSign started before the
+   * certificate page went on the file signed.
+   */
+  separateCertificates?: readonly string[];
 }) {
   const completed = envelope.status === 'completed';
   const esigned = envelope.recipients.some((r) => r.auth === 'aadhaar');
@@ -95,7 +101,7 @@ export function DocumentsCard({
         title="Documents"
         description={
           completed && esigned
-            ? 'The signed copy carries the Aadhaar eSign and a digital seal over it. Its signing certificate is a file of its own, because nothing can be added to a file after an Aadhaar eSign.'
+            ? 'The signed copy is one file: the pages and the certificate page, under the Aadhaar eSign and a digital seal.'
             : completed
               ? 'The signed copies carry a digital seal and a certificate page.'
               : 'The files as they were uploaded.'
@@ -123,7 +129,7 @@ export function DocumentsCard({
                   </a>
                 </Button>
               ) : null}
-              {completed && esigned && checks[d.id] ? (
+              {completed && separateCertificates.includes(d.id) && checks[d.id] ? (
                 <Button asChild size="sm" variant="secondary">
                   <a href={`${base}/${d.id}?version=certificate`}>
                     <Download aria-hidden className="h-4 w-4" />
@@ -364,10 +370,13 @@ function Hash({ value }: { value: string }) {
 export function CertificateCard({
   certificate,
   downloadHref,
+  auditTrailHref,
   esignProviders = {},
 }: {
   certificate: CertificateView;
   downloadHref: string;
+  /** The audit trail as a PDF, the file the completed-copy email carries. */
+  auditTrailHref?: string;
   /** The eSign provider of each recipient who signed with Aadhaar eSign, by recipient id. */
   esignProviders?: Record<string, { provider: string; sandbox?: boolean }>;
 }) {
@@ -377,12 +386,22 @@ export function CertificateCard({
         title="Certificate"
         description="The evidence record behind the signatures."
         action={
-          <Button asChild size="sm" variant="secondary">
-            <a href={downloadHref}>
-              <Download aria-hidden className="h-4 w-4" />
-              JSON
-            </a>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {auditTrailHref ? (
+              <Button asChild size="sm" variant="secondary">
+                <a href={auditTrailHref}>
+                  <Download aria-hidden className="h-4 w-4" />
+                  Audit trail (PDF)
+                </a>
+              </Button>
+            ) : null}
+            <Button asChild size="sm" variant="secondary">
+              <a href={downloadHref}>
+                <Download aria-hidden className="h-4 w-4" />
+                JSON
+              </a>
+            </Button>
+          </div>
         }
       />
       <div className="space-y-5 px-5 py-4 text-sm">
