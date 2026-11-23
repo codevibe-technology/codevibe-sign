@@ -4,8 +4,7 @@
 
 :root,
 [data-theme='light'],
-.home-skin,
-.home-skin .paper {
+.marketing {
   color-scheme: light;
   /* Codevibe brand: navy #0D1B2A, blue #1B6AE0, teal #2DD4BF, off-white #F4F5F7. */
   --canvas: #f4f5f7;
@@ -277,38 +276,6 @@ html [data-sonner-toaster][data-sonner-theme] {
   --info-text: var(--primary-text);
 }
 
-/* The home page's step-by-step story: the stage stays pinned while the page scrolls through
-   one step's length per step, and the story's pager moves it one step per gesture. */
-@media (prefers-reduced-motion: no-preference) {
-  .story-track {
-    --story-step: 70svh;
-    height: calc(100svh - 4rem + (var(--story-steps, 1) - 1) * var(--story-step));
-  }
-}
-
-/* A signature written once across the edge of the sealed copy. */
-@keyframes ink-stroke {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-.ink-stroke {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .ink-stroke {
-    animation: ink-stroke 1.6s cubic-bezier(0.65, 0, 0.35, 1) 0.5s both;
-  }
-  .ink-stroke-late {
-    animation-delay: 2s;
-    animation-duration: 0.5s;
-  }
-}
-
 /* A lockup on a surface that follows the theme: the logo on light, its inverse on dark. */
 .wordmark-on-dark {
   display: none;
@@ -327,11 +294,11 @@ html [data-sonner-toaster][data-sonner-theme] {
     display: block;
   }
 }
-/* The home page options are always light. */
-.home-skin .wordmark-on-light {
+/* The public site is always light, whatever theme the app is in. */
+.marketing .wordmark-on-light {
   display: block;
 }
-.home-skin .wordmark-on-dark {
+.marketing .wordmark-on-dark {
   display: none;
 }
 

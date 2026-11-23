@@ -22,6 +22,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Renders the single child (for example a link) with the button's look. */
   asChild?: boolean;
   pending?: boolean;
+  /** Fully rounded ends, as the public site's calls to action are drawn. */
+  pill?: boolean;
 }
 
 export function Button({
@@ -29,6 +31,7 @@ export function Button({
   size = 'md',
   asChild,
   pending,
+  pill = false,
   className,
   disabled,
   children,
@@ -38,7 +41,8 @@ export function Button({
   return (
     <Component
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-md font-display font-semibold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,translate] duration-200 ease-out not-disabled:active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex shrink-0 items-center justify-center font-display font-semibold whitespace-nowrap transition-[color,background-color,border-color,box-shadow,translate] duration-200 ease-out not-disabled:active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
+        pill ? 'rounded-full' : 'rounded-md',
         variants[variant],
         sizes[size],
         className,
