@@ -1,11 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { BRAND_COLORS, BRAND_FONTS, MARK_SVG } from './brand-assets';
+import { BRAND_COLORS, BRAND_FONTS, LOCKUP } from './brand-assets';
 
 const web = fileURLToPath(new URL('../../', import.meta.url));
 const site = fileURLToPath(new URL('../../../site/', import.meta.url));
+const pdf = fileURLToPath(new URL('../../../../packages/pdf/', import.meta.url));
 const read = (root: string, file: string) => readFileSync(join(root, file));
 const text = (root: string, file: string) => read(root, file).toString('utf8');
 
@@ -27,8 +29,6 @@ describe('the logo', () => {
     expect(text(web, 'public/mark.svg')).toBe(logo);
     expect(text(web, 'src/app/icon.svg')).toBe(logo);
     expect(text(site, 'public/favicon.svg')).toBe(logo);
-    expect(MARK_SVG).toBe(logo.trim());
-    expect(text(site, '.vitepress/config.ts')).toContain("logo: { src: '/mark.svg'");
   });
 
   it('is never drawn a second time in the code', () => {
@@ -68,6 +68,103 @@ describe('the logo', () => {
   });
 });
 
+const LOCKUPS = {
+  'logo.svg': { word: '#0D1B2A', sign: '#1B6AE0', mark: null },
+  'logo-white.svg': { word: '#FFFFFF', sign: '#2DD4BF', mark: null },
+  'logo-mono.svg': { word: '#0D1B2A', sign: '#0D1B2A', mark: '#0D1B2A' },
+  'logo-mono-white.svg': { word: '#FFFFFF', sign: '#FFFFFF', mark: '#FFFFFF' },
+} as const;
+
+/**
+ * "codevibe" and "sign" outlined in Poppins Medium on the codevibe.in logo grid. Changing the
+ * lockup means changing these on purpose.
+ */
+const WORD_HASHES = [
+  '2fc43569a6e258da0b364a4c02f3e1ac1952f9d913b94ce9c9b774de01ab1f80',
+  '387d304ab339a927c32b339e4924902cbbb6364b5248dd98107f7133ace3653d',
+];
+
+const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
+
+function parts(svg: string) {
+  const group = /<g transform="scale\(([\d.]+)\)">(.*?)<\/g>/.exec(svg);
+  const words = [
+    ...svg.replace(group?.[0] ?? '', '').matchAll(/<path d="([^"]*)" fill="([^"]*)"\/>/g),
+  ];
+  return {
+    viewBox: /viewBox="([^"]*)"/.exec(svg)?.[1],
+    markScale: group?.[1],
+    mark: group?.[2] ?? '',
+    words: words.map((m) => ({ d: m[1]!, fill: m[2]! })),
+  };
+}
+
+describe('the lockup', () => {
+  const mark = /<svg[^>]*>(?:<title>[^<]*<\/title>)?(.*)<\/svg>/s.exec(
+    text(site, 'public/mark.svg'),
+  )![1]!;
+
+  it('is the four colourways in the docs, copied unchanged to the app', () => {
+    for (const name of Object.keys(LOCKUPS)) {
+      expect(text(web, `public/brand/${name}`)).toBe(text(site, `public/brand/${name}`));
+    }
+  });
+
+  it('is the mark and the outlined words on the codevibe.in grid, never a font', () => {
+    for (const [name, colours] of Object.entries(LOCKUPS)) {
+      const svg = text(site, `public/brand/${name}`);
+      expect(svg).not.toMatch(/<text|font|@import|url\(/i);
+      const lockup = parts(svg);
+      expect(lockup.viewBox).toBe(`0 0 ${LOCKUP.width} ${LOCKUP.height}`);
+      // The mark is drawn on a 512 grid and stands 122 units tall, as codevibe.in's mark does.
+      expect(Number(lockup.markScale) * 512).toBeCloseTo(122, 2);
+      const expectedMark = colours.mark
+        ? mark.replace(/stroke="#[0-9A-Fa-f]{6}"/g, `stroke="${colours.mark}"`)
+        : mark;
+      expect(lockup.mark).toBe(expectedMark);
+      expect(lockup.words.map((word) => sha256(word.d))).toEqual(WORD_HASHES);
+      expect(lockup.words.map((word) => word.fill)).toEqual([colours.word, colours.sign]);
+    }
+  });
+
+  it('is drawn from the same paths on the PDF certificate', () => {
+    const lockup = parts(text(site, 'public/brand/logo.svg'));
+    const paths = text(pdf, 'src/lockup-paths.ts');
+    expect(paths).toContain(`width: ${LOCKUP.width},`);
+    expect(paths).toContain(`height: ${LOCKUP.height},`);
+    expect(paths).toContain(`markScale: ${lockup.markScale},`);
+    for (const word of lockup.words) expect(paths).toContain(`d: '${word.d}'`);
+    for (const [, d] of mark.matchAll(/d="([^"]*)"/g)) expect(paths).toContain(`d: '${d}'`);
+  });
+
+  it('is the logo wherever the app shows the name, in the version for the navy surfaces', () => {
+    const wordmark = text(web, 'src/components/shell/brand-mark.tsx');
+    expect(wordmark).toContain('src={LOCKUP.white}');
+    expect(wordmark).not.toContain('{BRAND_NAME}</');
+    for (const file of [
+      'src/components/marketing/site-header.tsx',
+      'src/components/marketing/site-footer.tsx',
+      'src/components/records/public-shell.tsx',
+      'src/components/shell/app-shell.tsx',
+      'src/components/shell/status-page.tsx',
+      'src/app/verify/page.tsx',
+    ]) {
+      expect(text(web, file)).toContain('<Wordmark');
+    }
+    expect(text(web, 'src/app/share-image.tsx')).toContain('LOCKUP.white');
+    expect(text(web, 'src/server/mail.ts')).toContain('LOCKUP.email');
+    expect(pngSize(read(web, `public${LOCKUP.email}`))[1]).toBe(56);
+  });
+
+  it('is the logo of the docs, light and dark, with no text title beside it', () => {
+    const config = text(site, '.vitepress/config.ts');
+    expect(config).toContain(
+      "logo: { light: '/brand/logo.svg', dark: '/brand/logo-white.svg', alt: SITE_NAME }",
+    );
+    expect(config).toContain('siteTitle: false');
+  });
+});
+
 describe('the typefaces', () => {
   it('are the three brand families and nothing else, in the app', () => {
     const layout = text(web, 'src/app/layout.tsx');
@@ -99,16 +196,46 @@ describe('the typefaces', () => {
     expect(named).toEqual([]);
   });
 
-  it('are the same three in the docs', () => {
+  it('are the same three in the docs, served by the docs themselves', () => {
     const config = text(site, '.vitepress/config.ts');
-    const families = [...config.matchAll(/family=([A-Za-z+]+)/g)].map((m) =>
-      m[1]!.replaceAll('+', ' '),
-    );
-    expect(families.sort()).toEqual([...BRAND_FONTS].sort());
+    expect(config).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+    // Inter comes with the VitePress theme; the other two are files of the docs.
+    expect(text(site, '.vitepress/theme/index.ts')).toContain("from 'vitepress/theme'");
     const style = text(site, '.vitepress/theme/style.css');
+    const faces = [
+      ...style.matchAll(
+        /font-family: '([^']+)';\s+font-style[^}]*url\('\/fonts\/([\w-]+\.woff2)'\)/g,
+      ),
+    ];
+    expect(new Set(faces.map((face) => face[1]))).toEqual(
+      new Set(['Space Grotesk', 'JetBrains Mono']),
+    );
+    for (const [, , file] of faces)
+      expect(existsSync(join(site, 'public/fonts', file!))).toBe(true);
+    expect(style).toMatch(/font-display: swap/);
     expect(style).toContain("--vp-font-family-base: 'Inter',");
-    expect(style).toContain("--vp-font-family-heading: 'Space Grotesk',");
-    expect(style).toContain("--vp-font-family-mono: 'JetBrains Mono',");
+    expect(style).toContain("--vp-font-family-heading: 'Space Grotesk', 'Space Grotesk Fallback',");
+    expect(style).toContain("--vp-font-family-mono: 'JetBrains Mono', 'JetBrains Mono Fallback',");
+    expect([...BRAND_FONTS].sort()).toEqual(['Inter', 'JetBrains Mono', 'Space Grotesk']);
+  });
+
+  it('never include the face of the wordmark, which is outlined in the logo files', () => {
+    const files = [
+      ...sources(join(web, 'src')),
+      join(site, '.vitepress/config.ts'),
+      join(site, '.vitepress/theme/style.css'),
+    ];
+    const loads = /(font-family|family=|next\/font|@font-face)[^\n]*poppins|['"`]poppins|poppins_/i;
+    expect(files.filter((file) => loads.test(readFileSync(file, 'utf8')))).toEqual([]);
+  });
+
+  it('are set as on codevibe.in: bold tight headings, 0.2em mono eyebrows, display buttons', () => {
+    const css = text(web, 'src/app/globals.css');
+    expect(css).toMatch(/h1 \{\s+letter-spacing: -0\.03em;/);
+    expect(css).toMatch(/h2 \{\s+letter-spacing: -0\.025em;/);
+    expect(css).toMatch(/h3 \{\s+letter-spacing: -0\.02em;/);
+    expect(css).toMatch(/\.eyebrow \{[^}]*letter-spacing: 0\.2em;/);
+    expect(text(web, 'src/components/ui/button.tsx')).toContain('font-display font-semibold');
   });
 });
 
@@ -123,6 +250,6 @@ describe('the colours', () => {
     expect(style).toContain(`--cv-blue: ${BRAND_COLORS.blue.toLowerCase()};`);
     expect(style).toContain(`--cv-teal: ${BRAND_COLORS.teal.toLowerCase()};`);
     for (const colour of Object.values(BRAND_COLORS))
-      expect(MARK_SVG + css).toContain(colour.toLowerCase());
+      expect(text(site, 'public/mark.svg').toLowerCase() + css).toContain(colour.toLowerCase());
   });
 });
