@@ -490,23 +490,74 @@ ways.
 ## Plans and limits
 
 `app_workspaces.plan` is `free`, `cloud` or `unlimited`. `PLAN_MODE=self-hosted` treats every
-workspace as unlimited; `hosted` applies the plan. The limits live in `src/lib/plans.ts` and
-are enforced where the work happens, never in memory:
+workspace as unlimited and shows nothing about plans or billing; `hosted` applies the plan.
+Every number lives in `src/lib/plans.ts` and nowhere else: the server checks, the Plan and
+usage page, the pricing section and the plan table in the docs are all built from it
+(`planFeatures`, `planTableMarkdown`), and a test compares any docs page that carries the
+table between its `plans:start` and `plans:end` comments with the module.
 
-| Limit                                  | Where                                                                                                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Envelopes sent per month, stored bytes | `createPlanGate` in front of the sign API: reserved in `app_usage` before the server works, given back if it refuses. |
-| API-key requests per day               | The same gate, for `Authorization: Bearer` calls only.                                                                |
-| PDF size, envelope size                | The gate (create), and the upload checks of the send flow and the template editor.                                    |
-| Members (with open invitations)        | `createInvitation` and `acceptInvitation`, with the workspace row locked.                                             |
-| Active templates                       | Create, duplicate and restore, with the workspace row locked.                                                         |
-| Webhook endpoints                      | `createWebhook`, with the workspace row locked.                                                                       |
-| Rows per bulk send                     | `startBulkSendAction`, which also refuses more rows than sends left this month.                                       |
-| Custom domain, badge                   | `updateSigningSettings`; `getBrand` always shows the badge where the plan requires it.                                |
-| Free workspaces per owner              | `createWorkspace`, with the user's row locked.                                                                        |
+|                                   | Free                 | Cloud                                         |
+| --------------------------------- | -------------------- | --------------------------------------------- |
+| Envelopes sent                    | 10 a month (UTC)     | no plan number                                |
+| Members, with open invitations    | 2                    | `CLOUD_INCLUDED_MEMBERS` (25) + `extra_seats` |
+| Active templates                  | 2                    | no plan number                                |
+| Webhooks                          | not included         | fair use: 10 endpoints                        |
+| Rows in one bulk send             | 10                   | fair use: 500                                 |
+| API requests                      | 100 a month (IST)    | fair use: 10,000 a day (UTC)                  |
+| One PDF, one envelope, all stored | 10 MB, 25 MB, 200 MB | fair use: 25 MB, 100 MB, 20 GB                |
+| Own signing domain, badge off     | no                   | yes                                           |
+| Own eSign provider account        | no                   | yes                                           |
+
+`FREE_PLAN_LIMITS` (JSON) overrides Free numbers for an install. `app_workspaces.extra_seats`
+holds the members a Cloud workspace pays for on top of the included ones.
+
+Limits are enforced where the work happens, never in memory, and with the workspace (or the
+person) row locked wherever two requests could otherwise both pass:
+
+| Limit                                  | Where                                                                                                                                                                         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Envelopes sent per month, stored bytes | `createPlanGate` in front of the sign API: reserved in `app_usage` before the server works, given back if it refuses or replays an idempotent answer.                         |
+| API requests                           | The same gate, for `Authorization: Bearer` calls only: per India month and per UTC day, whichever the plan has.                                                               |
+| PDF size, envelope size                | The gate (create, replace a draft's PDF), and the upload checks of the send flow and the template editor.                                                                     |
+| Members (with open invitations)        | `createInvitation` and `acceptInvitation`, with the workspace row locked.                                                                                                     |
+| Active templates                       | Create (editor and `POST /v1/templates`), duplicate and restore, with the workspace row locked.                                                                               |
+| Webhooks                               | `createWebhook` and `setWebhookEnabled` (locked), test events and redeliveries (`assertWebhooksLive`), and `webhookTargetsFor`, which the sign server asks before every send. |
+| Rows per bulk send                     | `startBulkSendAction`, before a row is stored; it also refuses more rows than sends left this month, and each row is then counted by the gate as it is sent.                  |
+| Custom domain, badge                   | `updateSigningSettings`; `getBrand` always shows the badge where the plan requires it.                                                                                        |
+| Workspaces per owner                   | `createWorkspace`, and `assertCanOwn` when someone is made an owner or accepts an owner's invitation, with the person's row locked.                                           |
+| Own eSign provider account             | `assertOwnEsignAccount`, when the account is saved and each time it is about to be used.                                                                                      |
+
+The gate matches on the path the router will see: percent-escapes decoded (`routedPath`),
+repeated slashes folded, dot segments already resolved by the URL parser. It covers
+`POST /v1/envelopes`, `POST /v1/envelopes/:id/send`, `POST /v1/templates/:id/envelopes`,
+`PUT /v1/envelopes/:id/documents/:docId` (file size, envelope size, and the bytes the new file
+adds or frees) and `POST /v1/envelopes/:id/recall|revise` (the copy's bytes). Every call to the
+sign server passes it; `handleSignRequest` is the only caller of `app.fetch`.
+
+**API requests.** Every call made with an API key counts once it is authenticated, whatever
+the server then answers, errors included. A call refused for the count itself is not counted.
+Calls the app makes for a signed-in person do not count. Free counts by the calendar month in
+India time, starting again on the 1st at 00:00 IST; Cloud has a daily fair-use ceiling in UTC.
+Over the count the answer is `429` with `Retry-After` and `details.resetsAt`.
 
 Every refusal is a `PlanLimitError` (`code: 'PLAN_LIMIT'`) whose message names the limit, the
-usage and what to do; the API answers `403` with `details: { limit, used, max, plan }`.
+usage and what to do. The API answers `403` (`429` for API requests) with
+`details: { limit, used, max, plan, upgradeUrl, resetsAt? }`; a server action returns the same
+details as `limit` next to the message, for the upgrade prompt.
+
+**A workspace over its limits** (an existing Free workspace when the limits changed, or one
+that left Cloud) keeps everything it has. Its members stay members, its templates stay usable
+and editable, its envelopes and files stay. It cannot add to what is over: no new invitation
+or member, no new, duplicated or restored template, until it is back under the limit. Webhooks
+are not part of Free, so its endpoints stay listed and can be edited, turned off or removed,
+but receive nothing: no new event is queued, deliveries waiting to be retried stop, and test
+events and redeliveries are refused. A connected eSign provider account is not used. A custom
+signing domain stops applying and the badge shows again. Moving to Cloud brings all of it
+back as it was.
+
+The matrix in `test/plan-matrix.db.test.ts` runs every entry point on Free, Cloud, Unlimited
+and a self-hosted install, and fails when a server action or a changing route of the sign API
+is not listed in it.
 
 ## Extension points for the next lanes
 
