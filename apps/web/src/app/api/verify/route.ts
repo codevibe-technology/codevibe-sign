@@ -66,7 +66,9 @@ export async function POST(request: Request) {
   if (!limit.allowed) {
     return problem(429, 'Too many checks from here. Wait a few minutes and try again.');
   }
-  const length = Number(request.headers.get('content-length') ?? '0');
+  // A body without a declared length would be read whole before its size is known.
+  const length = Number(request.headers.get('content-length') ?? Number.NaN);
+  if (!Number.isFinite(length)) return problem(411, 'Choose a PDF file to check.');
   if (length > MAX_PDF_BYTES + 64 * 1024) {
     return problem(413, `The file is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.`);
   }

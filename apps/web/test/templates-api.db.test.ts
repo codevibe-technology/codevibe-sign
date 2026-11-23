@@ -314,7 +314,11 @@ describe.skipIf(!url)('the dashboard’s templates through the sign API', () => 
     expect(busy.status).toBe(409);
     expect(await files.get(key)).not.toBeNull();
 
+    // A finished bulk send still keeps its history under the template.
     await sql`update app_bulk_sends set status = 'done' where template_id = ${saved.id}`;
+    expect((await call('DELETE', `/v1/templates/${saved.id}`)).status).toBe(409);
+    expect(await getTemplate(sql, workspaceId, saved.id)).not.toBeNull();
+    await sql`delete from app_bulk_sends where template_id = ${saved.id}`;
     expect(
       (await call('DELETE', `/v1/templates/${saved.id}`, undefined, otherWorkspaceId)).status,
     ).toBe(404);
@@ -368,6 +372,17 @@ describe.skipIf(!url)('the dashboard’s templates through the sign API', () => 
         }),
         async (request) => sign.app.fetch(request),
       );
+    const escaped = await gate(
+      new Request(`http://localhost:3000/v1/templates/${first.json.id}/%65nvelopes`, {
+        method: 'POST',
+        headers: { 'x-test-workspace': ws, 'content-type': 'application/json' },
+        body: '{"roles":{},"send":true}',
+      }),
+      async (request) => sign.app.fetch(request),
+    );
+    expect(escaped.status).toBe(400);
+    expect(await usageOf(sql, ws, 'storage_bytes')).toBe(pdf.length);
+
     expect((await send(false)).status).toBe(201);
     expect(await usageOf(sql, ws, 'envelopes_sent')).toBe(0);
     expect(await usageOf(sql, ws, 'storage_bytes')).toBe(pdf.length * 2);
@@ -377,5 +392,58 @@ describe.skipIf(!url)('the dashboard’s templates through the sign API', () => 
     expect(over.status).toBe(403);
     expect(((await over.json()) as { error: { code: string } }).error.code).toBe('PLAN_LIMIT');
     expect(await usageOf(sql, ws, 'storage_bytes')).toBe(pdf.length * 3);
+
+    // Deleting the template gives its storage back, so making and deleting cannot use it up.
+    expect((await call('DELETE', `/v1/templates/${first.json.id}`, undefined, ws)).status).toBe(
+      200,
+    );
+    expect(await usageOf(sql, ws, 'storage_bytes')).toBe(pdf.length * 2);
+  });
+
+  it('counts a replayed request once', async () => {
+    const ws = (await createWorkspace(sql, { name: 'Replays', userId })).id;
+    vi.stubEnv('PLAN_MODE', 'hosted');
+    vi.stubEnv('FREE_PLAN_LIMITS', '');
+    const template = await call('POST', '/v1/templates', apiTemplate(), ws);
+    const gate = createPlanGate({
+      sql,
+      settings: () => ({ mode: 'hosted', freeOverrides: {} }),
+      authenticate: async () => ({ id: 'user:u1', workspaceId: ws }),
+      templateSizes: async () => [pdf.length],
+      basePath: '',
+      maxBodyBytes: 1 << 20,
+    });
+    const send = () =>
+      gate(
+        new Request(`http://localhost:3000/v1/templates/${template.json.id}/envelopes`, {
+          method: 'POST',
+          headers: {
+            'x-test-workspace': ws,
+            'content-type': 'application/json',
+            'idempotency-key': 'once',
+          },
+          body: JSON.stringify({
+            roles: { 'Other party': { name: 'Zed', email: 'zed@example.com' } },
+            send: true,
+          }),
+        }),
+        async (request) => sign.app.fetch(request),
+      );
+    const first = await send();
+    const again = await send();
+    expect([first.status, again.status]).toEqual([201, 201]);
+    expect(again.headers.get('idempotent-replayed')).toBe('true');
+    expect(await usageOf(sql, ws, 'envelopes_sent')).toBe(1);
+    expect(await usageOf(sql, ws, 'storage_bytes')).toBe(pdf.length * 2);
+    expect(
+      (
+        await call(
+          'GET',
+          '/v1/templates?cursor=' + Buffer.from('["2026-01-01","x"]').toString('base64url'),
+          undefined,
+          ws,
+        )
+      ).status,
+    ).toBe(400);
   });
 });

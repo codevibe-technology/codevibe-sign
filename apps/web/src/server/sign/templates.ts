@@ -5,7 +5,7 @@ import type postgres from 'postgres';
 import { settingsBody } from '@/lib/send-flow';
 import { envelopeTitle, type RoleAuth, type TemplateDefinition } from '@/lib/templates';
 import { AppError } from '../errors';
-import { PlanLimitError, assertWithin, workspacePlan } from '../plans';
+import { PlanLimitError, assertWithin, releaseStorage, workspacePlan } from '../plans';
 import { insertTemplate } from '../templates';
 
 type Sql = postgres.Sql;
@@ -185,17 +185,31 @@ export function appTemplateStore(sql: Sql, files: FileStore): TemplateStore {
       return rows.length > 0;
     },
     async remove(workspaceId, id) {
-      const [busy] = await sql`select 1 from app_bulk_sends
-        where template_id = ${id} and workspace_id = ${workspaceId} and status = 'sending' limit 1`;
-      if (busy) {
-        throw new HttpError('CONFLICT', 'A bulk send from this template is still running');
+      // Deleting the row would take the history of its bulk sends with it.
+      const [used] = await sql`select 1 from app_bulk_sends
+        where template_id = ${id} and workspace_id = ${workspaceId} limit 1`;
+      if (used) {
+        throw new HttpError(
+          'CONFLICT',
+          'This template has bulk sends, whose history it holds; archive it in the app instead',
+        );
       }
-      const rows = await sql`delete from app_templates
-        where id = ${id} and workspace_id = ${workspaceId} and archived_at is null returning id`;
-      return rows.length > 0;
+      return sql.begin(async (tx) => {
+        const rows = await tx<{ definition: TemplateDefinition }[]>`delete from app_templates
+          where id = ${id} and workspace_id = ${workspaceId} and archived_at is null
+          returning definition`;
+        const [row] = rows;
+        if (!row) return false;
+        const bytes = row.definition.documents.reduce((sum, d) => sum + d.size, 0);
+        await releaseStorage(tx, workspaceId, bytes);
+        return true;
+      });
     },
   };
 }
+
+/** What `created_exact` looks like; nothing else may reach the timestamp cast. */
+const EXACT_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
 const encodeCursor = (createdAt: string, id: string) =>
   Buffer.from(JSON.stringify([createdAt, id])).toString('base64url');
@@ -208,6 +222,7 @@ function decodeCursor(value: string): { createdAt: string; id: string } {
       parsed.length === 2 &&
       typeof parsed[0] === 'string' &&
       typeof parsed[1] === 'string' &&
+      EXACT_TIME.test(parsed[0]) &&
       !Number.isNaN(Date.parse(parsed[0]))
     ) {
       return { createdAt: parsed[0], id: parsed[1] };

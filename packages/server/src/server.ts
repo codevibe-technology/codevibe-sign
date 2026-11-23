@@ -12,7 +12,7 @@ import { copyRoutes } from './routes/copy';
 import { receiptRoutes } from './routes/receipt';
 import { signerRoutes } from './routes/signer';
 import { templateRoutes } from './routes/templates';
-import { verifyRoutes } from './routes/verify';
+import { verifyRateLimit, verifyRoutes } from './routes/verify';
 import { createRuntime } from './runtime/context';
 import { tick, type TickOptions, type TickResult } from './runtime/tick';
 import { verifySealedPdf, type PublicVerification } from './verification';
@@ -95,6 +95,9 @@ export function createSignServer(options: SignServerOptions): SignServer {
   app.use('/v1/envelopes', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
   app.use('/v1/templates/*', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
   app.use('/v1/templates', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
+  // Before the size check, which reads a body sent without a length to measure it.
+  // The wildcard covers `/v1/verify` itself too; a second entry would count a request twice.
+  app.use('/v1/verify/*', verifyRateLimit(rt));
   app.use(
     '/v1/verify',
     bodyLimit({ maxSize: rt.limits.maxPdfBytes + VERIFY_FORM_OVERHEAD, onError: tooLarge }),

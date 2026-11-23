@@ -105,6 +105,28 @@ describe('createAuthenticate', () => {
     expect(await setup('admin')(voiding('env_other'))).toMatchObject({ id: 'user:u1' });
     expect(await setup('viewer')(voiding('env_mine'))).toMatchObject({ readOnly: true });
   });
+
+  it('applies the same checks to an address written with percent-escapes', async () => {
+    const at = (path: string) =>
+      new Request(`${APP}/api/v1/envelopes/${path}`, {
+        method: 'POST',
+        headers: { cookie: 'session', 'x-workspace': 'ws_a', origin: APP },
+      });
+    const member = setup('member', ['env_mine']);
+    for (const path of [
+      'env_other/%76oid',
+      'env_other/vo%69d',
+      'env_other/%72ecall',
+      'env_other/revis%65',
+      '%65nv_other/void',
+      'env_1/recipients/r1/%6Cink',
+      'env_1/recipients/r1/lin%6b',
+    ]) {
+      expect(await refusal(member(at(path))), path).toBe('FORBIDDEN');
+    }
+    expect(await member(at('env%5Fmine/void'))).toMatchObject({ id: 'user:u1' });
+    expect(await refusal(member(at('env_mine/%E0%A4%A/void')))).toBe('VALIDATION');
+  });
 });
 
 describe('inProcess', () => {

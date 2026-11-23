@@ -5,6 +5,7 @@ import type { SealCheck } from '../engine';
 import { fakePdfEngine } from '../testing/fake-pdf';
 import { PNG, envelopeBody, harness } from '../testing/harness';
 import type { SignServerOptions } from '../options';
+import { addressKey } from './verify';
 
 const CERT = 'c'.repeat(64);
 const text = (pdf: Uint8Array) => new TextDecoder().decode(pdf);
@@ -245,6 +246,33 @@ describe('POST /v1/verify', () => {
       headers: from('198.51.100.2'),
     });
     expect(other.status).toBe(200);
+  });
+
+  it('counts an IPv6 client by its /64, and refuses before reading the body', async () => {
+    expect(addressKey('203.0.113.9')).toBe('203.0.113.9');
+    expect(addressKey('2001:db8:1:2:aaaa::1')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('2001:0db8:0001:0002::ffff')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(addressKey('::1')).toBe('0:0:0:0::/64');
+    expect(addressKey('fe80::1%en0')).toBe('fe80:0:0:0::/64');
+
+    const pdf = new TextEncoder().encode('%PDF-1.7\npages=1\n');
+    const h = verifying({ trustProxy: true, limits: { verifyPer10Minutes: 1, maxPdfBytes: 64 } });
+    const from = (ip: string) => ({ 'x-forwarded-for': ip });
+    const first = await h.call('POST', '/v1/verify', {
+      body: upload(pdf),
+      headers: from('2001:db8:1:2::1'),
+    });
+    expect(first.status).toBe(200);
+    const neighbour = await h.call('POST', '/v1/verify', {
+      body: 'x'.repeat(200_000),
+      headers: { ...from('2001:db8:1:2:ffff::9'), 'content-type': 'application/pdf' },
+    });
+    expect(neighbour.status).toBe(429);
+    const elsewhere = await h.call('GET', `/v1/verify/${'a'.repeat(64)}`, {
+      headers: from('2001:db8:1:3::1'),
+    });
+    expect(elsewhere.status).toBe(200);
   });
 
   it('asks callers to retry while too many files are being checked', async () => {

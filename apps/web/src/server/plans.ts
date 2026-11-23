@@ -320,6 +320,18 @@ export async function releaseUsage(sql: Sql, reservation: Reservation | null) {
       and period = ${reservation.period}`;
 }
 
+/** Gives back the storage of files that were deleted for good. */
+export async function releaseStorage(
+  sql: Sql | postgres.TransactionSql,
+  workspaceId: string,
+  bytes: number,
+) {
+  if (bytes <= 0) return;
+  await sql`update app_usage set used = greatest(used - ${bytes}, 0), updated_at = now()
+    where workspace_id = ${workspaceId} and metric = 'storage_bytes'
+      and period = ${periodKey(METRIC_PERIOD.storage_bytes, new Date())}`;
+}
+
 export async function usageOf(
   sql: Sql,
   workspaceId: string,

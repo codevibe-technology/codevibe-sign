@@ -50,12 +50,16 @@ vi.mock('@/server/sign/server', () => ({
 const { POST } = await import('./route');
 
 let address = 0;
-function post(body: FormData | string, ip = `198.51.100.${++address}`) {
+function post(
+  body: FormData | string,
+  ip = `198.51.100.${++address}`,
+  length: string | null = '2048',
+) {
   return POST(
     new Request('http://localhost/api/verify', {
       method: 'POST',
       body,
-      headers: { 'x-forwarded-for': ip },
+      headers: { 'x-forwarded-for': ip, ...(length === null ? {} : { 'content-length': length }) },
     }),
   );
 }
@@ -136,6 +140,12 @@ describe('POST /api/verify', () => {
     const broken = await post(form());
     expect(broken.status).toBe(500);
     expect(JSON.stringify(await broken.json())).not.toMatch(/ECONNREFUSED|10\.0\.0\.5/);
+  });
+
+  it('wants to know the size before it reads anything', async () => {
+    expect((await post(form(), undefined, null)).status).toBe(411);
+    expect((await post(form(), undefined, String(64 * 1024 * 1024))).status).toBe(413);
+    expect(state.verified).toEqual([]);
   });
 
   it('limits how often one address can check', async () => {

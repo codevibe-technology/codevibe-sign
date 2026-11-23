@@ -2,6 +2,7 @@ import 'server-only';
 import type { Principal } from '@codevibe_technology/sign-server';
 import type postgres from 'postgres';
 import type { PlanSettings } from '@/lib/plans';
+import { routedParam, routedPath } from './route-path';
 import {
   PlanLimitError,
   assertWithin,
@@ -36,6 +37,12 @@ interface CreateBody {
   sizes: number[];
 }
 
+const malformedPath = () =>
+  new Response(
+    JSON.stringify({ error: { code: 'VALIDATION', message: 'The address is not valid' } }),
+    { status: 400, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } },
+  );
+
 const planLimitResponse = (err: PlanLimitError) =>
   new Response(JSON.stringify(err.toJSON()), {
     status: 403,
@@ -56,7 +63,8 @@ export function createPlanGate(deps: PlanGateDeps) {
   return async (request: Request, forward: Forward): Promise<Response> => {
     const settings = deps.settings();
     if (settings.mode === 'self-hosted') return forward(request);
-    const path = new URL(request.url).pathname;
+    const path = routedPath(request.url);
+    if (path === null) return malformedPath();
     if (!path.startsWith(prefix) || path.startsWith(`${prefix}sign/`)) return forward(request);
     const route = path.slice(deps.basePath.length);
     const creating = request.method === 'POST' && /^\/v1\/envelopes\/?$/.test(route);
@@ -94,7 +102,8 @@ export function createPlanGate(deps: PlanGateDeps) {
         }
       }
       if (fromTemplate) {
-        const sizes = await deps.templateSizes?.(plan.id, decodeURIComponent(fromTemplate[1]!));
+        const templateId = routedParam(fromTemplate[1]!);
+        const sizes = templateId ? await deps.templateSizes?.(plan.id, templateId) : null;
         const body = sizes ? await readSendFlag(request, deps.maxBodyBytes) : null;
         if (sizes && body) {
           const total = sizes.reduce((a, b) => a + b, 0);
@@ -107,8 +116,9 @@ export function createPlanGate(deps: PlanGateDeps) {
         }
       }
       if (sending) {
-        const envelopeId = decodeURIComponent(sending[1]!);
-        const sample = (await deps.isSampleEnvelope?.(plan.id, envelopeId)) ?? false;
+        const envelopeId = routedParam(sending[1]!);
+        const sample =
+          envelopeId !== null && ((await deps.isSampleEnvelope?.(plan.id, envelopeId)) ?? false);
         if (!sample) {
           const sent = await reserveUsage(deps.sql, plan, 'envelopes_sent', 1, at);
           if (sent) held.push(sent);
@@ -127,7 +137,9 @@ export function createPlanGate(deps: PlanGateDeps) {
       await Promise.all(held.map((r) => releaseUsage(deps.sql, r)));
       throw err;
     }
-    if (!response.ok) await Promise.all(held.map((r) => releaseUsage(deps.sql, r)));
+    // A replayed answer is the first request's, which was already counted.
+    const replayed = response.headers.get('idempotent-replayed') === 'true';
+    if (!response.ok || replayed) await Promise.all(held.map((r) => releaseUsage(deps.sql, r)));
     return response;
   };
 }

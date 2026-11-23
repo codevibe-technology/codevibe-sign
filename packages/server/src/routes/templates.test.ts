@@ -401,6 +401,45 @@ describe('an envelope from a template', () => {
     expect((await h.call('GET', '/v1/envelopes')).json.envelopes).toEqual([]);
   });
 
+  it('answers quickly and briefly when role names look like the paths of an error', async () => {
+    const h = harness();
+    const names = Array.from({ length: 14 }, (_, i) => `recipients[${i + 1}]`.repeat(4));
+    const template = await createTemplate(
+      h,
+      templateBody({
+        roles: names.map((name, i) => ({ key: String(i), name, auth: 'email_link' })),
+        fields: [],
+      }),
+    );
+    const roles = Object.fromEntries(
+      names.map((name, i) => [name, i === 0 ? {} : { name: 'A', email: `a${i}@example.com` }]),
+    );
+    const started = performance.now();
+    const res = await h.call('POST', `/v1/templates/${template.id}/envelopes`, { body: { roles } });
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(res.status).toBe(400);
+    expect(res.json.error.details.issues[0].path).toBe(`roles.${names[0]}.email`);
+    expect(JSON.stringify(res.json).length).toBeLessThan(2000);
+  });
+
+  it('leaves the caller all fifty metadata keys', async () => {
+    const h = harness();
+    const template = await createTemplate(h);
+    const metadata = Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`k${i}`, 'v']));
+    const at = `/v1/templates/${template.id}/envelopes`;
+    const full = await h.call('POST', at, { body: { roles: people, metadata } });
+    expect(full.status).toBe(201);
+    expect(Object.keys(full.json.metadata)).toHaveLength(51);
+    const over = await h.call('POST', at, {
+      body: { roles: people, metadata: { ...metadata, x: 'v' } },
+    });
+    expect(over.status).toBe(400);
+    const own = await h.call('POST', at, {
+      body: { roles: people, metadata: { templateId: 'mine' } },
+    });
+    expect(own.json.metadata.templateId).toBe(template.id);
+  });
+
   it('refuses when a PDF of the template is gone or was changed in storage', async () => {
     const h = harness();
     const template = await createTemplate(h);

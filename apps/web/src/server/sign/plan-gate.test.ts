@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { base64Bytes, createPlanGate, readCreateBody } from './plan-gate';
+import { routedParam, routedPath } from './route-path';
 
 const url = 'http://localhost:3000/api/v1/envelopes';
 
@@ -39,7 +40,33 @@ describe('readCreateBody', () => {
   });
 });
 
+describe('the address a guard matches on', () => {
+  it('is read the way the router reads it', () => {
+    const at = (path: string) => routedPath(`http://localhost:3000${path}`);
+    expect(at('/api/v1/envelopes/env_1/send')).toBe('/api/v1/envelopes/env_1/send');
+    expect(at('/api/v1/templates/t1/%65nvelopes')).toBe('/api/v1/templates/t1/envelopes');
+    expect(at('/api/v1/envelopes/a%2Fb/send')).toBe('/api/v1/envelopes/a%2Fb/send');
+    expect(at('/api/v1/envelopes/%E0%A4%A/send')).toBeNull();
+    expect(routedParam('a%2Fb')).toBe('a/b');
+    expect(routedParam('%')).toBeNull();
+  });
+});
+
 describe('createPlanGate', () => {
+  it('refuses an address whose escapes cannot be read, before anything else', async () => {
+    const forward = vi.fn(async () => new Response(null, { status: 200 }));
+    const gate = createPlanGate({
+      sql: {} as never,
+      settings: () => ({ mode: 'hosted', freeOverrides: {} }),
+      authenticate: vi.fn(),
+      basePath: '/api',
+      maxBodyBytes: 1000,
+    });
+    const res = await gate(new Request(`${url}/%E0%A4%A/send`, { method: 'POST' }), forward);
+    expect(res.status).toBe(400);
+    expect(forward).not.toHaveBeenCalled();
+  });
+
   it('forwards without looking at anything when self-hosted', async () => {
     const authenticate = vi.fn();
     const forward = vi.fn(async () => new Response(null, { status: 204 }));

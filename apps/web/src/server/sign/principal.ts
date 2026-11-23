@@ -1,6 +1,7 @@
 import { HttpError, type Principal } from '@codevibe_technology/sign-server';
 import { displayName } from '@/lib/person-name';
 import { can, canVoidEnvelope, type Role } from '@/lib/roles';
+import { routedParam, routedPath } from './route-path';
 
 export const WORKSPACE_HEADER = 'x-workspace';
 
@@ -61,13 +62,15 @@ export function createAuthenticate(deps: PrincipalDeps) {
     if (!user) throw new HttpError('UNAUTHORIZED', 'Sign in to continue');
     const role = await deps.roleOf(user.id, workspaceId);
     if (!role) throw new HttpError('UNAUTHORIZED', 'You are not a member of this workspace');
-    const path = new URL(request.url).pathname;
+    const path = routedPath(request.url);
+    if (path === null) throw new HttpError('VALIDATION', 'The address is not valid');
     if (request.method === 'POST' && LINK_PATH.test(path) && !can(role, 'links.share')) {
       throw new HttpError('FORBIDDEN', 'Only an admin can take a signing link to share');
     }
     const voiding = request.method === 'POST' && VOID_PATH.exec(path);
     if (voiding && can(role, 'envelopes.write')) {
-      const envelopeId = decodeURIComponent(voiding[1]!);
+      const envelopeId = routedParam(voiding[1]!);
+      if (envelopeId === null) throw new HttpError('VALIDATION', 'The address is not valid');
       const own = (await deps.isSender?.(user.id, workspaceId, envelopeId)) ?? false;
       if (!canVoidEnvelope(role, own)) {
         throw new HttpError('FORBIDDEN', 'Only an admin can void an envelope someone else sent');

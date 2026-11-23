@@ -400,7 +400,12 @@ describe.skipIf(!url)('postgresStore', () => {
     await admin.unsafe(`create schema ${schema}`);
     sql = postgres(url!, { max: 4, onnotice: () => {}, connection: { search_path: schema } });
     const runs = await Promise.all([migrate(sql), migrate(sql), migrate(sql)]);
-    expect(runs.flat()).toEqual(['0001_init', '0002_otp_issuance', '0003_workspaces']);
+    expect(runs.flat()).toEqual([
+      '0001_init',
+      '0002_otp_issuance',
+      '0003_workspaces',
+      '0004_templates_and_sealed_lookup',
+    ]);
     expect(await migrate(sql)).toEqual([]);
   });
 

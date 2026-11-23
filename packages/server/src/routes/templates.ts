@@ -67,18 +67,20 @@ function parseListQuery(query: Record<string, string>): TemplateListQuery {
   };
 }
 
-/** Points a validation error raised under `from` at `to`, in its message and its issues. */
-function repoint(err: unknown, from: string, to: string): unknown {
+/**
+ * Rewrites the paths of a validation error, in its message and its issues. `rewrite` sees
+ * the original text once, so what it puts in is never rewritten again.
+ */
+function repoint(err: unknown, rewrite: (text: string) => string): unknown {
   if (!(err instanceof SignError) || err.code !== 'VALIDATION') return err;
-  const swap = (text: string) => text.split(from).join(to);
   const issues = Array.isArray(err.details?.issues)
     ? (err.details.issues as { path?: string; message?: string }[]).map((issue) => ({
         ...issue,
-        ...(issue.path !== undefined ? { path: swap(issue.path) } : {}),
-        ...(issue.message !== undefined ? { message: swap(issue.message) } : {}),
+        ...(issue.path !== undefined ? { path: rewrite(issue.path) } : {}),
+        ...(issue.message !== undefined ? { message: rewrite(issue.message) } : {}),
       }))
     : undefined;
-  return new SignError('VALIDATION', swap(err.message), {
+  return new SignError('VALIDATION', rewrite(err.message), {
     ...err.details,
     ...(issues ? { issues } : {}),
   });
@@ -133,7 +135,12 @@ function recipientsFor(template: Template, body: Obj): RecipientSpec[] {
   try {
     return parseRecipients({ recipients: raw }, []);
   } catch (err) {
-    throw keys.reduce((e, key, i) => repoint(e, `recipients[${i}]`, `roles.${key}`), err);
+    throw repoint(err, (text) =>
+      text.replace(/recipients\[(\d+)\]/g, (found, index: string) => {
+        const key = keys[Number(index)];
+        return key === undefined ? found : `roles.${key}`;
+      }),
+    );
   }
 }
 
@@ -178,11 +185,12 @@ function applyPrefill(draft: Envelope, prefill: Prefill[]): Envelope {
     try {
       next = prefillFields(next, values);
     } catch (err) {
-      let pointed = err;
-      for (const { fieldId } of values) {
-        pointed = repoint(pointed, `values.${fieldId}`, `prefill.${entry.key}`);
-      }
-      throw pointed;
+      const ids = new Set(values.map((v) => `values.${v.fieldId}`));
+      throw repoint(err, (text) =>
+        text.replace(/values\.[^\s:,]+/g, (found) =>
+          ids.has(found) ? `prefill.${entry.key}` : found,
+        ),
+      );
     }
   }
   return next;
@@ -334,11 +342,12 @@ export function templateRoutes(rt: Runtime) {
         ...(body.expiresAt !== undefined
           ? { expiresAt: body.expiresAt }
           : { expiresInDays: body.expiresInDays ?? template.expiresInDays }),
-        metadata: { ...metadata, templateId: template.id },
       },
       now,
       true,
     );
+    // Added after the caller's own 50 keys are counted, so it never uses one of them up.
+    settings.metadata = { ...metadata, templateId: template.id };
     const recipients = recipientsFor(template, body);
     const prefill = parsePrefill(template, body);
     const fields: FieldSpec[] = template.fields.map((f) => ({
