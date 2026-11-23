@@ -1,5 +1,6 @@
 import 'server-only';
-import type { Envelope, FileStore } from '@codevibe_technology/sign-core';
+import type { FileStore } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 import type { Principal } from '@codevibe_technology/sign-server';
 import { envelopeFromTemplate, type People } from '@/lib/templates';
 import { AppError } from './errors';

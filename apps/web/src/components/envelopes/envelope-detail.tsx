@@ -1,5 +1,6 @@
 import { LocalTime } from '@/components/ui/local-time';
-import type { AuditEvent, Envelope } from '@codevibe_technology/sign-core';
+import type { AuditEvent } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 import {
   CheckCircle2,
   Download,

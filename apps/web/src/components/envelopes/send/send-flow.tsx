@@ -1,7 +1,8 @@
 'use client';
 
 import '@codevibe_technology/sign-react/styles.css';
-import type { Envelope, Field } from '@codevibe_technology/sign-core';
+import type { Field } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 import { ArrowLeft, ArrowRight, CheckCircle2, CloudOff, Loader2, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';

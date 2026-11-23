@@ -1,5 +1,5 @@
 import { LocalTime } from '@/components/ui/local-time';
-import type { Envelope } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 import { XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ROLE_OPTIONS } from '@/lib/envelopes';

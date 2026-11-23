@@ -1,5 +1,5 @@
 import 'server-only';
-import type { Envelope } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 import type { Principal } from '@codevibe_technology/sign-server';
 import type postgres from 'postgres';
 import {

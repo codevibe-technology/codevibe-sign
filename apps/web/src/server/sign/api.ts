@@ -1,6 +1,6 @@
 import 'server-only';
-import type { AuditEvent, Envelope } from '@codevibe_technology/sign-core';
-import type { Principal } from '@codevibe_technology/sign-server';
+import type { AuditEvent } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope, Principal } from '@codevibe_technology/sign-server';
 import type { EnvelopePage } from '@/lib/envelopes';
 import { AppError, type AppErrorCode } from '../errors';
 import { signRequest } from './client';

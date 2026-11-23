@@ -2,12 +2,12 @@ import {
   isValidEmail,
   isValidPhone,
   type AuthMethod,
-  type Envelope,
   type Field,
   type PageSize,
   type RecipientRole,
   type RoutingMode,
 } from '@codevibe_technology/sign-core';
+import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 
 /** Matches the sign server's limits, so a file is refused before it is uploaded. */
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
