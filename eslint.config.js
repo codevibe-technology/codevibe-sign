@@ -23,4 +23,14 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { files: ['scripts/**/*.mjs'], languageOptions: { globals: nodeGlobals } },
+  {
+    // Browser tests run in Node and hand functions to the page, so both sets of names appear.
+    files: ['apps/web/e2e/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...nodeGlobals,
+        ...Object.fromEntries(['document', 'setTimeout', 'window'].map((n) => [n, 'readonly'])),
+      },
+    },
+  },
 );

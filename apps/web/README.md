@@ -119,6 +119,7 @@ Traefik, from [Dockerfile](Dockerfile).
 | `dev:seal`    | Writes a self-signed seal certificate to `data/dev-seal.p12`.                                                              |
 | `test`        | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.                                              |
 | `smoke`       | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API.                                     |
+| `e2e:signing` | Drives a running app in a browser: the Fields step and the signing page at 1440 and 390 px. Needs `BASE` and `WEB_LOG`.    |
 | `brand:icons` | Draws the favicon, touch icon, 192 and 512 icons and the docs' copies from `apps/site/public/mark.svg`, the one logo file. |
 
 ## Configuration

@@ -18,6 +18,7 @@
     "dev:seal": "tsx scripts/dev-seal.ts",
     "sample:pdf": "tsx scripts/sample-pdf.ts",
     "smoke": "tsx scripts/smoke.ts",
+    "e2e:signing": "node e2e/signing-ux.mjs",
     "brand:icons": "tsx scripts/brand-icons.ts"
   },
   "dependencies": {
@@ -53,6 +54,7 @@
     "jsdom": "25.0.1",
     "node-forge": "1.4.3",
     "pdf-lib": "1.17.1",
+    "playwright-core": "1.56.1",
     "sharp": "0.35.5",
     "tailwindcss": "4.3.4",
     "tsup": "9.0.0",
