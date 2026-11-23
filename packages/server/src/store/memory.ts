@@ -16,7 +16,9 @@ import type {
   ServerStore,
   SigningToken,
   StoredEnvelope,
+  TemplateStore,
 } from './types';
+import type { Template } from '../template';
 
 interface EnvelopeRow extends StoredEnvelope {
   workspaceId: string;
@@ -47,6 +49,52 @@ function compareNewest(
   const byTime = Date.parse(b.createdAt) - Date.parse(a.createdAt);
   if (byTime !== 0) return byTime;
   return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+}
+
+function memoryTemplates(): TemplateStore {
+  const rows = new Map<Id, { workspaceId: string; template: Template }>();
+  const owned = (workspaceId: string, id: Id) => {
+    const row = rows.get(id);
+    return row?.workspaceId === workspaceId ? row : undefined;
+  };
+  return {
+    async insert(workspaceId, template) {
+      if (rows.has(template.id)) throw new Error(`Template ${template.id} already exists`);
+      rows.set(template.id, { workspaceId, template: clone(template) });
+    },
+    async get(workspaceId, id) {
+      const row = owned(workspaceId, id);
+      return row ? clone(row.template) : null;
+    },
+    async list(workspaceId, query) {
+      const after = query.cursor ? decodeCursor(query.cursor) : null;
+      const search = query.search?.toLowerCase();
+      const found = [...rows.values()]
+        .filter((row) => row.workspaceId === workspaceId)
+        .map((row) => row.template)
+        .filter((template) => !search || template.name.toLowerCase().includes(search))
+        .sort(compareNewest)
+        .filter((template) => !after || compareNewest(after, template) < 0);
+      const page = found.slice(0, query.limit).map(clone);
+      const last = page[page.length - 1];
+      return {
+        templates: page,
+        nextCursor:
+          found.length > query.limit && last
+            ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+            : null,
+      };
+    },
+    async replace(workspaceId, template, expectedUpdatedAt) {
+      const row = owned(workspaceId, template.id);
+      if (!row || row.template.updatedAt !== expectedUpdatedAt) return false;
+      row.template = clone(template);
+      return true;
+    },
+    async remove(workspaceId, id) {
+      return owned(workspaceId, id) ? rows.delete(id) : false;
+    },
+  };
 }
 
 /** Keeps everything in process memory. For tests, demos and single-process prototypes. */
@@ -126,6 +174,17 @@ export function memoryStore(): ServerStore {
     async listEvents(envelopeId) {
       return clone(envelopes.get(envelopeId)?.events ?? []);
     },
+    async findSealed(sha256) {
+      for (const row of envelopes.values()) {
+        const event = row.events.find(
+          (e) => e.action === 'document.sealed' && e.data?.sha256 === sha256,
+        );
+        const documentId = event?.data?.documentId;
+        if (typeof documentId === 'string') return { envelopeId: row.envelope.id, documentId };
+      }
+      return null;
+    },
+    templateStore: memoryTemplates(),
     async due(now, limit) {
       const out: Envelope[] = [];
       for (const row of envelopes.values()) {

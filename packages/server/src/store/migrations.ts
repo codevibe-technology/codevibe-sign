@@ -86,4 +86,23 @@ create index sign_envelopes_workspace_idx
   on sign_envelopes (workspace_id, created_at desc, id desc);
 `,
   },
+  {
+    name: '0004_templates_and_sealed_lookup',
+    sql: `
+create table sign_templates (
+  id text primary key,
+  workspace_id text not null,
+  name text not null,
+  data jsonb not null,
+  created_at timestamptz not null,
+  updated_at timestamptz not null
+);
+create index sign_templates_workspace_idx
+  on sign_templates (workspace_id, created_at desc, id desc);
+
+create index sign_audit_events_sealed_sha256_idx
+  on sign_audit_events ((data->'data'->>'sha256'))
+  where data->>'action' = 'document.sealed';
+`,
+  },
 ];

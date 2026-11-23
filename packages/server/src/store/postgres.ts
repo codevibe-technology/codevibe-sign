@@ -10,7 +10,15 @@ import { VersionConflictError } from '../errors';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import { decodeCursor, encodeCursor } from './cursor';
 import { migrations } from './migrations';
-import type { EnvelopePage, IdempotencyClaim, Job, JobKind, ServerStore } from './types';
+import type { Template } from '../template';
+import type {
+  EnvelopePage,
+  IdempotencyClaim,
+  Job,
+  JobKind,
+  ServerStore,
+  TemplateStore,
+} from './types';
 
 type Sql = postgres.Sql;
 type Json = postgres.JSONValue;
@@ -47,6 +55,56 @@ export async function migrate(sql: Sql): Promise<string[]> {
     }
   });
   return applied;
+}
+
+const likePattern = (search: string) => `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+
+function postgresTemplates(sql: Sql): TemplateStore {
+  return {
+    async insert(workspaceId, template) {
+      await sql`insert into sign_templates (id, workspace_id, name, data, created_at, updated_at)
+        values (${template.id}, ${workspaceId}, ${template.name}, ${sql.json(asJson(template))},
+          ${new Date(template.createdAt)}, ${new Date(template.updatedAt)})`;
+    },
+    async get(workspaceId, id) {
+      const rows = await sql<{ data: Template }[]>`
+        select data from sign_templates where id = ${id} and workspace_id = ${workspaceId}`;
+      return rows[0]?.data ?? null;
+    },
+    async list(workspaceId, query) {
+      const after = query.cursor ? decodeCursor(query.cursor) : null;
+      const rows = await sql<{ data: Template; created_at: Date; id: string }[]>`
+        select data, created_at, id from sign_templates
+        where workspace_id = ${workspaceId}
+          ${query.search ? sql`and name ilike ${likePattern(query.search)}` : sql``}
+          ${after ? sql`and (created_at, id) < (${new Date(after.createdAt)}, ${after.id})` : sql``}
+        order by created_at desc, id desc
+        limit ${query.limit + 1}`;
+      const page = rows.slice(0, query.limit);
+      const last = page[page.length - 1];
+      return {
+        templates: page.map((row) => row.data),
+        nextCursor:
+          rows.length > query.limit && last
+            ? encodeCursor({ createdAt: last.created_at.toISOString(), id: last.id })
+            : null,
+      };
+    },
+    async replace(workspaceId, template, expectedUpdatedAt) {
+      const rows = await sql`update sign_templates
+        set name = ${template.name}, data = ${sql.json(asJson(template))},
+          updated_at = ${new Date(template.updatedAt)}
+        where id = ${template.id} and workspace_id = ${workspaceId}
+          and data->>'updatedAt' = ${expectedUpdatedAt}
+        returning id`;
+      return rows.length > 0;
+    },
+    async remove(workspaceId, id) {
+      const rows = await sql`delete from sign_templates
+        where id = ${id} and workspace_id = ${workspaceId} returning id`;
+      return rows.length > 0;
+    },
+  };
 }
 
 /**
@@ -130,7 +188,7 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
       write(envelope, events, expectedVersion, jobs, options?.workspaceId),
     async list(workspaceId, query): Promise<EnvelopePage> {
       const after = query.cursor ? decodeCursor(query.cursor) : null;
-      const pattern = query.search ? `%${query.search.replace(/[\\%_]/g, '\\$&')}%` : null;
+      const pattern = query.search ? likePattern(query.search) : null;
       const rows = await sql<{ data: Envelope; created_at: Date; id: string }[]>`
         select data, created_at, id from sign_envelopes
         where workspace_id = ${workspaceId}
@@ -154,6 +212,16 @@ export function postgresStore(connection: Sql | string): ServerStore & { sql: Sq
         select data from sign_audit_events where envelope_id = ${envelopeId} order by seq`;
       return rows.map((row) => row.data);
     },
+    async findSealed(sha256) {
+      const rows = await sql<{ envelope_id: string; document_id: string | null }[]>`
+        select envelope_id, data->'data'->>'documentId' as document_id
+        from sign_audit_events
+        where data->>'action' = 'document.sealed' and data->'data'->>'sha256' = ${sha256}
+        limit 1`;
+      const row = rows[0];
+      return row?.document_id ? { envelopeId: row.envelope_id, documentId: row.document_id } : null;
+    },
+    templateStore: postgresTemplates(sql),
     async due(now, limit) {
       const rows = await sql<{ data: Envelope }[]>`
         select data from sign_envelopes

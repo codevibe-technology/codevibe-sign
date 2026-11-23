@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { VersionConflictError } from '../errors';
 import { memoryStore } from './memory';
 import { migrate, postgresStore } from './postgres';
+import type { Template } from '../template';
 import type { Job, ServerStore } from './types';
 
 const T0 = new Date('2026-03-02T09:00:00.000Z');
@@ -39,6 +40,32 @@ function draft(): Envelope {
     { ids },
   ).envelope;
   return envelope;
+}
+
+function sampleTemplate(name: string, age: number): Template {
+  const at = new Date(T0.getTime() + age * 1000).toISOString();
+  return {
+    id: ids.id(),
+    name,
+    title: name,
+    routing: 'sequential',
+    reminders: { firstAfterDays: 3, everyDays: 3, max: 3 },
+    expiresInDays: 30,
+    roles: [{ id: 'r1', name: 'Employee', type: 'signer', auth: 'email_otp' }],
+    documents: [
+      {
+        id: 'd1',
+        name: 'a.pdf',
+        size: 10,
+        sha256: 'a'.repeat(64),
+        pageCount: 1,
+        pages: [{ width: 612, height: 792 }],
+      },
+    ],
+    fields: [],
+    createdAt: at,
+    updatedAt: at,
+  };
 }
 
 const event = (envelope: Envelope, seq: number) => ({
@@ -298,6 +325,64 @@ function contract(name: string, make: () => Promise<ServerStore>) {
       expect((await store.list!(ws, { limit: 10, search: '%' })).envelopes).toHaveLength(1);
       expect((await store.list!('nobody', { limit: 10 })).envelopes).toEqual([]);
       await expect(store.list!(ws, { limit: 1, cursor: 'nonsense' })).rejects.toThrow(/cursor/);
+    });
+
+    it('finds the sealed document with a given hash, and only that one', async () => {
+      const envelope = draft();
+      const documentId = envelope.documents[0]!.id;
+      const sha256 = `${Date.now().toString(16)}${++counter}`.padStart(64, 'e');
+      const sealed = {
+        ...event(envelope, 2),
+        action: 'document.sealed' as const,
+        data: { documentId, sha256 },
+      };
+      // The original file's hash sits on other events and must not be taken for the seal.
+      const added = { ...event(envelope, 1), data: { documentId, sha256: 'a'.repeat(64) } };
+      await store.commit(envelope, [added, sealed], 0, []);
+      expect(await store.findSealed!(sha256)).toEqual({ envelopeId: envelope.id, documentId });
+      expect(await store.findSealed!('a'.repeat(64))).toBeNull();
+      expect(await store.findSealed!("' or true --")).toBeNull();
+    });
+
+    it('keeps templates apart by workspace and pages them newest first', async () => {
+      const templates = store.templateStore!;
+      const ws = `ws_${++counter}`;
+      const made: Template[] = [];
+      for (let i = 0; i < 3; i++) {
+        const template = sampleTemplate(i === 1 ? 'Offer 100%_done' : `Policy ${i}`, i);
+        await templates.insert(ws, template);
+        made.push(template);
+      }
+      const other = sampleTemplate('Elsewhere', 9);
+      await templates.insert(`${ws}_other`, other);
+
+      expect(await templates.get(ws, made[0]!.id)).toEqual(made[0]);
+      expect(await templates.get(ws, other.id)).toBeNull();
+      const first = await templates.list(ws, { limit: 2 });
+      expect(first.templates.map((t) => t.id)).toEqual([made[2]!.id, made[1]!.id]);
+      const second = await templates.list(ws, { limit: 2, cursor: first.nextCursor! });
+      expect(second.templates.map((t) => t.id)).toEqual([made[0]!.id]);
+      expect(second.nextCursor).toBeNull();
+      const found = await templates.list(ws, { limit: 10, search: '100%_' });
+      expect(found.templates.map((t) => t.id)).toEqual([made[1]!.id]);
+      expect((await templates.list(ws, { limit: 10, search: '%' })).templates).toHaveLength(1);
+      await expect(templates.list(ws, { limit: 1, cursor: 'nonsense' })).rejects.toThrow(/cursor/);
+
+      const changed = { ...made[0]!, name: 'Renamed', updatedAt: '2026-03-03T09:00:00.000Z' };
+      expect(await templates.replace(`${ws}_other`, changed, made[0]!.updatedAt)).toBe(false);
+      expect(await templates.replace(ws, changed, 'stale')).toBe(false);
+      expect(await templates.replace(ws, changed, made[0]!.updatedAt)).toBe(true);
+      expect(await templates.replace(ws, changed, made[0]!.updatedAt)).toBe(false);
+      expect((await templates.get(ws, changed.id))?.name).toBe('Renamed');
+      expect((await templates.list(ws, { limit: 10, search: 'renamed' })).templates).toHaveLength(
+        1,
+      );
+
+      expect(await templates.remove(`${ws}_other`, changed.id)).toBe(false);
+      expect(await templates.remove(ws, changed.id)).toBe(true);
+      expect(await templates.remove(ws, changed.id)).toBe(false);
+      expect(await templates.get(ws, changed.id)).toBeNull();
+      expect(await templates.get(`${ws}_other`, other.id)).toEqual(other);
     });
   });
 }

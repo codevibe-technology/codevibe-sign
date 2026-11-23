@@ -6,6 +6,7 @@ import type {
   Id,
   OtpState,
 } from '@codevibe_technology/sign-core';
+import type { Template } from '../template';
 
 export interface StoredEnvelope {
   envelope: Envelope;
@@ -39,6 +40,46 @@ export interface EnvelopePage {
   envelopes: Envelope[];
   /** Pass as `cursor` for the next page; null on the last one. */
   nextCursor: string | null;
+}
+
+export interface TemplateListQuery {
+  /** Case-insensitive match anywhere in the name. */
+  search?: string;
+  /** Page size, 1 to 100. */
+  limit: number;
+  /** `nextCursor` from the previous page. */
+  cursor?: string;
+}
+
+export interface TemplatePage {
+  /** Newest first. */
+  templates: Template[];
+  /** Pass as `cursor` for the next page; null on the last one. */
+  nextCursor: string | null;
+}
+
+/**
+ * Where templates are kept. Every method takes the workspace, and a template in another
+ * workspace must look exactly like one that does not exist.
+ */
+export interface TemplateStore {
+  /** Saves a new template. May refuse with an `HttpError`, for example over a quota. */
+  insert(workspaceId: string, template: Template): Promise<void>;
+  get(workspaceId: string, id: Id): Promise<Template | null>;
+  list(workspaceId: string, query: TemplateListQuery): Promise<TemplatePage>;
+  /**
+   * Saves `template` over the stored one only if that one's `updatedAt` is still
+   * `expectedUpdatedAt`, and reports whether it did.
+   */
+  replace(workspaceId: string, template: Template, expectedUpdatedAt: string): Promise<boolean>;
+  /** Reports whether there was a template to remove. */
+  remove(workspaceId: string, id: Id): Promise<boolean>;
+}
+
+/** Which envelope a sealed file belongs to; see `findSealed`. */
+export interface SealedDocumentRef {
+  envelopeId: Id;
+  documentId: Id;
 }
 
 export interface SigningToken {
@@ -104,6 +145,13 @@ export interface ServerStore extends EnvelopeStore {
    * `GET /v1/envelopes` needs it.
    */
   list?(workspaceId: string, query: EnvelopeListQuery): Promise<EnvelopePage>;
+  /**
+   * The sealed document whose file has exactly this SHA-256 (lowercase hex), in any workspace.
+   * Optional for custom stores; the public verify routes need it to name the envelope.
+   */
+  findSealed?(sha256: string): Promise<SealedDocumentRef | null>;
+  /** Templates. Optional for custom stores; the `/v1/templates` routes need it. */
+  templateStore?: TemplateStore;
   /** Hides an active envelope from `due` until `until`, or until it is saved again. */
   deferCheck(id: Id, until: Date): Promise<void>;
 
