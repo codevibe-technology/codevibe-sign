@@ -59,9 +59,13 @@ export interface CertificateOptions {
 
 const QR_SIZE = 104;
 const QR_GUTTER = 20;
-/** The "provided by" lockup under the QR code, in points tall. */
-const LOCKUP_HEIGHT = 24;
-const SIDE_WIDTH = Math.ceil(lockupWidth(LOCKUP_HEIGHT));
+/**
+ * The "provided by" lockup under the QR code, in points tall: about a line and a half of body
+ * text, so the brand stays small and quiet next to the signing record.
+ */
+const LOCKUP_HEIGHT = 12;
+/** The side column is as wide as the QR code; its caption and the lockup centre under it. */
+const SIDE_WIDTH = QR_SIZE;
 const PROVIDED_BY = 'Signing certificate provided by:';
 
 const SEALED_FILE_LINE =
@@ -200,15 +204,21 @@ function drawCertificate(
     });
     side = top - QR_SIZE - small.size - 16;
   }
+  const centred = (width: number) => right - SIDE_WIDTH + Math.max(0, (SIDE_WIDTH - width) / 2);
   small.font.draw(first, PROVIDED_BY, {
-    x: right - SIDE_WIDTH,
+    x: centred(small.font.widthOfTextAtSize(PROVIDED_BY, small.size)),
     y: side - small.size,
     size: small.size,
     color: small.color,
   });
-  drawLockup(first, { x: right - SIDE_WIDTH, top: side - small.size - 5, height: LOCKUP_HEIGHT });
+  const lockupTop = side - small.size - 4;
+  drawLockup(first, {
+    x: centred(lockupWidth(LOCKUP_HEIGHT)),
+    top: lockupTop,
+    height: LOCKUP_HEIGHT,
+  });
   if (flow.page === first) {
-    flow.y = Math.min(flow.y, side - small.size - 5 - LOCKUP_HEIGHT - 10);
+    flow.y = Math.min(flow.y, lockupTop - LOCKUP_HEIGHT - 10);
   }
 
   flow.section('Signers', 60);

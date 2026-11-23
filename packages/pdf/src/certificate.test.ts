@@ -6,6 +6,7 @@ import { extractText } from './testing/extract';
 import { appendCertificate, certificatePdf, type CertificateData } from './certificate';
 import { authLabel } from './certificate-text';
 import { lockupWidth } from './lockup';
+import { LOCKUP } from './lockup-paths';
 import {
   A4,
   document,
@@ -232,7 +233,7 @@ describe('appendCertificate', () => {
     expect(rect.x + rect.width).toBeCloseTo(PAGE.width - 44);
   });
 
-  it('ends the side column with the Codevibe Sign lockup, drawn as paths', async () => {
+  it('ends the side column with a small Codevibe Sign lockup centred under the code', async () => {
     for (const recordUrl of [RECORD_URL, undefined]) {
       const output = await appendCertificate(await makePdf([{ size: A4 }]), {
         envelope: envelope(),
@@ -248,20 +249,23 @@ describe('appendCertificate', () => {
       expect(content).toMatch(/0\.10588\d* 0\.41568\d* 0\.87843\d* RG/);
       expect(content).toMatch(/0\.17647\d* 0\.83137\d* 0\.74901\d* RG/);
       // Each path is placed with a move, a turn and a flip of the y axis.
-      const origins = [
+      const placed = [
         ...content.matchAll(
-          /1 0 0 1 ([\d.-]+) ([\d.-]+) cm\s+1 0 0 1 0 0 cm\s+[\d.]+ 0 0 -[\d.]+ 0 0 cm/g,
+          /1 0 0 1 ([\d.-]+) ([\d.-]+) cm\s+1 0 0 1 0 0 cm\s+([\d.]+) 0 0 -[\d.]+ 0 0 cm/g,
         ),
-      ].map((m) => ({ x: Number(m[1]), y: Number(m[2]) }));
-      expect(origins.length).toBeGreaterThanOrEqual(5);
+      ].map((m) => ({ x: Number(m[1]), y: Number(m[2]), scale: Number(m[3]) }));
+      expect(placed.length).toBeGreaterThanOrEqual(5);
       const right = PAGE.width - 44;
-      for (const { x, y } of origins) {
-        expect(x).toBeCloseTo(right - Math.ceil(lockupWidth(24)));
+      const width = lockupWidth(12);
+      // The lockup is about a line and a half of text tall and fits inside the code's width.
+      expect(width).toBeLessThan(104);
+      expect(Math.max(...placed.map((p) => p.scale)) * LOCKUP.height).toBeCloseTo(12);
+      for (const { x, y } of placed) {
+        expect(x).toBeCloseTo(right - 104 + (104 - width) / 2);
         // Under the code when there is one, at the top of the column when there is not.
         expect(y).toBeLessThan(PAGE.height - 44 - (recordUrl ? 104 : 0));
         expect(y).toBeGreaterThan(PAGE.height - 44 - 200);
       }
-      expect(Math.ceil(lockupWidth(24))).toBeLessThan(right - 44);
     }
   });
 

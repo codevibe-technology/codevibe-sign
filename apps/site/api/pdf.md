@@ -164,7 +164,7 @@ core's types. The page shows:
 - `recordUrl`, when given: a QR code for a page that shows this signing's record, such as the
   public record page of the web app. The code is also a link in PDF readers; the address
   itself is not printed;
-- under the code, "Signing certificate provided by:" and the Codevibe Sign logo, drawn as
+- under the code, "Signing certificate provided by:" and a small Codevibe Sign logo, drawn as
   vector paths so it needs no font;
 - `note`, when given: one line from the sender at the end, such as a company registration
   number.
