@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup';
+import { fontAssetsEsbuildPlugin } from './scripts/font-assets';
 import { limitsWorkerEsbuildPlugin } from './scripts/limits-worker';
 
 export default defineConfig({
@@ -7,5 +8,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   shims: true,
-  esbuildPlugins: [limitsWorkerEsbuildPlugin()],
+  esbuildPlugins: [limitsWorkerEsbuildPlugin(), fontAssetsEsbuildPlugin()],
 });

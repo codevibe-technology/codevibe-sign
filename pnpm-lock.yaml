@@ -386,9 +386,15 @@ importers:
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
+      harfbuzzjs:
+        specifier: 1.6.4
+        version: 1.6.4
       jsqr:
         specifier: 1.4.0
         version: 1.4.0
+      pdfjs-dist:
+        specifier: 4.10.38
+        version: 4.10.38
 
   packages/react:
     dependencies:
@@ -3440,6 +3446,9 @@ packages:
 
   graceful-fs@4.2.12:
     resolution: {integrity: sha512-iuyGF2E4oafQfPsRrG2wtY2ILupMhvtdrhzrxB+0VcjsPpSPttpfYdjnGFGsTi5MaJFjI1jOKHPQ6UTbTj9TAw==}
+
+  harfbuzzjs@1.6.4:
+    resolution: {integrity: sha512-T/PyfhVt1gGR2Tkf5KJUj1DQFkVBXHw552lS1iLEEDhV1Lukb3eq1pk2ov85kgbT2YUiZtJBTak9w+M7YgzUEQ==}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -7423,6 +7432,8 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.12: {}
+
+  harfbuzzjs@1.6.4: {}
 
   has-flag@4.0.0: {}
 

@@ -1,9 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { fontAssetsVitePlugin } from './scripts/font-assets';
 import { limitsWorkerVitePlugin } from './scripts/limits-worker';
 
 export default defineConfig({
-  plugins: [limitsWorkerVitePlugin()],
+  plugins: [limitsWorkerVitePlugin(), fontAssetsVitePlugin()],
   resolve: {
     alias: {
       '@codevibe_technology/sign-core': fileURLToPath(

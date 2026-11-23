@@ -40,7 +40,8 @@
     "README.md",
     "LICENSE",
     "NOTICE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "fonts/OFL.txt"
   ],
   "sideEffects": false,
   "engines": {
@@ -70,6 +71,8 @@
     "@types/node": "20.19.43",
     "@types/node-forge": "1.3.14",
     "esbuild": "0.28.2",
-    "jsqr": "1.4.0"
+    "harfbuzzjs": "1.6.4",
+    "jsqr": "1.4.0",
+    "pdfjs-dist": "4.10.38"
   }
 }
