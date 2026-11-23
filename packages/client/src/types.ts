@@ -2,6 +2,8 @@ import type {
   AuditAction,
   AuditEvent,
   AuthMethod,
+  Document as CoreDocument,
+  Envelope as CoreEnvelope,
   EnvelopeStatus,
   Field,
   FieldType,
@@ -20,8 +22,6 @@ export type {
   AuditAction,
   AuditEvent,
   AuthMethod,
-  Document,
-  Envelope,
   EnvelopeStatus,
   Field,
   FieldType,
@@ -36,6 +36,12 @@ export type {
   RoutingMode,
   SignErrorCode,
 } from '@codevibe_technology/sign-core';
+
+/** A document as the API describes it. Where the server stores the file is not part of it. */
+export type Document = Omit<CoreDocument, 'fileKey'>;
+
+/** An envelope as the API answers with it. */
+export type Envelope = Omit<CoreEnvelope, 'documents'> & { documents: Document[] };
 
 /** Error codes the API returns: core's codes plus the HTTP layer's own. */
 export type ApiErrorCode =
