@@ -41,6 +41,8 @@ export interface PublicRecordSigner {
   role: RecipientRole;
   status: RecipientStatus;
   auth: AuthMethod;
+  /** The eSign provider, for a signer who signed with Aadhaar eSign. */
+  esign?: { provider: string };
   actedAt: string | null;
 }
 

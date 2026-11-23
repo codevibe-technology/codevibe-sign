@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  EarlierSignatures,
+  type EarlierSignatureRow,
+} from '@/components/verify/earlier-signatures';
 import type {
   AuditAction,
   AuthMethod,
@@ -13,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import {
-  AUTH_LABELS,
+  authLabel,
   RECIPIENT_STATUS_LABELS,
   RECIPIENT_STATUS_TONES,
   actionLabel,
@@ -45,6 +49,7 @@ export interface PublicOutcome {
   signer: string | null;
   signedAt: string | null;
   sha256: string;
+  earlier?: EarlierSignatureRow[];
   fileName: string;
   evidence: PublicEvidence | null;
 }
@@ -200,6 +205,7 @@ function Result({ outcome }: { outcome: PublicOutcome }) {
               <dd>{formatDateTime(outcome.signedAt)}</dd>
             </>
           ) : null}
+          <EarlierSignatures signatures={outcome.earlier ?? []} />
           <dt className="text-muted">SHA-256</dt>
           <dd className="min-w-0">
             <code className="block font-mono text-xs break-all">{outcome.sha256}</code>
@@ -229,11 +235,7 @@ function Evidence({ evidence }: { evidence: PublicEvidence }) {
               <div className="min-w-0">
                 <p className="font-semibold text-ink">{r.name}</p>
                 <p className="text-muted">
-                  {[
-                    ROLE_LABELS[r.role],
-                    r.contact,
-                    r.role === 'viewer' ? null : AUTH_LABELS[r.auth],
-                  ]
+                  {[ROLE_LABELS[r.role], r.contact, r.role === 'viewer' ? null : authLabel(r)]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>

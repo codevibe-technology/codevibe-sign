@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  EarlierSignatures,
+  type EarlierSignatureRow,
+} from '@/components/verify/earlier-signatures';
 import { ExternalLink, FileText, ShieldAlert, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
@@ -17,6 +21,7 @@ interface Outcome {
   signer: string | null;
   signedAt: string | null;
   sha256: string;
+  earlier?: EarlierSignatureRow[];
   fileName: string;
   envelope: { envelopeId: string; title: string; documentName: string } | null;
 }
@@ -111,6 +116,7 @@ export function VerifyPanel({ workspaceId, slug }: { workspaceId: string; slug: 
                 <dd>{formatDateTime(outcome.signedAt)}</dd>
               </>
             ) : null}
+            <EarlierSignatures signatures={outcome.earlier ?? []} />
             <dt className="text-muted">SHA-256</dt>
             <dd className="min-w-0">
               <code className="block truncate font-mono text-xs" title={outcome.sha256}>

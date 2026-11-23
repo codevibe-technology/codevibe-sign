@@ -154,6 +154,8 @@ export interface SealedMatch {
   envelopeId: string;
   title: string;
   documentName: string;
+  /** The file is kept as an eSign provider signed it, with no seal of this install on it. */
+  providerOnly: boolean;
 }
 
 /** The workspace envelope whose sealed document has exactly this SHA-256, if any. */
@@ -162,8 +164,9 @@ export async function findSealedDocument(
   workspaceId: string,
   sha256: string,
 ): Promise<SealedMatch | null> {
-  const rows = await sql<{ envelope: Envelope; document_id: string }[]>`
-    select env.data as envelope, e.data->'data'->>'documentId' as document_id
+  const rows = await sql<{ envelope: Envelope; document_id: string; seal: string | null }[]>`
+    select env.data as envelope, e.data->'data'->>'documentId' as document_id,
+           e.data->'data'->>'seal' as seal
     from sign_audit_events e join sign_envelopes env on env.id = e.envelope_id
     where env.workspace_id = ${workspaceId}
       and e.data->>'action' = 'document.sealed'
@@ -176,5 +179,6 @@ export async function findSealedDocument(
     envelopeId: row.envelope.id,
     title: row.envelope.title,
     documentName: document?.name ?? 'Document',
+    providerOnly: row.seal === 'provider_only',
   };
 }

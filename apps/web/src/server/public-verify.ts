@@ -53,11 +53,21 @@ export function pageOutcome(
   const { envelope } = result;
   return {
     valid: result.valid,
-    summary: verifySummary(result.valid, result.reason, 'install'),
+    summary: verifySummary(result.valid, result.reason, 'install', {
+      seal: result.seal,
+      earlier: result.earlierSignatures.length,
+    }),
     reason: result.reason,
     signer: signer || null,
     signedAt: result.signedAt,
     sha256: result.sha256,
+    seal: result.seal,
+    earlier: result.earlierSignatures.map((signature) => ({
+      valid: signature.valid,
+      signer: signature.signerCommonName,
+      issuer: signature.issuerCommonName,
+      signedAt: signature.signedAt,
+    })),
     evidence: envelope
       ? {
           title: envelope.title,

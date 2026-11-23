@@ -85,6 +85,21 @@ export interface VerifyOutcome {
   signer: string | null;
   signedAt: string | null;
   sha256: string;
+  /**
+   * `provider_only`: the file is kept exactly as an eSign provider signed it, without a seal
+   * of this install, and is recognised by its SHA-256 in the audit trail.
+   */
+  seal: 'operator' | 'provider_only';
+  /** Signatures made before the seal, such as an Aadhaar eSign, earliest first. */
+  earlier: EarlierSignatureLine[];
+}
+
+export interface EarlierSignatureLine {
+  valid: boolean;
+  signer: string | null;
+  /** The authority that issued the signer's certificate. */
+  issuer: string | null;
+  signedAt: string | null;
 }
 
 /** Who the result speaks for: a workspace in the app, or the install on its public page. */
@@ -103,11 +118,24 @@ const reasons = (by: string): Record<string, string> => ({
     'Something was added to the file after it was sealed, so it is not the original.',
   multiple_signatures: `The file carries more than one signature; only a single seal from ${by} is accepted.`,
   untrusted_signer: `The seal is intact but was made by a different certificate, not by ${by}.`,
+  earlier_signature_invalid:
+    'A signature made before the seal, such as the Aadhaar eSign, is broken: that part of the file was changed.',
 });
 
 /** One plain sentence on what a seal check found, for the person who dropped the file. */
-export function verifySummary(valid: boolean, reason: string | null, scope: VerifyScope): string {
+export function verifySummary(
+  valid: boolean,
+  reason: string | null,
+  scope: VerifyScope,
+  signatures: { seal?: 'operator' | 'provider_only'; earlier?: number } = {},
+): string {
   const by = SEALER[scope];
+  if (valid && signatures.seal === 'provider_only') {
+    return `Authentic. This is exactly the file the eSign provider signed for a document completed by ${by}. The provider locked it against further signatures, so it carries no seal from here and is recognised by its fingerprint in the audit trail.`;
+  }
+  if (valid && signatures.earlier) {
+    return `Authentic. This is exactly the document sealed by ${by}, unchanged since. The signature made before the seal, such as an Aadhaar eSign, is intact too.`;
+  }
   if (valid) return `Authentic. This is exactly the document sealed by ${by}, unchanged since.`;
   if (reason === 'unreadable') {
     return 'The file could not be read as a PDF, so its seal cannot be checked.';
@@ -138,17 +166,30 @@ export async function verifyUpload(
   }
   const fingerprint = installSealCertificate().sha256;
   try {
-    const result = await verify(bytes, { trust: { fingerprints: [fingerprint] } });
+    const result = await verify(bytes, {
+      trust: { fingerprints: [fingerprint] },
+      allowEarlierSignatures: true,
+    });
+    const earlier = (result.earlierSignatures ?? []).map((signature) => ({
+      valid: signature.valid,
+      signer: signature.signer?.commonName ?? null,
+      issuer: signature.issuer?.commonName ?? null,
+      signedAt: signature.signedAt ?? null,
+    }));
     const signer = [result.signer?.commonName, result.signer?.organization]
       .filter(Boolean)
       .join(', ');
     return {
       valid: result.valid,
-      summary: verifySummary(result.valid, result.reason ?? null, scope),
+      summary: verifySummary(result.valid, result.reason ?? null, scope, {
+        earlier: earlier.length,
+      }),
       reason: result.reason ?? null,
       signer: signer || null,
       signedAt: result.signedAt ?? null,
       sha256,
+      seal: 'operator',
+      earlier,
     };
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -159,6 +200,8 @@ export async function verifyUpload(
       signer: null,
       signedAt: null,
       sha256,
+      seal: 'operator',
+      earlier: [],
     };
   }
 }

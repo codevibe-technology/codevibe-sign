@@ -161,7 +161,7 @@ export function signApi(principal: Principal) {
       json<SealCheck>(
         await call(`${envelope(id)}/documents/${encodeURIComponent(documentId)}/verification`),
       ),
-    document: (id: string, documentId: string, version?: 'original' | 'sealed') =>
+    document: (id: string, documentId: string, version?: 'original' | 'sealed' | 'certificate') =>
       call(
         `${envelope(id)}/documents/${encodeURIComponent(documentId)}${version ? `?version=${version}` : ''}`,
       ),

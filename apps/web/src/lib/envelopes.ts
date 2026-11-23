@@ -209,6 +209,26 @@ export function eventDetail(event: Pick<AuditEvent, 'action' | 'data'>): EventDe
   const byLine = by ? ` by ${by}` : '';
   const base = actionLabel(event.action);
   switch (event.action) {
+    case 'recipient.esign_started': {
+      const provider = text(event.data?.provider);
+      return { label: provider ? `${base} with ${esignProviderName(provider)}` : base };
+    }
+    case 'recipient.esign_failed': {
+      const reason = text(event.data?.reason);
+      const why = reason ? ESIGN_FAILURE_REASONS[reason] : null;
+      return { label: base, ...(why ? { note: `Nothing was signed: ${why}.` } : {}) };
+    }
+    case 'recipient.signed': {
+      const provider = text(event.data?.provider);
+      return event.data?.method === 'aadhaar_esign'
+        ? {
+            label: `Signed with Aadhaar eSign${provider ? ` (via ${esignProviderName(provider)})` : ''}`,
+            ...(text(event.data?.signerName)
+              ? { note: `Name on the signing certificate: ${text(event.data?.signerName)}` }
+              : {}),
+          }
+        : { label: base };
+    }
     case 'recipient.link_shared':
       return { label: `${base}${byLine}` };
     case 'recipient.corrected': {

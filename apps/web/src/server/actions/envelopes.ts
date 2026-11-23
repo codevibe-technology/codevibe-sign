@@ -6,7 +6,7 @@ import { can, canVoidEnvelope } from '@/lib/roles';
 import { db } from '../db';
 import { findSealedDocument, recordSender, sentBy } from '../envelopes';
 import { AppError } from '../errors';
-import { inspectUpload, verifyUpload } from '../pdf';
+import { inspectUpload, verifySummary, verifyUpload } from '../pdf';
 import { assertWithin, workspacePlan } from '../plans';
 import { signApi, userPrincipal } from '../sign/api';
 import { workspaceAction, type ActionContext } from './action';
@@ -102,10 +102,21 @@ export const verifyDocumentAction = workspaceAction(
   'envelopes.read',
   z.object({ file: pdfFile }),
   async (ctx, input) => {
-    const outcome = await verifyUpload(new Uint8Array(await input.file.arrayBuffer()));
-    const match = outcome.valid
-      ? await findSealedDocument(db(), ctx.workspace.id, outcome.sha256)
-      : null;
+    const checked = await verifyUpload(new Uint8Array(await input.file.arrayBuffer()));
+    const found = await findSealedDocument(db(), ctx.workspace.id, checked.sha256);
+    // A file an eSign provider locked carries no seal of ours; its fingerprint in the audit
+    // trail is what shows it is the signed document.
+    const outcome =
+      !checked.valid && found?.providerOnly
+        ? {
+            ...checked,
+            valid: true,
+            reason: null,
+            seal: 'provider_only' as const,
+            summary: verifySummary(true, null, 'workspace', { seal: 'provider_only' }),
+          }
+        : checked;
+    const match = outcome.valid && found ? found : null;
     return { ...outcome, fileName: input.file.name, envelope: match };
   },
 );

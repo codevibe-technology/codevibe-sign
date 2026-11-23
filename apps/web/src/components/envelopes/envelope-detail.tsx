@@ -15,7 +15,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { copyMailLine, type CopyMailStatus } from '@/lib/mail-log';
-import { AUTH_LABELS, ROLE_OPTIONS, actionLabel, actionTone, eventDetail } from '@/lib/envelopes';
+import {
+  AUTH_LABELS,
+  ROLE_OPTIONS,
+  actionLabel,
+  actionTone,
+  authLabel,
+  eventDetail,
+} from '@/lib/envelopes';
 import type { CertificateView, SealCheck } from '@/server/sign/api';
 import { CorrectRecipientButton, ShareLinkButton } from './recipient-fixes';
 import { RemindButton } from './remind-button';
@@ -80,15 +87,18 @@ export function DocumentsCard({
   checks: Record<string, SealCheck | null>;
 }) {
   const completed = envelope.status === 'completed';
+  const esigned = envelope.recipients.some((r) => r.auth === 'aadhaar');
   const base = `/dashboard/${slug}/envelopes/${envelope.id}/documents`;
   return (
     <Card>
       <CardHeader
         title="Documents"
         description={
-          completed
-            ? 'The signed copies carry a digital seal and a certificate page.'
-            : 'The files as they were uploaded.'
+          completed && esigned
+            ? 'The signed copy carries the Aadhaar eSign and a digital seal over it. Its signing certificate is a file of its own, because nothing can be added to a file after an Aadhaar eSign.'
+            : completed
+              ? 'The signed copies carry a digital seal and a certificate page.'
+              : 'The files as they were uploaded.'
         }
       />
       <ul className="divide-y divide-line">
@@ -110,6 +120,14 @@ export function DocumentsCard({
                   <a href={`${base}/${d.id}?version=sealed`}>
                     <Download aria-hidden className="h-4 w-4" />
                     Signed PDF
+                  </a>
+                </Button>
+              ) : null}
+              {completed && esigned && checks[d.id] ? (
+                <Button asChild size="sm" variant="secondary">
+                  <a href={`${base}/${d.id}?version=certificate`}>
+                    <Download aria-hidden className="h-4 w-4" />
+                    Certificate
                   </a>
                 </Button>
               ) : null}
@@ -183,13 +201,20 @@ export function RecipientsCard({
                 <p className="truncate font-semibold">
                   {r.name}
                   <span className="ml-2 font-mono text-[10.5px] font-medium tracking-[0.06em] text-muted uppercase">
-                    {ROLE_LABEL[r.role]} · {AUTH_LABELS[r.auth]}
+                    {ROLE_LABEL[r.role]} · {authLabel(r)}
                   </span>
                 </p>
                 <p className="truncate text-sm text-muted">
                   {r.email}
                   {r.phone ? ` · ${r.phone}` : ''}
                 </p>
+                {r.esign && !acted && r.esign.status !== 'signed' ? (
+                  <p className="mt-1 text-sm text-muted" data-testid={`esign-state-${r.id}`}>
+                    {r.esign.status === 'pending'
+                      ? 'At the eSign provider now, confirming with an Aadhaar one-time code.'
+                      : 'The last Aadhaar eSign did not finish. They can start again from their link.'}
+                  </p>
+                ) : null}
                 {r.declineReason ? (
                   <p className="mt-1 text-sm text-danger">Reason: {r.declineReason}</p>
                 ) : null}
@@ -272,7 +297,10 @@ export function Timeline({
           .reverse()
           .map((e) => {
             const who = name(e.recipientId);
-            const reason = typeof e.data?.reason === 'string' ? e.data.reason : null;
+            const reason =
+              typeof e.data?.reason === 'string' && !e.action.startsWith('recipient.esign_')
+                ? e.data.reason
+                : null;
             const detail = eventDetail(e);
             return (
               <li

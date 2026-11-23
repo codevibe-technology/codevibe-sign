@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { LocalTime } from '@/components/ui/local-time';
 import { cn } from '@/lib/cn';
 import {
-  AUTH_LABELS,
+  authLabel,
   RECIPIENT_STATUS_LABELS,
   RECIPIENT_STATUS_TONES,
   STATUS_LABELS,
@@ -157,7 +157,7 @@ export function PublicRecord({ view }: { view: PublicRecordView }) {
                   {[
                     ROLE_LABELS[signer.role],
                     signer.contact,
-                    signer.role === 'viewer' ? null : AUTH_LABELS[signer.auth],
+                    signer.role === 'viewer' ? null : authLabel(signer),
                   ]
                     .filter(Boolean)
                     .join(' · ')}

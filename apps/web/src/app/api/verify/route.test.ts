@@ -92,6 +92,8 @@ describe('POST /api/verify', () => {
         signer: 'Codevibe Sign Seal, Codevibe',
         signedAt: '2026-11-20T10:05:01.000Z',
         sha256: 'abc',
+        seal: 'operator',
+        earlier: [],
         fileName: 'offer.pdf',
         evidence: {
           title: 'Offer letter',
