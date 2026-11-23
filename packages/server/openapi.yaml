@@ -70,6 +70,8 @@ servers:
       baseUrl:
         default: http://localhost:3000
         description: Where the server listens, without a trailing slash.
+  - url: https://sign.codevibe.in/api
+    description: Codevibe Sign cloud, with an API key from your workspace settings
 tags:
   - name: Envelopes
     description: Create, change, send and withdraw envelopes. Sender API key required.
