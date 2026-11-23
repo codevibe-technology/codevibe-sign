@@ -801,6 +801,7 @@ describe.skipIf(!url)('against PostgreSQL', () => {
         envelopeId: mine.id,
         title: 'Yours',
         documentName: 'offer.pdf',
+        providerOnly: false,
       });
       expect(await findSealedDocument(sql, other.id, sha)).toBeNull();
       expect(await findSealedDocument(sql, ws.id, 'd'.repeat(64))).toBeNull();
