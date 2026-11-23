@@ -129,9 +129,12 @@ async function recordFailure(
   });
 }
 
+/** Compares by field and value only: a store may hand objects back with their keys reordered. */
 const sameValues = (a: FieldValue[], b: FieldValue[]) => {
   const key = (values: FieldValue[]) =>
-    JSON.stringify([...values].sort((x, y) => x.fieldId.localeCompare(y.fieldId)));
+    JSON.stringify(
+      values.map((v) => [v.fieldId, v.value] as const).sort(([x], [y]) => x.localeCompare(y)),
+    );
   return key(a) === key(b);
 };
 
