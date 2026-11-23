@@ -258,12 +258,12 @@ describe('step 2: recipients', () => {
     await user.type(names[1]!, 'Ravi Kumar');
     await user.click(screen.getByRole('button', { name: 'Move Ravi Kumar up' }));
     const items = within(screen.getByRole('list', { name: 'Recipients' })).getAllByRole('listitem');
-    expect(items[0]).toHaveTextContent('1Ravi Kumar');
-    expect(items[1]).toHaveTextContent('2Asha Rao');
+    expect(items[0]).toHaveTextContent(/^1RKRavi Kumar/);
+    expect(items[1]).toHaveTextContent(/^2ARAsha Rao/);
     await user.click(screen.getByLabelText(/Everyone at once/));
     expect(
       within(screen.getByRole('list', { name: 'Recipients' })).getAllByRole('listitem')[0],
-    ).toHaveTextContent('•Ravi Kumar');
+    ).toHaveTextContent(/^RKRavi Kumar/);
   });
 });
 

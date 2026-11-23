@@ -6,6 +6,7 @@ import { CircleAlert } from 'lucide-react';
 import { useMemo } from 'react';
 import { usePdfjs } from '@/components/pdf/use-pdfjs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/cn';
 import type { DraftDocument, DraftRecipient, Problems } from '@/lib/send-flow';
 
 const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
@@ -18,7 +19,11 @@ const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
   status: 'pending',
 });
 
-/** Step 3: drop signature, date and other fields on the pages, in each recipient's colour. */
+/**
+ * Step 3: drop signature, date and other fields on the pages, in each recipient's colour.
+ * `fill` takes all the room its parent gives it (the full-screen send flow); `card` sits in a
+ * page as a bordered box (the template editor).
+ */
 export function StepFields({
   documents,
   documentUrl,
@@ -26,6 +31,9 @@ export function StepFields({
   fields,
   problems,
   onChange,
+  layout = 'card',
+  previewing,
+  onPreviewingChange,
 }: {
   documents: DraftDocument[];
   documentUrl: (documentId: string) => string;
@@ -33,6 +41,9 @@ export function StepFields({
   fields: Field[];
   problems: Problems;
   onChange: (fields: Field[]) => void;
+  layout?: 'card' | 'fill';
+  previewing?: boolean;
+  onPreviewingChange?: (previewing: boolean) => void;
 }) {
   const pdf = usePdfjs();
   const viewerDocuments = useMemo<ViewerDocument[]>(
@@ -42,16 +53,25 @@ export function StepFields({
   const people = useMemo(() => recipients.map(asRecipient), [recipients]);
 
   const alerts = Object.entries(problems).filter(([key]) => key.startsWith('fields.'));
+  const fill = layout === 'fill';
 
   return (
-    <div className="space-y-3">
+    <div className={cn('flex flex-col', fill ? 'md:h-full md:min-h-0' : 'gap-3')}>
       {alerts.length > 0 ? (
-        <div className="flex flex-col gap-1.5">
+        <div
+          className={cn(
+            'flex flex-col gap-1.5',
+            fill && 'border-b border-danger/30 bg-danger-soft px-4 py-2',
+          )}
+        >
           {alerts.map(([key, message]) => (
             <p
               key={key}
               role="alert"
-              className="flex items-center gap-2 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger"
+              className={cn(
+                'flex items-center gap-2 text-sm text-danger',
+                !fill && 'rounded-md border border-danger/30 bg-danger-soft px-3 py-2',
+              )}
             >
               <CircleAlert aria-hidden className="h-4 w-4 shrink-0" />
               {message}
@@ -59,7 +79,14 @@ export function StepFields({
           ))}
         </div>
       ) : null}
-      <div className="cvs-app overflow-hidden rounded-xl border border-line bg-surface shadow-card md:h-[calc(100dvh-18rem)] md:min-h-[520px]">
+      <div
+        className={cn(
+          'cvs-app bg-surface',
+          fill
+            ? 'md:min-h-0 md:flex-1 md:overflow-hidden'
+            : 'overflow-hidden rounded-xl border border-line shadow-card md:h-[calc(100dvh-18rem)] md:min-h-[560px]',
+        )}
+      >
         {pdf ? (
           <FieldPlacer
             documents={viewerDocuments}
@@ -68,6 +95,8 @@ export function StepFields({
             onChange={onChange}
             pdf={pdf}
             fieldTypes={['signature', 'initials', 'date_signed', 'name', 'text', 'checkbox']}
+            {...(previewing !== undefined ? { previewing } : {})}
+            {...(onPreviewingChange ? { onPreviewingChange } : {})}
           />
         ) : (
           <div role="status" aria-label="Loading the pages" className="space-y-3 p-6">
