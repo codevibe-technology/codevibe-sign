@@ -205,9 +205,10 @@ describe('the typefaces', () => {
   it('are not overridden by a font named in a component', () => {
     // A workspace may pick the font of its own signing page and emails; that list lives in
     // lib/brand.ts. Emails cannot load fonts, so their layout names system fallbacks after
-    // Inter. Everything else takes the tokens.
+    // Inter. The share image is drawn by next/og, which reads the font files it is given by name.
+    // Everything else takes the tokens.
     const allowed =
-      /(lib\/brand\.ts|lib\/brand-assets\.ts|lib\/email-layout\.ts|app\/globals\.css)$/;
+      /(lib\/brand\.ts|lib\/brand-assets\.ts|lib\/email-layout\.ts|app\/globals\.css|app\/share-image\.tsx)$/;
     const named = sources(join(web, 'src'))
       .filter((file) => !allowed.test(file))
       .flatMap((file) =>

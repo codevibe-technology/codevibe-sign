@@ -111,6 +111,8 @@ the minor version and says so in its first line.
   `pnpm assets:build`, from screenshots of the app with sample data.
 - The README shows the current app: a new banner and demo, the plans, Aadhaar eSign, and the
   verify page with the published seal certificate. The package banners share one style.
+- The home page share card uses the hero's headline and claims in Space Grotesk and Inter, with
+  the current dashboard.
 
 ---
 

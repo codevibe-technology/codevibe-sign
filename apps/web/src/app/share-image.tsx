@@ -10,17 +10,31 @@ export const shareSize = { width: 1200, height: 630 };
 const INK = '#0F172A';
 const MUTED = '#5A6980';
 
-/** The four claims under the promise, each in its own colour, as the home page shows them. */
-const PILLS = [
-  { label: 'PAdES seal', bg: '#E6EFFC', fg: '#1860D0' },
-  { label: 'Audit trail', bg: '#DDF7F2', fg: '#0E7466' },
-  { label: 'Aadhaar eSign', bg: '#FDEDE3', fg: '#B4471A' },
-  { label: 'Open source', bg: '#F1E8FB', fg: '#7A35B5' },
+/** The four claims above the promise, each after its own dot, as the home page hero shows them. */
+const CLAIMS = [
+  { label: 'PDF e-signatures', dot: '#1B6AE0' },
+  { label: 'Aadhaar eSign', dot: '#E07A1F' },
+  { label: 'API and webhooks', dot: '#8A3FC2' },
+  { label: 'Self-host', dot: '#12A08A' },
 ];
+
+/** The brand faces as files next/og can read: Inter for the text, Space Grotesk Bold for the promise. */
+async function fonts() {
+  const dir = join(process.cwd(), 'assets/fonts');
+  const [display, text] = await Promise.all([
+    readFile(join(dir, 'SpaceGrotesk-Bold.ttf')),
+    readFile(join(dir, 'Inter-Regular.ttf')),
+  ]);
+  return [
+    { name: 'Inter', data: text, weight: 400 as const, style: 'normal' as const },
+    { name: 'Space Grotesk', data: display, weight: 700 as const, style: 'normal' as const },
+  ];
+}
 
 /**
  * The card shown when the home page is shared, in the light style of the site: the logo, the
- * promise, four claims and the real app in a browser frame. Rendered once at build time.
+ * hero's four claims, the promise and the real dashboard in a browser frame. Rendered once at
+ * build time.
  */
 export async function shareImage() {
   const shot = await readFile(join(process.cwd(), 'src/app/share-shot.jpg'));
@@ -48,7 +62,7 @@ export async function shareImage() {
             flexDirection: 'column',
             justifyContent: 'space-between',
             padding: '60px 0 60px 64px',
-            width: 640,
+            width: 660,
           }}
         >
           <img
@@ -57,45 +71,52 @@ export async function shareImage() {
             width={Math.round((LOCKUP.width * 46) / LOCKUP.height)}
             height={46}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            <div style={{ display: 'flex', gap: 16, fontSize: 17 }}>
+              {CLAIMS.map((claim) => (
+                <div key={claim.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 9, height: 9, borderRadius: 9, background: claim.dot }} />
+                  {claim.label}
+                </div>
+              ))}
+            </div>
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                fontSize: 54,
+                fontFamily: 'Space Grotesk',
+                fontSize: 52,
                 fontWeight: 700,
-                lineHeight: 1.04,
-                letterSpacing: '-0.03em',
+                lineHeight: 1.06,
+                letterSpacing: '-0.035em',
               }}
             >
               <span>Get documents signed.</span>
               <span style={{ color: BRAND_COLORS.blue }}>Keep the proof.</span>
             </div>
-            <div style={{ fontSize: 25, color: MUTED, lineHeight: 1.4 }}>
-              Signed on any phone, sealed with a certificate anyone can check. Aadhaar eSign built
-              in.
+            <div style={{ fontSize: 21, color: MUTED, lineHeight: 1.45 }}>
+              Send a PDF, people sign on any phone, and you get back a sealed PDF with a certificate
+              anyone can check.
             </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 18, fontWeight: 600 }}>
-            {PILLS.map((pill) => (
-              <div
-                key={pill.label}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: 999,
-                  background: pill.bg,
-                  color: pill.fg,
-                }}
-              >
-                {pill.label}
-              </div>
-            ))}
+          <div
+            style={{
+              display: 'flex',
+              alignSelf: 'flex-start',
+              padding: '10px 20px',
+              borderRadius: 999,
+              background: BRAND_COLORS.navy,
+              color: '#E2E8F0',
+              fontSize: 18,
+            }}
+          >
+            <span style={{ color: '#7CF0DF', marginRight: 10 }}>$</span>npm i codevibe-sign
           </div>
         </div>
         <div
           style={{
             position: 'absolute',
-            left: 700,
+            left: 728,
             top: 140,
             display: 'flex',
             flexDirection: 'column',
@@ -124,6 +145,6 @@ export async function shareImage() {
         </div>
       </div>
     ),
-    shareSize,
+    { ...shareSize, fonts: await fonts() },
   );
 }
