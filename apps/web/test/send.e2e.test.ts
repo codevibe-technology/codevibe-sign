@@ -33,6 +33,7 @@ vi.mock('@/server/auth/guards', () => ({
     state.user && slug === WORKSPACE.slug && state.roles[state.user.id]
       ? { workspace: WORKSPACE, role: state.roles[state.user.id], user: state.user }
       : null,
+  workspaceNotFound: async () => new Response('Not found', { status: 404 }),
 }));
 vi.mock('@/server/envelopes', async (original) => ({
   ...(await original<typeof import('@/server/envelopes')>()),

@@ -1,4 +1,4 @@
-import { findWorkspaceAccess } from '@/server/auth/guards';
+import { findWorkspaceAccess, workspaceNotFound } from '@/server/auth/guards';
 import { signApi, userPrincipal } from '@/server/sign/api';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const { slug, id, docId } = await params;
   const access = await findWorkspaceAccess(slug);
-  if (!access) return new Response('Not found', { status: 404 });
+  if (!access) return workspaceNotFound(request, slug);
   const version = new URL(request.url).searchParams.get('version');
   const res = await signApi(userPrincipal(access.user.id, access.workspace.id, true)).document(
     id,

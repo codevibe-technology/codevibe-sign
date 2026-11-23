@@ -4,6 +4,8 @@ import type { Role } from '@/lib/roles';
 const state = vi.hoisted(() => ({
   user: null as { id: string } | null,
   role: null as Role | null,
+  moved: {} as Record<string, string>,
+  path: null as string | null,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -13,8 +15,13 @@ vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
     throw new Error(`REDIRECT ${to}`);
   },
+  permanentRedirect: (to: string) => {
+    throw new Error(`MOVED ${to}`);
+  },
 }));
-vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
+vi.mock('next/headers', () => ({
+  headers: async () => new Headers(state.path ? { 'x-cvs-path': state.path } : {}),
+}));
 vi.mock('./auth', () => ({
   auth: () => ({
     api: {
@@ -30,12 +37,18 @@ vi.mock('../workspaces', () => ({
       ? { workspace: { id: 'ws_1', slug: 'acme', name: 'Acme' }, role: state.role }
       : null,
 }));
+vi.mock('../workspace-address', async (original) => ({
+  ...(await original<typeof import('../workspace-address')>()),
+  movedAddress: async (_sql: unknown, _user: string, slug: string) => state.moved[slug] ?? null,
+}));
 
-const { requireWorkspace } = await import('./guards');
+const { requireWorkspace, workspaceNotFound } = await import('./guards');
 
 beforeEach(() => {
   state.user = { id: 'u1' };
   state.role = 'member';
+  state.moved = {};
+  state.path = null;
 });
 
 describe('requireWorkspace', () => {
@@ -66,5 +79,44 @@ describe('requireWorkspace', () => {
       workspace: { slug: 'acme' },
       role: 'member',
     });
+  });
+
+  it('sends a member from an old address to the same page at the new one', async () => {
+    state.moved = { 'acme-old': 'acme' };
+    state.path = '/dashboard/acme-old/envelopes/env_1?tab=activity';
+    await expect(requireWorkspace('acme-old')).rejects.toThrow(
+      'MOVED /dashboard/acme/envelopes/env_1?tab=activity',
+    );
+  });
+
+  it('falls back to the workspace home when the path does not match', async () => {
+    state.moved = { 'acme-old': 'acme' };
+    state.path = '/elsewhere';
+    await expect(requireWorkspace('acme-old')).rejects.toThrow('MOVED /dashboard/acme');
+    state.path = null;
+    await expect(requireWorkspace('acme-old')).rejects.toThrow('MOVED /dashboard/acme');
+  });
+});
+
+describe('workspaceNotFound', () => {
+  const request = (path: string) => new Request(`http://localhost${path}`);
+
+  it('redirects a member from an old address with 308', async () => {
+    state.moved = { 'acme-old': 'acme' };
+    const response = await workspaceNotFound(
+      request('/dashboard/acme-old/envelopes/env_1/documents/d1?version=sealed'),
+      'acme-old',
+    );
+    expect(response.status).toBe(308);
+    expect(response.headers.get('location')).toBe(
+      '/dashboard/acme/envelopes/env_1/documents/d1?version=sealed',
+    );
+  });
+
+  it('answers 404 to people signed out or outside the workspace', async () => {
+    expect((await workspaceNotFound(request('/dashboard/x/y'), 'x')).status).toBe(404);
+    state.user = null;
+    state.moved = { x: 'acme' };
+    expect((await workspaceNotFound(request('/dashboard/x/y'), 'x')).status).toBe(404);
   });
 });

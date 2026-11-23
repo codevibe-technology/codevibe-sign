@@ -6,6 +6,7 @@ const pdf = new TextEncoder().encode('%PDF-1.7');
 vi.mock('@/server/auth/guards', () => ({
   findWorkspaceAccess: async (slug: string) =>
     state.member && slug === 'acme' ? { workspace: { id: 'ws_1' }, role: 'viewer' } : null,
+  workspaceNotFound: async () => new Response('Not found', { status: 404 }),
 }));
 vi.mock('@/server/db', () => ({ db: () => ({}) }));
 vi.mock('@/server/runtime', () => ({ appRuntime: () => ({ files: {} }) }));
