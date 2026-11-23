@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Field, FieldType, Rect, Recipient } from '@codevibe_technology/sign-core';
-import type { PageSize } from '../geometry';
+import { clampRect, roundRect, type PageSize } from '../geometry';
 import {
   fieldGroups,
   initialsOnEveryPage,
@@ -49,11 +49,13 @@ export interface FieldPlacementState {
     documentId: string,
     page: number,
     center?: { x: number; y: number },
-    options?: { avoidOverlap?: boolean },
+    options?: { avoidOverlap?: boolean; label?: string },
   ) => Field | null;
   /** Moves a field to the rect's position, with snapping and clamping. */
   moveField: (id: string, rect: Rect) => void;
   resizeField: (id: string, width: number, height: number) => void;
+  /** Gives a field a new position and size, kept on its page. */
+  setFieldRect: (id: string, rect: Rect) => void;
   nudgeField: (id: string, key: ArrowKey, options?: { large?: boolean; resize?: boolean }) => void;
   updateField: (
     id: string,
@@ -62,6 +64,8 @@ export interface FieldPlacementState {
   removeField: (id: string) => void;
   /** Adds ready-made fields, for example placed from text tags. */
   addFields: (fields: Field[]) => void;
+  /** Replaces every field at once: undo, redo, paste and moves of several fields. */
+  setFields: (fields: Field[]) => void;
   /**
    * The linked copies a field belongs to (itself included): copies made by "Repeat on pages",
    * or a field moved away from its copies a moment ago. Empty when it stands alone.
@@ -175,7 +179,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
       documentId: string,
       page: number,
       center?: { x: number; y: number },
-      options: { avoidOverlap?: boolean } = {},
+      options: { avoidOverlap?: boolean; label?: string } = {},
     ) => {
       const size = pageSize(documentId, page);
       if (!size || !recipientId) return null;
@@ -186,7 +190,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
               .filter((f) => f.documentId === documentId && f.page === page)
               .map((f) => f.rect)
           : undefined;
-      const field = createField({
+      const created = createField({
         id: createId(),
         documentId,
         recipientId,
@@ -197,6 +201,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
         pageSize: size,
         ...(avoid ? { avoid } : {}),
       });
+      const field = options.label ? { ...created, label: options.label } : created;
       commit([...fieldsRef.current, field]);
       setSelectedId(field.id);
       return field;
@@ -217,6 +222,12 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
         rect: sizeRect(f.rect, width, height, page, minSize, snapThreshold),
       })),
     [update, minSize, snapThreshold],
+  );
+
+  const setFieldRect = useCallback(
+    (id: string, rect: Rect) =>
+      update(id, (f, page) => ({ ...f, rect: roundRect(clampRect(rect, page, minSize)) })),
+    [update, minSize],
   );
 
   const nudgeField = useCallback(
@@ -402,10 +413,12 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     addField,
     moveField,
     resizeField,
+    setFieldRect,
     nudgeField,
     updateField,
     removeField,
     addFields,
+    setFields: commit,
     groupOf,
     repeatField,
     setFieldPages,
