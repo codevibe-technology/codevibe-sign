@@ -2,7 +2,7 @@ import type { Field, FieldType, Rect } from '@codevibe_technology/sign-core';
 import type { TextItem } from '../pdf/types';
 
 /** Field types drawn as an image, which would hide whatever text lies under them. */
-export const OVERLAP_CHECKED_TYPES: readonly FieldType[] = ['signature', 'initials'];
+export const OVERLAP_CHECKED_TYPES: readonly FieldType[] = ['signature', 'initials', 'aadhaar'];
 
 /** Covering this share of a line's height, and at least two of its characters, hides it. */
 const MIN_HEIGHT_SHARE = 0.5;
@@ -36,7 +36,7 @@ export function coveredText(rect: Rect, items: TextItem[]): TextItem[] {
 }
 
 /**
- * Ids of signature and initials fields that sit over page text. `textOf` returns the text
+ * Ids of signature, initials and Aadhaar eSign fields that sit over page text. `textOf` returns the text
  * runs of a document's page, or undefined while they are not read yet.
  */
 export function fieldsOverText(
