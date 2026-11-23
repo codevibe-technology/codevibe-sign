@@ -1,10 +1,9 @@
 import { memoryRateLimiter } from '@codevibe_technology/sign-server';
 import { MAX_PDF_BYTES } from '@/lib/send-flow';
-import { db } from '@/server/db';
+import { SignError } from '@codevibe_technology/sign-core';
 import { env } from '@/server/env';
-import { AppError } from '@/server/errors';
-import { verifyUpload } from '@/server/pdf';
-import { sealedEvidence } from '@/server/public-verify';
+import { pageOutcome } from '@/server/public-verify';
+import { signServer } from '@/server/sign/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +29,31 @@ function clientKey(request: Request): string | null {
 
 const problem = (status: number, error: string) => Response.json({ ok: false, error }, { status });
 
+const MB = 1024 * 1024;
+
+/** A refusal of the sign server, in the page's words. */
+function refusal(err: SignError): Response {
+  switch (err.code) {
+    case 'DOCUMENT_TOO_LARGE':
+      return problem(
+        400,
+        `The file is larger than ${MAX_PDF_BYTES / MB} MB; sealed documents from Codevibe Sign on this site are smaller.`,
+      );
+    case 'DOCUMENT_INVALID':
+      return problem(400, 'That file is not a PDF. Drop the PDF you received after signing.');
+    case 'RATE_LIMITED':
+      return problem(429, 'Many files are being checked right now. Try again in a moment.');
+    default:
+      return problem(409, err.message);
+  }
+}
+
 /**
- * The public verify page posts a PDF here. The file is read in memory, checked against this
- * install's seal certificate and dropped; nothing about it is written anywhere. When the
- * seal is valid and the file is one this install sealed, the signers and the audit trail
- * come back too: the same facts the certificate page inside the file already shows.
+ * The public verify page posts a PDF here. The check itself is the sign server's, the same one
+ * behind `POST /api/v1/verify`: the file is read in memory, checked against this install's
+ * seal certificate and dropped; nothing about it is written anywhere. When the seal is valid
+ * and the file is one this install sealed, the signers and the audit trail come back too:
+ * the same facts the certificate page inside the file already shows.
  */
 export async function POST(request: Request) {
   const key = clientKey(request);
@@ -59,14 +78,13 @@ export async function POST(request: Request) {
   }
   if (!(file instanceof File)) return problem(400, 'Choose a PDF file to check.');
   try {
-    const outcome = await verifyUpload(new Uint8Array(await file.arrayBuffer()), 'install');
-    const evidence = outcome.valid ? await sealedEvidence(db(), outcome.sha256) : null;
+    const result = await signServer().verifyPdf(new Uint8Array(await file.arrayBuffer()));
     return Response.json({
       ok: true,
-      data: { ...outcome, fileName: file.name.slice(0, 200), evidence },
+      data: { ...pageOutcome(result), fileName: file.name.slice(0, 200) },
     });
   } catch (err) {
-    if (err instanceof AppError) return problem(err.code === 'VALIDATION' ? 400 : 409, err.message);
+    if (err instanceof SignError) return refusal(err);
     console.error('[verify] failed', err instanceof Error ? err.message : err);
     return problem(500, 'Something went wrong on our side. Try again in a moment.');
   }

@@ -1,18 +1,12 @@
 import 'server-only';
-import {
-  verifyChain,
-  type AuditAction,
-  type AuditEvent,
-  type AuthMethod,
-  type Envelope,
-  type RecipientRole,
-  type RecipientStatus,
+import type {
+  AuditAction,
+  AuthMethod,
+  RecipientRole,
+  RecipientStatus,
 } from '@codevibe_technology/sign-core';
-import { nodeHasher } from '@codevibe_technology/sign-server';
-import type postgres from 'postgres';
-import { maskEmail, maskPhone } from '@codevibe_technology/sign-pdf';
-
-type Sql = postgres.Sql | postgres.TransactionSql;
+import type { PublicVerification } from '@codevibe_technology/sign-server';
+import { verifySummary, type VerifyOutcome } from './pdf';
 
 export interface EvidenceRecipient {
   name: string;
@@ -46,56 +40,34 @@ export interface SealedEvidence {
   chain: { valid: boolean; head: string | null; events: number };
 }
 
-/** The sealed document with exactly this SHA-256, in any workspace of the install, with its trail. */
-export async function sealedEvidence(sql: Sql, sha256: string): Promise<SealedEvidence | null> {
-  const rows = await sql<{ envelope: Envelope; document_id: string }[]>`
-    select env.data as envelope, e.data->'data'->>'documentId' as document_id
-    from sign_audit_events e join sign_envelopes env on env.id = e.envelope_id
-    where e.data->>'action' = 'document.sealed'
-      and e.data->'data'->>'sha256' = ${sha256}
-    limit 1`;
-  const row = rows[0];
-  if (!row) return null;
-  const events = (
-    await sql<{ data: AuditEvent }[]>`
-      select data from sign_audit_events where envelope_id = ${row.envelope.id} order by seq`
-  ).map((r) => r.data);
-  return evidenceFrom(row.envelope, row.document_id, events);
-}
-
-export async function evidenceFrom(
-  envelope: Envelope,
-  documentId: string,
-  events: AuditEvent[],
-): Promise<SealedEvidence> {
-  const chain = await verifyChain(events, nodeHasher, {
-    envelopeId: envelope.id,
-    ...(envelope.auditHead ? { expectedHead: envelope.auditHead } : {}),
-  });
-  const names = new Map(envelope.recipients.map((r) => [r.id, r.name]));
+/**
+ * The answer of the sign server's public verification, the one `POST /api/v1/verify` gives,
+ * in the words and shape of the verify page.
+ */
+export function pageOutcome(
+  result: PublicVerification,
+): VerifyOutcome & { evidence: SealedEvidence | null } {
+  const signer = [result.signer?.commonName, result.signer?.organization]
+    .filter(Boolean)
+    .join(', ');
+  const { envelope } = result;
   return {
-    title: envelope.title,
-    documentName: envelope.documents.find((d) => d.id === documentId)?.name ?? 'Document',
-    sentAt: envelope.sentAt ?? null,
-    completedAt: envelope.completedAt ?? null,
-    recipients: envelope.recipients.map((r) => ({
-      name: r.name,
-      contact: r.email ? maskEmail(r.email) : r.phone ? maskPhone(r.phone) : null,
-      role: r.role,
-      status: r.status,
-      auth: r.auth,
-      actedAt: r.actedAt ?? null,
-    })),
-    events: events.map((e) => ({
-      seq: e.seq,
-      action: e.action,
-      at: e.at,
-      recipient: e.recipientId ? (names.get(e.recipientId) ?? null) : null,
-    })),
-    chain: {
-      valid: chain.valid,
-      head: chain.valid ? chain.head : null,
-      events: events.length,
-    },
+    valid: result.valid,
+    summary: verifySummary(result.valid, result.reason, 'install'),
+    reason: result.reason,
+    signer: signer || null,
+    signedAt: result.signedAt,
+    sha256: result.sha256,
+    evidence: envelope
+      ? {
+          title: envelope.title,
+          documentName: envelope.documentName,
+          sentAt: envelope.sentAt,
+          completedAt: envelope.completedAt,
+          recipients: envelope.recipients,
+          events: envelope.events,
+          chain: envelope.chain,
+        }
+      : null,
   };
 }

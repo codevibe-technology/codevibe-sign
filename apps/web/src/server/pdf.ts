@@ -105,6 +105,16 @@ const reasons = (by: string): Record<string, string> => ({
   untrusted_signer: `The seal is intact but was made by a different certificate, not by ${by}.`,
 });
 
+/** One plain sentence on what a seal check found, for the person who dropped the file. */
+export function verifySummary(valid: boolean, reason: string | null, scope: VerifyScope): string {
+  const by = SEALER[scope];
+  if (valid) return `Authentic. This is exactly the document sealed by ${by}, unchanged since.`;
+  if (reason === 'unreadable') {
+    return 'The file could not be read as a PDF, so its seal cannot be checked.';
+  }
+  return reasons(by)[reason ?? ''] ?? 'The seal could not be confirmed.';
+}
+
 /** Checks that `bytes` is a file this install sealed and that nothing changed since. */
 export async function verifyUpload(
   bytes: Uint8Array,
@@ -134,9 +144,7 @@ export async function verifyUpload(
       .join(', ');
     return {
       valid: result.valid,
-      summary: result.valid
-        ? `Authentic. This is exactly the document sealed by ${by}, unchanged since.`
-        : (reasons(by)[result.reason ?? ''] ?? 'The seal could not be confirmed.'),
+      summary: verifySummary(result.valid, result.reason ?? null, scope),
       reason: result.reason ?? null,
       signer: signer || null,
       signedAt: result.signedAt ?? null,
@@ -146,7 +154,7 @@ export async function verifyUpload(
     if (err instanceof AppError) throw err;
     return {
       valid: false,
-      summary: 'The file could not be read as a PDF, so its seal cannot be checked.',
+      summary: verifySummary(false, 'unreadable', scope),
       reason: 'unreadable',
       signer: null,
       signedAt: null,
