@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { resolveDocsFile, serveDocs } from './docs';
+import { cleanDocsPath, resolveDocsFile, serveDocs } from './docs';
 
 describe('docs files', () => {
   let root: string;
@@ -39,6 +39,25 @@ describe('docs files', () => {
       join(root, 'guides', 'webhooks.html'),
     );
     expect(await resolveDocsFile(root, ['guides', 'nope'])).toBeNull();
+  });
+
+  it('names the clean address of a page asked for by its .html file', () => {
+    expect(cleanDocsPath(['guides', 'webhooks.html'])).toBe('/docs/guides/webhooks');
+    expect(cleanDocsPath(['getting-started.html'])).toBe('/docs/getting-started');
+    expect(cleanDocsPath(['index.html'])).toBe('/docs');
+    expect(cleanDocsPath(['guides', 'index.html'])).toBe('/docs/guides');
+    expect(cleanDocsPath(['guides', 'webhooks'])).toBeNull();
+    expect(cleanDocsPath(['assets', 'app.abc.js'])).toBeNull();
+    expect(cleanDocsPath(['404.html'])).toBeNull();
+    expect(cleanDocsPath([])).toBeNull();
+  });
+
+  it('sends .html addresses of existing pages on to the clean one, keeping the query', async () => {
+    const moved = await serveDocs(['guides', 'webhooks.html'], false, '?from=old');
+    expect(moved.status).toBe(308);
+    expect(moved.headers.get('location')).toBe('/docs/guides/webhooks?from=old');
+    expect((await serveDocs(['index.html'])).headers.get('location')).toBe('/docs');
+    expect((await serveDocs(['guides', 'nope.html'])).status).toBe(404);
   });
 
   it('never leaves the docs folder', async () => {

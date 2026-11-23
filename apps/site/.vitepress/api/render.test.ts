@@ -30,7 +30,7 @@ describe('the generated reference', () => {
     for (const resource of resources()) {
       expect(pages[`${REFERENCE_DIR}/${resource.slug}.md`], resource.name).toBeDefined();
       for (const op of resource.operations) {
-        expect(index).toContain(`/docs/${REFERENCE_DIR}/${resource.slug}.html#${op.anchor}`);
+        expect(index).toContain(`/docs/${REFERENCE_DIR}/${resource.slug}#${op.anchor}`);
       }
     }
   });

@@ -52,10 +52,33 @@ export async function resolveDocsFile(root: string, segments: string[]): Promise
   return null;
 }
 
-/** Serves the built docs site; assets are fingerprinted, so they are cached for a year. */
-export async function serveDocs(segments: string[], head = false): Promise<Response> {
+/**
+ * The clean address of a page asked for by its `.html` file, such as `/docs/guides/webhooks`
+ * for `guides/webhooks.html`, or null when the address is already clean. Pages are linked
+ * without `.html`, so older links land on the one address search engines know.
+ */
+export function cleanDocsPath(segments: string[]): string | null {
+  const last = segments.at(-1);
+  if (!last?.endsWith('.html') || (segments.length === 1 && last === '404.html')) return null;
+  const page = last.slice(0, -'.html'.length);
+  const path = page === 'index' ? segments.slice(0, -1) : [...segments.slice(0, -1), page];
+  return ['/docs', ...path].join('/');
+}
+
+/**
+ * Serves the built docs site; assets are fingerprinted, so they are cached for a year. A page
+ * asked for by its `.html` file is sent on to its clean address, keeping `search`.
+ */
+export async function serveDocs(segments: string[], head = false, search = ''): Promise<Response> {
   const root = docsDir();
   const file = await resolveDocsFile(root, segments);
+  const clean = file ? cleanDocsPath(segments) : null;
+  if (clean) {
+    return new Response(null, {
+      status: 308,
+      headers: { location: `${clean}${search}`, 'cache-control': 'public, max-age=3600' },
+    });
+  }
   const notFound = file ? null : join(root, '404.html');
   const path = file ?? notFound!;
   let body: Uint8Array;

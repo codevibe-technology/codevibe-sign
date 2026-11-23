@@ -99,8 +99,8 @@ const methodBadge = (method: string) =>
 
 export const pagePath = (resource: Pick<Resource, 'slug'>) => `/${REFERENCE_DIR}/${resource.slug}`;
 
-/** A link for raw HTML, which VitePress does not rewrite: with the base and the `.html` file. */
-const htmlHref = (path: string, anchor: string) => `${DOCS_BASE}${path.slice(1)}.html#${anchor}`;
+/** A link for raw HTML, which VitePress does not rewrite: with the base, as a clean URL. */
+const htmlHref = (path: string, anchor: string) => `${DOCS_BASE}${path.slice(1)}#${anchor}`;
 
 const fence = (lang: string, title: string, code: string) => {
   const ticks = code.includes('```') ? '````' : '```';

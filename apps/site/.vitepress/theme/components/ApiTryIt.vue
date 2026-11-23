@@ -120,7 +120,7 @@ async function copyResult() {
   }
 }
 
-const sandboxGuide = withBase('/http-api/sandbox.html');
+const sandboxGuide = withBase('/http-api/sandbox');
 </script>
 
 <template>

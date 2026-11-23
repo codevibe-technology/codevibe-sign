@@ -18,14 +18,16 @@ import {
 } from './site';
 
 /**
- * The docs are served by the web app under /docs. Folder index pages are written out as
- * `getting-started.html` and so on, so every page has one address with no trailing slash.
+ * The docs are served by the web app under /docs, with clean URLs: `/docs/guides/webhooks`
+ * is served from `guides/webhooks.html`, and the app sends `.html` addresses to the clean
+ * one. Folder index pages are written out as `getting-started.html` and so on, so every page
+ * has one address with no trailing slash.
  */
 const BASE = DOCS_BASE;
 const DOCS_URL = `${SITE_URL}${BASE}`;
 
 function pageUrl(relativePath: string): string {
-  const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html');
+  const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '');
   return withoutTrailingSlash(new URL(path, DOCS_URL).href);
 }
 
@@ -73,7 +75,7 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
     'http-api/reference/index.md': 'http-api/reference.md',
     'api/index.md': 'api.md',
   },
-  cleanUrls: false,
+  cleanUrls: true,
   lastUpdated: false,
   // Light until the reader picks dark with the switch; their pick is remembered.
   appearance: { initialValue: 'light' },
