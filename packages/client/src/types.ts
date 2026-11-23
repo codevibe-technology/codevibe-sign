@@ -190,6 +190,8 @@ export interface SigningSession {
   authenticated: boolean;
   /** False while earlier signers in a sequential envelope have not acted. */
   canAct: boolean;
+  /** IANA zone the signing date is printed in on the document, for example `Asia/Kolkata`. */
+  timeZone: string;
 }
 
 export interface OtpSent {

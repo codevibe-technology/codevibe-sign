@@ -42,7 +42,12 @@ describe('sender and signer clients against the server', () => {
 
     const signer = signerFor('asha@example.com');
     const session = await signer.session();
-    expect(session).toMatchObject({ otpRequired: true, authenticated: false, canAct: true });
+    expect(session).toMatchObject({
+      otpRequired: true,
+      authenticated: false,
+      canAct: true,
+      timeZone: 'UTC',
+    });
     expect(session.fields).toEqual([]);
     expect(session.documents).toEqual([]);
 
