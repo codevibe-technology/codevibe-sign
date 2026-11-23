@@ -2,9 +2,9 @@ import { writeFile } from 'node:fs/promises';
 import { createDevSeal } from '@codevibe_technology/sign-pdf';
 import { EXIT, fileProblem, painter, parse, rows, UsageError, type Command } from './io';
 
-const WARNING = `This certificate is self-signed, for development and testing only. Adobe Reader and
-other PDF readers show seals made with it as untrusted. In production, seal with a
-certificate issued by a certificate authority (a document signing or AATL certificate).`;
+const WARNING = `This certificate is self-signed, for development and testing only. PDF readers
+show seals made with it as untrusted. In production, seal with a certificate issued by a
+certificate authority (a document signing certificate).`;
 
 async function writeNew(path: string, data: Uint8Array | string, force: boolean): Promise<void> {
   try {
