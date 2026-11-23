@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, Fingerprint, Lock, PlugZap, ShieldCheck } from 'lucide-react';
+import { Check, Copy, FileCheck2, Fingerprint, Lock, PlugZap, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -358,6 +358,23 @@ export function EsignSettingsPanel({
               The signer types their Aadhaar number and one-time code on Leegality's page. Codevibe
               Sign never sees or stores an Aadhaar number.
             </p>
+            <p className="flex gap-2 text-[13px] text-muted" data-testid="esign-standard-flow">
+              <FileCheck2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Leegality places the Aadhaar signature where the Leegality workflow says; senders
+                place no box and the signer fills in nothing. Everyone then gets the signed PDF,
+                with the Aadhaar signature and the Codevibe Sign seal, and a separate certificate
+                and audit trail PDF.{' '}
+                <a
+                  className="font-semibold text-primary hover:underline"
+                  href="/docs/guides/aadhaar-leegality#set-the-signature-position"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Set the signature position
+                </a>
+              </span>
+            </p>
           </CardBody>
         </Card>
 
@@ -370,7 +387,12 @@ export function EsignSettingsPanel({
             <CardBody className="space-y-4">
               <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
                 <li>Choose Aadhaar eSign as the signature type for the invitee.</li>
-                <li>Place the signature box where the signature should appear.</li>
+                <li>
+                  Set the signature position for the invitee: Leegality places the Aadhaar signature
+                  where the workflow says. Codevibe Sign sends the document as you approved it and
+                  places no box; without a position Leegality signs at the bottom left of every
+                  page.
+                </li>
                 <li>
                   Under the invitee's custom URLs and webhooks, paste the two addresses below and
                   choose webhook version 2.5.

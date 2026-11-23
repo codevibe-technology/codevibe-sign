@@ -198,14 +198,14 @@ export function renderMail(
             ? 'The document signed with Aadhaar eSign and its certificate and audit trail could not be attached. Download them below and keep them for your records.'
             : `The signed copy could not be attached. Ask ${brand.company} for a copy.`
         : input.attached
-        ? input.auditTrail
-          ? 'The signed copy and its audit trail are attached. Keep them for your records.'
-          : 'The signed copy is attached. Keep it for your records.'
-        : downloads.length
           ? input.auditTrail
-            ? 'The signed copy and its audit trail could not be attached. Download them below and keep them for your records.'
-            : 'The signed copy could not be attached. Download it below and keep it for your records.'
-          : `The signed copy could not be attached. Ask ${brand.company} for a copy.`,
+            ? 'The signed copy and its audit trail are attached. Keep them for your records.'
+            : 'The signed copy is attached. Keep it for your records.'
+          : downloads.length
+            ? input.auditTrail
+              ? 'The signed copy and its audit trail could not be attached. Download them below and keep them for your records.'
+              : 'The signed copy could not be attached. Download it below and keep it for your records.'
+            : `The signed copy could not be attached. Ask ${brand.company} for a copy.`,
     );
   }
   if (kind === 'cancelled') paragraphs.push('Your signing link no longer works.');

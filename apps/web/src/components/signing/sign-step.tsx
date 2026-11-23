@@ -63,7 +63,7 @@ export function SignStep({
           }),
   };
   const hasDate = view.fields.some((f) => f.type === 'date_signed');
-  // The Aadhaar eSign box is signed at the provider, so it is not one of the fields to fill.
+  // An Aadhaar eSign box, on an envelope sent while it existed, is not one to fill.
   const fieldCount = view.fields.filter((f) => f.type !== 'aadhaar').length;
 
   return (
@@ -81,7 +81,7 @@ export function SignStep({
             {approver
               ? 'Read the document, then approve it or decline.'
               : aadhaar && fieldCount === 0
-                ? 'Read the document. The highlighted box is where your Aadhaar eSign goes.'
+                ? `Read the document, then continue. You sign it with Aadhaar eSign at ${provider}, which places your signature.`
                 : fieldCount === 1
                   ? 'Press Start to go to the highlighted field, then finish.'
                   : `Press Start and we take you to each of the ${fieldCount} highlighted fields in turn.`}{' '}

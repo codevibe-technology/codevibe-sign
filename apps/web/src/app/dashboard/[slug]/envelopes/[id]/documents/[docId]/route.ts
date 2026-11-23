@@ -4,8 +4,9 @@ import { signApi, userPrincipal } from '@/server/sign/api';
 export const dynamic = 'force-dynamic';
 
 /**
- * The original or sealed PDF, or the separate signing certificate of an envelope signed with
- * Aadhaar eSign (`?version=`), for members of the workspace only.
+ * The original or sealed PDF, the separate certificate and audit trail of an envelope signed
+ * with Aadhaar eSign, or the eSign provider's own audit trail (`?version=`), for members of
+ * the workspace only.
  */
 export async function GET(
   request: Request,
@@ -18,7 +19,10 @@ export async function GET(
   const res = await signApi(userPrincipal(access.user.id, access.workspace.id, true)).document(
     id,
     docId,
-    version === 'sealed' || version === 'original' || version === 'certificate'
+    version === 'sealed' ||
+      version === 'original' ||
+      version === 'certificate' ||
+      version === 'provider-audit-trail'
       ? version
       : undefined,
   );

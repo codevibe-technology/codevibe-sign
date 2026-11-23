@@ -1,5 +1,9 @@
 import 'server-only';
-import { auditTrailPdf, certificatePdf } from '@codevibe_technology/sign-pdf';
+import {
+  auditTrailPdf,
+  certificatePdf,
+  certificateWithAuditTrailPdf,
+} from '@codevibe_technology/sign-pdf';
 import type { PublicRecordView } from '@/lib/public-record';
 import { actionLabel } from '@/lib/envelopes';
 import { defaultTimeZone, env } from './env';
@@ -33,12 +37,23 @@ export const recordRefusal = (status: 404 | 429) =>
     },
   );
 
-/** The completion certificate as a PDF of its own: one page per document, no document. */
+/**
+ * The completion certificate as a PDF of its own: one page per document, no document. For an
+ * envelope signed with Aadhaar eSign, the certificate with the audit trail after it, as its
+ * parties have it.
+ */
 export async function certificateDownload(source: RecordSource): Promise<Response> {
   const config = env();
-  const bytes = await certificatePdf(
-    recordCertificates(source, config.APP_URL, defaultTimeZone(config)),
-  );
+  const certificates = recordCertificates(source, config.APP_URL, defaultTimeZone(config));
+  const esigned = certificates[0]?.esign ? certificates[0] : null;
+  if (esigned) {
+    return download(
+      Buffer.from(await certificateWithAuditTrailPdf(esigned)),
+      'application/pdf',
+      `certificate-and-audit-trail-${safeName(source.envelope.id)}.pdf`,
+    );
+  }
+  const bytes = await certificatePdf(certificates);
   return download(
     Buffer.from(bytes),
     'application/pdf',

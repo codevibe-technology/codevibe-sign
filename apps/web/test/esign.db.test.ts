@@ -124,6 +124,22 @@ function fakeLeegality(espP12: Uint8Array) {
         },
       });
     }
+    if (target.hostname === 'cdn.leegality.test') {
+      return new Response(new TextEncoder().encode(`%PDF-1.7\nLeegality audit trail ${id}\n`), {
+        headers: { 'content-type': 'application/pdf' },
+      });
+    }
+    if (
+      target.pathname.endsWith('/v3.1/document/fetchDocument') &&
+      document &&
+      target.searchParams.get('documentDownloadType') === 'AUDIT_TRAIL'
+    ) {
+      // Leegality answers with a short-lived link to the file.
+      return json({
+        status: 1,
+        data: { file: `https://cdn.leegality.test/trail?documentId=${id}` },
+      });
+    }
     if (target.pathname.endsWith('/v3.1/document/fetchDocument') && document) {
       calls.fetch += 1;
       const signed = await seal(document.uploaded, {
@@ -252,12 +268,6 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
             page: 0,
             rect: { x: 72, y: 500, width: 180, height: 48 },
           })),
-          {
-            recipient: 'r1',
-            type: 'aadhaar',
-            page: 0,
-            rect: { x: 72, y: 600, width: 200, height: 64 },
-          },
         ],
       }),
     );
@@ -421,13 +431,27 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         )
       ).json()) as { valid: boolean };
       expect(check.valid).toBe(true);
-      // One file: the page and the certificate page under the Aadhaar eSign and the seal.
-      expect((await PDFDocument.load(sealed!)).getPageCount()).toBe(2);
+      // Leegality got the one page with Meera's signature drawn on it and nothing added, and
+      // the seal added no page either.
+      expect((await PDFDocument.load(document.uploaded)).getPageCount()).toBe(1);
+      expect((await PDFDocument.load(sealed!)).getPageCount()).toBe(1);
       const certificate = await api(
         ws.key,
         `/v1/envelopes/${envelope.id}/documents/${done.documents[0]!.id}?version=certificate`,
       );
-      expect(certificate.status).toBe(409);
+      expect(certificate.status).toBe(200);
+      expect(decodeURIComponent(certificate.headers.get('content-disposition') ?? '')).toContain(
+        'Appointment letter (certificate and audit trail).pdf',
+      );
+      const evidence = await PDFDocument.load(new Uint8Array(await certificate.arrayBuffer()));
+      expect(evidence.getPageCount()).toBeGreaterThanOrEqual(2);
+      expect(evidence.getTitle()).toBe('Signing certificate and audit trail: Appointment letter');
+      const theirs = await api(
+        ws.key,
+        `/v1/envelopes/${envelope.id}/documents/${done.documents[0]!.id}?version=provider-audit-trail`,
+      );
+      expect(theirs.status).toBe(200);
+      expect(await theirs.text()).toContain(`Leegality audit trail ${document.id}`);
       const trail = await api(ws.key, `/v1/envelopes/${envelope.id}/audit-trail`);
       expect(trail.headers.get('content-type')).toBe('application/pdf');
       const completedCopy = mailer.sent.find(
@@ -435,8 +459,12 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       );
       expect(completedCopy?.attachments?.map((a) => a.filename)).toEqual([
         'letter.pdf',
-        'Appointment letter (audit trail).pdf',
+        'Appointment letter (certificate and audit trail).pdf',
+        'Appointment letter (Leegality audit trail).pdf',
       ]);
+      expect(completedCopy?.text).toContain(
+        'The document signed with Aadhaar eSign and its certificate and audit trail are attached.',
+      );
 
       const actions = (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'esign.' })).map(
         (row) => row.action,

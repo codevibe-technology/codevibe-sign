@@ -108,6 +108,27 @@ describe('renderMail', () => {
     expect(links).toContain('https://sign.example.com/c/2');
   });
 
+  it('names the certificate and audit trail of a document signed with Aadhaar eSign', () => {
+    const base = sampleInput('completed');
+    const text = (input: Partial<typeof base>) =>
+      renderMail('completed', { ...base, esign: true, ...input }, brand).text;
+    expect(text({})).toContain(
+      'The document signed with Aadhaar eSign and its certificate and audit trail are attached.',
+    );
+    expect(
+      text({
+        attached: false,
+        downloads: [
+          { name: 'offer.pdf', url: 'https://sign.example.com/c/1' },
+          {
+            name: 'Offer letter (certificate and audit trail).pdf',
+            url: 'https://sign.example.com/c/2',
+          },
+        ],
+      }),
+    ).toContain('could not be attached. Download them below');
+  });
+
   it('escapes everything that reaches the HTML', () => {
     const hostile = '<img src=x onerror=alert(1)>';
     const mail = renderMail(

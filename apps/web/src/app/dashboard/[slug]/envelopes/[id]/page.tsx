@@ -17,7 +17,7 @@ import { PublicRecordCard } from '@/components/envelopes/public-record-card';
 import { StatusPill } from '@/components/envelopes/status-pill';
 import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
-import { isFinalStatus, isOpen } from '@/lib/envelopes';
+import { eventDetail, isFinalStatus, isOpen } from '@/lib/envelopes';
 import { can, canVoidEnvelope } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
@@ -159,6 +159,13 @@ export default async function EnvelopePage({
             copyMail={copyMail}
             canShareLinks={open && can(role, 'links.share')}
             canCorrect={open && canWrite}
+            nameNotes={Object.fromEntries(
+              events.flatMap((e) => {
+                if (e.action !== 'recipient.esign_name_differs' || !e.recipientId) return [];
+                const note = eventDetail(e).note;
+                return note ? [[e.recipientId, note]] : [];
+              }),
+            )}
           />
           {can(role, 'workspace.manage') ? (
             <p className="-mt-3 text-right text-sm">
@@ -175,8 +182,21 @@ export default async function EnvelopePage({
             envelope={envelope}
             checks={checks}
             separateCertificates={events
-              .filter((e) => e.action === 'document.sealed' && e.data?.certificate === 'separate')
+              .filter(
+                (e) =>
+                  e.action === 'document.sealed' &&
+                  (e.data?.certificate === 'separate' ||
+                    e.data?.certificate === 'with_audit_trail'),
+              )
               .map((e) => String(e.data?.documentId ?? ''))}
+            withAuditTrail={events
+              .filter(
+                (e) => e.action === 'document.sealed' && e.data?.certificate === 'with_audit_trail',
+              )
+              .map((e) => String(e.data?.documentId ?? ''))}
+            providerAuditTrail={events.some(
+              (e) => e.action === 'recipient.signed' && e.data?.providerAuditTrail === true,
+            )}
           />
           {record && recordsOn && envelope.status === 'completed' ? (
             <PublicRecordCard

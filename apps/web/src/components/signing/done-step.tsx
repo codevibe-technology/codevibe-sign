@@ -88,10 +88,25 @@ export function DoneStep({
                   <Button asChild className="w-full">
                     <a href={receiptDocumentUrl(d.id)} download>
                       <Download aria-hidden className="h-4 w-4" />
-                      {receipt.documents.length === 1 ? 'Download your copy' : `Download ${d.name}`}
+                      {d.certificateWithAuditTrail
+                        ? 'Signed document (Aadhaar eSign)'
+                        : receipt.documents.length === 1
+                          ? 'Download your copy'
+                          : `Download ${d.name}`}
                     </a>
                   </Button>
-                  {d.certificate ? (
+                  {d.certificateWithAuditTrail ? (
+                    <Button asChild variant="secondary" className="mt-2 w-full">
+                      <a
+                        href={`${receiptDocumentUrl(d.id)}?file=certificate`}
+                        download
+                        data-testid="certificate-and-audit-trail-download"
+                      >
+                        <Download aria-hidden className="h-4 w-4" />
+                        Certificate and audit trail
+                      </a>
+                    </Button>
+                  ) : d.certificate ? (
                     <a
                       href={`${receiptDocumentUrl(d.id)}?file=certificate`}
                       download
@@ -103,7 +118,7 @@ export function DoneStep({
                 </li>
               ))}
             </ul>
-            {receipt.documents[0] ? (
+            {receipt.documents[0] && !receipt.documents.some((d) => d.certificateWithAuditTrail) ? (
               <a
                 href={`${receiptDocumentUrl(receipt.documents[0].id)}?file=audit-trail`}
                 download

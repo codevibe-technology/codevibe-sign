@@ -15,6 +15,7 @@ import {
   type SendFlowState,
   type StepKey,
 } from '@/lib/send-flow';
+import { AadhaarPlacementNote } from './aadhaar-note';
 import { RecipientAvatar, colorIndex } from './step-recipients';
 
 const ROLE_LABEL = Object.fromEntries(ROLE_OPTIONS.map((r) => [r.value, r.label]));
@@ -73,6 +74,7 @@ export function StepReview({
     : [...EXPIRY_OPTIONS, settings.expiresInDays].sort((a, b) => a - b);
   const pages = state.documents.reduce((n, d) => n + d.pages.length, 0);
   const actors = state.recipients.filter((r) => r.role !== 'viewer');
+  const esigner = state.recipients.find((r) => r.auth === 'aadhaar' && r.role === 'signer');
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
@@ -281,9 +283,8 @@ export function StepReview({
                 {state.recipients.map((r, i) => {
                   const own = state.fields.filter((f) => f.recipientId === r.id);
                   const required = own.filter((f) => f.required).length;
-                  const signs = own.some(
-                    (f) => f.type === (r.auth === 'aadhaar' ? 'aadhaar' : 'signature'),
-                  );
+                  const esign = r.auth === 'aadhaar';
+                  const signs = esign || own.some((f) => f.type === 'signature');
                   return (
                     <li
                       key={r.id}
@@ -302,16 +303,15 @@ export function StepReview({
                         <span className="block truncate text-[12.5px] text-muted">
                           {ROLE_LABEL[r.role]}
                           {r.role !== 'viewer' ? ` · ${AUTH_LABELS[r.auth]}` : ''}
-                          {r.role === 'signer' ? ` · ${required} required` : ''}
+                          {r.role === 'signer' && !esign ? ` · ${required} required` : ''}
+                          {r.role === 'signer' && esign ? ' · signature placed by Leegality' : ''}
                         </span>
                       </span>
                       {r.role === 'signer' ? (
                         signs ? (
                           <PenLine
                             aria-label={
-                              r.auth === 'aadhaar'
-                                ? 'Has the Aadhaar eSign box'
-                                : 'Has a signature field'
+                              esign ? 'Leegality places the signature' : 'Has a signature field'
                             }
                             className="h-4 w-4 shrink-0 text-success"
                           />
@@ -321,7 +321,7 @@ export function StepReview({
                             className="shrink-0 text-[12.5px] font-semibold text-danger underline"
                             onClick={() => onGoTo('fields')}
                           >
-                            {r.auth === 'aadhaar' ? 'No Aadhaar eSign box' : 'No signature'}
+                            No signature
                           </button>
                         )
                       ) : null}
@@ -329,18 +329,31 @@ export function StepReview({
                   );
                 })}
               </ol>
+              {esigner ? (
+                <AadhaarPlacementNote name={esigner.name.trim() || undefined} className="mt-3" />
+              ) : null}
             </div>
           </div>
         </Panel>
         <div className="flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent-soft/60 px-4 py-3 text-[13px] text-ink">
           <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-          <p>
-            When everyone has signed, the PDF is sealed against changes and a certificate with the
-            full audit trail is added.{' '}
-            {actors.length > 1 ? 'Everyone on the envelope gets' : 'The recipient gets'} an email
-            with the signed PDF and its audit trail attached, or download links when the files are
-            too large to attach.
-          </p>
+          {esigner ? (
+            <p>
+              Once Leegality returns the file with the Aadhaar eSign, it is sealed against changes
+              without touching its pages.{' '}
+              {actors.length > 1 ? 'Everyone on the envelope gets' : 'The recipient gets'} an email
+              with the signed document and, as a separate PDF, the certificate and audit trail, or
+              download links when the files are too large to attach.
+            </p>
+          ) : (
+            <p>
+              When everyone has signed, the PDF is sealed against changes and a certificate with the
+              full audit trail is added.{' '}
+              {actors.length > 1 ? 'Everyone on the envelope gets' : 'The recipient gets'} an email
+              with the signed PDF and its audit trail attached, or download links when the files are
+              too large to attach.
+            </p>
+          )}
         </div>
         <p className="flex items-center gap-2 px-1 text-[12.5px] text-muted">
           <BellRing aria-hidden className="h-3.5 w-3.5" />

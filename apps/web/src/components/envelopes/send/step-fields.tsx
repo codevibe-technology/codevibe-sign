@@ -7,7 +7,19 @@ import { useMemo } from 'react';
 import { usePdfjs } from '@/components/pdf/use-pdfjs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
-import type { DraftDocument, DraftRecipient, Problems } from '@/lib/send-flow';
+import {
+  AADHAAR_PLACEMENT_NOTE,
+  type DraftDocument,
+  type DraftRecipient,
+  type Problems,
+} from '@/lib/send-flow';
+import { AadhaarPlacementNote } from './aadhaar-note';
+
+const PLACER_LABELS = {
+  aadhaarHint: (name: string) =>
+    `${name} signs with Aadhaar eSign and fills in nothing here. ${AADHAAR_PLACEMENT_NOTE}`,
+  aadhaarSummary: 'Aadhaar eSign: no fields. Leegality places the signature.',
+};
 
 const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
   id: r.id,
@@ -21,7 +33,7 @@ const asRecipient = (r: DraftRecipient, i: number): Recipient => ({
 
 /**
  * Step 3: drop signature, date and other fields on the pages, in each recipient's colour. A
- * signer who uses Aadhaar eSign is offered the Aadhaar eSign box instead of a signature.
+ * signer who uses Aadhaar eSign gets no fields: Leegality places their signature.
  * `fill` takes all the room its parent gives it (the full-screen send flow); `card` sits in a
  * page as a bordered box (the template editor).
  */
@@ -55,6 +67,7 @@ export function StepFields({
 
   const alerts = Object.entries(problems).filter(([key]) => key.startsWith('fields.'));
   const fill = layout === 'fill';
+  const esigner = recipients.find((r) => r.auth === 'aadhaar' && r.role === 'signer');
 
   return (
     <div className={cn('flex flex-col', fill ? 'md:h-full md:min-h-0' : 'gap-3')}>
@@ -80,6 +93,12 @@ export function StepFields({
           ))}
         </div>
       ) : null}
+      {esigner ? (
+        <AadhaarPlacementNote
+          name={esigner.name.trim() || undefined}
+          className={cn(fill ? 'rounded-none border-x-0 border-t-0 px-4 py-2' : '')}
+        />
+      ) : null}
       <div
         className={cn(
           'cvs-app bg-surface',
@@ -95,15 +114,8 @@ export function StepFields({
             fields={fields}
             onChange={onChange}
             pdf={pdf}
-            fieldTypes={[
-              'signature',
-              'initials',
-              'aadhaar',
-              'date_signed',
-              'name',
-              'text',
-              'checkbox',
-            ]}
+            labels={PLACER_LABELS}
+            fieldTypes={['signature', 'initials', 'date_signed', 'name', 'text', 'checkbox']}
             {...(previewing !== undefined ? { previewing } : {})}
             {...(onPreviewingChange ? { onPreviewingChange } : {})}
           />

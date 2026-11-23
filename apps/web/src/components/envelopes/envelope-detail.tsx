@@ -21,6 +21,7 @@ import {
   actionLabel,
   actionTone,
   authLabel,
+  esignProviderName,
   eventDetail,
 } from '@/lib/envelopes';
 import type { CertificateView, SealCheck } from '@/server/sign/api';
@@ -82,29 +83,37 @@ export function DocumentsCard({
   envelope,
   checks,
   separateCertificates = [],
+  withAuditTrail = [],
+  providerAuditTrail = false,
 }: {
   slug: string;
   envelope: Envelope;
   checks: Record<string, SealCheck | null>;
-  /**
-   * Documents whose certificate is a file of its own: an Aadhaar eSign started before the
-   * certificate page went on the file signed.
-   */
+  /** Documents whose certificate is a file of its own, as with Aadhaar eSign. */
   separateCertificates?: readonly string[];
+  /** Of those, the ones whose certificate file holds the audit trail too. */
+  withAuditTrail?: readonly string[];
+  /** The eSign provider's own audit trail was kept for the envelope. */
+  providerAuditTrail?: boolean;
 }) {
   const completed = envelope.status === 'completed';
   const esigned = envelope.recipients.some((r) => r.auth === 'aadhaar');
+  const standard = esigned && envelope.documents.some((d) => withAuditTrail.includes(d.id));
+  const provider = envelope.recipients.find((r) => r.esign?.status === 'signed')?.esign?.provider;
+  const providerName = provider ? esignProviderName(provider) : 'eSign provider';
   const base = `/dashboard/${slug}/envelopes/${envelope.id}/documents`;
   return (
     <Card>
       <CardHeader
         title="Documents"
         description={
-          completed && esigned
-            ? 'The signed copy is one file: the pages and the certificate page, under the Aadhaar eSign and a digital seal.'
-            : completed
-              ? 'The signed copies carry a digital seal and a certificate page.'
-              : 'The files as they were uploaded.'
+          completed && standard
+            ? `Signed with Aadhaar eSign at ${providerName}, then sealed without adding or changing a page. The certificate and audit trail are a separate PDF.`
+            : completed && esigned
+              ? 'The signed copy is one file: the pages and the certificate page, under the Aadhaar eSign and a digital seal.'
+              : completed
+                ? 'The signed copies carry a digital seal and a certificate page.'
+                : 'The files as they were uploaded.'
         }
       />
       <ul className="divide-y divide-line">
@@ -125,7 +134,7 @@ export function DocumentsCard({
                 <Button asChild size="sm">
                   <a href={`${base}/${d.id}?version=sealed`}>
                     <Download aria-hidden className="h-4 w-4" />
-                    Signed PDF
+                    {standard ? 'Signed document (Aadhaar eSign)' : 'Signed PDF'}
                   </a>
                 </Button>
               ) : null}
@@ -133,7 +142,15 @@ export function DocumentsCard({
                 <Button asChild size="sm" variant="secondary">
                   <a href={`${base}/${d.id}?version=certificate`}>
                     <Download aria-hidden className="h-4 w-4" />
-                    Certificate
+                    {withAuditTrail.includes(d.id) ? 'Certificate and audit trail' : 'Certificate'}
+                  </a>
+                </Button>
+              ) : null}
+              {completed && providerAuditTrail && d.id === envelope.documents[0]?.id ? (
+                <Button asChild size="sm" variant="secondary">
+                  <a href={`${base}/${d.id}?version=provider-audit-trail`}>
+                    <Download aria-hidden className="h-4 w-4" />
+                    {providerName} audit trail
                   </a>
                 </Button>
               ) : null}
@@ -159,6 +176,7 @@ export function RecipientsCard({
   copyMail = {},
   canShareLinks = false,
   canCorrect = false,
+  nameNotes = {},
 }: {
   workspaceId: string;
   envelope: Envelope;
@@ -170,6 +188,8 @@ export function RecipientsCard({
   canCorrect?: boolean;
   /** The completed-copy email to each recipient, by recipient id, from the mail log. */
   copyMail?: Record<string, CopyMailStatus>;
+  /** By recipient id: the eSign certificate names someone else, from the audit trail. */
+  nameNotes?: Record<string, string>;
 }) {
   const sequential = envelope.routing === 'sequential';
   return (
@@ -219,6 +239,20 @@ export function RecipientsCard({
                     {r.esign.status === 'pending'
                       ? 'At the eSign provider now, confirming with an Aadhaar one-time code.'
                       : 'The last Aadhaar eSign did not finish. They can start again from their link.'}
+                  </p>
+                ) : null}
+                {r.esign?.status === 'signed' && r.esign.signerName ? (
+                  <p className="mt-1 text-sm text-muted" data-testid={`esign-signer-${r.id}`}>
+                    Aadhaar eSign by {r.esign.signerName}
+                  </p>
+                ) : null}
+                {nameNotes[r.id] ? (
+                  <p
+                    className="mt-1 flex items-start gap-1.5 rounded-md bg-warning-soft px-2 py-1 text-sm text-ink"
+                    data-testid={`esign-name-differs-${r.id}`}
+                  >
+                    <ShieldAlert aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+                    {nameNotes[r.id]}
                   </p>
                 ) : null}
                 {r.declineReason ? (

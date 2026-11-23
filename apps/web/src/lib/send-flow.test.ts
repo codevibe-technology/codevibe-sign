@@ -147,23 +147,19 @@ describe('fields and settings', () => {
     expect(fieldProblems([asha, ravi], [signature('a')])).toEqual({});
   });
 
-  it('asks for one Aadhaar eSign box, and no drawn signature, from an Aadhaar signer', () => {
+  it('asks for no field from an Aadhaar signer, and refuses one to fill in', () => {
     const asha = person({ id: 'a' });
     const esigner = { ...asha, auth: 'aadhaar' as const };
-    expect(fieldProblems([esigner], [])).toEqual({
-      'fields.a':
-        'Place the Aadhaar eSign box for Asha Rao: pick them, then drag "Aadhaar eSign" to where the signature goes.',
-    });
-    expect(fieldProblems([esigner], [signature('a')])['fields.a']).toMatch(/Aadhaar eSign box/);
+    expect(fieldProblems([esigner], [])).toEqual({});
     const box = signature('a', { id: 'box', type: 'aadhaar' });
-    expect(fieldProblems([esigner], [box])).toEqual({});
-    expect(fieldProblems([esigner], [box, signature('a', { id: 'x', type: 'initials' })])).toEqual({
+    // Left from an earlier draft; dropped when the envelope is sent.
+    expect(
+      fieldProblems([esigner], [box, signature('a'), signature('a', { type: 'initials' })]),
+    ).toEqual({});
+    expect(fieldProblems([esigner], [signature('a', { type: 'text' })])).toEqual({
       'fields.a':
-        'Asha Rao signs with Aadhaar eSign and draws nothing. Delete their signature and initials fields.',
+        'Asha Rao signs with Aadhaar eSign and fills in nothing here. Delete their fields, or give them to a signer before them.',
     });
-    expect(fieldProblems([esigner], [box, { ...box, id: 'box2' }])['fields.a']).toMatch(
-      /Keep one Aadhaar eSign box/,
-    );
     expect(fieldProblems([asha], [signature('a'), box])['fields.a']).toMatch(
       /Only a signer who uses Aadhaar eSign/,
     );

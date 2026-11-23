@@ -68,7 +68,14 @@ export interface SigningReceipt {
   recipient: { id: string; name: string; role: RecipientRole; status: RecipientStatus };
   waitingFor: number;
   /** `certificate`: the signing certificate is a file of its own (after an Aadhaar eSign). */
-  documents: { id: string; name: string; sealed: boolean; certificate?: boolean }[];
+  documents: {
+    id: string;
+    name: string;
+    sealed: boolean;
+    certificate?: boolean;
+    /** The certificate file holds the audit trail too, as with Aadhaar eSign. */
+    certificateWithAuditTrail?: boolean;
+  }[];
 }
 
 /** `GET /brand/<workspaceId>/signing`: the header of the signing page. */

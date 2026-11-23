@@ -201,6 +201,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'recipient.corrected': 'Details corrected',
   'recipient.esign_started': 'Started Aadhaar eSign',
   'recipient.esign_failed': 'Aadhaar eSign did not finish',
+  'recipient.esign_name_differs': 'Aadhaar name differs from recipient name',
   'document.sealed': 'Document sealed',
 };
 
@@ -238,15 +239,26 @@ export function eventDetail(event: Pick<AuditEvent, 'action' | 'data'>): EventDe
       return { label: base, ...(why ? { note: `Nothing was signed: ${why}.` } : {}) };
     }
     case 'recipient.signed': {
+      if (event.data?.method !== 'aadhaar_esign') return { label: base };
       const provider = text(event.data?.provider);
-      return event.data?.method === 'aadhaar_esign'
-        ? {
-            label: `Signed with Aadhaar eSign${provider ? ` (via ${esignProviderName(provider)})` : ''}`,
-            ...(text(event.data?.signerName)
-              ? { note: `Name on the signing certificate: ${text(event.data?.signerName)}` }
-              : {}),
-          }
-        : { label: base };
+      const name = text(event.data?.signerName);
+      const issuer = text(event.data?.certificateIssuer);
+      return {
+        label: `${name ? `Aadhaar eSign by ${name}` : 'Signed with Aadhaar eSign'}${provider ? ` (via ${esignProviderName(provider)})` : ''}`,
+        ...(name && issuer ? { note: `eSign certificate issued by ${issuer}` } : {}),
+      };
+    }
+    case 'recipient.esign_name_differs': {
+      const certificate = text(event.data?.certificateName);
+      const recipient = text(event.data?.recipientName);
+      return {
+        label: base,
+        ...(certificate && recipient
+          ? {
+              note: `The eSign certificate names ${certificate}; the recipient is ${recipient}. Check it was the right person.`,
+            }
+          : {}),
+      };
     }
     case 'recipient.link_shared':
       return { label: `${base}${byLine}` };

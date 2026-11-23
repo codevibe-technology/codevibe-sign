@@ -579,6 +579,41 @@ describe('signing with Aadhaar eSign', () => {
     expect(window.location.search).toBe('');
   });
 
+  it('offers the signed document and the certificate and audit trail once sealed', async () => {
+    window.history.replaceState(null, '', '/sign?esign=return');
+    server({
+      'GET /api/v1/sign/link': refused(401, 'TOKEN_INVALID'),
+      'GET /api/v1/sign/receipt': ok(
+        receipt({
+          envelope: {
+            id: 'env_1',
+            title: 'Offer letter',
+            status: 'completed',
+            completedAt: '2026-11-24T10:00:00.000Z',
+          },
+          waitingFor: 0,
+          documents: [
+            {
+              id: 'doc_1',
+              name: 'offer.pdf',
+              sealed: true,
+              certificate: true,
+              certificateWithAuditTrail: true,
+            },
+          ],
+        }),
+      ),
+      'GET /api/v1/sign/link/esign': ok({ status: 'signed', signUrl: null, expiresAt: null }),
+    });
+    render(<SigningApp smsAvailable={false} poll={POLL} esignPoll={ESIGN_POLL} />);
+    const signed = await screen.findByRole('link', { name: 'Signed document (Aadhaar eSign)' });
+    expect(signed.getAttribute('href')).toBe('/api/v1/sign/receipt/documents/doc_1');
+    expect(
+      screen.getByRole('link', { name: 'Certificate and audit trail' }).getAttribute('href'),
+    ).toBe('/api/v1/sign/receipt/documents/doc_1?file=certificate');
+    expect(screen.queryByTestId('audit-trail-download')).toBeNull();
+  });
+
   it('thanks a signer whose link was already spent by the provider callback', async () => {
     window.history.replaceState(null, '', '/sign?esign=return');
     server({

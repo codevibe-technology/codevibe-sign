@@ -22,7 +22,9 @@ vi.mock('sonner', () => ({ toast: mocks.toast }));
 
 const { EnvelopesTable } = await import('./envelopes-table');
 const { VerifyPanel } = await import('./verify-panel');
-const { CertificateCard, RecipientsCard, SealBadge, Timeline } = await import('./envelope-detail');
+const { CertificateCard, DocumentsCard, RecipientsCard, SealBadge, Timeline } = await import(
+  './envelope-detail'
+);
 
 const row = (patch: Partial<EnvelopeSummary>): EnvelopeSummary => ({
   id: 'env_1',
@@ -383,6 +385,60 @@ describe('envelope detail', () => {
     reminders: { firstAfterDays: 2, everyDays: 2, max: 5 },
     createdAt: '2026-11-18T10:00:00.000Z',
   };
+
+  const esigned: Envelope = {
+    ...envelope,
+    status: 'completed',
+    recipients: [
+      {
+        ...envelope.recipients[0]!,
+        auth: 'aadhaar',
+        esign: { provider: 'leegality', status: 'signed', signerName: 'SHUBHAM DHALL' },
+      },
+    ],
+  };
+
+  it('offers the files of an Aadhaar eSign: signed document, certificate and audit trail', () => {
+    render(
+      <DocumentsCard
+        slug="acme"
+        envelope={esigned}
+        checks={{ doc_1: { valid: true } as never }}
+        separateCertificates={['doc_1']}
+        withAuditTrail={['doc_1']}
+        providerAuditTrail
+      />,
+    );
+    const base = '/dashboard/acme/envelopes/env_1/documents/doc_1';
+    expect(
+      screen.getByRole('link', { name: 'Signed document (Aadhaar eSign)' }).getAttribute('href'),
+    ).toBe(`${base}?version=sealed`);
+    expect(
+      screen.getByRole('link', { name: 'Certificate and audit trail' }).getAttribute('href'),
+    ).toBe(`${base}?version=certificate`);
+    expect(screen.getByRole('link', { name: 'Leegality audit trail' }).getAttribute('href')).toBe(
+      `${base}?version=provider-audit-trail`,
+    );
+    expect(screen.getByText(/sealed without adding or changing a page/)).toBeTruthy();
+  });
+
+  it('names the Aadhaar signer from their certificate and notes a different name', () => {
+    render(
+      <RecipientsCard
+        workspaceId="ws_1"
+        envelope={esigned}
+        currentIds={[]}
+        canRemind={false}
+        nameNotes={{ r1: 'The eSign certificate names SHUBHAM DHALL; the recipient is Ravi.' }}
+      />,
+    );
+    expect(screen.getByTestId('esign-signer-r1')).toHaveTextContent(
+      'Aadhaar eSign by SHUBHAM DHALL',
+    );
+    expect(screen.getByTestId('esign-name-differs-r1')).toHaveTextContent(
+      'The eSign certificate names SHUBHAM DHALL',
+    );
+  });
 
   it('lists recipients with their status and offers to resend to whoever is next', () => {
     render(<RecipientsCard workspaceId="ws_1" envelope={envelope} currentIds={['r2']} canRemind />);

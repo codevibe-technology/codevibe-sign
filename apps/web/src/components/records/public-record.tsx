@@ -64,6 +64,7 @@ export function PublicRecord({ view }: { view: PublicRecordView }) {
   const Icon =
     state === 'verified' ? ShieldCheck : state === 'failed' ? ShieldAlert : ShieldQuestion;
   const base = recordPath(view.id);
+  const esigned = view.signers.some((s) => s.auth === 'aadhaar' && s.status === 'signed');
   return (
     <div className="space-y-5">
       <header>
@@ -288,15 +289,17 @@ export function PublicRecord({ view }: { view: PublicRecordView }) {
           <Button asChild size="sm">
             <a href={`${base}/certificate`}>
               <Download aria-hidden className="h-4 w-4" />
-              Certificate (PDF)
+              {esigned ? 'Certificate and audit trail (PDF)' : 'Certificate (PDF)'}
             </a>
           </Button>
-          <Button asChild size="sm" variant="secondary">
-            <a href={`${base}/audit-trail`}>
-              <Download aria-hidden className="h-4 w-4" />
-              Audit trail (PDF)
-            </a>
-          </Button>
+          {esigned ? null : (
+            <Button asChild size="sm" variant="secondary">
+              <a href={`${base}/audit-trail`}>
+                <Download aria-hidden className="h-4 w-4" />
+                Audit trail (PDF)
+              </a>
+            </Button>
+          )}
           <Button asChild size="sm" variant="secondary">
             <a href={`${base}/audit-trail?format=json`}>
               <Download aria-hidden className="h-4 w-4" />

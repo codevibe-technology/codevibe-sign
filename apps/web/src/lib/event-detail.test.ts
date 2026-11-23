@@ -30,11 +30,28 @@ describe('aadhaar esign labels', () => {
     expect(
       eventDetail({
         action: 'recipient.signed',
-        data: { method: 'aadhaar_esign', provider: 'leegality', signerName: 'RAVI KUMAR' },
+        data: {
+          method: 'aadhaar_esign',
+          provider: 'leegality',
+          signerName: 'RAVI KUMAR',
+          certificateIssuer: 'Protean eGov Technologies Limited',
+        },
       }),
     ).toEqual({
-      label: 'Signed with Aadhaar eSign (via Leegality)',
-      note: 'Name on the signing certificate: RAVI KUMAR',
+      label: 'Aadhaar eSign by RAVI KUMAR (via Leegality)',
+      note: 'eSign certificate issued by Protean eGov Technologies Limited',
+    });
+    expect(eventDetail({ action: 'recipient.signed', data: { method: 'aadhaar_esign' } })).toEqual({
+      label: 'Signed with Aadhaar eSign',
+    });
+    expect(
+      eventDetail({
+        action: 'recipient.esign_name_differs',
+        data: { recipientName: 'Prakriti Iyer', certificateName: 'SHUBHAM DHALL' },
+      }),
+    ).toEqual({
+      label: 'Aadhaar name differs from recipient name',
+      note: 'The eSign certificate names SHUBHAM DHALL; the recipient is Prakriti Iyer. Check it was the right person.',
     });
     expect(eventDetail({ action: 'recipient.signed', data: {} })).toEqual({ label: 'Signed' });
   });

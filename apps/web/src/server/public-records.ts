@@ -326,10 +326,20 @@ export function recordCertificates(
   const { record, envelope, sender } = source;
   const timeZone = record.timeZone ?? fallbackTimeZone;
   const events = bareEvents(source.events);
+  const esigner = envelope.recipients.find((r) => r.esign?.status === 'signed');
+  const esign = esigner?.esign
+    ? {
+        recipientId: esigner.id,
+        provider: esigner.esign.provider,
+        ...(esigner.esign.sandbox ? { sandbox: true } : {}),
+        ...(esigner.esign.signerName ? { signerName: esigner.esign.signerName } : {}),
+      }
+    : null;
   return envelope.documents.map((document) => ({
     envelope,
     document,
     events,
+    ...(esign ? { esign } : {}),
     recordUrl: recordUrl(appUrl, record.id),
     sender: sender.name
       ? {

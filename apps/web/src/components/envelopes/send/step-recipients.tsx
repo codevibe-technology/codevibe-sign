@@ -19,6 +19,7 @@ import { useState } from 'react';
 import type { RoutingMode } from '@codevibe_technology/sign-core';
 import { Button } from '@/components/ui/button';
 import { Field, Input, NativeSelect } from '@/components/ui/field';
+import { AadhaarPlacementNote } from './aadhaar-note';
 import { formatInr } from '@/lib/billing/money';
 import { cn } from '@/lib/cn';
 import { AUTH_LABELS, AUTH_OPTIONS, ROLE_OPTIONS } from '@/lib/envelopes';
@@ -435,7 +436,12 @@ export function StepRecipients({
                       )}
                     </Field>
                   )}
-                  {r.auth === 'aadhaar' && r.role !== 'viewer' ? <EsignNote esign={esign} /> : null}
+                  {r.auth === 'aadhaar' && r.role !== 'viewer' ? (
+                    <>
+                      <EsignNote esign={esign} />
+                      <AadhaarPlacementNote className="sm:col-span-2" />
+                    </>
+                  ) : null}
                   {r.auth === 'sms_otp' && r.role !== 'viewer' ? (
                     <Field
                       label="Mobile number"
