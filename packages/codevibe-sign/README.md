@@ -59,7 +59,7 @@ one-time code she is asked for. Once she signs, the sealed PDF is at
 `GET /v1/envelopes/:id/documents/:docId`, and `codevibe-sign verify` checks it.
 
 Needs Node.js 22 or newer. For the real service (PostgreSQL, SMTP, your own certificate), see
-[Self-host](https://sign.codevibe.in/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body).
+[Self-host](https://sign.codevibe.in/docs/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body).
 
 ## Install
 
@@ -198,9 +198,9 @@ is licensed under AGPL-3.0-only and is installed on its own, or run from the Doc
 ## Learn more
 
 - [Documentation](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body)
-- [Send your first envelope](https://sign.codevibe.in/guides/first-envelope?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body)
-- [Verify a sealed PDF](https://sign.codevibe.in/guides/verify-pdf?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body)
-- [Legal note](https://sign.codevibe.in/legal?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body):
+- [Send your first envelope](https://sign.codevibe.in/docs/guides/first-envelope?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body)
+- [Verify a sealed PDF](https://sign.codevibe.in/docs/guides/verify-pdf?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body)
+- [Legal note](https://sign.codevibe.in/docs/legal?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=body):
   what an electronic signature covers under the IT Act, and when you need Aadhaar eSign.
 - [Source and issues](https://github.com/codevibe-technology/codevibe-sign)
 

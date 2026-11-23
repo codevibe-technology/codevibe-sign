@@ -24,7 +24,7 @@ The server keeps running on port 3000 so you can sign with the
 
 The server answers CORS requests from the docs site (`http://localhost:5173`,
 `http://localhost:4173` and `https://sign.codevibe.in` unless `CORS_ORIGINS` says otherwise), so
-the [interactive HTTP API reference](https://sign.codevibe.in/http-api/sandbox) can call it.
+the [interactive HTTP API reference](https://sign.codevibe.in/docs/http-api/sandbox) can call it.
 
 For production, swap the memory adapters for `postgresStore`, `localFileStore`,
 `smtpMailer` and a real seal certificate; see the server package README.

@@ -43,7 +43,7 @@ npx @codevibe_technology/sign-server start --seal seal.p12 --public-url https://
 
 It reads `DATABASE_URL`, `PUBLIC_URL`, `API_KEYS`, `SEAL_P12_BASE64`, `SEAL_P12_PASSPHRASE`,
 `SMTP_HOST`, `SMTP_FROM` and the optional ones in the
-[variable reference](https://sign.codevibe.in/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=sign-server&utm_content=body).
+[variable reference](https://sign.codevibe.in/docs/getting-started/docker?utm_source=github&utm_medium=readme&utm_campaign=sign-server&utm_content=body).
 `--port`, `--host`, `--public-url`, `--database-url`, `--files-dir` and `--seal <file.p12>`
 override their variable. Passwords and keys are read from the environment only. Every missing
 or invalid variable is reported at once, by name, and `Ctrl+C` lets running work finish before
@@ -122,7 +122,7 @@ The whole HTTP API is described in [`openapi.yaml`](openapi.yaml), an OpenAPI 3.
 with every route, schema, error code and the webhook payload; `openapi.json` is the same
 document as JSON and ships with the package. Each server serves it, without authentication, at
 `GET /v1/openapi.json`. The docs site has an
-[interactive reference](https://sign.codevibe.in/http-api/reference) and a Postman collection.
+[interactive reference](https://sign.codevibe.in/docs/http-api/reference) and a Postman collection.
 
 ## Sending
 

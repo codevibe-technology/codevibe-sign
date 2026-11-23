@@ -228,7 +228,7 @@ Options (each one overrides its variable)
   -h, --help               Show this help
 
 The seal passphrase, SMTP password and API keys are read from the environment only.
-Variables: https://sign.codevibe.in/getting-started/docker?utm_source=cli
+Variables: https://sign.codevibe.in/docs/getting-started/docker?utm_source=cli
 
 Examples
   npx @codevibe_technology/sign-server start --memory
