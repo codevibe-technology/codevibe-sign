@@ -18,10 +18,12 @@
 
   --vp-c-text-1: var(--cv-navy);
   --vp-c-text-2: #44546a;
-  --vp-c-text-3: #6b7a8f;
+  --vp-c-text-3: #5a6980;
   --vp-c-bg-alt: #f4f7fb;
   --vp-c-bg-soft: #eef3f9;
   --vp-c-divider: #e2e8f0;
+  /* Code sits on white so the syntax colours keep 4.5:1; the border sets the block apart. */
+  --vp-code-block-bg: #ffffff;
 
   --vp-button-brand-bg: var(--cv-blue);
   --vp-button-brand-hover-bg: var(--cv-blue-dark);
@@ -42,6 +44,7 @@
   --vp-c-bg-alt: #0d1b2a;
   --vp-c-bg-soft: #13253a;
   --vp-c-bg-elv: #13253a;
+  --vp-code-block-bg: #0d1b2a;
   --vp-c-divider: #22364d;
   --vp-c-gutter: #08111b;
 
@@ -96,4 +99,8 @@
   max-width: 720px;
   margin-left: auto;
   margin-right: auto;
+}
+
+:root:not(.dark) .vp-doc div[class*='language-'] {
+  border: 1px solid var(--vp-c-divider);
 }

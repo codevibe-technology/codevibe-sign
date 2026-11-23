@@ -70,8 +70,6 @@ export default defineConfig({
     ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
     ['link', { rel: 'manifest', href: `${BASE}site.webmanifest` }],
     ['meta', { name: 'theme-color', content: '#0D1B2A' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     ['link', { rel: 'stylesheet', href: fonts }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: SITE_NAME }],

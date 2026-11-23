@@ -248,3 +248,19 @@
     --cvs-recipient-5: #4cc3d6;
   }
 }
+
+/* Toasts take the app's tokens, so their text meets the same contrast as everything else. */
+html [data-sonner-toaster][data-sonner-theme] {
+  --success-bg: var(--success-soft);
+  --success-border: color-mix(in srgb, var(--success) 30%, transparent);
+  --success-text: var(--success-text);
+  --error-bg: var(--danger-soft);
+  --error-border: color-mix(in srgb, var(--danger) 30%, transparent);
+  --error-text: var(--danger-text);
+  --warning-bg: var(--warning-soft);
+  --warning-border: color-mix(in srgb, var(--warning) 30%, transparent);
+  --warning-text: var(--warning);
+  --info-bg: var(--primary-soft);
+  --info-border: color-mix(in srgb, var(--primary) 30%, transparent);
+  --info-text: var(--primary-text);
+}

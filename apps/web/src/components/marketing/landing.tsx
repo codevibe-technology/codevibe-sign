@@ -439,7 +439,11 @@ export function Landing({
                 One container for the app, one for PostgreSQL. Your documents never leave your
                 server, and there are no limits.
               </p>
-              <pre className="mt-4 overflow-x-auto rounded-lg bg-black/30 p-4 text-sm leading-6 text-white/90">
+              <pre
+                tabIndex={0}
+                aria-label="Commands to self-host with Docker"
+                className="mt-4 overflow-x-auto rounded-lg bg-black/30 p-4 text-sm leading-6 text-white/90"
+              >
                 <code>{`git clone ${GITHUB_URL}.git
 cd codevibe-sign/deploy
 cp .env.example .env    # set your domain and secrets
