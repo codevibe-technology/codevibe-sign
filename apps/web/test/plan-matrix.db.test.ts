@@ -874,6 +874,11 @@ const ACTIONS: Record<string, { entry: string; enforcedBy: string } | { free: st
   // api keys
   createApiKeyAction: { free: 'keys are free to make; each call is counted by api.requests' },
   revokeApiKeyAction: { free: 'removes' },
+  // aadhaar esign
+  setEsignModeAction: { entry: 'esign.own-account', enforcedBy: 'assertOwnEsignAccount' },
+  saveEsignCredentialsAction: { entry: 'esign.own-account', enforcedBy: 'assertOwnEsignAccount' },
+  removeEsignCredentialsAction: { free: 'removes' },
+  testEsignConnectionAction: { free: 'a read-only check of details already saved' },
   // billing
   saveBillingDetailsAction: { free: 'billing itself' },
   createCreditsOrderAction: { free: 'a purchase; open to every plan' },
