@@ -47,6 +47,7 @@ const documentOf = (invoice: Invoice): InvoiceDocument => ({
   sac: invoice.order.sac,
   tax: invoice.order.tax,
   paymentRef: invoice.order.razorpayPaymentId,
+  paymentMethod: invoice.order.paymentMethod,
   test: invoice.order.mode === 'test',
 });
 
@@ -72,12 +73,31 @@ export async function getInvoice(
   return row ? toInvoice(row) : null;
 }
 
+/**
+ * The invoice file with the install's fonts and images, sealed when the install has a seal.
+ * A seal that fails does not hold the invoice back: the file is then made without one and
+ * says so in its footer.
+ */
+async function renderSigned(deps: BillingDeps, document: InvoiceDocument): Promise<Uint8Array> {
+  const assets = (await deps.invoice?.assets()) ?? {};
+  const seal = deps.invoice?.seal;
+  if (seal && !document.test) {
+    try {
+      const page = await renderInvoicePdf(document, { ...assets, digitallySigned: true });
+      return await seal(page, document.issuedAt);
+    } catch (err) {
+      console.error('[billing] invoice seal', err instanceof Error ? err.message : err);
+    }
+  }
+  return renderInvoicePdf(document, assets);
+}
+
 async function storedPdf(sql: Sql, deps: BillingDeps, row: InvoiceRow): Promise<Uint8Array> {
   if (row.file_key) {
     const stored = await deps.files.get(row.file_key);
     if (stored) return stored;
   }
-  const bytes = await renderInvoicePdf(documentOf(toInvoice(row)));
+  const bytes = await renderSigned(deps, documentOf(toInvoice(row)));
   const key = invoiceFileKey(row.invoice_id);
   await deps.files.put(key, bytes, 'application/pdf');
   await sql`update app_invoices set file_key = ${key} where id = ${row.invoice_id}`;

@@ -1,7 +1,9 @@
 import 'server-only';
+import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { billingConfig } from './config';
 import { fulfilCredits } from './credit-orders';
+import { invoiceRendering } from './invoice-assets';
 import { registerFulfilment, type BillingDeps } from './orders';
 import { createRazorpay } from './razorpay';
 
@@ -22,5 +24,6 @@ export function billingDeps(): BillingDeps {
     files,
     mailer,
     now: () => new Date(),
+    invoice: invoiceRendering(config, env()),
   };
 }

@@ -444,4 +444,10 @@ create index app_esign_credit_ledger_workspace_idx
   on app_esign_credit_ledger (workspace_id, created_at desc);
 `,
   },
+  {
+    name: '0017_invoice_payment_method',
+    sql: `
+alter table app_billing_orders add column payment_method text;
+`,
+  },
 ];

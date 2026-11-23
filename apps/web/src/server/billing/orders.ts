@@ -14,7 +14,7 @@ import {
   type RazorpayConfig,
   type SellerConfig,
 } from './config';
-import type { InvoiceLine } from './invoice-pdf';
+import type { InvoiceAssets, InvoiceLine } from './invoice-pdf';
 import { finishInvoice } from './invoices';
 import {
   RazorpayError,
@@ -37,6 +37,14 @@ export interface BillingDeps {
   files: FileStore;
   mailer: Mailer;
   now: () => Date;
+  /** Fonts, images and the seal for invoice files; without it invoices are plain and unsigned. */
+  invoice?: InvoiceRendering | undefined;
+}
+
+export interface InvoiceRendering {
+  assets: () => Promise<InvoiceAssets>;
+  /** Applies the install's digital seal to a rendered invoice. */
+  seal?: ((pdf: Uint8Array, at: Date) => Promise<Uint8Array>) | undefined;
 }
 
 export const ORDER_KINDS = [
@@ -64,6 +72,8 @@ export interface BillingOrder {
   mode: 'test' | 'live';
   razorpayOrderId: string;
   razorpayPaymentId: string | null;
+  /** How the payment was made, for example `upi`; null when the payment service did not say. */
+  paymentMethod: string | null;
   createdBy: string | null;
   createdAt: Date;
   paidAt: Date | null;
@@ -115,6 +125,7 @@ interface OrderRow {
   mode: 'test' | 'live';
   razorpay_order_id: string;
   razorpay_payment_id: string | null;
+  payment_method?: string | null;
   created_by: string | null;
   created_at: Date;
   paid_at: Date | null;
@@ -151,6 +162,7 @@ function toOrder(row: OrderRow): BillingOrder {
     mode: row.mode,
     razorpayOrderId: row.razorpay_order_id,
     razorpayPaymentId: row.razorpay_payment_id,
+    paymentMethod: row.payment_method ?? null,
     createdBy: row.created_by,
     createdAt: row.created_at,
     paidAt: row.paid_at,
@@ -294,7 +306,7 @@ export class PaymentMismatchError extends AppError {
 async function nextInvoiceNumber(tx: Tx, config: BillingConfig, order: BillingOrder, now: Date) {
   // Test payments get their own series, so the tax series has no gaps and no test documents.
   const prefix =
-    order.mode === 'test' ? `T-${seriesPrefix('{FY}-', now)}` : seriesPrefix(config.series, now);
+    order.mode === 'test' ? seriesPrefix('T-{FYS}-', now) : seriesPrefix(config.series, now);
   const [row] = await tx<{ last_sequence: number }[]>`
     insert into app_invoice_counters (prefix, last_sequence) values (${prefix}, 1)
     on conflict (prefix) do update set last_sequence = app_invoice_counters.last_sequence + 1
@@ -337,7 +349,8 @@ export async function fulfilOrder(
 
     const [paid] = await tx<OrderRow[]>`
       update app_billing_orders
-      set status = 'paid', razorpay_payment_id = ${payment.id}, paid_at = ${now}, updated_at = ${now}
+      set status = 'paid', razorpay_payment_id = ${payment.id},
+        payment_method = ${payment.method ?? null}, paid_at = ${now}, updated_at = ${now}
       where id = ${order.id}
       returning *`;
     const paidOrder = toOrder(paid!);

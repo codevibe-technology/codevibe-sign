@@ -128,17 +128,25 @@ describe('invoice series', () => {
     expect(financialYearStart(new Date('2027-01-01T00:00:00Z'))).toBe(2026);
   });
 
-  it('renders numbers such as CVS-2026-0001', () => {
-    const prefix = seriesPrefix('CVS-{FY}-', new Date('2026-11-23T10:00:00Z'));
-    expect(prefix).toBe('CVS-2026-');
-    expect(invoiceNumber(prefix, 1)).toBe('CVS-2026-0001');
-    expect(invoiceNumber(prefix, 12_345)).toBe('CVS-2026-12345');
+  it('renders numbers such as CV-2026270001', () => {
+    const at = new Date('2026-11-23T10:00:00Z');
+    const prefix = seriesPrefix('CV-{FY}', at);
+    expect(prefix).toBe('CV-202627');
+    expect(invoiceNumber(prefix, 1)).toBe('CV-2026270001');
+    expect(invoiceNumber(prefix, 12_345)).toBe('CV-20262712345');
+    expect(invoiceNumber(seriesPrefix('CVCN-{FY}', at), 1)).toBe('CVCN-2026270001');
+    expect(invoiceNumber(seriesPrefix('CVPI-{FY}', at), 7)).toBe('CVPI-2026270007');
+    expect(seriesPrefix('CV-{FY}', new Date('2099-12-01T00:00:00Z'))).toBe('CV-209900');
+    expect(seriesPrefix('INV-{FYS}-', at)).toBe('INV-2026-');
     expect(seriesPrefix('INV/', new Date())).toBe('INV/');
   });
 
   it('refuses a series that breaks the 16 character rule or has other characters', () => {
-    expect(seriesProblem('CVS-{FY}-')).toBeNull();
+    expect(seriesProblem('CV-{FY}')).toBeNull();
+    expect(seriesProblem('CVCN-{FY}')).toBeNull();
+    expect(seriesProblem('CVPI-{FY}')).toBeNull();
     expect(seriesProblem('CODEVIBE-{FY}-')).toMatch(/longer than 16/);
+    expect(seriesProblem('CVCNX-{FY}-')).toMatch(/longer than 16/);
     expect(seriesProblem('CVS {FY}')).toMatch(/letters, digits/);
     expect(seriesProblem('CVS-{YEAR}-')).toMatch(/letters, digits/);
   });

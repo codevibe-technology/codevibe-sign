@@ -1,7 +1,12 @@
 import 'server-only';
 import { z } from 'zod';
 import { gstinProblem, stateByCode } from '@/lib/billing/gst';
-import { DEFAULT_INVOICE_SERIES, seriesProblem } from '@/lib/billing/invoice-series';
+import {
+  DEFAULT_CREDIT_NOTE_SERIES,
+  DEFAULT_INVOICE_SERIES,
+  DEFAULT_PROFORMA_SERIES,
+  seriesProblem,
+} from '@/lib/billing/invoice-series';
 import { parseInr, type Paise } from '@/lib/billing/money';
 import type { Plan } from '@/lib/plans';
 
@@ -22,12 +27,35 @@ export interface SellerConfig {
   address: string;
   /** The first two digits of the GSTIN. */
   stateCode: string;
+  /** From `INVOICE_SELLER_PAN`, else the ten characters of the GSTIN that are the PAN. */
+  pan?: string | undefined;
+  phone?: string | undefined;
+  email?: string | undefined;
+  website?: string | undefined;
+  /** Printed as a QR code for paying by UPI. */
+  upiId?: string | undefined;
+  bank?: BankDetails | undefined;
 }
 
+export interface BankDetails {
+  name: string;
+  holder: string;
+  account: string;
+  ifsc: string;
+  branch?: string | undefined;
+}
+
+export const LEEGALITY_SANDBOX_URL = 'https://sandbox.leegality.com/api';
+export const LEEGALITY_PRODUCTION_URL = 'https://app1.leegality.com/api';
+
 export interface LeegalityConfig {
+  /** `LEEGALITY_API_KEY`: the account's Auth Token, sent as `X-Auth-Token`. */
   authToken: string;
   privateSalt: string;
   workflowId: string;
+  /** `LEEGALITY_BASE_URL`; the sandbox when unset. */
+  baseUrl: string;
+  /** From the base URL: only `sandbox.` hosts are the sandbox. */
   environment: 'sandbox' | 'production';
   webhookHeader: { name: string; value: string } | null;
 }
@@ -45,6 +73,21 @@ export interface BillingConfig {
   sac: string;
   /** Invoice number pattern; see `seriesPrefix`. */
   series: string;
+  /** Number patterns kept for credit notes and proforma invoices. */
+  creditNoteSeries: string;
+  proformaSeries: string;
+  /** Image files drawn on invoices, when set: a PNG or JPEG logo and signature. */
+  invoiceLogoPath: string | null;
+  invoiceSignaturePath: string | null;
+  /**
+   * `BILLING_LIVE`: the operator says this install takes real money. Test payment keys and the
+   * eSign sandbox are then refused, and listed in `problems`, instead of being used.
+   */
+  live: boolean;
+  /** What the keys that are set are for, whether or not they were accepted. */
+  detected: { razorpay: 'test' | 'live' | null; leegality: 'sandbox' | 'production' | null };
+  /** Settings that were set but refused, in words for the operator. Never holds a secret. */
+  problems: string[];
   esign: {
     /** What one eSign costs the operator. Null until it is set; nothing can be bought then. */
     providerCostPaise: Paise | null;
@@ -152,29 +195,86 @@ function seller(source: Source): SellerConfig | null {
     cin: read(source, 'INVOICE_SELLER_CIN') ?? null,
     address: values.INVOICE_SELLER_ADDRESS,
     stateCode: gstin.slice(0, 2),
+    pan: sellerPan(source, gstin),
+    phone: read(source, 'INVOICE_SELLER_PHONE'),
+    email: read(source, 'INVOICE_SELLER_EMAIL'),
+    website: read(source, 'INVOICE_SELLER_WEBSITE'),
+    upiId: upiId(source),
+    bank: bank(source),
   };
+}
+
+function sellerPan(source: Source, gstin: string): string {
+  const pan = read(source, 'INVOICE_SELLER_PAN')?.toUpperCase();
+  if (pan === undefined) return gstin.slice(2, 12);
+  if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(pan)) fail('INVOICE_SELLER_PAN', 'is not a PAN');
+  return pan;
+}
+
+function upiId(source: Source): string | undefined {
+  const id = read(source, 'INVOICE_UPI_ID');
+  if (id !== undefined && !/^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9.-]{1,64}$/.test(id)) {
+    fail('INVOICE_UPI_ID', 'must be a UPI id such as name@bank');
+  }
+  return id;
+}
+
+function bank(source: Source): BankDetails | undefined {
+  const values = group(
+    source,
+    [
+      'INVOICE_BANK_NAME',
+      'INVOICE_BANK_HOLDER',
+      'INVOICE_BANK_ACCOUNT',
+      'INVOICE_BANK_IFSC',
+    ] as const,
+    'the bank details on invoices',
+  );
+  if (!values) return undefined;
+  const ifsc = values.INVOICE_BANK_IFSC.toUpperCase();
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) fail('INVOICE_BANK_IFSC', 'is not an IFSC code');
+  return {
+    name: values.INVOICE_BANK_NAME,
+    holder: values.INVOICE_BANK_HOLDER,
+    account: values.INVOICE_BANK_ACCOUNT,
+    ifsc,
+    branch: read(source, 'INVOICE_BANK_BRANCH'),
+  };
+}
+
+function leegalityBaseUrl(source: Source): string {
+  const raw = read(source, 'LEEGALITY_BASE_URL') ?? LEEGALITY_SANDBOX_URL;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    fail('LEEGALITY_BASE_URL', `must be an https URL, for example ${LEEGALITY_PRODUCTION_URL}`);
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    fail('LEEGALITY_BASE_URL', `must be an https URL, for example ${LEEGALITY_PRODUCTION_URL}`);
+  }
+  return raw.replace(/\/+$/, '');
 }
 
 function leegality(source: Source): LeegalityConfig | null {
   const values = group(
     source,
-    ['LEEGALITY_AUTH_TOKEN', 'LEEGALITY_PRIVATE_SALT', 'LEEGALITY_WORKFLOW_ID'] as const,
+    ['LEEGALITY_API_KEY', 'LEEGALITY_PRIVATE_SALT', 'LEEGALITY_WORKFLOW_ID'] as const,
     'Leegality',
   );
   if (!values) return null;
-  const environment = read(source, 'LEEGALITY_ENVIRONMENT') ?? 'sandbox';
-  if (environment !== 'sandbox' && environment !== 'production') {
-    fail('LEEGALITY_ENVIRONMENT', 'must be "sandbox" or "production"');
-  }
+  const baseUrl = leegalityBaseUrl(source);
+  const environment = new URL(baseUrl).hostname.startsWith('sandbox.') ? 'sandbox' : 'production';
   const header = group(
     source,
     ['LEEGALITY_WEBHOOK_HEADER_NAME', 'LEEGALITY_WEBHOOK_HEADER_VALUE'] as const,
     'the Leegality webhook header',
   );
   return {
-    authToken: values.LEEGALITY_AUTH_TOKEN,
+    authToken: values.LEEGALITY_API_KEY,
     privateSalt: values.LEEGALITY_PRIVATE_SALT,
     workflowId: values.LEEGALITY_WORKFLOW_ID,
+    baseUrl,
     environment,
     webhookHeader: header
       ? { name: header.LEEGALITY_WEBHOOK_HEADER_NAME, value: header.LEEGALITY_WEBHOOK_HEADER_VALUE }
@@ -239,9 +339,21 @@ function gstPercent(source: Source): number {
  * that is set but malformed throws a message naming its variable.
  */
 export function billingConfig(source: Source = process.env): BillingConfig {
-  const series = read(source, 'INVOICE_SERIES') ?? DEFAULT_INVOICE_SERIES;
-  const problem = seriesProblem(series);
-  if (problem) fail('INVOICE_SERIES', problem);
+  const series = seriesOf(source, 'INVOICE_SERIES', DEFAULT_INVOICE_SERIES);
+  const live = isLive(source);
+  const keys = razorpay(source);
+  const esignAccount = leegality(source);
+  const problems: string[] = [];
+  if (live && keys?.mode === 'test') {
+    problems.push(
+      'BILLING_LIVE is on but RAZORPAY_KEY_ID is a test key. Payments stay off until a live key is set.',
+    );
+  }
+  if (live && esignAccount?.environment === 'sandbox') {
+    problems.push(
+      'BILLING_LIVE is on but LEEGALITY_BASE_URL is the sandbox. Aadhaar eSign stays off until the production URL is set.',
+    );
+  }
   const sac = read(source, 'INVOICE_SAC') ?? '998319';
   if (!/^\d{4,8}$/.test(sac)) fail('INVOICE_SAC', 'must be a SAC code of 4 to 8 digits');
   const operatorEmail = read(source, 'OPERATOR_EMAIL') ?? null;
@@ -249,11 +361,18 @@ export function billingConfig(source: Source = process.env): BillingConfig {
     fail('OPERATOR_EMAIL', 'must be an email address');
   }
   return {
-    razorpay: razorpay(source),
+    razorpay: live && keys?.mode === 'test' ? null : keys,
     seller: seller(source),
     gstPercent: gstPercent(source),
     sac,
     series,
+    creditNoteSeries: seriesOf(source, 'CREDIT_NOTE_SERIES', DEFAULT_CREDIT_NOTE_SERIES),
+    proformaSeries: seriesOf(source, 'PROFORMA_SERIES', DEFAULT_PROFORMA_SERIES),
+    invoiceLogoPath: read(source, 'INVOICE_LOGO_PATH') ?? null,
+    invoiceSignaturePath: read(source, 'INVOICE_SIGNATURE_PATH') ?? null,
+    live,
+    detected: { razorpay: keys?.mode ?? null, leegality: esignAccount?.environment ?? null },
+    problems,
     esign: {
       providerCostPaise: amount(source, 'ESIGN_PROVIDER_COST_INR', null),
       markupPaise: amount(source, 'ESIGN_MARKUP_INR', '10'),
@@ -269,9 +388,43 @@ export function billingConfig(source: Source = process.env): BillingConfig {
     installHelpPaise: amount(source, 'INSTALL_HELP_PRICE_INR', '1999'),
     operatorEmail,
     hostingOffers: hostingOffers(source),
-    leegality: leegality(source),
+    leegality: live && esignAccount?.environment === 'sandbox' ? null : esignAccount,
   };
 }
+
+function seriesOf(source: Source, name: string, fallback: string): string {
+  const series = read(source, name) ?? fallback;
+  const problem = seriesProblem(series);
+  if (problem) fail(name, problem);
+  return series;
+}
+
+function isLive(source: Source): boolean {
+  const raw = read(source, 'BILLING_LIVE')?.toLowerCase();
+  if (raw === undefined || raw === 'false' || raw === '0') return false;
+  if (raw === 'true' || raw === '1') return true;
+  fail('BILLING_LIVE', 'must be true or false');
+}
+
+export interface BillingMode {
+  /** `test` keys never move money; null when no key is set. */
+  razorpay: 'test' | 'live' | null;
+  leegality: 'sandbox' | 'production' | null;
+  /** The operator has declared this install live with `BILLING_LIVE`. */
+  live: boolean;
+  problems: string[];
+}
+
+/**
+ * Which accounts the install's keys belong to, for the operator to check after a change. Safe
+ * to publish: it names modes only, never a key.
+ */
+export const billingMode = (config: BillingConfig): BillingMode => ({
+  razorpay: config.detected.razorpay,
+  leegality: config.detected.leegality,
+  live: config.live,
+  problems: config.problems,
+});
 
 /** The operator's own Leegality account, or null when it is not set up. */
 export const platformLeegality = (source: Source = process.env): LeegalityConfig | null =>

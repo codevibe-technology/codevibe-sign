@@ -7,6 +7,7 @@ import {
   esignPrice,
   paymentsConfigured,
   platformLeegality,
+  billingMode,
 } from './config';
 import { creditsLine } from './credit-orders';
 import {
@@ -27,7 +28,7 @@ const SELLER = {
 };
 const RAZORPAY = { RAZORPAY_KEY_ID: 'rzp_test_abc123', RAZORPAY_KEY_SECRET: 'secret-value' };
 const LEEGALITY = {
-  LEEGALITY_AUTH_TOKEN: 'token',
+  LEEGALITY_API_KEY: 'token',
   LEEGALITY_PRIVATE_SALT: 'salt',
   LEEGALITY_WORKFLOW_ID: 'wf_1',
 };
@@ -41,7 +42,11 @@ describe('billingConfig', () => {
       leegality: null,
       gstPercent: 18,
       sac: '998319',
-      series: 'CVS-{FY}-',
+      series: 'CV-{FY}',
+      creditNoteSeries: 'CVCN-{FY}',
+      proformaSeries: 'CVPI-{FY}',
+      live: false,
+      problems: [],
       esign: { providerCostPaise: null, markupPaise: 1000, packs: [10, 50, 200] },
       cloud: {
         pricePaise: 99_900,
@@ -64,7 +69,7 @@ describe('billingConfig', () => {
       ...RAZORPAY,
       ...LEEGALITY,
       RAZORPAY_WEBHOOK_SECRET: 'whsec',
-      LEEGALITY_ENVIRONMENT: 'production',
+      LEEGALITY_BASE_URL: 'https://app1.leegality.com/api',
       ESIGN_PROVIDER_COST_INR: '24.50',
       ESIGN_MARKUP_INR: '10',
       CREDIT_PACKS: '200, 10,50,10',
@@ -102,8 +107,14 @@ describe('billingConfig', () => {
     [{ CLOUD_PRICE_INR: 'free' }, /CLOUD_PRICE_INR must be an amount/],
     [{ HOSTING_OFFERS: '{' }, /HOSTING_OFFERS must be a JSON list/],
     [{ HOSTING_OFFERS: '[{"name":"x","url":"http://x.example"}]' }, /https links/],
-    [{ ...LEEGALITY, LEEGALITY_ENVIRONMENT: 'live' }, /LEEGALITY_ENVIRONMENT must be/],
-    [{ LEEGALITY_AUTH_TOKEN: 't' }, /LEEGALITY_PRIVATE_SALT, LEEGALITY_WORKFLOW_ID must be set/],
+    [
+      { ...LEEGALITY, LEEGALITY_BASE_URL: 'http://app1.leegality.com/api' },
+      /LEEGALITY_BASE_URL must be/,
+    ],
+    [{ BILLING_LIVE: 'yes' }, /BILLING_LIVE must be true or false/],
+    [{ ...SELLER, INVOICE_UPI_ID: 'not a upi' }, /INVOICE_UPI_ID must be/],
+    [{ ...SELLER, INVOICE_BANK_NAME: 'Bank' }, /INVOICE_BANK_HOLDER, INVOICE_BANK_ACCOUNT/],
+    [{ LEEGALITY_API_KEY: 't' }, /LEEGALITY_PRIVATE_SALT, LEEGALITY_WORKFLOW_ID must be set/],
     [{ OPERATOR_EMAIL: 'owner' }, /OPERATOR_EMAIL must be an email/],
   ])('names the variable for %j', (source, message) => {
     expect(() => billingConfig(source)).toThrow(message);
@@ -118,6 +129,75 @@ describe('billingConfig', () => {
     } catch (err) {
       expect(String(err)).not.toContain('hunter2');
     }
+  });
+});
+
+describe('billing mode', () => {
+  const live = 'https://app1.leegality.com/api';
+
+  it('reports test keys and the sandbox while the install is not live', () => {
+    const config = billingConfig({ ...SELLER, ...RAZORPAY, ...LEEGALITY });
+    expect(billingMode(config)).toEqual({
+      razorpay: 'test',
+      leegality: 'sandbox',
+      live: false,
+      problems: [],
+    });
+    expect(config.leegality).toMatchObject({
+      environment: 'sandbox',
+      baseUrl: 'https://sandbox.leegality.com/api',
+    });
+    expect(creditsOffer(config, 'free').testMode).toBe(true);
+  });
+
+  it('refuses test keys and the sandbox once BILLING_LIVE is on, without throwing', () => {
+    const config = billingConfig({ ...SELLER, ...RAZORPAY, ...LEEGALITY, BILLING_LIVE: 'true' });
+    expect(config.razorpay).toBeNull();
+    expect(config.leegality).toBeNull();
+    expect(paymentsConfigured(config)).toBe(false);
+    const mode = billingMode(config);
+    expect(mode).toMatchObject({ razorpay: 'test', leegality: 'sandbox', live: true });
+    expect(mode.problems).toHaveLength(2);
+    expect(mode.problems.join(' ')).toMatch(/RAZORPAY_KEY_ID is a test key/);
+    expect(mode.problems.join(' ')).toMatch(/LEEGALITY_BASE_URL is the sandbox/);
+    expect(JSON.stringify(mode)).not.toContain('secret-value');
+  });
+
+  it('accepts live keys and the production URL when live', () => {
+    const config = billingConfig({
+      ...SELLER,
+      ...LEEGALITY,
+      RAZORPAY_KEY_ID: 'rzp_live_abc123',
+      RAZORPAY_KEY_SECRET: 'secret-value',
+      LEEGALITY_BASE_URL: `${live}/`,
+      BILLING_LIVE: 'true',
+    });
+    expect(billingMode(config)).toEqual({
+      razorpay: 'live',
+      leegality: 'production',
+      live: true,
+      problems: [],
+    });
+    expect(config.leegality?.baseUrl).toBe(live);
+    expect(creditsOffer(config, 'free').testMode).toBe(false);
+  });
+
+  it('reads the seller details printed on invoices', () => {
+    const { seller } = billingConfig({
+      ...SELLER,
+      INVOICE_SELLER_PHONE: '+91 70000 00000',
+      INVOICE_UPI_ID: 'shop@bank',
+      INVOICE_BANK_NAME: 'Bank',
+      INVOICE_BANK_HOLDER: 'Holder',
+      INVOICE_BANK_ACCOUNT: '123456',
+      INVOICE_BANK_IFSC: 'idfb0021003',
+    });
+    expect(seller).toMatchObject({
+      pan: 'AANCC6406C',
+      phone: '+91 70000 00000',
+      upiId: 'shop@bank',
+      bank: { name: 'Bank', holder: 'Holder', account: '123456', ifsc: 'IDFB0021003' },
+    });
   });
 });
 
@@ -164,7 +244,7 @@ describe('eSign price', () => {
       ESIGN_PROVIDER_COST_INR: '25',
       ...SELLER,
       ...LEEGALITY,
-      LEEGALITY_ENVIRONMENT: 'production',
+      LEEGALITY_BASE_URL: 'https://app1.leegality.com/api',
     };
     expect(creditsOffer(billingConfig({ ...base, ...RAZORPAY }), 'cloud').unavailable).toBe(
       'test_payments',

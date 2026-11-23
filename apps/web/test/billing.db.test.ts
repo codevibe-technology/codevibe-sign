@@ -68,10 +68,10 @@ const ENV = {
   INVOICE_SELLER_CIN: 'U62099HR2026PTC142917',
   INVOICE_SELLER_ADDRESS:
     '3rd Floor, Tower A 309, SAS Tower, Medicity, Sadar Bazar, Gurugram, Haryana 122001',
-  LEEGALITY_AUTH_TOKEN: 'token',
+  LEEGALITY_API_KEY: 'token',
   LEEGALITY_PRIVATE_SALT: 'salt',
   LEEGALITY_WORKFLOW_ID: 'workflow',
-  LEEGALITY_ENVIRONMENT: 'production',
+  LEEGALITY_BASE_URL: 'https://app1.leegality.com/api',
   ESIGN_PROVIDER_COST_INR: '25',
   ESIGN_MARKUP_INR: '10',
 };
@@ -515,7 +515,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const outcome = await confirm(ws.id, order.razorpayOrderId, payment);
       expect(outcome).toMatchObject({ status: 'paid', kind: 'esign_credits', orderId: order.id });
       if (outcome.status !== 'paid') throw new Error('unreachable');
-      expect(outcome.invoice.number).toMatch(/^CVS-2026-\d{4}$/);
+      expect(outcome.invoice.number).toMatch(/^CV-202627\d{4}$/);
       expect(await creditBalance(sql, ws.id)).toEqual({ available: 10, reserved: 0 });
 
       const paid = await getOrder(sql, ws.id, order.id);
@@ -753,7 +753,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
 
     it('numbers invoices without gaps or repeats when many are paid at once', async () => {
       const [before] = await sql<{ last_sequence: number }[]>`
-        select last_sequence from app_invoice_counters where prefix = 'CVS-2026-'`;
+        select last_sequence from app_invoice_counters where prefix = 'CV-202627'`;
       const start = before?.last_sequence ?? 0;
       const buyers = await Promise.all(Array.from({ length: 8 }, () => workspace()));
       const orders = await Promise.all(buyers.map((ws) => buy(ws, 10)));
@@ -780,7 +780,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect((await getOrder(sql, ws.id, failing.order.id))?.status).toBe('created');
       registerFulfilment('esign_credits', fulfilCredits);
       const [counter] = await sql<{ last_sequence: number }[]>`
-        select last_sequence from app_invoice_counters where prefix = 'CVS-2026-'`;
+        select last_sequence from app_invoice_counters where prefix = 'CV-202627'`;
       const next = await buy(ws, 10);
       const outcome = await confirm(
         ws.id,
@@ -801,14 +801,14 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
         razorpay.pay(order.razorpayOrderId),
       );
       if (outcome.status !== 'paid') throw new Error('unreachable');
-      expect(outcome.invoice.number).toMatch(/^CVS-2027-\d{4}$/);
+      expect(outcome.invoice.number).toMatch(/^CV-202728\d{4}$/);
     });
 
     it('keeps test payments out of the tax series', async () => {
       deps.config = billingConfig({
         ...ENV,
         RAZORPAY_KEY_ID: 'rzp_test_TESTKEY123',
-        LEEGALITY_ENVIRONMENT: 'sandbox',
+        LEEGALITY_BASE_URL: 'https://sandbox.leegality.com/api',
       });
       const ws = await workspace();
       const { order, checkout } = await buy(ws, 10);
@@ -889,24 +889,25 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(Buffer.from(pdf!.bytes.subarray(0, 5)).toString()).toBe('%PDF-');
       const text = pdfText(pdf!.bytes);
       for (const expected of [
-        'Tax Invoice',
+        'ORIGINAL FOR RECIPIENT',
         outcome.invoice.number,
-        'Date: 23 Nov 2026',
-        'Codevibe Technology Private Limited',
-        'GSTIN: 06AANCC6406C1ZX',
-        'CIN: U62099HR2026PTC142917',
+        '23 Nov 2026',
+        'CODEVIBE TECHNOLOGY PRIVATE LIMITED',
+        '06AANCC6406C1ZX',
+        'AANCC6406C',
+        'U62099HR2026PTC142917',
         'Acme Traders Private Limited',
-        'Place of supply: Haryana (06)',
+        '06-HARYANA',
         'Aadhaar eSign credits × 10 @ Rs. 35',
-        '998319',
-        '350.00',
-        'CGST @ 9%',
-        'SGST @ 9%',
-        '31.50',
-        '413.00',
-        'Amount in words: Rupees Four Hundred Thirteen Only',
-        `Payment reference: ${payment.id}`,
-        'computer generated invoice',
+        'SAC: 998319',
+        'Rs. 350.00',
+        'CGST 9.0%',
+        'SGST 9.0%',
+        'Rs. 31.50',
+        'Rs. 413.00',
+        'Total amount (in words): INR Four Hundred Thirteen Rupees Only.',
+        `Paid via Razorpay on 23-11-2026 (${payment.id})`,
+        'computer generated document',
       ]) {
         expect(text, expected).toContain(expected);
       }
@@ -921,14 +922,15 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const outcome = await confirm(
         ws.id,
         order.razorpayOrderId,
-        razorpay.pay(order.razorpayOrderId),
+        razorpay.pay(order.razorpayOrderId, { method: 'card' }),
       );
       if (outcome.status !== 'paid') throw new Error('unreachable');
       const text = pdfText((await invoicePdf(sql, deps, ws.id, outcome.invoice.id))!.bytes);
-      expect(text).toContain('IGST @ 18%');
+      expect(text).toContain('IGST 18.0%');
       expect(text).toContain('63.00');
-      expect(text).toContain('GSTIN: Unregistered');
-      expect(text).toContain('Place of supply: Maharashtra (27)');
+      expect(text).toContain('Unregistered');
+      expect(text).toContain('Paid via Card on');
+      expect(text).toContain('27-MAHARASHTRA');
       expect(text).not.toContain('CGST');
     });
 
@@ -951,7 +953,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       const text = pdfText((await invoicePdf(sql, deps, ws.id, outcome.invoice.id))!.bytes);
       expect(text).toContain('Acme Traders Private Limited');
       expect(text).toContain('413.00');
-      expect(text).toContain('CGST @ 9%');
+      expect(text).toContain('CGST 9.0%');
     });
 
     it('draws a name in another script without failing', async () => {

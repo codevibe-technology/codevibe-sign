@@ -18,6 +18,8 @@ export interface RazorpayPayment {
   currency: string;
   /** `created`, `authorized`, `captured`, `refunded` or `failed`. */
   status: string;
+  /** How it was paid: `upi`, `card`, `netbanking`, `wallet` and so on, when the service says. */
+  method?: string | undefined;
 }
 
 export interface RazorpayClient {
@@ -64,6 +66,10 @@ function paymentOf(value: unknown): RazorpayPayment | null {
     amount: body.amount as number,
     currency: typeof body.currency === 'string' ? body.currency : '',
     status: typeof body.status === 'string' ? body.status : '',
+    method:
+      typeof body.method === 'string' && /^[a-z_]{2,24}$/.test(body.method)
+        ? body.method
+        : undefined,
   };
 }
 

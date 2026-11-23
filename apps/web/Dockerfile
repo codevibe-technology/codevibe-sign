@@ -37,6 +37,7 @@ WORKDIR /app
 COPY --from=build --chown=sign:sign /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=sign:sign /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=sign:sign /repo/apps/web/public ./apps/web/public
+COPY --from=build --chown=sign:sign /repo/apps/web/assets ./apps/web/assets
 COPY --from=build --chown=sign:sign /repo/apps/web/docs-dist ./apps/web/docs-dist
 COPY --from=build --chown=sign:sign /repo/apps/web/ops ./apps/web/ops
 WORKDIR /app/apps/web
