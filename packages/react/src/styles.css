@@ -687,6 +687,10 @@
   pointer-events: none;
 }
 
+.cvs-field.cvs-field--esign[data-required]::after {
+  content: none;
+}
+
 .cvs-esign-title {
   color: var(--cvs-accent);
   font-weight: 700;

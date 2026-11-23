@@ -570,6 +570,7 @@ export function SigningView({
               key={f.id}
               className="cvs-field cvs-field--esign"
               data-type="aadhaar"
+              data-required
               role="note"
               aria-label={`${labels.aadhaarBox}: ${labels.aadhaarBoxNote}`}
               style={
