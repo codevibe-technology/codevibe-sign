@@ -36,11 +36,21 @@ export function contentSecurityPolicy({ development }: { development: boolean })
   return directives.map(([name, values]) => `${name} ${values.join(' ')}`).join('; ');
 }
 
-/** Paths that carry, or are reached from, a signing link: they send no referrer at all. */
-const SIGNING_PATHS = ['/sign', '/api/sign/:path*', '/api/v1/sign/:path*'];
+/**
+ * Paths that carry, or are reached from, a link that works like a password: a signing link, a
+ * password reset link or an invitation. They send no referrer at all.
+ */
+const SECRET_LINK_PATHS = [
+  '/sign',
+  '/api/sign/:path*',
+  '/api/v1/sign/:path*',
+  '/reset-password',
+  '/api/auth/reset-password/:path*',
+  '/invite/:path*',
+];
 
 /**
- * Response headers for `next.config.ts`. Later rules win for the same header, so the signing
+ * Response headers for `next.config.ts`. Later rules win for the same header, so the secret-link
  * paths come after the rule for every path.
  */
 export function headerRules(options: { development: boolean }): HeaderRule[] {
@@ -55,7 +65,7 @@ export function headerRules(options: { development: boolean }): HeaderRule[] {
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
       ],
     },
-    ...SIGNING_PATHS.map((source) => ({
+    ...SECRET_LINK_PATHS.map((source) => ({
       source,
       headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
     })),

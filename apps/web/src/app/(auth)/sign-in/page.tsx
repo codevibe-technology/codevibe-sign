@@ -20,8 +20,17 @@ export default async function SignInPage({
     <AuthFrame>
       <p className="eyebrow mb-2">Codevibe Sign</p>
       <h1 className="text-[26px] leading-tight font-bold">Sign in</h1>
-      <p className="mt-1.5 mb-6 text-muted">We will email you a link. No password to remember.</p>
-      <SignInForm next={next} google={googleEnabled(env())} failed={params.error !== undefined} />
+      <p className="mt-1.5 mb-6 text-muted">
+        Use your password, or have a sign-in link sent to your email.
+      </p>
+      <SignInForm
+        next={next}
+        google={googleEnabled(env())}
+        failed={params.error !== undefined}
+        {...(params.reset !== undefined
+          ? { notice: 'Your password was changed. Sign in with the new one.' }
+          : {})}
+      />
     </AuthFrame>
   );
 }

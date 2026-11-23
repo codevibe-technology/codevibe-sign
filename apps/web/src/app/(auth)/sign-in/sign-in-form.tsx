@@ -1,7 +1,9 @@
 'use client';
 
 import { MailCheck } from 'lucide-react';
+import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import { PasswordInput } from '@/components/auth/password-input';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { authClient } from '@/lib/auth-client';
@@ -17,40 +19,84 @@ function GoogleIcon() {
   );
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const BAD_EMAIL = 'Enter your work email, for example asha@company.com';
+
+type Mode = 'password' | 'link';
+
 export function SignInForm({
   next,
   google,
   failed,
+  notice,
 }: {
   next: string;
   google: boolean;
   failed: boolean;
+  /** Something that just happened, for example a password that was reset. */
+  notice?: string;
 }) {
+  const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | undefined>(
-    failed ? 'That sign-in link has expired or was already used. Ask for a new one.' : undefined,
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
+    failed
+      ? { email: 'That sign-in link has expired or was already used. Ask for a new one.' }
+      : {},
   );
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const address = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-      setError('Enter your work email, for example asha@company.com');
-      return;
-    }
+  function switchTo(to: Mode) {
+    setMode(to);
+    setErrors({});
+  }
+
+  async function sendLink(address: string) {
     setPending(true);
-    setError(undefined);
-    const { error: failure } = await authClient.signIn.magicLink({
+    const { error } = await authClient.signIn.magicLink({
       email: address,
       callbackURL: next,
-      newUserCallbackURL: next === '/' ? '/onboarding' : next,
+      newUserCallbackURL: next,
       errorCallbackURL: '/sign-in?error=link',
     });
     setPending(false);
-    if (failure) setError(failure.message ?? 'We could not send the link. Try again.');
+    if (error) setErrors({ email: error.message ?? 'We could not send the link. Try again.' });
     else setSentTo(address);
+  }
+
+  async function signIn(address: string) {
+    if (!password) {
+      setErrors({ password: 'Enter your password, or use "Email me a link instead".' });
+      return;
+    }
+    setPending(true);
+    const { error } = await authClient.signIn.email({ email: address, password });
+    if (!error) {
+      // A full page load, so the next page is rendered with the new session.
+      window.location.assign(next);
+      return;
+    }
+    setPending(false);
+    setErrors({
+      password:
+        error.status === 429
+          ? (error.message ?? 'Too many attempts. Try again in a few minutes.')
+          : error.status === 401
+            ? 'That email and password do not match. Check them, or use "Email me a link instead".'
+            : (error.message ?? 'We could not sign you in. Try again.'),
+    });
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const address = email.trim();
+    if (!EMAIL.test(address)) {
+      setErrors({ email: BAD_EMAIL });
+      return;
+    }
+    setErrors({});
+    void (mode === 'link' ? sendLink(address) : signIn(address));
   }
 
   if (sentTo) {
@@ -73,15 +119,23 @@ export function SignInForm({
     );
   }
 
+  const forgot = `/forgot-password${EMAIL.test(email.trim()) ? `?email=${encodeURIComponent(email.trim())}` : ''}`;
+
   return (
     <div className="space-y-5">
+      {notice ? (
+        <p className="rounded-lg border border-accent/40 bg-accent-soft p-3 text-sm" role="status">
+          {notice}
+        </p>
+      ) : null}
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Work email" error={error}>
+        <Field label="Work email" error={errors.email}>
           {(props) => (
             <Input
               {...props}
               type="email"
-              autoComplete="email"
+              name="email"
+              autoComplete="username"
               autoFocus
               placeholder="you@company.com"
               value={email}
@@ -89,15 +143,52 @@ export function SignInForm({
             />
           )}
         </Field>
+        {mode === 'password' ? (
+          <div className="space-y-1.5">
+            <Field label="Password" error={errors.password}>
+              {(props) => (
+                <PasswordInput
+                  {...props}
+                  name="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              )}
+            </Field>
+            <p className="text-right text-[13px]">
+              <Link href={forgot} className="font-semibold text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted">
+            We will email you a link that signs you in. It works once and expires in 10 minutes.
+          </p>
+        )}
         <Button type="submit" className="w-full" pending={pending}>
-          {pending ? 'Sending link…' : 'Email me a sign-in link'}
+          {mode === 'password'
+            ? pending
+              ? 'Signing in…'
+              : 'Sign in'
+            : pending
+              ? 'Sending link…'
+              : 'Email me a sign-in link'}
         </Button>
       </form>
-      {google ? (
-        <>
-          <div className="flex items-center gap-3 font-mono text-[11px] tracking-[0.1em] text-muted uppercase">
-            <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
-          </div>
+      <div className="flex items-center gap-3 font-mono text-[11px] tracking-[0.1em] text-muted uppercase">
+        <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
+      </div>
+      <div className="space-y-3">
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={() => switchTo(mode === 'password' ? 'link' : 'password')}
+        >
+          {mode === 'password' ? 'Email me a link instead' : 'Use my password instead'}
+        </Button>
+        {google ? (
           <Button
             variant="secondary"
             className="w-full"
@@ -105,15 +196,19 @@ export function SignInForm({
               void authClient.signIn.social({
                 provider: 'google',
                 callbackURL: next,
-                newUserCallbackURL: next === '/' ? '/onboarding' : next,
+                newUserCallbackURL: next,
                 errorCallbackURL: '/sign-in?error=google',
               })
             }
           >
             <GoogleIcon /> Continue with Google
           </Button>
-        </>
-      ) : null}
+        ) : null}
+      </div>
+      <p className="text-center text-[13px] text-muted">
+        New here? Use &quot;Email me a link instead&quot;. It creates your account, and you can add
+        a password afterwards in your settings.
+      </p>
       <p className="text-center text-xs text-muted">
         By signing in you agree to your workspace&apos;s terms of use.
       </p>

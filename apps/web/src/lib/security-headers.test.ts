@@ -53,4 +53,10 @@ describe('headerRules', () => {
     const order = rules.map((rule) => rule.source);
     expect(order.indexOf('/:path*')).toBeLessThan(order.indexOf('/sign'));
   });
+
+  it('sends no referrer from a password reset link or an invitation', () => {
+    for (const source of ['/reset-password', '/api/auth/reset-password/:path*', '/invite/:path*']) {
+      expect(valueFor(source, 'Referrer-Policy')).toBe('no-referrer');
+    }
+  });
 });

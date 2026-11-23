@@ -27,6 +27,12 @@ export async function hasPassword(sql: Sql, userId: string): Promise<boolean> {
   return Boolean(row);
 }
 
+/** Whether anyone has an account with this address. */
+export async function hasAccount(sql: Sql, email: string): Promise<boolean> {
+  const [row] = await sql`select 1 from auth_users where lower(email) = ${cleanEmail(email)}`;
+  return Boolean(row);
+}
+
 function checked(password: string, account: { email: string; name?: string | null }): string {
   const problem = passwordProblem(password, account);
   if (problem) throw new AppError('VALIDATION', problem, 'newPassword');

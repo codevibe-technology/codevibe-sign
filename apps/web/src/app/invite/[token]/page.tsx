@@ -1,13 +1,15 @@
 import { MailX, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { StatusPage } from '@/components/shell/status-page';
+import { AuthFrame, StatusPage } from '@/components/shell/status-page';
 import { Button } from '@/components/ui/button';
 import { ROLE_LABELS } from '@/lib/roles';
 import { getSessionUser } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { findInvitation, invitationState } from '@/server/invitations';
+import { hasAccount } from '@/server/auth/passwords';
 import { AcceptInvitation } from './accept-invitation';
+import { JoinForm } from './join-form';
 
 export const metadata: Metadata = { title: 'Invitation' };
 
@@ -32,17 +34,28 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     </>
   );
   if (!user) {
+    const signIn = `/sign-in?next=${encodeURIComponent(here)}`;
+    if (await hasAccount(db(), invitation.email)) {
+      return (
+        <StatusPage
+          icon={Users}
+          title={`Join ${invitation.workspaceName}`}
+          description={description}
+          action={
+            <Button asChild>
+              <Link href={signIn}>Sign in to accept</Link>
+            </Button>
+          }
+        />
+      );
+    }
     return (
-      <StatusPage
-        icon={Users}
-        title={`Join ${invitation.workspaceName}`}
-        description={description}
-        action={
-          <Button asChild>
-            <Link href={`/sign-in?next=${encodeURIComponent(here)}`}>Sign in to accept</Link>
-          </Button>
-        }
-      />
+      <AuthFrame>
+        <p className="eyebrow mb-2">Invitation</p>
+        <h1 className="text-[26px] leading-tight font-bold">Join {invitation.workspaceName}</h1>
+        <p className="mt-1.5 mb-6 text-muted">{description}</p>
+        <JoinForm token={token} email={invitation.email} signInHref={signIn} />
+      </AuthFrame>
     );
   }
   if (user.email.toLowerCase() !== invitation.email) {
