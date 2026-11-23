@@ -282,7 +282,7 @@ function checkSignature(signedContent: Buffer, cmsBinary: string): SignatureChec
   );
   const md = digest.forge();
   md.update(attributesDer);
-  let verified = false;
+  let verified: boolean;
   try {
     verified = (cert.publicKey as forge.pki.rsa.PublicKey).verify(
       md.digest().getBytes(),

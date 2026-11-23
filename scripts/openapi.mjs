@@ -196,7 +196,7 @@ const outputs = [
 const check = process.argv.includes('--check');
 let stale = false;
 for (const [file, text] of outputs) {
-  let current = '';
+  let current;
   try {
     current = readFileSync(file, 'utf8');
   } catch {

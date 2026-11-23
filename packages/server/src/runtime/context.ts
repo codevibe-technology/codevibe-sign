@@ -140,7 +140,10 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     try {
       checkWebhookUrl(hook.url, webhookSecurity);
     } catch (err) {
-      throw new Error(`${err instanceof Error ? err.message : 'Invalid webhook URL'}: ${hook.url}`);
+      throw new Error(
+        `${err instanceof Error ? err.message : 'Invalid webhook URL'}: ${hook.url}`,
+        { cause: err },
+      );
     }
     if (hook.secret.length < 16) throw new Error(`Webhook secret for ${hook.url} is too short`);
   }

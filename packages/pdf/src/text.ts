@@ -42,7 +42,6 @@ export function wrapText(text: string, font: PDFFont, size: number, maxWidth: nu
       }
       if (line !== '') {
         lines.push(line);
-        line = '';
       }
       if (font.widthOfTextAtSize(word, size) <= maxWidth) {
         line = word;

@@ -136,29 +136,15 @@ class MockContext2D {
   }
   drawImage(source: HTMLCanvasElement, ...args: number[]) {
     const src = pixelsOf(source);
-    let [sx, sy, sw, sh, dx, dy, dw, dh] = [
-      0,
-      0,
-      src.width,
-      src.height,
-      0,
-      0,
-      src.width,
-      src.height,
-    ];
-    if (args.length === 2) [dx, dy] = args as [number, number];
-    else if (args.length === 4) [dx, dy, dw, dh] = args as [number, number, number, number];
-    else
-      [sx, sy, sw, sh, dx, dy, dw, dh] = args as [
-        number,
-        number,
-        number,
-        number,
-        number,
-        number,
-        number,
-        number,
-      ];
+    type Box = [number, number, number, number];
+    const whole: Box = [0, 0, src.width, src.height];
+    const [sx, sy, sw, sh, dx, dy, dw, dh] = (
+      args.length === 2
+        ? [...whole, ...args, src.width, src.height]
+        : args.length === 4
+          ? [...whole, ...args]
+          : args
+    ) as [...Box, ...Box];
     const dst = this.px;
     for (let yy = 0; yy < dh; yy++) {
       for (let xx = 0; xx < dw; xx++) {

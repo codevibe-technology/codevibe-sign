@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   if (length > MAX_PDF_BYTES + 64 * 1024) {
     return problem(413, `The file is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.`);
   }
-  let file: FormDataEntryValue | null = null;
+  let file: FormDataEntryValue | null;
   try {
     file = (await request.formData()).get('file');
   } catch {

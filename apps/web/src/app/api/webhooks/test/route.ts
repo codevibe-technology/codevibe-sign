@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   if (text.length > MAX_BODY_BYTES) {
     return Response.json({ received: false, error: 'body too large' }, { status: 413 });
   }
-  let event: string | null = null;
+  let event: string | null;
   try {
     const body = JSON.parse(text) as { type?: unknown; event?: unknown };
     const name = body.type ?? body.event;
