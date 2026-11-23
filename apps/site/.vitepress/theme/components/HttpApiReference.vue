@@ -24,7 +24,8 @@ const customCss = `
   --scalar-button-1-hover: var(--vp-c-brand-2);
   --scalar-color-green: #0f766e;
   --scalar-color-blue: var(--cv-blue);
-  --scalar-color-orange: #c2621d;
+  --scalar-color-orange: #a14d0f;
+  --scalar-color-yellow: #855d00;
   --scalar-color-red: #c2410c;
   --scalar-color-purple: #4f46e5;
   --scalar-sidebar-background-1: var(--vp-c-bg-alt);
@@ -32,10 +33,14 @@ const customCss = `
   --scalar-sidebar-color-active: var(--vp-c-brand-1);
   --scalar-custom-header-height: var(--vp-nav-height);
 }
+.scalar-app .sidebar-search-placeholder {
+  color: var(--vp-c-text-2);
+}
 .dark .scalar-app {
   --scalar-color-green: var(--cv-teal);
   --scalar-color-blue: #6ea3f5;
   --scalar-color-orange: var(--cv-warm);
+  --scalar-color-yellow: #facc15;
   --scalar-color-red: #f87171;
   --scalar-color-purple: #a5b4fc;
   --scalar-button-1-color: #0b1622;
@@ -97,16 +102,16 @@ const links = [
 
 <template>
   <div class="http-api">
-    <div class="http-api__intro">
+    <section class="http-api__intro" aria-label="About this reference">
       <p>
         Every route of the server, with a <strong>Test Request</strong> button that calls your own
         server. Set the server URL under <em>Server</em>, then your API key under
         <em>Authentication</em>.
       </p>
-      <nav>
+      <nav aria-label="API downloads and guides">
         <a v-for="link in links" :key="link.href" :href="link.href">{{ link.text }}</a>
       </nav>
-    </div>
+    </section>
     <div ref="mountPoint" class="http-api__reference" />
   </div>
 </template>

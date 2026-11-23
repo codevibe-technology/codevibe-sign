@@ -13,7 +13,7 @@ info:
       when the recipient needs one, and sign, approve or decline. Signer routes are
       authorised by the signing token in the path.
 
-    ### Errors
+    ## Errors
 
     Every error has the same JSON body, `{ "error": { "code", "message", "details"? } }`,
     and each code always comes with the same HTTP status:
@@ -36,20 +36,20 @@ info:
     Validation errors list each problem in `details.issues` as `{ path, message }`, for
     example `recipients[1].email`. Stack traces never leave the server.
 
-    ### Workspaces
+    ## Workspaces
 
     Every envelope belongs to the workspace of the credential that created it. A sender only
     sees and acts on its own workspace's envelopes; an id from another workspace answers
     `ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for
     example a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.
 
-    ### Retries
+    ## Retries
 
     POST routes accept an `Idempotency-Key` header. A retry with the same key and the same
     body within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.
     Server errors (5xx) are not stored, so they can be retried with the same key.
 
-    ### Rate limits
+    ## Rate limits
 
     Limits are per API key (creating envelopes), per signing token and per client IP
     (signer routes), and per recipient (one-time codes). A request over a limit gets `429`
