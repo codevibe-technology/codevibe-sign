@@ -50,6 +50,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
+    "@types/node": "22.19.1",
     "fast-check": "4.10.1"
   }
 }
