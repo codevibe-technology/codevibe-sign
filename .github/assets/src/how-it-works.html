@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>How it works</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 680px;
+      }
+      h1 {
+        font-size: 42px;
+        margin-top: 16px;
+      }
+      .row {
+        display: flex;
+        align-items: stretch;
+        gap: 14px;
+        margin-top: 30px;
+      }
+      .card {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .screen {
+        height: 214px;
+        background: #eef2f8;
+        border-bottom: 1px solid var(--line);
+        overflow: hidden;
+        position: relative;
+      }
+      .screen img {
+        position: absolute;
+        display: block;
+      }
+      .body {
+        padding: 18px 20px 20px;
+      }
+      .n {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--primary);
+        color: #fff;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Space Grotesk';
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .card h3 {
+        display: inline;
+        font-size: 21px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      .card p {
+        margin-top: 10px;
+        font-size: 14.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <span class="eyebrow t-teal">How it works</span>
+      <h1>From PDF to a signed copy <span class="blue">anyone can check.</span></h1>
+      <div class="row">
+        <div class="card">
+          <div class="screen">
+            <img src="shots/send-fields.webp" alt="" style="width: 560px; left: -6px; top: -4px" />
+          </div>
+          <div class="body">
+            <span class="n">1</span>
+            <h3>Send</h3>
+            <p>
+              Upload PDFs, add signers, approvers and people who get a copy, and place fields on one
+              page, every page or a few.
+            </p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="screen" style="background: #e8faf6">
+            <img
+              src="shots/phone-guided.webp"
+              alt=""
+              style="
+                width: 180px;
+                left: 50%;
+                margin-left: -90px;
+                top: -150px;
+                border-radius: 16px;
+                box-shadow: 0 12px 30px -12px rgb(13 27 42 / 0.4);
+              "
+            />
+          </div>
+          <div class="body">
+            <span class="n">2</span>
+            <h3>Sign</h3>
+            <p>
+              A one-time code, then Start, Next and Finish on any phone. In order or all at once. No
+              account and no app.
+            </p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="screen" style="background: #f4eefc">
+            <img
+              src="shots/certificate.webp"
+              alt=""
+              style="
+                width: 300px;
+                left: 50%;
+                margin-left: -150px;
+                top: 14px;
+                box-shadow: 0 12px 30px -12px rgb(13 27 42 / 0.4);
+              "
+            />
+          </div>
+          <div class="body">
+            <span class="n">3</span>
+            <h3>Seal</h3>
+            <p>
+              One sealed PDF: the signed pages and a one-page certificate with a QR code, under a
+              PAdES seal.
+            </p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="screen">
+            <img
+              src="shots/verify-result.webp"
+              alt=""
+              style="width: 420px; left: 12px; top: 14px; border-radius: 10px"
+            />
+          </div>
+          <div class="body">
+            <span class="n">4</span>
+            <h3>Verify</h3>
+            <p>
+              Scan the QR for the public record, or drop the file on the verify page. No account
+              needed.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="tags">
+          <span class="tag">One-page certificate with QR</span>
+          <span class="tag">PAdES seal</span>
+          <span class="tag">SHA-256 audit chain</span>
+          <span class="tag">Public record</span>
+          <span class="tag">sign.codevibe.in/verify</span>
+        </div>
+        <span class="by">by <img src="../codevibe-logo-dark.png" alt="Codevibe" /></span>
+      </div>
+    </div>
+  </body>
+</html>

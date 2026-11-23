@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Codevibe Sign banner</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 640px;
+        padding-top: 58px;
+      }
+      h1 {
+        font-size: 52px;
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+        margin-top: 26px;
+        width: 640px;
+        white-space: nowrap;
+      }
+      .lead {
+        font-size: 19px;
+        line-height: 1.5;
+        margin-top: 20px;
+        width: 500px;
+      }
+      .dots {
+        margin-top: 40px;
+        width: 560px;
+      }
+      .code {
+        margin-top: 30px;
+      }
+      .shot {
+        position: absolute;
+        left: 716px;
+        top: 92px;
+        width: 720px;
+      }
+      .phone {
+        left: 656px;
+        top: 236px;
+        width: 180px;
+      }
+      .toast {
+        white-space: nowrap;
+      }
+      .by {
+        position: absolute;
+        left: 64px;
+        bottom: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <img
+        src="../../../apps/web/public/brand/logo.svg"
+        alt=""
+        style="height: 40px; display: block"
+      />
+      <div class="dots">
+        <span><i style="background: var(--dot-blue)"></i>PDF e-signatures</span>
+        <span><i style="background: var(--dot-orange)"></i>Aadhaar eSign</span>
+        <span><i style="background: var(--dot-purple)"></i>API and webhooks</span>
+        <span><i style="background: var(--dot-teal)"></i>Self-host</span>
+      </div>
+      <h1>Get documents signed.<br /><span class="blue">Keep the proof.</span></h1>
+      <p class="lead muted">
+        Send a PDF, people sign on any phone, and you get back a sealed PDF with a certificate
+        anyone can check.
+      </p>
+      <div class="code"><b>$</b>npm i codevibe-sign</div>
+      <div class="frame shot">
+        <div class="bar">
+          <span class="lights"
+            ><i style="background: #f26b5b"></i><i style="background: #f5be4f"></i
+            ><i style="background: #4cc38a"></i
+          ></span>
+          <span class="addr">sign.codevibe.in</span><span class="chip">Sample data</span>
+        </div>
+        <img src="shots/dashboard.webp" alt="" />
+      </div>
+      <div class="phone"><img src="shots/phone-guided.webp" alt="" /></div>
+      <div class="toast" style="left: 850px; top: 540px">
+        <span class="tile t-green" data-icon="Check"></span>
+        <span><b>Ananya Rao signed</b><small>On a phone, with an email code</small></span>
+      </div>
+      <div class="toast" style="left: 1010px; top: 410px">
+        <span class="tile t-blue" data-icon="ShieldCheck"></span>
+        <span><b>Seal is valid</b><small>PAdES, SHA-256 chain intact</small></span>
+      </div>
+      <span class="by">by <img src="../codevibe-logo-dark.png" alt="Codevibe" /></span>
+    </div>
+  </body>
+</html>

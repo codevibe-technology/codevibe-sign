@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>What's inside</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 720px;
+      }
+      h1 {
+        font-size: 42px;
+        margin-top: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 28px;
+      }
+      .card {
+        padding: 22px 24px 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <span class="eyebrow t-blue">What's inside</span>
+      <h1>Everything a signing tool needs, <span class="blue">and the evidence.</span></h1>
+      <div class="grid">
+        <div class="card">
+          <span class="tile t-blue" data-icon="ShieldCheck"></span>
+          <h3>A sealed PDF and a public record</h3>
+          <p>
+            A PAdES seal, a one-page certificate with a QR code and a SHA-256 audit chain. The QR
+            opens the public record.
+          </p>
+        </div>
+        <div class="card">
+          <span class="tile t-violet" data-icon="ListOrdered"></span>
+          <h3>Guided signing on any phone</h3>
+          <p>
+            A one-time code, then Start, Next and Finish. In order or all at once, with reminders
+            and an expiry date.
+          </p>
+        </div>
+        <div class="card">
+          <span class="tile t-pink" data-icon="FileStack"></span>
+          <h3>Templates and bulk send</h3>
+          <p>
+            Roles and fields kept in place, on one page, every page or a few. One envelope per CSV
+            row, every row checked first.
+          </p>
+        </div>
+        <div class="card">
+          <span class="tile t-orange" data-icon="Webhook"></span>
+          <h3>API, webhooks and React</h3>
+          <p>
+            An HTTP API with OpenAPI 3.1 and Postman, signed webhooks, and a React signing view for
+            your own app.
+          </p>
+        </div>
+        <div class="card">
+          <span class="tile t-green" data-icon="Fingerprint"></span>
+          <h3>Aadhaar eSign through Leegality</h3>
+          <p>
+            The signer confirms with an Aadhaar OTP on Leegality's page. Pay only for completed
+            eSigns. We never see the Aadhaar number.
+          </p>
+        </div>
+        <div class="card">
+          <span class="tile t-teal" data-icon="UserCog"></span>
+          <h3>Team roles and transfer</h3>
+          <p>
+            Owner, admins, members and viewers, plus a Billing admin. Hand a workspace to another
+            account with its documents.
+          </p>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="tags">
+          <span class="tag">Free: 10 envelopes a month</span>
+          <span class="tag">Cloud: ₹999 a month + GST</span>
+          <span class="tag">Self-hosted: free, unlimited</span>
+          <span class="tag">Apache-2.0 libraries</span>
+          <span class="tag">AGPL-3.0 server and app</span>
+        </div>
+        <span class="by">by <img src="../codevibe-logo-dark.png" alt="Codevibe" /></span>
+      </div>
+    </div>
+  </body>
+</html>

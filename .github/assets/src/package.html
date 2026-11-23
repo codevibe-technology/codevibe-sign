@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Package banner</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 400px;
+        padding-top: 46px;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .scope {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 20px;
+        color: var(--muted);
+        margin-top: 30px;
+        min-height: 26px;
+      }
+      .name {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        font-size: 54px;
+        line-height: 1.1;
+      }
+      .desc {
+        font-size: 18px;
+        line-height: 1.5;
+        margin-top: 12px;
+        width: 700px;
+        color: var(--muted);
+      }
+      .tags {
+        margin-top: 18px;
+        align-items: center;
+      }
+      .list {
+        position: absolute;
+        right: 64px;
+        top: 34px;
+        width: 330px;
+        padding: 14px 12px;
+      }
+      .list p {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+        padding: 0 12px 6px;
+      }
+      .item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13.5px;
+        color: #334155;
+      }
+      .item.on {
+        background: var(--primary-soft);
+        color: var(--primary-text);
+        font-weight: 500;
+        outline: 1px solid #b9d0f5;
+      }
+      .item small {
+        font-size: 11.5px;
+      }
+      .by {
+        position: absolute;
+        left: 64px;
+        bottom: 26px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <div class="top">
+        <img
+          src="../../../apps/web/public/brand/logo.svg"
+          alt=""
+          style="height: 30px; display: block"
+        />
+        <span class="eyebrow t-teal">Package</span>
+      </div>
+      <p class="scope" id="scope"></p>
+      <h1 class="name" id="name"></h1>
+      <p class="desc" id="desc"></p>
+      <div class="tags" id="tags"></div>
+      <div class="card list" id="list"><p>THE PACKAGES</p></div>
+      <span class="by">by <img src="../codevibe-logo-dark.png" alt="Codevibe" /></span>
+    </div>
+    <script>
+      // Each package with the text of its package.json description, shortened to fit.
+      const PACKAGES = [
+        [
+          'codevibe-sign',
+          'codevibe-sign',
+          'The one library to install: the API client, PDF sealing and offline verify, React components and a CLI.',
+          'Apache-2.0',
+        ],
+        [
+          'core',
+          '@codevibe_technology/sign-core',
+          'Envelopes, recipients, the signing workflow and a hash-chained audit log. Pure TypeScript, no I/O.',
+          'Apache-2.0',
+        ],
+        [
+          'pdf',
+          '@codevibe_technology/sign-pdf',
+          'Draws signatures on PDFs, adds the signing certificate page, and applies or verifies a PAdES seal.',
+          'Apache-2.0',
+        ],
+        [
+          'client',
+          '@codevibe_technology/sign-client',
+          'A typed client for the Codevibe Sign HTTP API, signing sessions and webhooks.',
+          'Apache-2.0',
+        ],
+        [
+          'react',
+          '@codevibe_technology/sign-react',
+          'React components for signing: a signature pad, the signing view and field placement.',
+          'Apache-2.0',
+        ],
+        [
+          'templates',
+          '@codevibe_technology/sign-templates',
+          'Reusable signing templates with roles and prefilled fields, and bulk send from CSV.',
+          'Apache-2.0',
+        ],
+        [
+          'aadhaar',
+          '@codevibe_technology/sign-aadhaar',
+          'Aadhaar eSign through a licensed eSign provider, with your own provider account.',
+          'Apache-2.0',
+        ],
+        [
+          'server',
+          '@codevibe_technology/sign-server',
+          'The HTTP API and runtime for sending, signing and sealing documents.',
+          'AGPL-3.0',
+        ],
+      ];
+      const key = new URLSearchParams(location.search).get('pkg') ?? 'codevibe-sign';
+      const [, name, desc, licence] = PACKAGES.find(([k]) => k === key);
+      const parts = name.split('/');
+      document.getElementById('scope').textContent = parts.length > 1 ? parts[0] + '/' : '';
+      const nameEl = document.getElementById('name');
+      nameEl.textContent = parts.at(-1);
+      if (parts.at(-1).length > 13) nameEl.style.fontSize = '48px';
+      document.getElementById('desc').textContent = desc;
+      document.getElementById('tags').innerHTML =
+        `<span class="eyebrow ${licence === 'AGPL-3.0' ? 't-violet' : 't-green'}">${licence}</span>` +
+        '<span class="tag">Node 22+</span><span class="tag">TypeScript</span>';
+      document
+        .getElementById('list')
+        .insertAdjacentHTML(
+          'beforeend',
+          PACKAGES.map(
+            ([k, n, , l]) =>
+              `<div class="item${k === key ? ' on' : ''}"><span>${n.split('/').pop()}</span>` +
+              `<small style="color:${l === 'AGPL-3.0' ? '#7a35b5' : '#0e7466'}">${l.split('-')[0]}</small></div>`,
+          ).join(''),
+        );
+    </script>
+  </body>
+</html>

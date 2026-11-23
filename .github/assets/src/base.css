@@ -1,0 +1,330 @@
+/* Shared look of the README and package images: the tokens of apps/web/src/app/globals.css. */
+@font-face {
+  font-family: 'Inter';
+  font-weight: 100 900;
+  src: url('fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-weight: 100 900;
+  src: url('fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-weight: 300 700;
+  src: url('../../../apps/site/public/fonts/space-grotesk-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-weight: 300 700;
+  src: url('fonts/space-grotesk-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+20A0-20C0;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400 800;
+  src: url('../../../apps/site/public/fonts/jetbrains-mono-latin.woff2') format('woff2');
+}
+
+:root {
+  --canvas: #f4f5f7;
+  --surface: #ffffff;
+  --ink: #0f172a;
+  --muted: #5a6980;
+  --line: #e3e6eb;
+  --line-strong: #c9d0da;
+  --primary: #1b6ae0;
+  --primary-text: #1860d0;
+  --primary-soft: #e6effc;
+  --accent: #2dd4bf;
+  --accent-soft: #d8f7f2;
+  --success: #12805c;
+  --success-soft: #def4eb;
+  --navy: #0d1b2a;
+  --dot-blue: #1b6ae0;
+  --dot-orange: #e07a1f;
+  --dot-purple: #8a3fc2;
+  --dot-teal: #12a08a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html,
+body {
+  background: #fff;
+}
+body {
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11';
+}
+h1,
+h2,
+h3,
+.display {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* The canvas of every image: the hero gradient of the home page. */
+.c {
+  position: relative;
+  overflow: hidden;
+  width: 1280px;
+  padding: 52px 64px 0;
+  background: radial-gradient(60rem 32rem at 15% -10%, #dce9ff 0%, transparent 60%),
+    radial-gradient(50rem 30rem at 90% 10%, #d5f6f0 0%, transparent 60%),
+    linear-gradient(#f7faff, #ffffff 80%);
+}
+.blue {
+  color: var(--primary);
+}
+.muted {
+  color: var(--muted);
+}
+
+/* An eyebrow: Inter 600 in a pill on a tint. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.t-blue {
+  background: #e6effc;
+  color: #1860d0;
+}
+.t-teal {
+  background: #ddf7f2;
+  color: #0e7466;
+}
+.t-violet {
+  background: #f1e8fb;
+  color: #7a35b5;
+}
+.t-orange {
+  background: #fdede3;
+  color: #b4471a;
+}
+.t-green {
+  background: #e1f5ea;
+  color: #167347;
+}
+.t-pink {
+  background: #fbe7ef;
+  color: #a62d60;
+}
+
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+.tile svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* The four claims of the hero, each after a coloured dot. */
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.dots span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.card {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 rgb(13 27 42 / 0.04),
+    0 18px 40px -26px rgb(13 27 42 / 0.35);
+  outline: 1px solid var(--line);
+}
+.card h3 {
+  font-size: 21px;
+  line-height: 1.25;
+  margin: 16px 0 8px;
+}
+.card p {
+  color: var(--muted);
+  font-size: 15.5px;
+  line-height: 1.5;
+}
+
+.frame {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 2px 4px rgb(13 27 42 / 0.04),
+    0 36px 70px -30px rgb(27 106 224 / 0.45);
+  outline: 1px solid #d6e2f5;
+}
+.frame .bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f7f9fc;
+  border-bottom: 1px solid var(--line);
+  padding: 9px 14px;
+}
+.frame .lights {
+  display: flex;
+  gap: 6px;
+}
+.frame .lights i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.frame .addr {
+  margin: 0 auto;
+  background: #fff;
+  outline: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 2px 26px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.frame .chip {
+  font-size: 11.5px;
+  color: var(--muted);
+  background: #eef0f3;
+  border-radius: 99px;
+  padding: 2px 10px;
+}
+.frame img {
+  display: block;
+  width: 100%;
+}
+
+.phone {
+  position: absolute;
+  border-radius: 34px;
+  background: #0d1b2a;
+  padding: 9px;
+  box-shadow: 0 40px 70px -30px rgb(13 27 42 / 0.6);
+}
+.phone img {
+  display: block;
+  width: 100%;
+  border-radius: 26px;
+}
+
+.toast {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 11px 16px 11px 12px;
+  box-shadow: 0 18px 40px -16px rgb(13 27 42 / 0.45);
+  outline: 1px solid var(--line);
+}
+.toast .tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.toast .tile svg {
+  width: 18px;
+  height: 18px;
+}
+.toast b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.toast small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.code {
+  display: inline-flex;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--navy);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 11px 22px;
+  font-size: 16px;
+}
+.code b {
+  color: #7cf0df;
+  font-weight: 500;
+}
+
+.foot {
+  position: absolute;
+  left: 64px;
+  right: 64px;
+  bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #334155;
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  outline: 1px solid var(--line);
+}
+
+/* The agency credit: small, never the main mark. */
+.by {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.by img {
+  height: 17px;
+}

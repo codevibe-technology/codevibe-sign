@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Licensing</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 520px;
+      }
+      .head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+      }
+      h1 {
+        font-size: 42px;
+        margin-top: 16px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 32px;
+      }
+      .card {
+        padding: 26px 26px 28px;
+        min-height: 300px;
+      }
+      .card h3 {
+        font-size: 24px;
+        margin: 16px 0 8px;
+      }
+      .pk {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .pk span {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: #334155;
+        border-radius: 999px;
+        padding: 4px 11px;
+        outline: 1px solid var(--line);
+      }
+      .note {
+        margin-top: 20px;
+        border-radius: 12px;
+        padding: 11px 14px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <div class="head">
+        <div>
+          <span class="eyebrow t-violet">Licensing</span>
+          <h1>Two licences, <span class="blue">kept apart.</span></h1>
+        </div>
+        <span class="by" style="margin-bottom: 10px"
+          >by <img src="../codevibe-logo-dark.png" alt="Codevibe"
+        /></span>
+      </div>
+      <div class="row">
+        <div class="card">
+          <span class="eyebrow t-green">Apache-2.0</span>
+          <h3>Libraries</h3>
+          <p>Use them in any product, open or closed, commercial or not.</p>
+          <div class="pk">
+            <span>codevibe-sign</span><span>sign-core</span><span>sign-pdf</span
+            ><span>sign-client</span><span>sign-react</span><span>sign-templates</span
+            ><span>sign-aadhaar</span>
+          </div>
+          <div class="code" style="margin-top: 20px; font-size: 14px; padding: 10px 18px">
+            <b>$</b>npm i codevibe-sign<span style="color: #8fa3bb"
+              >installs Apache-2.0 code only</span
+            >
+          </div>
+        </div>
+        <div class="card">
+          <span class="eyebrow t-violet">AGPL-3.0</span>
+          <h3>Server and web app</h3>
+          <p>
+            Run, self-host and change them freely, inside your company too. Offer a
+            <b style="color: var(--ink)">modified</b> version to others over a network, and you
+            share those changes.
+          </p>
+          <div class="pk">
+            <span>sign-server</span><span>apps/server (Docker)</span><span>apps/web</span>
+          </div>
+          <p class="note t-violet">Commercial licence on request: hello@codevibe.in</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

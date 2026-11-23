@@ -107,6 +107,8 @@ the minor version and says so in its first line.
   a provenance statement.
 - Contributors sign a contributor licence agreement (individual or corporate), checked on every
   pull request.
+- The README, package and docs images are rendered from HTML in `.github/assets/src` with
+  `pnpm assets:build`, from screenshots of the app with sample data.
 
 ---
 

@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Aadhaar eSign</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 680px;
+      }
+      .head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+      }
+      h1 {
+        font-size: 40px;
+        margin-top: 14px;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 26px;
+      }
+      .step {
+        padding: 18px 20px;
+        display: flex;
+        gap: 14px;
+      }
+      .n {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: #e07a1f;
+        color: #fff;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Space Grotesk';
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .step h3 {
+        margin: 2px 0 6px;
+        font-size: 18px;
+      }
+      .step p {
+        font-size: 14px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 318px 290px;
+        gap: 14px;
+        margin-top: 14px;
+        align-items: start;
+      }
+      .pick {
+        padding: 16px;
+      }
+      .pick img {
+        display: block;
+        width: 100%;
+        border-radius: 10px;
+        outline: 1px solid var(--line);
+      }
+      .cap {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+      .price {
+        padding: 20px;
+      }
+      .label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+      }
+      .prices {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .prices div {
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #f7f9fc;
+        outline: 1px solid var(--line);
+      }
+      .prices div.on {
+        background: #fdede3;
+        outline-color: #f6c9a8;
+      }
+      .prices small {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .prices b {
+        display: block;
+        font-family: 'Space Grotesk';
+        font-size: 30px;
+        margin-top: 2px;
+      }
+      .list {
+        margin-top: 14px;
+        display: grid;
+        gap: 8px;
+        font-size: 13px;
+        color: #334155;
+      }
+      .list span {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        line-height: 1.4;
+      }
+      .list svg {
+        width: 15px;
+        height: 15px;
+        color: var(--success);
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .otp {
+        padding: 0;
+        overflow: hidden;
+      }
+      .otp .top {
+        background: #0d1b2a;
+        color: #fff;
+        padding: 12px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .otp .top small {
+        font-weight: 400;
+        color: #8fa3bb;
+      }
+      .otp .in {
+        padding: 16px;
+      }
+      .doc {
+        font-size: 13px;
+        background: #f7f9fc;
+        border-radius: 10px;
+        padding: 10px 12px;
+        outline: 1px solid var(--line);
+      }
+      .doc b {
+        display: block;
+        font-size: 14px;
+      }
+      .boxes {
+        display: flex;
+        gap: 7px;
+        margin-top: 10px;
+      }
+      .boxes i {
+        flex: 1;
+        height: 40px;
+        border-radius: 9px;
+        outline: 1.5px solid var(--line-strong);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-style: normal;
+        font-family: 'JetBrains Mono';
+        font-size: 18px;
+      }
+      .boxes i.f {
+        outline-color: #e07a1f;
+      }
+      .btn {
+        margin-top: 12px;
+        background: #e07a1f;
+        color: #fff;
+        text-align: center;
+        border-radius: 999px;
+        padding: 10px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <div class="head">
+        <div>
+          <span class="eyebrow t-orange">Aadhaar eSign, with Leegality</span>
+          <h1>Aadhaar eSign, <span class="blue">built into the send flow.</span></h1>
+        </div>
+        <span class="by" style="margin-bottom: 10px"
+          >by <img src="../codevibe-logo-dark.png" alt="Codevibe"
+        /></span>
+      </div>
+      <div class="steps">
+        <div class="card step">
+          <span class="n">1</span>
+          <div>
+            <h3>Pick Aadhaar eSign</h3>
+            <p>
+              For a signer, under Identity check. You see the price and your credits before you
+              send.
+            </p>
+          </div>
+        </div>
+        <div class="card step">
+          <span class="n">2</span>
+          <div>
+            <h3>They confirm with an OTP</h3>
+            <p>
+              On Leegality's page, with a code sent to the mobile number linked to their Aadhaar.
+            </p>
+          </div>
+        </div>
+        <div class="card step">
+          <span class="n">3</span>
+          <div>
+            <h3>One sealed PDF back</h3>
+            <p>
+              Their Aadhaar signature and our seal, with the certificate page, plus an audit trail
+              PDF.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="card pick">
+          <img src="shots/aadhaar-picker.webp" alt="" />
+          <p class="cap">The send flow, with a signer set to Aadhaar eSign and demo credits.</p>
+        </div>
+        <div class="card price">
+          <p class="label">PRICE OF ONE ESIGN</p>
+          <div class="prices">
+            <div><small>Free plan</small><b>₹35</b><small>per eSign + GST</small></div>
+            <div class="on"><small>Cloud</small><b>₹25</b><small>per eSign + GST</small></div>
+          </div>
+          <div class="list">
+            <span><i data-icon="Check"></i>Pay only for completed eSigns</span>
+            <span><i data-icon="Check"></i>Prepaid credits that never expire</span>
+            <span><i data-icon="Check"></i>On Cloud, you can use your own Leegality account</span>
+            <span><i data-icon="Check"></i>We never see or store the Aadhaar number</span>
+          </div>
+        </div>
+        <div class="card otp">
+          <div class="top"><span>Aadhaar eSign</span><small>via Leegality</small></div>
+          <div class="in">
+            <div class="doc">
+              <b>Offer letter, Ananya Rao</b><span class="muted">Acme HR, 3 pages</span>
+            </div>
+            <p style="font-size: 13px; margin-top: 12px; line-height: 1.4">
+              Enter the OTP sent to your Aadhaar-linked mobile
+            </p>
+            <div class="boxes">
+              <i class="f">•</i><i class="f">•</i><i class="f">•</i><i class="f">•</i
+              ><i class="f">•</i><i></i>
+            </div>
+            <div class="btn">Sign with Aadhaar</div>
+            <p class="cap" style="text-align: center">An illustration of the OTP step</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

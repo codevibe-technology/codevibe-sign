@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Verify a signed PDF</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .c {
+        height: 640px;
+      }
+      h1 {
+        font-size: 42px;
+        margin-top: 16px;
+      }
+      .shot {
+        position: absolute;
+        left: 64px;
+        top: 186px;
+        width: 760px;
+      }
+      .side {
+        position: absolute;
+        left: 852px;
+        top: 186px;
+        width: 364px;
+        padding: 22px 24px;
+      }
+      .label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+        margin-top: 16px;
+      }
+      .label.first {
+        margin-top: 0;
+      }
+      .val {
+        font-size: 14px;
+        line-height: 1.5;
+        margin-top: 5px;
+      }
+      .fp {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12.5px;
+        line-height: 1.7;
+        margin-top: 5px;
+        color: #334155;
+      }
+      .by {
+        position: absolute;
+        right: 64px;
+        top: 58px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="c">
+      <span class="eyebrow t-green">Verify a signed PDF</span>
+      <h1>Anyone can check it. <span class="blue">No account needed.</span></h1>
+      <div class="frame shot">
+        <div class="bar">
+          <span class="lights"
+            ><i style="background: #f26b5b"></i><i style="background: #f5be4f"></i
+            ><i style="background: #4cc38a"></i
+          ></span>
+          <span class="addr">sign.codevibe.in/verify</span><span class="chip">Sample data</span>
+        </div>
+        <div style="padding: 16px 18px 0; background: #f7faff">
+          <img src="shots/verify-result.webp" alt="" style="border-radius: 12px" />
+        </div>
+      </div>
+      <div class="card side">
+        <p class="label first">THE SEAL CERTIFICATE</p>
+        <p class="val">CN=Codevibe Sign, O=Codevibe Technology, C=IN</p>
+        <p class="val muted" style="font-size: 13.5px">
+          RSA 3072, self-signed. Public, safe to share.
+        </p>
+        <p class="label">SIGNATURE</p>
+        <p class="val">PAdES (ETSI.CAdES.detached), SHA-256, DocMDP P=1</p>
+        <p class="label">SHA-256 FINGERPRINT</p>
+        <p class="fp">
+          6B6E D7EC C18F C1B1 B6F5 514C<br />58C2 13B4 8840 528D 665D F007<br />0D63 90AF 73DF 9C80
+        </p>
+        <p class="label">PUBLIC RECORD</p>
+        <p class="val muted" style="font-size: 13.5px">
+          The QR code on the certificate page opens the seal, the signers and the trail.
+        </p>
+      </div>
+      <span class="by">by <img src="../codevibe-logo-dark.png" alt="Codevibe" /></span>
+    </div>
+  </body>
+</html>
