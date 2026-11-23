@@ -94,7 +94,7 @@ const faqs = [
 </script>
 
 <template>
-  <div class="home">
+  <main class="home">
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
@@ -242,7 +242,7 @@ const faqs = [
         </div>
       </div>
     </section>
-  </div>
+  </main>
 </template>
 
 <style scoped>

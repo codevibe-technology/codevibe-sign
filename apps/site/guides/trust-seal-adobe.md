@@ -28,7 +28,7 @@ intact.
 
 ## The seal certificate
 
-|                     |                                                                                   |
+| Field               | Value                                                                             |
 | ------------------- | --------------------------------------------------------------------------------- |
 | Subject             | CN=Codevibe Sign, O=Codevibe Technology, C=IN                                     |
 | Issuer              | Itself (self-signed)                                                              |
