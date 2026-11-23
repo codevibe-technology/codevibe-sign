@@ -3,8 +3,10 @@ import { APIError, betterAuth } from 'better-auth';
 import { db } from '../db';
 import { env, googleEnabled } from '../env';
 import { sendMagicLink, sendPasswordChanged, sendPasswordReset } from '../mail';
+import { checkHuman } from '../human-check';
 import { appRuntime } from '../runtime';
 import { authOptions, RESET_LINK_MINUTES } from './config';
+import { guardHumans } from './human-guard';
 import { limitMagicLinks, limitResetLinks, TooManySignInLinks } from './magic-link-limit';
 import { guardPasswords } from './password-guard';
 import { passwordLockout, type PasswordLockout } from './password-lockout';
@@ -70,8 +72,13 @@ export function lockout(): PasswordLockout {
   return holder.__cvsLockout;
 }
 
-/** Handles `/api/auth/*`, with the password rules in front of the library. */
+/**
+ * Handles `/api/auth/*`: the human check first, then the password rules, then the library.
+ */
 export function handleAuth(request: Request): Promise<Response> {
-  holder.__cvsAuthHandler ??= guardPasswords((r) => auth().handler(r), lockout());
+  holder.__cvsAuthHandler ??= guardHumans(
+    guardPasswords((r) => auth().handler(r), lockout()),
+    (token, r) => checkHuman(token, r.headers),
+  );
   return holder.__cvsAuthHandler(request);
 }
