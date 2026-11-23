@@ -1,4 +1,4 @@
-import { PDFDocument, PDFName } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SignError } from '@codevibe_technology/sign-core';
 import { countersign } from './countersign';
@@ -12,6 +12,7 @@ import {
   type OpensslIdentity,
   type ThirdPartyOptions,
 } from './testing/third-party';
+import { toIndefiniteLength } from './testing/ber';
 import { startFakeTsa } from './testing/tsa';
 import { verify } from './trust';
 import { verifySeal, verifySignatures } from './verify';
@@ -354,4 +355,56 @@ describe.skipIf(!openssl)('signatures made by another product', () => {
       ]);
     },
   );
+});
+
+describe('countersign over an Aadhaar eSign written in BER', () => {
+  /** Every page's size, resources and content stream bytes, which no seal may change. */
+  async function pageState(bytes: Uint8Array) {
+    const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    return doc.getPages().map((page) => {
+      const contents = page.node.get(PDFName.of('Contents'));
+      const stream = contents instanceof PDFRef ? doc.context.lookup(contents) : contents;
+      return {
+        mediaBox: page.getMediaBox(),
+        resources: page.node.get(PDFName.of('Resources'))?.toString(),
+        contents:
+          stream instanceof PDFRawStream ? Buffer.from(stream.contents).toString('hex') : null,
+      };
+    });
+  }
+
+  it('adds no page and no page content, and keeps both signatures valid', async () => {
+    const signed = toIndefiniteLength(await thirdParty());
+    const [provider] = await verifySignatures(signed);
+    expect(provider).toMatchObject({ valid: true, coversWholeDocument: true });
+
+    const output = await countersign(signed, sealOptions());
+    expect(startsWith(output, signed)).toBe(true);
+    expect(await pageState(output)).toEqual(await pageState(signed));
+
+    // The update holds the seal and the objects that name it, and nothing that draws: its
+    // only streams are the seal's zero-size appearance and, for some files, a cross-reference.
+    const update = Buffer.from(output.subarray(signed.length)).toString('latin1');
+    const objects = update.split(/\bendobj\b/).filter((o) => /\d+ \d+ obj/.test(o));
+    const streams = objects.filter((o) => /\bstream\r?\n/.test(o));
+    expect(objects.length).toBeGreaterThanOrEqual(4);
+    expect(streams.length).toBeGreaterThanOrEqual(1);
+    for (const stream of streams) {
+      expect(stream).toMatch(/\/Type\s*\/XRef|\/BBox\s*\[\s*0 0 0 0\s*\][^]*\/Subtype\s*\/Form/);
+    }
+    expect(update).toMatch(/\/Rect\s*\[\s*0\s+0\s+0\s+0\s*\]/);
+
+    const signatures = await verifySignatures(output);
+    expect(signatures.map((s) => [s.valid, s.coversWholeDocument])).toEqual([
+      [true, false],
+      [true, true],
+    ]);
+    expect(signatures[0]!.coveredBytes).toBe(signed.length);
+    const result = await verify(output, { trust: trust(), allowEarlierSignatures: true });
+    expect(result.valid).toBe(true);
+    expect(result.earlierSignatures?.[0]).toMatchObject({
+      valid: true,
+      signer: { commonName: 'Asha Rao' },
+    });
+  });
 });
