@@ -13,6 +13,8 @@
     { "key": "apiKey", "value": "" },
     { "key": "envelopeId", "value": "" },
     { "key": "docId", "value": "" },
+    { "key": "templateId", "value": "" },
+    { "key": "sha256", "value": "" },
     { "key": "token", "value": "" },
     { "key": "signerSession", "value": "" }
   ],
@@ -476,6 +478,253 @@
               ]
             },
             "description": "Signing certificate\n\nWhat the certificate page of the sealed PDF shows, as JSON: the hash of each document\nbefore and after sealing, each recipient with the authentication they used and every\naction they took, and the head of the audit chain."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Templates",
+      "description": "A template is an envelope without the people: its PDFs, the roles that act on them\n(Employee, HR), the fields each role fills and the settings. Make an envelope from one by\nsaying who takes each role. Sender API key required.",
+      "item": [
+        {
+          "name": "List templates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Case-insensitive text anywhere in the name.",
+                  "disabled": true
+                },
+                { "key": "limit", "value": "", "description": "Page size.", "disabled": true },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "The `nextCursor` of the previous page.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List templates\n\nThe caller's workspace's templates, newest first, one page at a time. Pass the\n`nextCursor` of a page as `cursor` to get the next one. Each row is a summary; get the\ntemplate for its documents, roles and fields."
+          }
+        },
+        {
+          "name": "Create a template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates"]
+            },
+            "description": "Create a template\n\nStores the PDFs with the roles, fields and settings to reuse. Send the PDFs either as\nbase64 in JSON, or as a multipart upload with the template JSON in a form field named\n`template` and the files as `documents`.\n\nFields name their role by its `key` in the same request. Each PDF is checked like an\nenvelope's, and field boxes must fit on their page.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Offer letter\",\n  \"description\": \"Standard offer for full-time staff\",\n  \"message\": \"Welcome aboard. Please sign your offer.\",\n  \"documents\": [\n    {\n      \"key\": \"offer\",\n      \"name\": \"offer.pdf\",\n      \"content\": \"JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCA5OQo+PgpzdHJlYW0KeJwr5HIK4TJQAMGidC59j9ScstSSzOREXXMDSwsTCwNzC0sFIwOFkDQuIxOFEB8uQ7BSQwVzIwVzM6B4LpeNiZsZCJiaGxkZmDkDaRNzExDPTiEkiytEi8s1hCuQCwDoMxbjCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM2Nwo+PgpzdHJlYW0KeJzVUl1LwzAUfc+vuI/64PLR9EvGYFtbBRHHJiiKD1kbRmUk0qYy/703bTfZg/gs4ZDce889yW0PBwYCpIQA4gQkhIGAECIuYTol9PHrQwNdqZ1uCb2rqxZescpgDW+ELm1nHHAym5Ef7lI5tbc7MjQB9+QjY9XYqit1A9MiLwrGYsZYJBERYyLDfYlIEQJjrIkEz4hYjsBcHDAWzLFWDIjiocfXe2449ue4IzfynGzgymSIT/f6u/JBQ/z1nnRG6L2tMuU0XGTXgomIc57iEoK9XOLnaLRy9v8O17+/tubXCc/+c2GNI3TTbV0f+iQndKFa7StAb/X+U7u6VITmprRVbXZAn2ozN219TJwresN42zTau6r3DV3r1nZNiUbyvF7ZH07iVzFLE5w8TlL07mg1+vywfddlT/VhfnA3G+enGhI+d6+rWi3sAf3McIVpOBEJJJJPUAm9PTfGOu/23ufG4Zt8FI3eR4lvH/rHKAplbmRzdHJlYW0KZW5kb2JqCgo4IDAgb2JqCjw8Ci9TaXplIDkKL1Jvb3QgMiAwIFIKL0luZm8gMyAwIFIKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL1hSZWYKL0xlbmd0aCA0MAovVyBbIDEgMiAyIF0KL0luZGV4IFsgMCA5IF0KPj4Kc3RyZWFtCnicFcSxEQAgDAOxt8MdLaOzD8MlWIWAbrMhKTlVWuKAeD9fGGEqA5YKZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjY1NgolJUVPRg==\"\n    }\n  ],\n  \"roles\": [\n    {\n      \"key\": \"employee\",\n      \"name\": \"Employee\"\n    },\n    {\n      \"key\": \"hr\",\n      \"name\": \"HR\",\n      \"type\": \"viewer\"\n    }\n  ],\n  \"fields\": [\n    {\n      \"role\": \"employee\",\n      \"document\": \"offer\",\n      \"type\": \"signature\",\n      \"page\": 0,\n      \"x\": 72,\n      \"y\": 640,\n      \"width\": 180,\n      \"height\": 48\n    },\n    {\n      \"role\": \"employee\",\n      \"type\": \"text\",\n      \"label\": \"Employee code\",\n      \"page\": 0,\n      \"x\": 72,\n      \"y\": 600,\n      \"width\": 180,\n      \"height\": 20,\n      \"required\": false\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('templateId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a template (multipart upload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates"]
+            },
+            "description": "Create a template\n\nStores the PDFs with the roles, fields and settings to reuse. Send the PDFs either as\nbase64 in JSON, or as a multipart upload with the template JSON in a form field named\n`template` and the files as `documents`.\n\nFields name their role by its `key` in the same request. Each PDF is checked like an\nenvelope's, and field boxes must fit on their page.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "template",
+                  "value": "{\"name\":\"Offer letter\",\"roles\":[{\"key\":\"employee\",\"name\":\"Employee\"}],\"fields\":[{\"role\":\"employee\",\"page\":0,\"x\":72,\"y\":640,\"width\":180,\"height\":48}]}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                { "key": "documents", "type": "file", "src": [] }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get a template",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates/:templateId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates", ":templateId"],
+              "variable": [
+                {
+                  "key": "templateId",
+                  "value": "{{templateId}}",
+                  "description": "The template id."
+                }
+              ]
+            },
+            "description": "Get a template\n\nThe template with its documents, roles, fields and settings."
+          }
+        },
+        {
+          "name": "Change a template",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates/:templateId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates", ":templateId"],
+              "variable": [
+                {
+                  "key": "templateId",
+                  "value": "{{templateId}}",
+                  "description": "The template id."
+                }
+              ]
+            },
+            "description": "Change a template\n\nOnly the properties you send change. `roles` and `fields`, when sent, replace the\nexisting ones; give a role its `id` to keep it. Fields you do not resend must still\nhave their role. The documents of a template cannot be changed: create a new template\ninstead. Envelopes already made from the template are not affected.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Offer letter 2026\",\n  \"message\": \"Welcome aboard. Please sign by Friday.\",\n  \"expiresInDays\": 14\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Delete a template",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates/:templateId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates", ":templateId"],
+              "variable": [
+                {
+                  "key": "templateId",
+                  "value": "{{templateId}}",
+                  "description": "The template id."
+                }
+              ]
+            },
+            "description": "Delete a template\n\nRemoves the template and its stored PDFs for good. Envelopes already made from it keep\ntheir own copies and are not affected."
+          }
+        },
+        {
+          "name": "Create an envelope from a template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Any unique string, up to 255 characters. A retry with the same key and body within\n24 hours returns the first response. The same key with a different body is a\n`VALIDATION` error; while the first request is still running, `CONFLICT`.",
+                "disabled": true
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/templates/:templateId/envelopes",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "templates", ":templateId", "envelopes"],
+              "variable": [
+                {
+                  "key": "templateId",
+                  "value": "{{templateId}}",
+                  "description": "The template id."
+                }
+              ]
+            },
+            "description": "Create an envelope from a template\n\nMakes an envelope with the template's documents, fields and settings, and the people\nyou name for its roles. `roles` is keyed by role name (case does not matter) or role\nid, and every role needs a person. `prefill` sets text fields by their label or id\nbefore anyone signs. The envelope is a draft unless `send` is `true`, and from then on\nit is an ordinary envelope: `metadata.templateId` says where it came from.\n\nCounts towards the same per-minute limit as creating envelopes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": {\n    \"Employee\": {\n      \"name\": \"Asha Rao\",\n      \"email\": \"asha@example.com\"\n    },\n    \"HR\": {\n      \"name\": \"HR Team\",\n      \"email\": \"hr@example.com\"\n    }\n  },\n  \"prefill\": {\n    \"Employee code\": \"E-1042\"\n  },\n  \"metadata\": {\n    \"employeeId\": \"E-1042\"\n  },\n  \"send\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verification",
+      "description": "Check that a PDF is a document this server sealed and that nothing changed since.\nPublic: no API key, like the certificate page inside every sealed file. Limited per\nclient address.",
+      "item": [
+        {
+          "name": "Verify a PDF",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "verify"]
+            },
+            "description": "Verify a PDF\n\nUpload a PDF to learn whether it is exactly a document this server sealed. The file is\nread in memory, checked against the server's seal certificate and dropped: nothing\nabout it is stored. Send it as a multipart upload in a form field named `file`, or as\nthe raw body with `Content-Type: application/pdf`.\n\n`checks` lists each check in order; the first that fails is the `reason`, and the\nones after it are `null` because they were not reached. For a valid file the answer\nalso names its envelope with the signers and the audit trail: the same facts the\ncertificate page inside the file prints, with contacts masked.\n\nNo API key is needed. Each client address may make 30 checks in 10 minutes by default,\nand a file may be up to 20 MB.",
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            }
+          }
+        },
+        {
+          "name": "Verify by SHA-256",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/verify/:sha256",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "verify", ":sha256"],
+              "variable": [
+                {
+                  "key": "sha256",
+                  "value": "{{sha256}}",
+                  "description": "SHA-256 of the sealed PDF, 64 hexadecimal characters."
+                }
+              ]
+            },
+            "description": "Verify by SHA-256\n\nThe same answer without uploading the file: send the SHA-256 of the PDF you hold. The\nserver looks for a document it sealed with exactly that hash and checks its own stored\ncopy. A hash it never sealed answers `valid: false` with `unknown_document`, which is\nalso what a changed file gets, since any change gives another hash.\n\nNo API key is needed. It shares the per-address limit of the upload.",
+            "auth": { "type": "noauth" }
           }
         }
       ]

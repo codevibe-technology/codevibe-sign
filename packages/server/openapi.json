@@ -5,7 +5,7 @@
     "title": "Codevibe Sign HTTP API",
     "version": "1",
     "summary": "Send documents for signature, sign them, seal the PDF and verify it.",
-    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n## Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status:\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS`, `FORBIDDEN` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n## Workspaces\n\nEvery envelope belongs to the workspace of the credential that created it. A sender only\nsees and acts on its own workspace's envelopes; an id from another workspace answers\n`ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for\nexample a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.\n\n## Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n## Rate limits\n\nLimits are per API key (creating envelopes), per signing token and per client IP\n(signer routes), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
+    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n## Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status:\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS`, `FORBIDDEN` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n## Workspaces\n\nEvery envelope belongs to the workspace of the credential that created it. A sender only\nsees and acts on its own workspace's envelopes; an id from another workspace answers\n`ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for\nexample a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.\n\nTemplates follow the same rule: one from another workspace answers `NOT_FOUND`.\n\n## Versioning\n\nThe version is in the path and covers the whole API: every route is under `/v1`, and\nevery answer carries `Codevibe-Api-Version: 1`. Within `/v1` changes only add. An operation\nthat is going away is marked `deprecated` here at least six months before, and its\nanswers carry `Deprecation`, `Sunset` and a `Link` with `rel=\"deprecation\"`.\n\n## Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n## Rate limits\n\nLimits are per API key (creating envelopes and templates), per signing token and per\nclient IP (signer routes and public verification), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
     "license": {
       "name": "AGPL-3.0-only",
       "url": "https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md"
@@ -48,6 +48,14 @@
     {
       "name": "Audit trail",
       "description": "The hash-chained audit log of an envelope and the signing certificate built from it.\nSender API key required.\n"
+    },
+    {
+      "name": "Templates",
+      "description": "A template is an envelope without the people: its PDFs, the roles that act on them\n(Employee, HR), the fields each role fills and the settings. Make an envelope from one by\nsaying who takes each role. Sender API key required.\n"
+    },
+    {
+      "name": "Verification",
+      "description": "Check that a PDF is a document this server sealed and that nothing changed since.\nPublic: no API key, like the certificate page inside every sealed file. Limited per\nclient address.\n"
     },
     {
       "name": "Signing",
@@ -788,6 +796,400 @@
         }
       }
     },
+    "/v1/templates": {
+      "get": {
+        "operationId": "listTemplates",
+        "tags": ["Templates"],
+        "summary": "List templates",
+        "description": "The caller's workspace's templates, newest first, one page at a time. Pass the\n`nextCursor` of a page as `cursor` to get the next one. Each row is a summary; get the\ntemplate for its documents, roles and fields.\n",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive text anywhere in the name.",
+            "schema": { "type": "string", "maxLength": 200 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `nextCursor` of the previous page.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of templates.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TemplateList" },
+                "example": {
+                  "templates": [
+                    {
+                      "id": "3d6f0a1c-8b2e-4f7a-9c5d-1e2f3a4b5c6d",
+                      "name": "Offer letter",
+                      "description": "Standard offer for full-time staff",
+                      "roles": [
+                        { "name": "Employee", "type": "signer" },
+                        { "name": "HR", "type": "viewer" }
+                      ],
+                      "documentCount": 1,
+                      "pageCount": 1,
+                      "createdAt": "2026-03-02T09:00:00.000Z",
+                      "updatedAt": "2026-03-02T09:00:00.000Z"
+                    }
+                  ],
+                  "nextCursor": null
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      },
+      "post": {
+        "operationId": "createTemplate",
+        "tags": ["Templates"],
+        "summary": "Create a template",
+        "description": "Stores the PDFs with the roles, fields and settings to reuse. Send the PDFs either as\nbase64 in JSON, or as a multipart upload with the template JSON in a form field named\n`template` and the files as `documents`.\n\nFields name their role by its `key` in the same request. Each PDF is checked like an\nenvelope's, and field boxes must fit on their page.\n",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateTemplate" },
+              "examples": {
+                "offer": {
+                  "summary": "An offer letter the employee signs and HR gets a copy of",
+                  "value": {
+                    "name": "Offer letter",
+                    "description": "Standard offer for full-time staff",
+                    "message": "Welcome aboard. Please sign your offer.",
+                    "documents": [
+                      {
+                        "key": "offer",
+                        "name": "offer.pdf",
+                        "content": "JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCA5OQo+PgpzdHJlYW0KeJwr5HIK4TJQAMGidC59j9ScstSSzOREXXMDSwsTCwNzC0sFIwOFkDQuIxOFEB8uQ7BSQwVzIwVzM6B4LpeNiZsZCJiaGxkZmDkDaRNzExDPTiEkiytEi8s1hCuQCwDoMxbjCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM2Nwo+PgpzdHJlYW0KeJzVUl1LwzAUfc+vuI/64PLR9EvGYFtbBRHHJiiKD1kbRmUk0qYy/703bTfZg/gs4ZDce889yW0PBwYCpIQA4gQkhIGAECIuYTol9PHrQwNdqZ1uCb2rqxZescpgDW+ELm1nHHAym5Ef7lI5tbc7MjQB9+QjY9XYqit1A9MiLwrGYsZYJBERYyLDfYlIEQJjrIkEz4hYjsBcHDAWzLFWDIjiocfXe2449ue4IzfynGzgymSIT/f6u/JBQ/z1nnRG6L2tMuU0XGTXgomIc57iEoK9XOLnaLRy9v8O17+/tubXCc/+c2GNI3TTbV0f+iQndKFa7StAb/X+U7u6VITmprRVbXZAn2ozN219TJwresN42zTau6r3DV3r1nZNiUbyvF7ZH07iVzFLE5w8TlL07mg1+vywfddlT/VhfnA3G+enGhI+d6+rWi3sAf3McIVpOBEJJJJPUAm9PTfGOu/23ufG4Zt8FI3eR4lvH/rHKAplbmRzdHJlYW0KZW5kb2JqCgo4IDAgb2JqCjw8Ci9TaXplIDkKL1Jvb3QgMiAwIFIKL0luZm8gMyAwIFIKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL1hSZWYKL0xlbmd0aCA0MAovVyBbIDEgMiAyIF0KL0luZGV4IFsgMCA5IF0KPj4Kc3RyZWFtCnicFcSxEQAgDAOxt8MdLaOzD8MlWIWAbrMhKTlVWuKAeD9fGGEqA5YKZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjY1NgolJUVPRg=="
+                      }
+                    ],
+                    "roles": [
+                      { "key": "employee", "name": "Employee" },
+                      { "key": "hr", "name": "HR", "type": "viewer" }
+                    ],
+                    "fields": [
+                      {
+                        "role": "employee",
+                        "document": "offer",
+                        "type": "signature",
+                        "page": 0,
+                        "x": 72,
+                        "y": 640,
+                        "width": 180,
+                        "height": 48
+                      },
+                      {
+                        "role": "employee",
+                        "type": "text",
+                        "label": "Employee code",
+                        "page": 0,
+                        "x": 72,
+                        "y": 600,
+                        "width": 180,
+                        "height": 20,
+                        "required": false
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/CreateTemplateUpload" },
+              "encoding": {
+                "template": { "contentType": "application/json" },
+                "documents": { "contentType": "application/pdf" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The template.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Template" },
+                "examples": { "offer": { "$ref": "#/components/examples/OfferTemplate" } }
+              }
+            },
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "422": { "$ref": "#/components/responses/Unprocessable" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/templates/{templateId}": {
+      "parameters": [{ "$ref": "#/components/parameters/TemplateId" }],
+      "get": {
+        "operationId": "getTemplate",
+        "tags": ["Templates"],
+        "summary": "Get a template",
+        "description": "The template with its documents, roles, fields and settings.",
+        "responses": {
+          "200": {
+            "description": "The template.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Template" },
+                "examples": { "offer": { "$ref": "#/components/examples/OfferTemplate" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/TemplateNotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      },
+      "patch": {
+        "operationId": "updateTemplate",
+        "tags": ["Templates"],
+        "summary": "Change a template",
+        "description": "Only the properties you send change. `roles` and `fields`, when sent, replace the\nexisting ones; give a role its `id` to keep it. Fields you do not resend must still\nhave their role. The documents of a template cannot be changed: create a new template\ninstead. Envelopes already made from the template are not affected.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateTemplate" },
+              "example": {
+                "name": "Offer letter 2026",
+                "message": "Welcome aboard. Please sign by Friday.",
+                "expiresInDays": 14
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed template.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Template" },
+                "examples": { "offer": { "$ref": "#/components/examples/OfferTemplate" } }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/TemplateNotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTemplate",
+        "tags": ["Templates"],
+        "summary": "Delete a template",
+        "description": "Removes the template and its stored PDFs for good. Envelopes already made from it keep\ntheir own copies and are not affected.\n",
+        "responses": {
+          "200": {
+            "description": "The template is gone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "deleted"],
+                  "properties": {
+                    "id": { "$ref": "#/components/schemas/Id" },
+                    "deleted": { "const": true }
+                  }
+                },
+                "example": { "id": "3d6f0a1c-8b2e-4f7a-9c5d-1e2f3a4b5c6d", "deleted": true }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/TemplateNotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/templates/{templateId}/envelopes": {
+      "parameters": [{ "$ref": "#/components/parameters/TemplateId" }],
+      "post": {
+        "operationId": "createEnvelopeFromTemplate",
+        "tags": ["Templates"],
+        "summary": "Create an envelope from a template",
+        "description": "Makes an envelope with the template's documents, fields and settings, and the people\nyou name for its roles. `roles` is keyed by role name (case does not matter) or role\nid, and every role needs a person. `prefill` sets text fields by their label or id\nbefore anyone signs. The envelope is a draft unless `send` is `true`, and from then on\nit is an ordinary envelope: `metadata.templateId` says where it came from.\n\nCounts towards the same per-minute limit as creating envelopes.\n",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateEnvelopeFromTemplate" },
+              "example": {
+                "roles": {
+                  "Employee": { "name": "Asha Rao", "email": "asha@example.com" },
+                  "HR": { "name": "HR Team", "email": "hr@example.com" }
+                },
+                "prefill": { "Employee code": "E-1042" },
+                "metadata": { "employeeId": "E-1042" },
+                "send": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The envelope, as a draft or already sent.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Envelope" },
+                "examples": { "sent": { "$ref": "#/components/examples/SentEnvelope" } }
+              }
+            },
+            "headers": {
+              "Idempotent-Replayed": { "$ref": "#/components/headers/IdempotentReplayed" }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/ReadOnly" },
+          "404": { "$ref": "#/components/responses/TemplateNotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/v1/verify": {
+      "post": {
+        "operationId": "verifyPdf",
+        "tags": ["Verification"],
+        "summary": "Verify a PDF",
+        "description": "Upload a PDF to learn whether it is exactly a document this server sealed. The file is\nread in memory, checked against the server's seal certificate and dropped: nothing\nabout it is stored. Send it as a multipart upload in a form field named `file`, or as\nthe raw body with `Content-Type: application/pdf`.\n\n`checks` lists each check in order; the first that fails is the `reason`, and the\nones after it are `null` because they were not reached. For a valid file the answer\nalso names its envelope with the signers and the audit trail: the same facts the\ncertificate page inside the file prints, with contacts masked.\n\nNo API key is needed. Each client address may make 30 checks in 10 minutes by default,\nand a file may be up to 20 MB.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": "application/pdf",
+                    "description": "The PDF to check."
+                  }
+                }
+              },
+              "encoding": { "file": { "contentType": "application/pdf" } }
+            },
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "contentMediaType": "application/pdf"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the check, whether the file is valid or not.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PublicVerification" },
+                "examples": {
+                  "valid": { "$ref": "#/components/examples/ValidVerification" },
+                  "changed": { "$ref": "#/components/examples/ChangedVerification" }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "422": { "$ref": "#/components/responses/Unprocessable" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/v1/verify/{sha256}": {
+      "parameters": [
+        {
+          "name": "sha256",
+          "in": "path",
+          "required": true,
+          "description": "SHA-256 of the sealed PDF, 64 hexadecimal characters.",
+          "schema": { "$ref": "#/components/schemas/Sha256" },
+          "example": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d"
+        }
+      ],
+      "get": {
+        "operationId": "verifySha256",
+        "tags": ["Verification"],
+        "summary": "Verify by SHA-256",
+        "description": "The same answer without uploading the file: send the SHA-256 of the PDF you hold. The\nserver looks for a document it sealed with exactly that hash and checks its own stored\ncopy. A hash it never sealed answers `valid: false` with `unknown_document`, which is\nalso what a changed file gets, since any change gives another hash.\n\nNo API key is needed. It shares the per-address limit of the upload.\n",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The result of the check.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PublicVerification" },
+                "examples": {
+                  "valid": { "$ref": "#/components/examples/ValidVerification" },
+                  "unknown": {
+                    "summary": "A hash this server never sealed",
+                    "value": {
+                      "valid": false,
+                      "reason": "unknown_document",
+                      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "checks": {
+                        "sealed": null,
+                        "singleSignature": null,
+                        "intact": null,
+                        "coversWholeDocument": null,
+                        "trustedCertificate": null
+                      },
+                      "signer": null,
+                      "signedAt": null,
+                      "certificateSha256": null,
+                      "envelope": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
     "/v1/sign/receipt": {
       "get": {
         "operationId": "getSigningReceipt",
@@ -1337,6 +1739,14 @@
         "schema": { "type": "string" },
         "example": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37"
       },
+      "TemplateId": {
+        "name": "templateId",
+        "in": "path",
+        "required": true,
+        "description": "The template id.",
+        "schema": { "type": "string" },
+        "example": "3d6f0a1c-8b2e-4f7a-9c5d-1e2f3a4b5c6d"
+      },
       "RecipientId": {
         "name": "recipientId",
         "in": "path",
@@ -1480,6 +1890,15 @@
           }
         }
       },
+      "TemplateNotFound": {
+        "description": "`NOT_FOUND`: no such template in the workspace of the API key.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "error": { "code": "NOT_FOUND", "message": "Template not found" } }
+          }
+        }
+      },
       "Conflict": {
         "description": "`INVALID_STATE`: not allowed in the envelope's status (`details.status`).\n`NOT_YOUR_TURN`: sequential routing, an earlier recipient has not acted.\n`CONFLICT`: another request changed the envelope, or one with the same\n`Idempotency-Key` is still running; try again.\n",
         "content": {
@@ -1581,6 +2000,158 @@
           "metadata": { "employeeId": "E-1042" },
           "auditHead": "3b5f0c4d6e1a2b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c"
         }
+      },
+      "OfferTemplate": {
+        "summary": "An offer letter template",
+        "value": {
+          "id": "3d6f0a1c-8b2e-4f7a-9c5d-1e2f3a4b5c6d",
+          "name": "Offer letter",
+          "description": "Standard offer for full-time staff",
+          "title": "Offer letter",
+          "message": "Welcome aboard. Please sign your offer.",
+          "routing": "sequential",
+          "reminders": { "firstAfterDays": 3, "everyDays": 3, "max": 3 },
+          "expiresInDays": 30,
+          "roles": [
+            {
+              "id": "5a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+              "name": "Employee",
+              "type": "signer",
+              "auth": "email_otp"
+            },
+            {
+              "id": "6b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e",
+              "name": "HR",
+              "type": "viewer",
+              "auth": "email_otp"
+            }
+          ],
+          "documents": [
+            {
+              "id": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+              "name": "offer.pdf",
+              "size": 1042,
+              "sha256": "4f2a9c1e7b3d5a6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7",
+              "pageCount": 1,
+              "pages": [{ "width": 612, "height": 792 }]
+            }
+          ],
+          "fields": [
+            {
+              "id": "7c3d4e5f-6a7b-4c8d-8e9f-1a2b3c4d5e6f",
+              "documentId": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+              "roleId": "5a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+              "type": "signature",
+              "page": 0,
+              "rect": { "x": 72, "y": 640, "width": 180, "height": 48 },
+              "required": true
+            },
+            {
+              "id": "8d4e5f6a-7b8c-4d9e-9f0a-2b3c4d5e6f7a",
+              "documentId": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+              "roleId": "5a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+              "type": "text",
+              "page": 0,
+              "rect": { "x": 72, "y": 600, "width": 180, "height": 20 },
+              "required": false,
+              "label": "Employee code"
+            }
+          ],
+          "createdAt": "2026-03-02T09:00:00.000Z",
+          "updatedAt": "2026-03-02T09:00:00.000Z"
+        }
+      },
+      "ValidVerification": {
+        "summary": "A sealed document, unchanged",
+        "value": {
+          "valid": true,
+          "reason": null,
+          "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d",
+          "checks": {
+            "sealed": true,
+            "singleSignature": true,
+            "intact": true,
+            "coversWholeDocument": true,
+            "trustedCertificate": true
+          },
+          "signer": { "commonName": "Codevibe Sign Seal", "organization": null },
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+          "envelope": {
+            "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
+            "title": "Offer letter",
+            "documentId": "1b8e4f60-2c3a-4d7e-8f91-a5c2e6b3d048",
+            "documentName": "offer.pdf",
+            "sentAt": "2026-03-02T09:00:00.000Z",
+            "completedAt": "2026-03-02T09:14:30.000Z",
+            "recipients": [
+              {
+                "name": "Asha Rao",
+                "contact": "a****@example.com",
+                "role": "signer",
+                "status": "signed",
+                "auth": "email_otp",
+                "actedAt": "2026-03-02T09:14:30.000Z"
+              }
+            ],
+            "events": [
+              {
+                "seq": 1,
+                "action": "envelope.created",
+                "at": "2026-03-02T09:00:00.000Z",
+                "recipient": null
+              },
+              {
+                "seq": 2,
+                "action": "envelope.sent",
+                "at": "2026-03-02T09:00:00.000Z",
+                "recipient": null
+              },
+              {
+                "seq": 3,
+                "action": "recipient.signed",
+                "at": "2026-03-02T09:14:30.000Z",
+                "recipient": "Asha Rao"
+              },
+              {
+                "seq": 4,
+                "action": "envelope.completed",
+                "at": "2026-03-02T09:14:30.000Z",
+                "recipient": null
+              },
+              {
+                "seq": 5,
+                "action": "document.sealed",
+                "at": "2026-03-02T09:14:31.000Z",
+                "recipient": null
+              }
+            ],
+            "chain": {
+              "valid": true,
+              "head": "8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a09f",
+              "events": 5
+            }
+          }
+        }
+      },
+      "ChangedVerification": {
+        "summary": "A file that was changed after sealing",
+        "value": {
+          "valid": false,
+          "reason": "not_whole_document",
+          "sha256": "2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e",
+          "checks": {
+            "sealed": true,
+            "singleSignature": true,
+            "intact": true,
+            "coversWholeDocument": false,
+            "trustedCertificate": null
+          },
+          "signer": { "commonName": "Codevibe Sign Seal", "organization": null },
+          "signedAt": "2026-03-02T09:14:31.000Z",
+          "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+          "envelope": null
+        }
       }
     },
     "schemas": {
@@ -1650,7 +2221,7 @@
           "FORBIDDEN": "The credential may only read; only `GET` routes are allowed.",
           "ENVELOPE_NOT_FOUND": "No envelope with this id in the caller's workspace.",
           "RECIPIENT_NOT_FOUND": "No recipient with this id on the envelope.",
-          "NOT_FOUND": "No route or document at this address.",
+          "NOT_FOUND": "No route, document or template at this address.",
           "INVALID_STATE": "Not allowed in the envelope's current status (`details.status`).",
           "NOT_YOUR_TURN": "Sequential routing, and an earlier recipient has not acted yet.",
           "CONFLICT": "Another request changed the envelope, or one with the same `Idempotency-Key` is still running. Try again.",
@@ -2481,6 +3052,542 @@
             "maxItems": 500,
             "description": "Replaces all fields.",
             "items": { "$ref": "#/components/schemas/NewField" }
+          }
+        }
+      },
+      "TemplateRole": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "type", "auth"],
+        "description": "A slot a person fills when an envelope is made, such as Employee or HR.",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string", "description": "Unique within the template, ignoring case." },
+          "type": { "$ref": "#/components/schemas/RecipientRole" },
+          "auth": { "$ref": "#/components/schemas/AuthMethod" }
+        }
+      },
+      "TemplateDocument": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "size", "sha256", "pageCount", "pages"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "size": { "type": "integer", "description": "Size of the PDF in bytes." },
+          "sha256": { "$ref": "#/components/schemas/Sha256" },
+          "pageCount": { "type": "integer", "minimum": 1 },
+          "pages": {
+            "type": "array",
+            "description": "Page sizes in PDF points, in page order.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["width", "height"],
+              "properties": { "width": { "type": "number" }, "height": { "type": "number" } }
+            }
+          }
+        }
+      },
+      "TemplateField": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "documentId", "roleId", "type", "page", "rect", "required"],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "documentId": { "$ref": "#/components/schemas/Id" },
+          "roleId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "The role whose person fills the field in."
+          },
+          "type": { "$ref": "#/components/schemas/FieldType" },
+          "page": { "type": "integer", "minimum": 0, "description": "Zero-based page index." },
+          "rect": { "$ref": "#/components/schemas/Rect" },
+          "required": { "type": "boolean" },
+          "label": { "type": "string", "description": "Text fields are prefilled by label." }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "title",
+          "routing",
+          "reminders",
+          "expiresInDays",
+          "roles",
+          "documents",
+          "fields",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "title": {
+            "type": "string",
+            "description": "Title of the envelopes made from the template."
+          },
+          "message": {
+            "type": "string",
+            "description": "Shown to recipients in the invitation and on the signing page."
+          },
+          "routing": { "$ref": "#/components/schemas/Routing" },
+          "reminders": { "$ref": "#/components/schemas/Reminders" },
+          "expiresInDays": {
+            "type": "integer",
+            "description": "Envelopes expire this many days after they are created."
+          },
+          "roles": { "type": "array", "items": { "$ref": "#/components/schemas/TemplateRole" } },
+          "documents": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TemplateDocument" }
+          },
+          "fields": { "type": "array", "items": { "$ref": "#/components/schemas/TemplateField" } },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        }
+      },
+      "TemplateSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "description",
+          "roles",
+          "documentCount",
+          "pageCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "type"],
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "$ref": "#/components/schemas/RecipientRole" }
+              }
+            }
+          },
+          "documentCount": { "type": "integer" },
+          "pageCount": { "type": "integer" },
+          "createdAt": { "$ref": "#/components/schemas/Timestamp" },
+          "updatedAt": { "$ref": "#/components/schemas/Timestamp" }
+        }
+      },
+      "TemplateList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["templates", "nextCursor"],
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TemplateSummary" }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "description": "Pass as `cursor` for the next page; null on the last page."
+          }
+        }
+      },
+      "NewTemplateRole": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "How fields refer to this role in the same request. Default its position, `\"0\"`."
+          },
+          "id": {
+            "type": "string",
+            "description": "On `PATCH`, the id of an existing role to keep."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "For example `Employee`. Unique within the template, ignoring case."
+          },
+          "type": { "$ref": "#/components/schemas/RecipientRole", "default": "signer" },
+          "auth": { "$ref": "#/components/schemas/AuthMethod", "default": "email_otp" }
+        }
+      },
+      "NewTemplateField": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "page"],
+        "description": "A box on a page for one role. Give its position either as `x`, `y`, `width` and\n`height` or as `rect`.\n",
+        "properties": {
+          "role": {
+            "type": ["string", "integer"],
+            "description": "The role's `key` (or `id` on `PATCH`). Viewers have no fields."
+          },
+          "document": {
+            "type": ["string", "integer"],
+            "description": "The document's `key` or `id`. Optional when the template has one document."
+          },
+          "type": { "$ref": "#/components/schemas/FieldType", "default": "signature" },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Zero-based page index."
+          },
+          "x": { "type": "number", "minimum": 0 },
+          "y": { "type": "number", "minimum": 0 },
+          "width": { "type": "number", "minimum": 1 },
+          "height": { "type": "number", "minimum": 1 },
+          "rect": { "$ref": "#/components/schemas/Rect" },
+          "required": { "type": "boolean", "default": true },
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Give text fields a label to prefill them by."
+          }
+        },
+        "anyOf": [{ "required": ["rect"] }, { "required": ["x", "y", "width", "height"] }]
+      },
+      "TemplateSettings": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "What the template is called in lists."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Title of the envelopes made from it. Default the name."
+          },
+          "routing": { "$ref": "#/components/schemas/Routing", "default": "sequential" },
+          "reminders": { "$ref": "#/components/schemas/Reminders" },
+          "expiresInDays": { "type": "integer", "minimum": 1, "maximum": 365, "default": 30 }
+        }
+      },
+      "CreateTemplate": {
+        "allOf": [{ "$ref": "#/components/schemas/TemplateSettings" }],
+        "type": "object",
+        "required": ["name", "documents", "roles"],
+        "unevaluatedProperties": false,
+        "properties": {
+          "description": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 5000 },
+          "documents": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "$ref": "#/components/schemas/NewDocument" }
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "description": "At least one must be a signer or an approver.",
+            "items": { "$ref": "#/components/schemas/NewTemplateRole" }
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 500,
+            "items": { "$ref": "#/components/schemas/NewTemplateField" }
+          }
+        }
+      },
+      "CreateTemplateUpload": {
+        "type": "object",
+        "required": ["template", "documents"],
+        "properties": {
+          "template": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "description": "The same JSON as the JSON body, with `documents` holding only `{ key, name }` for\neach file in upload order, or left out.\n",
+            "examples": [
+              "{\"name\":\"Offer letter\",\"roles\":[{\"key\":\"employee\",\"name\":\"Employee\"}],\"fields\":[{\"role\":\"employee\",\"page\":0,\"x\":72,\"y\":640,\"width\":180,\"height\":48}]}"
+            ]
+          },
+          "documents": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "type": "string", "format": "binary", "contentMediaType": "application/pdf" }
+          }
+        }
+      },
+      "UpdateTemplate": {
+        "allOf": [{ "$ref": "#/components/schemas/TemplateSettings" }],
+        "type": "object",
+        "unevaluatedProperties": false,
+        "properties": {
+          "description": {
+            "type": ["string", "null"],
+            "maxLength": 500,
+            "description": "Send null to clear it."
+          },
+          "message": {
+            "type": ["string", "null"],
+            "maxLength": 5000,
+            "description": "Send null to clear it."
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "description": "Replaces the roles. Include `id` to keep an existing one.",
+            "items": { "$ref": "#/components/schemas/NewTemplateRole" }
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 500,
+            "description": "Replaces all fields.",
+            "items": { "$ref": "#/components/schemas/NewTemplateField" }
+          }
+        }
+      },
+      "RolePerson": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "description": "The person who takes a role. `email` is required for viewers and for `email_link` and\n`email_otp`; `phone` for `sms_otp`.\n",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "email": { "type": "string", "format": "email", "maxLength": 254 },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{6,14}$",
+            "description": "International format, like `+919812345678`."
+          },
+          "auth": {
+            "$ref": "#/components/schemas/AuthMethod",
+            "description": "Replaces the role's way of signing in for this person."
+          }
+        }
+      },
+      "CreateEnvelopeFromTemplate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["roles"],
+        "properties": {
+          "roles": {
+            "type": "object",
+            "description": "One person for every role of the template, keyed by role name or role id.",
+            "additionalProperties": { "$ref": "#/components/schemas/RolePerson" }
+          },
+          "prefill": {
+            "type": "object",
+            "maxProperties": 500,
+            "description": "Values for text fields, keyed by field label (case does not matter) or field id.\nA label shared by several fields fills them all. Recipients may change the values.\n",
+            "additionalProperties": { "type": "string" }
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Replaces the template's title for this envelope."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "Replaces the template's message for this envelope."
+          },
+          "reminders": { "$ref": "#/components/schemas/Reminders" },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the envelope expires; must be in the future."
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "Used when `expiresAt` is not set. Default the template's."
+          },
+          "metadata": { "$ref": "#/components/schemas/Metadata" },
+          "send": {
+            "type": "boolean",
+            "default": false,
+            "description": "Send at once instead of keeping a draft."
+          }
+        }
+      },
+      "SealChecks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sealed",
+          "singleSignature",
+          "intact",
+          "coversWholeDocument",
+          "trustedCertificate"
+        ],
+        "description": "Each check in the order it is made. `true` passed, `false` failed, `null` was not\nreached because an earlier one failed.\n",
+        "properties": {
+          "sealed": { "type": ["boolean", "null"], "description": "The file carries a seal." },
+          "singleSignature": {
+            "type": ["boolean", "null"],
+            "description": "It carries exactly one signature."
+          },
+          "intact": {
+            "type": ["boolean", "null"],
+            "description": "The signature is intact; no byte it covers was changed."
+          },
+          "coversWholeDocument": {
+            "type": ["boolean", "null"],
+            "description": "The signature covers the whole file; nothing was added after sealing."
+          },
+          "trustedCertificate": {
+            "type": ["boolean", "null"],
+            "description": "The seal was made with this server's certificate, or one it trusts."
+          }
+        }
+      },
+      "VerifiedEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "documentId",
+          "documentName",
+          "sentAt",
+          "completedAt",
+          "recipients",
+          "events",
+          "chain"
+        ],
+        "description": "What the certificate page inside the file prints, without IP addresses.",
+        "properties": {
+          "id": { "$ref": "#/components/schemas/Id" },
+          "title": { "type": "string" },
+          "documentId": { "$ref": "#/components/schemas/Id" },
+          "documentName": { "type": "string" },
+          "sentAt": { "type": ["string", "null"], "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "contact", "role", "status", "auth", "actedAt"],
+              "properties": {
+                "name": { "type": "string" },
+                "contact": {
+                  "type": ["string", "null"],
+                  "description": "The email or phone, masked, for example `a****@example.com`."
+                },
+                "role": { "$ref": "#/components/schemas/RecipientRole" },
+                "status": { "$ref": "#/components/schemas/RecipientStatus" },
+                "auth": { "$ref": "#/components/schemas/AuthMethod" },
+                "actedAt": { "type": ["string", "null"], "format": "date-time" }
+              }
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["seq", "action", "at", "recipient"],
+              "properties": {
+                "seq": { "type": "integer", "minimum": 1 },
+                "action": { "$ref": "#/components/schemas/AuditAction" },
+                "at": { "$ref": "#/components/schemas/Timestamp" },
+                "recipient": {
+                  "type": ["string", "null"],
+                  "description": "Name of the recipient the event is about."
+                }
+              }
+            }
+          },
+          "chain": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["valid", "head", "events"],
+            "properties": {
+              "valid": { "type": "boolean", "description": "The audit hash chain is intact." },
+              "head": {
+                "type": ["string", "null"],
+                "description": "The last hash of the chain, as printed on the certificate page."
+              },
+              "events": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "PublicVerification": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "valid",
+          "reason",
+          "sha256",
+          "checks",
+          "signer",
+          "signedAt",
+          "certificateSha256",
+          "envelope"
+        ],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "The file is exactly what this server sealed, unchanged since."
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": [
+              "not_sealed",
+              "multiple_signatures",
+              "signature_invalid",
+              "not_whole_document",
+              "untrusted_signer",
+              "unreadable",
+              "unknown_document",
+              null
+            ],
+            "description": "The first check that failed; `null` when valid. `unreadable`: the file could not\nbe read as a PDF. `unknown_document`: no sealed document has this SHA-256. More\nvalues may be added.\n"
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Sha256",
+            "description": "SHA-256 of the file that was checked."
+          },
+          "checks": { "$ref": "#/components/schemas/SealChecks" },
+          "signer": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["commonName", "organization"],
+            "description": "Who the seal's certificate was issued to.",
+            "properties": {
+              "commonName": { "type": ["string", "null"] },
+              "organization": { "type": ["string", "null"] }
+            }
+          },
+          "signedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When the file was sealed, from the signature."
+          },
+          "certificateSha256": {
+            "description": "SHA-256 of the certificate the seal was made with.",
+            "oneOf": [{ "$ref": "#/components/schemas/Sha256" }, { "type": "null" }]
+          },
+          "envelope": {
+            "description": "The envelope of a valid file; `null` otherwise, or when it is no longer held.",
+            "oneOf": [{ "$ref": "#/components/schemas/VerifiedEnvelope" }, { "type": "null" }]
           }
         }
       },

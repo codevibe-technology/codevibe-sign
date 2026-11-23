@@ -46,6 +46,22 @@ export { memoryRateLimiter, type RateLimiter, type RateLimitResult } from './htt
 export { defaultTemplates, escapeHtml } from './templates';
 export { formatMailDate } from './time-zone';
 export type { ApiDocument, ApiEnvelope } from './views';
+export {
+  templateFileKey,
+  type Template,
+  type TemplateDocument,
+  type TemplateField,
+  type TemplateRole,
+  type TemplateSummary,
+} from './template';
+export type {
+  PublicVerification,
+  SealChecks,
+  VerificationFailure,
+  VerifiedEnvelope,
+  VerifiedRecipient,
+} from './verification';
+export { API_VERSION } from './http/versioning';
 export type {
   MailTemplates,
   RenderedMail,
@@ -65,6 +81,10 @@ export type {
   CommitOptions,
   EnvelopeListQuery,
   EnvelopePage,
+  TemplateStore,
+  TemplateListQuery,
+  TemplatePage,
+  SealedDocumentRef,
   SigningToken,
   OtpChallenge,
   IdempotencyClaim,

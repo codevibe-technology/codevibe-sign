@@ -25,13 +25,17 @@ import type {
   WebhookDeliveryReport,
   WebhookTarget,
 } from '../options';
-import type { ServerStore } from '../store/types';
+import type { ServerStore, TemplateStore } from '../store/types';
 import type { Principal } from '../tenancy';
 import { defaultTemplates, type MailTemplates, type WorkspaceMail } from '../templates';
 import { checkWebhookUrl, type WebhookSecurity } from './webhook-guard';
 
 export interface Runtime {
   store: ServerStore;
+  /** Absent when neither the options nor the store provide one. */
+  templateStore?: TemplateStore;
+  /** Uploaded files being verified right now; see `maxConcurrentVerifications`. */
+  verifying: { count: number };
   files: FileStore;
   mailer: Mailer;
   otp: OtpSender;
@@ -89,6 +93,9 @@ const DEFAULT_LIMITS: Required<Limits> = {
   otpSendsPer15Minutes: 5,
   otpCodesPerRecipient: 10,
   maxAttachmentBytes: 10 * 1024 * 1024,
+  verifyPer10Minutes: 30,
+  verifySharedPer10Minutes: 300,
+  maxConcurrentVerifications: 4,
 };
 
 /**
@@ -147,8 +154,11 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     }
     if (hook.secret.length < 16) throw new Error(`Webhook secret for ${hook.url} is too short`);
   }
+  const templateStore = options.templateStore ?? options.store.templateStore;
   return {
     store: options.store,
+    ...(templateStore ? { templateStore } : {}),
+    verifying: { count: 0 },
     files: options.files,
     mailer: options.mailer,
     otp: options.otp,

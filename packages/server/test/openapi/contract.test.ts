@@ -6,8 +6,9 @@ import addFormats from 'ajv-formats';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { defaultPdfEngine } from '../../src/engine';
-import { harness, PNG, WEBHOOK_SECRET } from '../../src/testing/harness';
+import { API_KEY, harness, PNG, WEBHOOK_SECRET } from '../../src/testing/harness';
 import { makeP12, makePdf } from '../../src/testing/real-pdf';
+import { API_VERSION, deprecatedOperations } from '../../src/http/versioning';
 import { verifyWebhook } from '../../src/runtime/webhooks';
 import spec from '../../openapi.json';
 
@@ -85,6 +86,26 @@ describe('the OpenAPI document', () => {
     );
     const documented = new Set(operations().map((o) => `${o.method.toUpperCase()} ${o.path}`));
     expect([...documented].sort()).toEqual([...registered].sort());
+  });
+
+  it('keeps every route of the API under /v1', () => {
+    // The two exceptions are not API calls: a probe for load balancers, and the address
+    // printed in every signing email, which has to stay the same for as long as links live.
+    const unversioned = ['/health', '/sign/{token}'];
+    const outside = Object.keys(paths).filter((path) => !path.startsWith('/v1/'));
+    expect(outside.sort()).toEqual(unversioned);
+    expect(spec.info.version).toBe(API_VERSION);
+  });
+
+  it('gives every deprecated operation both dates, six months apart or more', () => {
+    for (const { operation, method, path } of operations()) {
+      const marked = operation as unknown as Json;
+      if (!marked.deprecated) {
+        expect(marked['x-sunset'], `${method} ${path}`).toBeUndefined();
+        expect(marked['x-deprecated-since'], `${method} ${path}`).toBeUndefined();
+      }
+    }
+    expect(() => deprecatedOperations(spec)).not.toThrow();
   });
 
   it('maps every error code to the status the server sends', async () => {
@@ -336,6 +357,100 @@ describe('a full run against the server', () => {
     form.append('documents', new Blob([pdf], { type: 'application/pdf' }), 'upload.pdf');
     expect((await call('POST', '/v1/envelopes', { body: form })).status).toBe(201);
 
+    const templateBody = {
+      name: 'Offer letter',
+      description: 'Standard offer for full-time staff',
+      documents: [{ key: 'offer', name: 'offer.pdf', content }],
+      roles: [
+        { key: 'employee', name: 'Employee', auth: 'email_link' },
+        { key: 'hr', name: 'HR', type: 'viewer' },
+      ],
+      fields: [
+        { role: 'employee', type: 'signature', page: 1, x: 72, y: 600, width: 180, height: 48 },
+        {
+          role: 'employee',
+          type: 'text',
+          label: 'Employee code',
+          page: 0,
+          x: 72,
+          y: 100,
+          width: 200,
+          height: 20,
+        },
+      ],
+    };
+    const template = await call('POST', '/v1/templates', {
+      body: templateBody,
+      headers: { 'idempotency-key': 'template-1' },
+    });
+    expect(template.status).toBe(201);
+    const templateId = template.json.id as string;
+    const templates = await call('GET', '/v1/templates?limit=1&q=offer');
+    expect(templates.json.templates[0].id).toBe(templateId);
+    await call('GET', `/v1/templates/${templateId}`);
+    const renamed = await call('PATCH', `/v1/templates/${templateId}`, {
+      body: { name: 'Offer letter 2026', description: null },
+    });
+    expect(renamed.json.name).toBe('Offer letter 2026');
+    const fromTemplate = await call('POST', `/v1/templates/${templateId}/envelopes`, {
+      body: {
+        roles: {
+          Employee: { name: 'Meera Nair', email: 'meera@example.com' },
+          HR: { name: 'HR', email: 'hr@example.com' },
+        },
+        prefill: { 'Employee code': 'E-1042' },
+        send: true,
+      },
+    });
+    expect(fromTemplate.status).toBe(201);
+    expect(fromTemplate.json.metadata.templateId).toBe(templateId);
+    expect(fromTemplate.json.values).toHaveLength(1);
+    const noPerson = await call('POST', `/v1/templates/${templateId}/envelopes`, {
+      body: { roles: {} },
+    });
+    expect(noPerson.status).toBe(400);
+    const uploadTemplate = new FormData();
+    uploadTemplate.set('template', JSON.stringify({ name: 'Upload', roles: [{ name: 'Signer' }] }));
+    uploadTemplate.append('documents', new Blob([pdf], { type: 'application/pdf' }), 'upload.pdf');
+    expect((await call('POST', '/v1/templates', { body: uploadTemplate })).status).toBe(201);
+    expect((await call('DELETE', `/v1/templates/${templateId}`)).json.deleted).toBe(true);
+    expect((await call('GET', `/v1/templates/${templateId}`)).status).toBe(404);
+    expect((await call('DELETE', `/v1/templates/${templateId}`)).status).toBe(404);
+    expect((await call('GET', '/v1/templates', { auth: false })).status).toBe(401);
+
+    const sealedBytes = new Uint8Array(
+      await (
+        await h.server.app.request(`/v1/envelopes/${id}/documents/${docId}?version=sealed`, {
+          headers: { authorization: `Bearer ${API_KEY}` },
+        })
+      ).arrayBuffer(),
+    );
+    const sealedForm = new FormData();
+    sealedForm.set('file', new Blob([sealedBytes], { type: 'application/pdf' }), 'sealed.pdf');
+    const verified = await call('POST', '/v1/verify', { body: sealedForm, auth: false });
+    expect(verified.json).toMatchObject({ valid: true, envelope: { id, documentId: docId } });
+    const sealedHash = verified.json.sha256 as string;
+    const byHash = await call('GET', `/v1/verify/${sealedHash}`, { auth: false });
+    expect(byHash.json).toEqual(verified.json);
+    const tampered = new Uint8Array(sealedBytes);
+    tampered[tampered.length - 200] = tampered[tampered.length - 200]! ^ 1;
+    const tamperedForm = new FormData();
+    tamperedForm.set('file', new Blob([tampered], { type: 'application/pdf' }), 'sealed.pdf');
+    const broken = await call('POST', '/v1/verify', { body: tamperedForm });
+    expect(broken.json).toMatchObject({ valid: false, envelope: null });
+    const unsealedForm = new FormData();
+    unsealedForm.set('file', new Blob([pdf], { type: 'application/pdf' }), 'plain.pdf');
+    const unsealed = await call('POST', '/v1/verify', { body: unsealedForm });
+    expect(unsealed.json).toMatchObject({ valid: false, reason: 'not_sealed' });
+    expect((await call('GET', `/v1/verify/${'0'.repeat(64)}`)).json.reason).toBe(
+      'unknown_document',
+    );
+    expect((await call('GET', '/v1/verify/not-a-hash')).status).toBe(400);
+    const notPdf = new FormData();
+    notPdf.set('file', new Blob(['hello'], { type: 'text/plain' }), 'note.txt');
+    expect((await call('POST', '/v1/verify', { body: notPdf })).status).toBe(422);
+    expect((await call('POST', '/v1/verify', { body: { sha256: sealedHash } })).status).toBe(400);
+
     const failures = [
       await call('GET', `/v1/envelopes/${id}`, { auth: false }),
       await call('GET', '/v1/envelopes/missing'),
@@ -389,5 +504,14 @@ describe('a full run against the server', () => {
     const call = checked(h);
     const limited = await call('POST', '/v1/envelopes', { body: { title: 'x' } });
     expect(limited.status).toBe(429);
+    expect((await call('POST', '/v1/templates', { body: { name: 'x' } })).status).toBe(429);
+    const busy = harness({
+      limits: { verifyPer10Minutes: 0, verifySharedPer10Minutes: 0 },
+    });
+    const refused = await checked(busy)('GET', `/v1/verify/${'0'.repeat(64)}`);
+    expect(refused.status).toBe(429);
+    const form = new FormData();
+    form.set('file', new Blob(['%PDF-1.7'], { type: 'application/pdf' }), 'a.pdf');
+    expect((await checked(busy)('POST', '/v1/verify', { body: form })).status).toBe(429);
   });
 });

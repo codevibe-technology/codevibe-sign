@@ -22,6 +22,10 @@ const CAPTURE = {
     "if (body.id) pm.collectionVariables.set('envelopeId', body.id);",
     "if (body.documents?.[0]) pm.collectionVariables.set('docId', body.documents[0].id);",
   ],
+  createTemplate: [
+    'const body = pm.response.json();',
+    "if (body.id) pm.collectionVariables.set('templateId', body.id);",
+  ],
   verifyOtp: [
     'const body = pm.response.json();',
     "if (body.sessionToken) pm.collectionVariables.set('signerSession', body.sessionToken);",
@@ -29,7 +33,13 @@ const CAPTURE = {
 };
 
 /** Collection variables that stand in for path parameters. */
-const PATH_VARIABLES = { id: 'envelopeId', docId: 'docId', token: 'token' };
+const PATH_VARIABLES = {
+  id: 'envelopeId',
+  docId: 'docId',
+  token: 'token',
+  templateId: 'templateId',
+  sha256: 'sha256',
+};
 
 function resolve(spec, node) {
   let current = node;
@@ -123,11 +133,12 @@ function uploadVariant(spec, path, method, operation, pathItem) {
   const schema = resolve(spec, media.schema);
   const request = requestFor(spec, path, method, operation, pathItem);
   request.header = request.header.filter((h) => h.key !== 'Content-Type');
-  const formdata = schema.properties.envelope
+  const part = ['envelope', 'template'].find((name) => schema.properties[name]);
+  const formdata = part
     ? [
         {
-          key: 'envelope',
-          value: schema.properties.envelope.examples[0],
+          key: part,
+          value: schema.properties[part].examples[0],
           type: 'text',
           contentType: 'application/json',
         },
@@ -139,7 +150,9 @@ function uploadVariant(spec, path, method, operation, pathItem) {
           : { key, value: '', type: 'text' },
       );
   request.body = { mode: 'formdata', formdata };
-  return { name: `${operation.summary} (multipart upload)`, request };
+  const alone = !resolve(spec, operation.requestBody).content['application/json'];
+  const name = alone ? operation.summary : `${operation.summary} (multipart upload)`;
+  return { alone, name, request };
 }
 
 function toPostman(spec) {
@@ -156,9 +169,10 @@ function toPostman(spec) {
       const capture = CAPTURE[operation.operationId];
       if (capture)
         item.event = [{ listen: 'test', script: { type: 'text/javascript', exec: capture } }];
-      folder.item.push(item);
       const upload = uploadVariant(spec, path, method, operation, pathItem);
-      if (upload) folder.item.push(upload);
+      // An operation that only takes an upload is listed once, as the upload.
+      if (!upload?.alone) folder.item.push(item);
+      if (upload) folder.item.push({ name: upload.name, request: upload.request });
     }
   }
   return {
@@ -173,6 +187,8 @@ function toPostman(spec) {
       { key: 'apiKey', value: '' },
       { key: 'envelopeId', value: '' },
       { key: 'docId', value: '' },
+      { key: 'templateId', value: '' },
+      { key: 'sha256', value: '' },
       { key: 'token', value: '' },
       { key: 'signerSession', value: '' },
     ],

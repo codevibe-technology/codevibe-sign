@@ -63,7 +63,7 @@ export function harness(overrides: Partial<SignServerOptions> = {}) {
     options: { body?: unknown; headers?: Record<string, string>; auth?: boolean } = {},
   ) {
     const headers: Record<string, string> = { ...options.headers };
-    if (options.auth !== false && path.startsWith('/v1/envelopes')) {
+    if (options.auth !== false && /^\/v1\/(envelopes|templates)/.test(path)) {
       headers.authorization ??= `Bearer ${API_KEY}`;
     }
     let body: BodyInit | undefined;
@@ -126,6 +126,34 @@ export function envelopeBody(overrides: Record<string, unknown> = {}) {
       {
         recipient: 'ravi',
         type: 'text',
+        page: 0,
+        x: 72,
+        y: 100,
+        width: 200,
+        height: 20,
+        required: false,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+/** A template with an Employee who signs and fills in a text field, and HR who gets a copy. */
+export function templateBody(overrides: Record<string, unknown> = {}) {
+  return {
+    name: 'Offer letter',
+    description: 'Standard offer for full-time staff',
+    documents: [{ key: 'offer', name: 'offer.pdf', content: pdfBase64(2) }],
+    roles: [
+      { key: 'employee', name: 'Employee', auth: 'email_link' },
+      { key: 'hr', name: 'HR', type: 'viewer', auth: 'email_link' },
+    ],
+    fields: [
+      { role: 'employee', type: 'signature', page: 1, x: 72, y: 600, width: 180, height: 48 },
+      {
+        role: 'employee',
+        type: 'text',
+        label: 'Employee code',
         page: 0,
         x: 72,
         y: 100,

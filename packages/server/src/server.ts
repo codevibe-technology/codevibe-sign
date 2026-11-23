@@ -3,6 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { defaultPdfEngine } from './engine';
 import { errorHandler, HttpError } from './errors';
 import { redactPath } from './http/redact';
+import { versioning } from './http/versioning';
 import type { SignServerOptions, WebhookDeliveryReport } from './options';
 import { senderRoutes } from './routes/sender';
 import { linkRoutes } from './routes/link';
@@ -10,8 +11,11 @@ import { openApiRoutes } from './routes/openapi';
 import { copyRoutes } from './routes/copy';
 import { receiptRoutes } from './routes/receipt';
 import { signerRoutes } from './routes/signer';
+import { templateRoutes } from './routes/templates';
+import { verifyRoutes } from './routes/verify';
 import { createRuntime } from './runtime/context';
 import { tick, type TickOptions, type TickResult } from './runtime/tick';
+import { verifySealedPdf, type PublicVerification } from './verification';
 import {
   attemptWebhook,
   buildTestWebhookBody,
@@ -20,6 +24,8 @@ import {
 } from './runtime/webhooks';
 
 const SIGNER_BODY_LIMIT = 10 * 1024 * 1024;
+/** Room for the multipart boundaries and headers around an uploaded PDF. */
+const VERIFY_FORM_OVERHEAD = 64 * 1024;
 
 export interface SignServer {
   app: Hono;
@@ -43,6 +49,11 @@ export interface SignServer {
     deliveryId: string;
     body: string;
   }): Promise<WebhookDeliveryReport>;
+  /**
+   * What `POST /v1/verify` answers for these bytes, for a page of your own that checks sealed
+   * files. Apply your own rate limit before calling it; nothing is stored.
+   */
+  verifyPdf(bytes: Uint8Array): Promise<PublicVerification>;
 }
 
 export function createSignServer(options: SignServerOptions): SignServer {
@@ -75,16 +86,26 @@ export function createSignServer(options: SignServerOptions): SignServer {
     }
   });
 
+  app.use('*', versioning(rt.basePath));
+
   const tooLarge = () => {
     throw new HttpError('DOCUMENT_TOO_LARGE', 'The request body is too large');
   };
   app.use('/v1/envelopes/*', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
   app.use('/v1/envelopes', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
+  app.use('/v1/templates/*', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
+  app.use('/v1/templates', bodyLimit({ maxSize: rt.limits.maxRequestBytes, onError: tooLarge }));
+  app.use(
+    '/v1/verify',
+    bodyLimit({ maxSize: rt.limits.maxPdfBytes + VERIFY_FORM_OVERHEAD, onError: tooLarge }),
+  );
   app.use('/v1/sign/*', bodyLimit({ maxSize: SIGNER_BODY_LIMIT, onError: tooLarge }));
 
   app.get('/health', (c) => c.json({ ok: true }));
   app.route('/v1/openapi.json', openApiRoutes());
   app.route('/v1/envelopes', senderRoutes(rt));
+  app.route('/v1/templates', templateRoutes(rt));
+  app.route('/v1/verify', verifyRoutes(rt));
   // Before the signer routes, whose `/:token` would otherwise take `receipt` for a token.
   app.route('/v1/sign/receipt', receiptRoutes(rt));
   app.route('/v1/sign/copy', copyRoutes(rt));
@@ -107,6 +128,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
     },
     redeliverWebhook: ({ workspaceId, url, deliveryId, body }) =>
       deliverNow({ url, workspaceId, deliveryId, body }),
+    verifyPdf: (bytes) => verifySealedPdf(rt, bytes),
     async idle() {
       while (rt.inflight.size > 0) await Promise.allSettled([...rt.inflight]);
     },

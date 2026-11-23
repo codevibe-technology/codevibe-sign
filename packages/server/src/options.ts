@@ -10,7 +10,7 @@ import type {
 import type { PdfEngine, SealTrust } from './engine';
 import type { Logger } from './errors';
 import type { RateLimiter } from './http/rate-limit';
-import type { ServerStore } from './store/types';
+import type { ServerStore, TemplateStore } from './store/types';
 import type { Principal } from './tenancy';
 import type { WebhookSecurity } from './runtime/webhook-guard';
 import type { MailTemplates, WorkspaceMail } from './templates';
@@ -81,6 +81,15 @@ export interface Limits {
   otpCodesPerRecipient?: number;
   /** Total size of sealed files attached to the completion email. Default 10 MB. */
   maxAttachmentBytes?: number;
+  /** Public verify requests per 10 minutes from one IP address. Default 30. */
+  verifyPer10Minutes?: number;
+  /**
+   * Public verify requests per 10 minutes from every caller whose address is not known,
+   * together. Default 300.
+   */
+  verifySharedPer10Minutes?: number;
+  /** Uploaded files being verified at the same moment; more are asked to retry. Default 4. */
+  maxConcurrentVerifications?: number;
 }
 
 export type WebhookEvent = string;
@@ -125,6 +134,11 @@ export interface EnvelopeChange {
 
 export interface SignServerOptions {
   store: ServerStore;
+  /**
+   * Where templates are kept, when not in `store`: for example your own table with your own
+   * quotas. Defaults to `store.templateStore`.
+   */
+  templateStore?: TemplateStore;
   files: FileStore;
   mailer: Mailer;
   otp: OtpSender;
