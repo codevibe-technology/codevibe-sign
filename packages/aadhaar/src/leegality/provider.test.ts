@@ -371,6 +371,38 @@ describe('parseWebhook', () => {
     await expect(provider.parseWebhook({}, body)).resolves.toMatchObject({ status: 'failed' });
   });
 
+  it('accepts a failed identity check while the invitation is still open', async () => {
+    const { provider } = setup(() => statusResponse({ signed: false, expired: false }));
+    const body = webhookBody(
+      {
+        webhookType: 'Error',
+        messages: [{ code: 'name.verification.failed', message: 'mismatch' }],
+      },
+      { action: null },
+    );
+    await expect(provider.parseWebhook({}, body)).resolves.toMatchObject({ status: 'failed' });
+  });
+
+  it('refuses a failed event for an invitation the provider says is signed', async () => {
+    const { provider } = setup(() => statusResponse({ signed: true }));
+    const body = webhookBody(
+      {
+        webhookType: 'Error',
+        messages: [{ code: 'name.verification.failed', message: 'mismatch' }],
+      },
+      { action: null },
+    );
+    await expect(provider.parseWebhook({}, body)).rejects.toMatchObject({
+      code: 'WEBHOOK_INVALID',
+    });
+  });
+
+  it('never follows a redirect with the auth token', async () => {
+    const { provider, fetch } = setup(() => statusResponse({ signed: true }));
+    await provider.parseWebhook({}, webhookBody());
+    expect(fetch.mock.calls[0]![1]).toMatchObject({ redirect: 'error' });
+  });
+
   it('returns null for a verified event that does not change the status', async () => {
     const { provider, fetch } = setup(() => statusResponse({}));
     const body = webhookBody({}, { inviteeType: 'Reviewer', action: 'Approved' });

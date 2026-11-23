@@ -125,8 +125,11 @@ function confirms(status: EsignStatus, row: StatusRequest): boolean {
     case 'declined':
       return row.rejected === true;
     case 'expired':
-    case 'failed':
       return row.expired === true;
+    case 'failed':
+      // A failed identity check leaves the invitation open at the provider, so the status
+      // API can only show that nothing was signed or rejected.
+      return row.signed !== true && row.rejected !== true;
   }
 }
 

@@ -23,7 +23,12 @@ export async function request<T>(
   try {
     let response: Response;
     try {
-      response = await options.fetch(url, { ...init, signal: controller.signal });
+      // The auth token travels in a header that a redirect would carry to another host.
+      response = await options.fetch(url, {
+        ...init,
+        redirect: 'error',
+        signal: controller.signal,
+      });
     } catch {
       throw transportError(controller.signal.aborted, options);
     }
