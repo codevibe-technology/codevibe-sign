@@ -98,6 +98,37 @@ describe('GET /v1/sign/:token', () => {
     expect(res.headers.get('content-type')).toBe('application/pdf');
   });
 
+  it('keeps a document name in another script in the download file name', async () => {
+    const h = harness();
+    const body = envelopeBody({ send: true });
+    (body.documents[0] as Record<string, unknown>).name = 'अनुबंध عقد.pdf';
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', { body });
+    const token = h.tokenFor('asha@example.com');
+    const res = await h.server.app.request(
+      `/v1/sign/${token}/documents/${envelope.documents[0].id}`,
+    );
+    const disposition = res.headers.get('content-disposition') ?? '';
+    expect(disposition).toContain('attachment; filename="document-original.pdf"');
+    expect(disposition).toContain(
+      `filename*=UTF-8''${encodeURIComponent('अनुबंध عقد-original.pdf')}`,
+    );
+  });
+
+  it('keeps quotes, slashes and line breaks out of the download file name', async () => {
+    const h = harness();
+    const body = envelopeBody({ send: true });
+    (body.documents[0] as Record<string, unknown>).name = 'a"b/c\\d\r\ne.pdf';
+    const { json: envelope } = await h.call('POST', '/v1/envelopes', { body });
+    const token = h.tokenFor('asha@example.com');
+    const res = await h.server.app.request(
+      `/v1/sign/${token}/documents/${envelope.documents[0].id}`,
+    );
+    const disposition = res.headers.get('content-disposition') ?? '';
+    expect(disposition).toBe(
+      `attachment; filename="a_b_c_d_e-original.pdf"; filename*=UTF-8''a_b_c_d_e-original.pdf`,
+    );
+  });
+
   it('limits requests per token', async () => {
     const { h } = await sent({}, { limits: { signerRequestsPerMinute: 3 } });
     const token = h.tokenFor('asha@example.com');
@@ -260,6 +291,33 @@ describe('OTP', () => {
     expect(doc.status).toBe(401);
     expect(doc.json.error.code).toBe('OTP_INVALID');
     expect((await h.call('POST', `/v1/sign/${token}/view`)).status).toBe(401);
+  });
+
+  it('shows no message, fields, values or full address before the code is checked', async () => {
+    const h = harness();
+    const body = { ...otpBody(), message: 'Your salary is 18 lakh a year.' };
+    await h.call('POST', '/v1/envelopes', { body });
+    const token = h.tokenFor('asha@example.com');
+    const before = await h.call('GET', `/v1/sign/${token}`);
+    expect(before.status).toBe(200);
+    expect(before.json.envelope.message).toBeNull();
+    expect(before.json.fields).toEqual([]);
+    expect(before.json.values).toEqual([]);
+    expect(before.json.documents).toEqual([]);
+    expect(JSON.stringify(before.json)).not.toContain('asha@example.com');
+    expect(before.json.recipient.name).toBe('Asha Rao');
+
+    await h.call('POST', `/v1/sign/${token}/otp`);
+    const { json: session } = await h.call('POST', `/v1/sign/${token}/otp/verify`, {
+      body: { code: h.otp.sent.at(-1)!.code },
+    });
+    const after = await h.call('GET', `/v1/sign/${token}`, {
+      headers: { 'x-sign-session': session.sessionToken },
+    });
+    expect(after.json.envelope.message).toBe('Your salary is 18 lakh a year.');
+    expect(after.json.fields).toHaveLength(1);
+    expect(after.json.documents).toHaveLength(1);
+    expect(after.json.recipient.email).toBe('asha@example.com');
   });
 
   it('issues a session after the right code, by header or cookie', async () => {

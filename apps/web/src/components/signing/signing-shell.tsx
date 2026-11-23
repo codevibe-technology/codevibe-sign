@@ -57,7 +57,7 @@ export function SigningShell({
           <span className="truncate font-display text-base font-semibold tracking-tight">
             {brand?.name ?? 'Codevibe Sign'}
           </span>
-          <span className="ml-auto hidden font-mono text-[10.5px] tracking-[0.12em] uppercase opacity-70 sm:inline">
+          <span className="ml-auto hidden font-mono text-[10.5px] tracking-[0.12em] uppercase sm:inline">
             Secure signing
           </span>
         </div>

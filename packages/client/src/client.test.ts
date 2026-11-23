@@ -43,7 +43,8 @@ describe('sender and signer clients against the server', () => {
     const signer = signerFor('asha@example.com');
     const session = await signer.session();
     expect(session).toMatchObject({ otpRequired: true, authenticated: false, canAct: true });
-    expect(session.fields).toHaveLength(1);
+    expect(session.fields).toEqual([]);
+    expect(session.documents).toEqual([]);
 
     await expect(signer.document(draft.documents[0]!.id)).rejects.toMatchObject({
       code: 'OTP_INVALID',
@@ -55,13 +56,15 @@ describe('sender and signer clients against the server', () => {
     const code = env.otp.sent.at(-1)!.code;
     const verified = await signer.verifyOtp(code);
     expect(signer.sessionToken).toBe(verified.sessionToken);
-    expect((await signer.session()).authenticated).toBe(true);
+    const unlocked = await signer.session();
+    expect(unlocked.authenticated).toBe(true);
+    expect(unlocked.fields).toHaveLength(1);
 
     const original = await signer.document(draft.documents[0]!.id);
     expect(decoder.decode(original)).toContain('%PDF-1.7');
     expect(await signer.view()).toEqual({ envelopeStatus: 'sent', recipientStatus: 'viewed' });
 
-    const done = await signer.submit([{ fieldId: session.fields[0]!.id, value: PNG }]);
+    const done = await signer.submit([{ fieldId: unlocked.fields[0]!.id, value: PNG }]);
     expect(done).toEqual({ envelopeStatus: 'completed', recipientStatus: 'signed' });
 
     const sealed = await client.envelopes.downloadDocument(draft.id, draft.documents[0]!.id, {

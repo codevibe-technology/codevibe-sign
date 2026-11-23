@@ -397,9 +397,7 @@ export function EnvelopesTable({
                       ) : null}
                     </td>
                     <td className="hidden px-4 py-3 text-muted sm:table-cell">
-                      <time dateTime={e.createdAt} title={new Date(e.createdAt).toLocaleString()}>
-                        {relativeTime(e.createdAt)}
-                      </time>
+                      <time dateTime={e.createdAt}>{relativeTime(e.createdAt)}</time>
                     </td>
                     <td className="py-3 pr-3 text-right">
                       <RowActions

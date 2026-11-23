@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { isTimeZone } from '@/lib/preferences';
 import { parseMailbox } from './graph-mail';
 
 const flag = z
@@ -39,6 +40,10 @@ const schema = z.object({
     .optional()
     .transform((value) => (value === undefined ? undefined : value === 'true' || value === '1')),
   SIGN_SESSION_SECRET: z.string().min(32).optional(),
+  SIGN_TIME_ZONE: z
+    .string()
+    .refine(isTimeZone, 'SIGN_TIME_ZONE must be an IANA time zone, for example Asia/Kolkata')
+    .optional(),
   SINGLE_WORKSPACE: flag,
   AUTO_MIGRATE: flag,
   TRUST_PROXY: flag,

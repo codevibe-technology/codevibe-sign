@@ -1,13 +1,15 @@
 import 'server-only';
-import { betterAuth } from 'better-auth';
+import { APIError, betterAuth } from 'better-auth';
 import { db } from '../db';
 import { env, googleEnabled } from '../env';
 import { sendMagicLink } from '../mail';
 import { appRuntime } from '../runtime';
 import { authOptions } from './config';
+import { limitMagicLinks, TooManySignInLinks } from './magic-link-limit';
 
 function createAuth() {
   const config = env();
+  const send = limitMagicLinks((email, url) => sendMagicLink(appRuntime().mailer, email, url));
   return betterAuth(
     authOptions({
       sql: db(),
@@ -21,7 +23,14 @@ function createAuth() {
             },
           }
         : {}),
-      sendMagicLink: (email, url) => sendMagicLink(appRuntime().mailer, email, url),
+      sendMagicLink: async (email, url) => {
+        try {
+          await send(email, url);
+        } catch (err) {
+          if (!(err instanceof TooManySignInLinks)) throw err;
+          throw new APIError('TOO_MANY_REQUESTS', { message: err.message });
+        }
+      },
     }),
   );
 }

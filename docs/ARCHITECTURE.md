@@ -15,8 +15,15 @@ packages you can embed in your own product, or run as a standalone service.
 | `@codevibe_technology/sign-react`   | UI: signature pad (draw, type, upload), signing view for recipients, field placement for senders. Unstyled by default, themed with CSS variables.                               | core, `react` (peer)                  |
 | `@codevibe_technology/sign-aadhaar` | Aadhaar eSign through a licensed eSign provider, using the integrator's own provider account.                                                                                   | core                                  |
 
-Apps: `apps/server` (Docker image of the standalone service) and `apps/playground`
-(a local demo of the full flow).
+Two more packages sit on top of these: `@codevibe_technology/sign-templates` (reusable
+templates and bulk drafts from a CSV file; depends on core) and `codevibe-sign`, the one
+package to install, which re-exports the others under subpaths and adds the `codevibe-sign`
+command line.
+
+Apps: `apps/web` (the product: workspaces, sending, the signing page and the HTTP API in one
+Next.js server; see [APP-ARCHITECTURE.md](APP-ARCHITECTURE.md)), `apps/server` (Docker image
+of the standalone API service), `apps/site` (the documentation) and `apps/playground` (a local
+demo of the full flow).
 
 ## Core model
 

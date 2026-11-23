@@ -52,10 +52,12 @@ In the browser, with the token from the signing link:
 import { createSignerClient } from '@codevibe_technology/sign-client';
 
 const signer = createSignerClient({ baseUrl: 'https://sign.example.com', token });
-const session = await signer.session();
+let session = await signer.session();
 if (session.otpRequired && !session.authenticated) {
   await signer.requestOtp();
   await signer.verifyOtp(codeTypedByTheSigner);
+  // Documents and fields are only listed once the code has been checked.
+  session = await signer.session();
 }
 const pdf = await signer.document(session.documents[0]!.id);
 await signer.view();

@@ -959,8 +959,11 @@ paths:
       description: |
         The envelope basics, the recipient, their own fields and values, and what they still
         need to do. For recipients who sign with a one-time code, `otpRequired` is `true` and
-        `authenticated` says whether a valid session came with the request. `canAct` is
-        `false` while it is someone else's turn.
+        `authenticated` says whether a valid session came with the request. Until it is
+        `true` the answer holds only what the invitation email already said: `message` and
+        `changeNote` are `null`, `documents`, `fields` and `values` are empty and the email
+        address is masked. Read it again after `otp/verify`. `canAct` is `false` while it is
+        someone else's turn.
       security:
         - {}
         - signerSession: []

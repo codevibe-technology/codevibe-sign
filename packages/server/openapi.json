@@ -844,7 +844,7 @@
         "operationId": "getSigningSession",
         "tags": ["Signing"],
         "summary": "Open a signing session",
-        "description": "The envelope basics, the recipient, their own fields and values, and what they still\nneed to do. For recipients who sign with a one-time code, `otpRequired` is `true` and\n`authenticated` says whether a valid session came with the request. `canAct` is\n`false` while it is someone else's turn.\n",
+        "description": "The envelope basics, the recipient, their own fields and values, and what they still\nneed to do. For recipients who sign with a one-time code, `otpRequired` is `true` and\n`authenticated` says whether a valid session came with the request. Until it is\n`true` the answer holds only what the invitation email already said: `message` and\n`changeNote` are `null`, `documents`, `fields` and `values` are empty and the email\naddress is masked. Read it again after `otp/verify`. `canAct` is `false` while it is\nsomeone else's turn.\n",
         "security": [
           {},
           { "signerSession": [] },

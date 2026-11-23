@@ -26,6 +26,11 @@ function setup(props: Partial<Parameters<typeof FieldPlacer>[0]> = {}) {
 }
 
 describe('FieldPlacer', () => {
+  it('lets the keyboard reach the page area so it can be scrolled', () => {
+    setup();
+    expect(document.querySelector('.cvs-scroller')).toHaveAttribute('tabindex', '0');
+  });
+
   it('adds a field to the page in view from the keyboard', () => {
     const { last } = setup();
     fireEvent.click(screen.getByRole('button', { name: 'Signature' }));

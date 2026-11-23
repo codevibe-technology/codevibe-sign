@@ -24,15 +24,19 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** `14:42` for today, `3 Nov, 14:42` otherwise. */
-export function mailTime(iso: string, now: Date = new Date()): string {
+/** `14:42` for today, `3 Nov, 14:42` otherwise, in `timeZone` or the local zone. */
+export function mailTime(iso: string, now: Date = new Date(), timeZone?: string): string {
   const at = new Date(iso);
-  const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  if (at.toDateString() === now.toDateString()) return time;
+  const zone = timeZone ? { timeZone } : {};
+  const dayOf = (date: Date) => date.toLocaleDateString('en-CA', zone);
+  const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...zone });
+  if (dayOf(at) === dayOf(now)) return time;
+  const year = (date: Date) => date.toLocaleDateString('en-GB', { year: 'numeric', ...zone });
   const day = at.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
-    ...(at.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+    ...(year(at) !== year(now) ? { year: 'numeric' } : {}),
+    ...zone,
   });
   return `${day}, ${time}`;
 }

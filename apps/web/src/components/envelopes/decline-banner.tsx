@@ -1,7 +1,8 @@
+import { LocalTime } from '@/components/ui/local-time';
 import type { Envelope } from '@codevibe_technology/sign-core';
 import { XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { ROLE_OPTIONS, formatDateTime } from '@/lib/envelopes';
+import { ROLE_OPTIONS } from '@/lib/envelopes';
 
 const ROLE = Object.fromEntries(ROLE_OPTIONS.map((r) => [r.value, r.label.toLowerCase()]));
 
@@ -36,7 +37,12 @@ export function DeclineBanner({
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-semibold text-ink">
           Declined by {decline.name} ({ROLE[decline.role] ?? decline.role})
-          {decline.at ? ` on ${formatDateTime(decline.at)}` : ''}
+          {decline.at ? (
+            <>
+              {' '}
+              on <LocalTime iso={decline.at} />
+            </>
+          ) : null}
         </p>
         <p className="mt-1 break-words whitespace-pre-line text-ink">
           {decline.reason ? `“${decline.reason}”` : 'No reason was given.'}

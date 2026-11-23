@@ -11,10 +11,27 @@ export async function readJson(c: Context, optional = false): Promise<unknown> {
   }
 }
 
+/** Characters that cannot go in a file name on common systems, or that would break the header. */
+const UNSAFE_NAME = /[\p{Cc}"*/:<>?\\|]+/gu;
+
+/**
+ * `Content-Disposition` for a download. `filename` is a plain ASCII fallback for old clients;
+ * `filename*` (RFC 6266) carries the real name, so names in other scripts survive.
+ */
+export function attachmentDisposition(name: string, suffix: string): string {
+  const base = name.replace(/\.pdf$/i, '').trim();
+  const ascii = base.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || 'document';
+  const full = base.replace(UNSAFE_NAME, '_').trim() || 'document';
+  const encoded = encodeURIComponent(`${full}-${suffix}.pdf`).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${ascii}-${suffix}.pdf"; filename*=UTF-8''${encoded}`;
+}
+
 export function pdfResponse(c: Context, bytes: Uint8Array, name: string, suffix: string) {
-  const base = name.replace(/\.pdf$/i, '').replace(/[^\w.-]+/g, '_') || 'document';
   c.header('Content-Type', 'application/pdf');
-  c.header('Content-Disposition', `attachment; filename="${base}-${suffix}.pdf"`);
+  c.header('Content-Disposition', attachmentDisposition(name, suffix));
   c.header('Cache-Control', 'private, no-store');
   return c.body(new Uint8Array(bytes));
 }

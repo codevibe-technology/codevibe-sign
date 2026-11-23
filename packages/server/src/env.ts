@@ -7,6 +7,8 @@ export interface EnvConfig {
   trustProxy: boolean;
   /** Proxies in front of the server that append to `X-Forwarded-For`. */
   trustedProxyHops: number;
+  /** IANA zone for the dates printed on signed documents; UTC when not set. */
+  timeZone?: string;
   port: number;
   host: string;
 }
@@ -118,6 +120,15 @@ export function configFromEnv(env: EnvVars): EnvConfig {
 
   const trustedProxyHops = integer('TRUSTED_PROXY_HOPS', 1, 1, 20);
 
+  const timeZone = env.TIME_ZONE?.trim() || undefined;
+  if (timeZone) {
+    try {
+      new Intl.DateTimeFormat('en-GB', { timeZone });
+    } catch {
+      problems.push('TIME_ZONE must be an IANA time zone, for example Asia/Kolkata');
+    }
+  }
+
   const port = integer('PORT', 3000, 1, 65535);
   const host = env.HOST?.trim() || '0.0.0.0';
 
@@ -149,6 +160,7 @@ export function configFromEnv(env: EnvVars): EnvConfig {
     },
     trustProxy: trustRaw === 'true',
     trustedProxyHops,
+    ...(timeZone ? { timeZone } : {}),
     port,
     host,
   };

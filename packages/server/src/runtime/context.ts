@@ -50,6 +50,7 @@ export interface Runtime {
   templates: MailTemplates;
   workspaceMail?: (workspaceId: string) => Promise<WorkspaceMail | null>;
   certificateNote?: (workspaceId: string) => Promise<string | null>;
+  timeZone?: string;
   apiKeys: StoredApiKey[];
   authenticate?: (request: Request) => Promise<Principal | null>;
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
@@ -120,6 +121,15 @@ function proxyHops(value: number | undefined): number {
   return hops;
 }
 
+function checkedTimeZone(timeZone: string): string {
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone });
+  } catch {
+    throw new Error(`timeZone "${timeZone}" is not known. Use an IANA name such as Asia/Kolkata.`);
+  }
+  return timeZone;
+}
+
 export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runtime {
   const publicUrl = options.publicUrl.replace(/\/+$/, '');
   const basePath = normalizeBasePath(options.basePath);
@@ -152,6 +162,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     templates: { ...defaultTemplates, ...options.templates },
     ...(options.workspaceMail ? { workspaceMail: options.workspaceMail } : {}),
     ...(options.certificateNote ? { certificateNote: options.certificateNote } : {}),
+    ...(options.timeZone ? { timeZone: checkedTimeZone(options.timeZone) } : {}),
     apiKeys: normalizeApiKeys(options.apiKeys, options.authenticate !== undefined),
     ...(options.authenticate ? { authenticate: options.authenticate } : {}),
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),

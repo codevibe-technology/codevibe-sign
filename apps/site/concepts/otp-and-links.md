@@ -37,6 +37,11 @@ verifyToken(presentedToken, tokenHash); // true or false
 
 Recipients set to `email_otp` or `sms_otp` also confirm a code before they can sign.
 
+Until the code has been checked, the signing API tells the link holder only what the
+invitation email already said: the title and the recipient's name. The sender's message, the
+documents, the fields and any prefilled values are left out and the email address is masked,
+so a forwarded link shows nothing more than the forwarded email did.
+
 | Rule           | Value                                            |
 | -------------- | ------------------------------------------------ |
 | Length         | 6 digits, drawn uniformly                        |

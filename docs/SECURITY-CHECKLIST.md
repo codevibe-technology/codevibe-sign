@@ -168,6 +168,13 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       release comes out.
 - [ ] Watch the security advisories for this project and for your eSign provider.
 
+## Dates on signed documents
+
+- [ ] Set the time zone your signers expect: `TIME_ZONE` for the standalone server,
+      `SIGN_TIME_ZONE` for the web app, or the `timeZone` option, as an IANA name such as
+      `Asia/Kolkata`. Without it the date under each signature is the UTC date, which is the
+      previous day for anyone signing before 5:30 am in India.
+
 ## Before go-live
 
 - [ ] Send a test envelope end to end, open the sealed PDF in Adobe Reader and confirm the seal
@@ -175,6 +182,8 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 - [ ] Change one byte of the sealed file and confirm `verify()` and Reader both report it, and
       that `GET /v1/envelopes/:id/documents/:docId/verification` reports the stored file as
       valid.
+- [ ] Sign a test document and confirm the date under the signature is today's date where
+      your signers are.
 - [ ] Open a signing link and confirm the browser lands on the signing page with no token in
       its address bar.
 - [ ] Try a wrong OTP six times and confirm the code locks.

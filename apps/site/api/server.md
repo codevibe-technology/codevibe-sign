@@ -78,6 +78,7 @@ development only.
 | API keys     | Hashed with SHA-256 at start-up and compared in constant time. Pass `{ id, sha256 }` to keep plain keys out of the config.                       | none                                                       |
 | Logs         | Signing tokens, codes, session values, credentials and bodies are removed from every line. `accessLog: true` adds one redacted line per request. | none                                                       |
 | OTP          | 5 codes per 15 minutes and 10 per recipient over the envelope's life; each new code replaces the last; checks are saved atomically.              | `limits.otpCodesPerRecipient`                              |
+| Signed dates | Dates on signed documents are in UTC; the certificate page shows UTC and, with a zone set, the local time next to it.                            | `timeZone: 'Asia/Kolkata'` (`TIME_ZONE`)                   |
 
 ## OpenAPI
 

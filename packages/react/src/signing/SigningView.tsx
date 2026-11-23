@@ -393,7 +393,7 @@ export function SigningView({
       <div className="cvs-viewer-bar">
         <ZoomControls zoom={zoom} onZoom={setZoom} labels={labels} />
       </div>
-      <div ref={scroller} className="cvs-scroller">
+      <div ref={scroller} className="cvs-scroller" tabIndex={0}>
         <DocumentPages
           documents={documents}
           states={states}
