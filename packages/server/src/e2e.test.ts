@@ -115,6 +115,98 @@ describe('end to end with @codevibe_technology/sign-pdf', () => {
     expect(forged.json).toMatchObject({ valid: false, reason: 'untrusted_signer' });
   }, 60_000);
 
+  it('seals a document whose signers write their names in Indian scripts and Arabic', async () => {
+    const h = realHarness();
+    const names = [
+      'आशा राव',
+      'தமிழ்செல்வி',
+      'ಕಾವ್ಯ',
+      'മീര',
+      'রাহুল',
+      'ગીતા',
+      'ਹਰਪ੍ਰੀਤ',
+      'ଅନିତା',
+      'علی',
+    ];
+    const created = await h.call('POST', '/v1/envelopes', {
+      body: {
+        title: 'नियुक्ति पत्र',
+        send: true,
+        routing: 'parallel',
+        documents: [{ name: 'offer.pdf', content: Buffer.from(pdf).toString('base64') }],
+        recipients: names.map((name, index) => ({
+          key: `s${index}`,
+          name,
+          email: `s${index}@example.com`,
+          auth: 'email_link',
+        })),
+        fields: names.flatMap((_, index) => [
+          {
+            recipient: `s${index}`,
+            type: 'signature',
+            page: 0,
+            x: 72,
+            y: 60 + index * 70,
+            width: 180,
+            height: 48,
+          },
+          {
+            recipient: `s${index}`,
+            type: 'name',
+            page: 0,
+            x: 300,
+            y: 60 + index * 70,
+            width: 200,
+            height: 20,
+          },
+        ]),
+      },
+    });
+    expect(created.status).toBe(201);
+    const envelope = created.json;
+    for (const [index] of names.entries()) {
+      const fieldId = envelope.fields.find(
+        (f: { type: string; recipientId: string }) =>
+          f.type === 'signature' && f.recipientId === envelope.recipients[index].id,
+      ).id;
+      const signed = await h.call(
+        'POST',
+        `/v1/sign/${h.tokenFor(`s${index}@example.com`)}/submit`,
+        {
+          body: { consent: true, values: [{ fieldId, value: PNG }] },
+        },
+      );
+      expect(signed.status).toBe(200);
+    }
+
+    const doc = envelope.documents[0].id;
+    const res = await h.server.app.request(
+      `/v1/envelopes/${envelope.id}/documents/${doc}?version=sealed`,
+      { headers: { authorization: 'Bearer test-key-0123456789abcdef' } },
+    );
+    expect(res.status).toBe(200);
+    const sealed = new Uint8Array(await res.arrayBuffer());
+    expect(await verifySeal(sealed)).toMatchObject({
+      sealed: true,
+      valid: true,
+      coversWholeDocument: true,
+    });
+    const raw = Buffer.from(sealed).toString('latin1');
+    for (const face of [
+      'Devanagari',
+      'Tamil',
+      'Kannada',
+      'Malayalam',
+      'Bengali',
+      'Gujarati',
+      'Gurmukhi',
+      'Oriya',
+      'Arabic',
+    ]) {
+      expect(raw).toContain(`+NotoSans${face}-Regular`);
+    }
+  }, 60_000);
+
   it('refuses to start with a weak seal key unless told it is for development', () => {
     const weak = makeP12('Weak Seal', 'weak', 1024);
     expect(() =>
