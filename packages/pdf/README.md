@@ -161,6 +161,8 @@ step is available on its own as `sanitizePdf(bytes)`.
   that still does not fit is cut with an ellipsis. `name` falls back to the recipient's
   name and `date_signed` to the recipient's `actedAt`. Dates print as `19 Nov 2026`.
 - `checkbox`: `'true'` or `'false'`; a box is drawn, with a tick when checked.
+- `aadhaar`: no value; a framed box with "Aadhaar eSign", the signer's name and the provider
+  (`esignProvider`) is drawn on the file sent for the Aadhaar eSign.
 
 Boxes that run off the page are trimmed to it.
 

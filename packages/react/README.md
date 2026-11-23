@@ -263,6 +263,10 @@ When pdf.js can read the document's text, tags such as `{{signature:1}}` are fou
 "Place fields from tags" covers each with a field. The number is the recipient's place in
 the signing order. Types: `signature`, `initials`, `date`, `name`, `text`, `checkbox`.
 
+For a recipient with `auth: 'aadhaar'` the placer offers the **Aadhaar eSign** box instead of
+signature and initials, and `SigningView` shows that box as a note the signer does not fill:
+they sign it at the eSign provider.
+
 With the same text, a signature or initials field that covers page text gets a dashed
 outline and an "Over text" badge, and the side panel says how many do. It is a warning
 only: the drawn signature would hide the words under it, but the sender may still place it.
