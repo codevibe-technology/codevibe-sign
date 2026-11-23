@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
 import { ViewerTimeZone } from '@/components/ui/local-time';
+import { TransferNotice } from '@/components/workspace/transfer-notice';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
 import { env } from '@/server/env';
 import { workspaceLogoUrls } from '@/server/brand';
 import { getPreferences } from '@/server/preferences';
+import { pendingTransfersFor } from '@/server/transfers';
 import { listWorkspacesForUser } from '@/server/workspaces';
 
 export default async function WorkspaceLayout({
@@ -17,9 +19,10 @@ export default async function WorkspaceLayout({
 }) {
   const { slug } = await params;
   const access = await requireWorkspace(slug);
-  const [memberships, preferences] = await Promise.all([
+  const [memberships, preferences, offers] = await Promise.all([
     listWorkspacesForUser(db(), access.user.id),
     getPreferences(db(), access.user.id),
+    pendingTransfersFor(db(), access.user.email),
   ]);
   const logos = await workspaceLogoUrls(db(), [
     access.workspace.id,
@@ -38,7 +41,16 @@ export default async function WorkspaceLayout({
         canCreate: !env().SINGLE_WORKSPACE,
       }}
     >
-      <ViewerTimeZone zone={preferences.timezone}>{children}</ViewerTimeZone>
+      <ViewerTimeZone zone={preferences.timezone}>
+        <TransferNotice
+          offers={offers.map((o) => ({
+            id: o.id,
+            workspaceName: o.workspaceName,
+            fromName: o.fromName,
+          }))}
+        />
+        {children}
+      </ViewerTimeZone>
     </AppShell>
   );
 }
