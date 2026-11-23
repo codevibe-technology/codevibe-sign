@@ -24,6 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     { url: `${appUrl}/docs`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${appUrl}/verify`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${appUrl}/install-help`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${appUrl}/terms`, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${appUrl}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
   ];
