@@ -36,6 +36,27 @@ export interface SignerView {
   canAct: boolean;
   /** IANA zone the signing date is printed in on the document. */
   timeZone: string;
+  /** Present for a recipient who signs with Aadhaar eSign. */
+  esign?: {
+    /** False when the sender's workspace cannot start an eSign right now. */
+    available: boolean;
+    provider: string | null;
+    status: 'pending' | 'signed' | 'declined' | 'expired' | 'failed' | null;
+  };
+}
+
+/** `GET /api/v1/sign/link/esign`: where the signer's Aadhaar eSign stands. */
+export interface EsignStatus {
+  status: 'none' | 'pending' | 'signed' | 'declined' | 'expired' | 'failed';
+  /** The provider's signing page, while the eSign is still open. */
+  signUrl: string | null;
+  expiresAt: string | null;
+}
+
+/** `POST /api/v1/sign/link/esign`: where to send the signer. */
+export interface EsignStart {
+  signUrl: string;
+  expiresAt: string;
 }
 
 /** `GET /api/v1/sign/receipt`: where things stand after signing. */
@@ -44,7 +65,8 @@ export interface SigningReceipt {
   envelope: { id: string; title: string; status: EnvelopeStatus; completedAt: string | null };
   recipient: { id: string; name: string; role: RecipientRole; status: RecipientStatus };
   waitingFor: number;
-  documents: { id: string; name: string; sealed: boolean }[];
+  /** `certificate`: the signing certificate is a file of its own (after an Aadhaar eSign). */
+  documents: { id: string; name: string; sealed: boolean; certificate?: boolean }[];
 }
 
 /** `GET /brand/<workspaceId>/signing`: the header of the signing page. */

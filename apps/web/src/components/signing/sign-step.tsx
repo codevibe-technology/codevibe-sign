@@ -5,6 +5,7 @@ import { SigningView, type SigningViewLabels } from '@codevibe_technology/sign-r
 import { useMemo } from 'react';
 import { usePdfjs } from '@/components/pdf/use-pdfjs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { esignProviderName } from '@/lib/envelopes';
 import { zoneLabel } from '@/lib/preferences';
 import { linkDocumentUrl, signingDay, type SignerView } from '@/lib/signing';
 
@@ -27,13 +28,14 @@ export function SignStep({
     [view.documents],
   );
   const approver = view.recipient.role === 'approver';
+  const aadhaar = view.recipient.auth === 'aadhaar';
   // The document gets the date of signing in the workspace's zone, whatever zone the signer
   // is in, so the field shows that date rather than the browser's.
   const labels: Partial<SigningViewLabels> = {
     formatDate: () => signingDay(new Date(), view.timeZone),
     ...(approver
       ? { finish: 'Approve', declineTitle: 'Decline to approve' }
-      : { finish: 'Finish and sign' }),
+      : { finish: aadhaar ? 'Continue to Aadhaar eSign' : 'Finish and sign' }),
   };
   const hasDate = view.fields.some((f) => f.type === 'date_signed');
   const fieldCount = view.fields.length;
@@ -57,6 +59,17 @@ export function SignStep({
           ) : null}
         </p>
       </div>
+      {aadhaar ? (
+        <p
+          className="rounded-lg bg-primary-soft px-3 py-2 text-sm text-ink"
+          data-testid="esign-note"
+        >
+          <span className="font-semibold">This document is signed with Aadhaar eSign.</span> When
+          you continue, you confirm with a one-time code from Aadhaar on the page of{' '}
+          {esignProviderName(view.esign?.provider ?? 'leegality')}, a licensed eSign provider.
+          Codevibe Sign never sees your Aadhaar number.
+        </p>
+      ) : null}
       {view.envelope.changeNote ? (
         <p
           className="max-h-24 overflow-y-auto rounded-lg bg-warning-soft px-3 py-2 text-sm whitespace-pre-line text-ink"

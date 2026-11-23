@@ -2,7 +2,7 @@
 
 import '@codevibe_technology/sign-react/styles.css';
 import type { FieldValue } from '@codevibe_technology/sign-core';
-import { CloudOff } from 'lucide-react';
+import { CloudOff, Fingerprint } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +10,8 @@ import {
   SigningError,
   signFetch,
   type EndState,
+  type EsignStart,
+  type EsignStatus,
   type SignerView,
   type SigningBrand,
   type SigningReceipt,
@@ -17,6 +19,7 @@ import {
 import { ConsentStep } from './consent-step';
 import { DoneStep, type PollDelays } from './done-step';
 import { EndStateMessage } from './end-state';
+import { EsignWaitStep, type EsignPoll } from './esign-step';
 import { OtpStep } from './otp-step';
 import { SignStep } from './sign-step';
 import { SigningMessage, SigningShell } from './signing-shell';
@@ -28,6 +31,8 @@ type Phase =
   | { kind: 'otp' }
   | { kind: 'consent' }
   | { kind: 'sign' }
+  | { kind: 'esign_wait' }
+  | { kind: 'esign_off' }
   | { kind: 'done'; name: string; approved: boolean };
 
 async function loadBrand(workspaceId: string): Promise<SigningBrand | null> {
@@ -39,10 +44,19 @@ async function loadBrand(workspaceId: string): Promise<SigningBrand | null> {
   }
 }
 
+/** The eSign provider sends the signer back to `/sign?esign=return`. */
+const returnedFromEsign = () =>
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('esign') === 'return';
+
 /** The phase a fresh signer view leads to. */
 function phaseFor(view: SignerView): Phase {
   if (!view.canAct) return { kind: 'ended', state: 'not_your_turn' };
   if (view.otpRequired && !view.authenticated) return { kind: 'otp' };
+  if (view.esign?.status === 'pending' || (view.esign && returnedFromEsign())) {
+    return { kind: 'esign_wait' };
+  }
+  if (view.esign && !view.esign.available) return { kind: 'esign_off' };
   return { kind: 'consent' };
 }
 
@@ -51,7 +65,18 @@ function phaseFor(view: SignerView): Phase {
  * through `/api/v1/sign/link`; once the signer has acted, the receipt the server hands back
  * lets the page follow the envelope to the signed copy.
  */
-export function SigningApp({ smsAvailable, poll }: { smsAvailable: boolean; poll?: PollDelays }) {
+export function SigningApp({
+  smsAvailable,
+  poll,
+  esignPoll,
+  navigate = (url) => window.location.assign(url),
+}: {
+  smsAvailable: boolean;
+  poll?: PollDelays;
+  esignPoll?: EsignPoll;
+  /** Leaves for the eSign provider's page; replaced in tests. */
+  navigate?: (url: string) => void;
+}) {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [view, setView] = useState<SignerView | null>(null);
   const [brand, setBrand] = useState<SigningBrand | null>(null);
@@ -88,7 +113,18 @@ export function SigningApp({ smsAvailable, poll }: { smsAvailable: boolean; poll
           approved: receipt.recipient.status === 'approved',
         });
       } catch {
-        setPhase({ kind: 'ended', state: 'invalid' });
+        // An Aadhaar eSign is recorded while the signer is away at the provider, so the link
+        // is spent when they come back; the eSign status hands over the receipt.
+        try {
+          const esign = await signFetch<EsignStatus>('link/esign');
+          setPhase(
+            esign.status === 'signed'
+              ? { kind: 'done', name: '', approved: false }
+              : { kind: 'ended', state: 'invalid' },
+          );
+        } catch {
+          setPhase({ kind: 'ended', state: 'invalid' });
+        }
       }
     }
   }, [fail]);
@@ -140,6 +176,25 @@ export function SigningApp({ smsAvailable, poll }: { smsAvailable: boolean; poll
     });
   }
 
+  /** Hands the filled-in document to the eSign provider and sends the signer to its page. */
+  async function startEsign(values: FieldValue[]) {
+    const started = await signFetch<EsignStart>('link/esign', {
+      method: 'POST',
+      body: JSON.stringify({ consent: true, values }),
+    }).catch((err: unknown) => {
+      if (err instanceof SigningError && err.code === 'ESIGN_UNAVAILABLE') {
+        setPhase({ kind: 'esign_off' });
+        return null;
+      }
+      throw err;
+    });
+    if (started) navigate(started.signUrl);
+  }
+
+  function leaveEsignReturn() {
+    if (returnedFromEsign()) window.history.replaceState(null, '', window.location.pathname);
+  }
+
   async function decline(reason: string) {
     await signFetch('link/decline', { method: 'POST', body: JSON.stringify({ reason }) });
     setPhase({ kind: 'ended', state: 'declined_by_you' });
@@ -186,7 +241,51 @@ export function SigningApp({ smsAvailable, poll }: { smsAvailable: boolean; poll
       content = view && <ConsentStep view={view} company={company} onContinue={startSigning} />;
       break;
     case 'sign':
-      content = view && <SignStep view={view} onSubmit={submit} onDecline={decline} />;
+      content = view && (
+        <SignStep
+          view={view}
+          onSubmit={view.recipient.auth === 'aadhaar' ? startEsign : submit}
+          onDecline={decline}
+        />
+      );
+      break;
+    case 'esign_wait':
+      content = (
+        <EsignWaitStep
+          {...(esignPoll ? { poll: esignPoll } : {})}
+          onSigned={() => {
+            leaveEsignReturn();
+            setPhase({ kind: 'done', name: view?.recipient.name ?? '', approved: false });
+          }}
+          onDeclined={() => {
+            leaveEsignReturn();
+            setPhase({ kind: 'ended', state: 'declined_by_you' });
+          }}
+          onRetry={() => {
+            leaveEsignReturn();
+            setPhase(
+              view?.esign && !view.esign.available ? { kind: 'esign_off' } : { kind: 'consent' },
+            );
+          }}
+        />
+      );
+      break;
+    case 'esign_off':
+      content = (
+        <SigningMessage
+          icon={<Fingerprint aria-hidden className="h-6 w-6" />}
+          title="Aadhaar eSign is not available right now"
+          tone="warning"
+        >
+          <p data-testid="esign-off">
+            This document is to be signed with Aadhaar eSign, which {company} cannot start at the
+            moment. They have been told. You do not need to do anything; try this link again later.
+          </p>
+          <Button type="button" variant="secondary" onClick={() => void load()}>
+            Try again
+          </Button>
+        </SigningMessage>
+      );
       break;
     case 'done':
       content = (

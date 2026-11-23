@@ -64,12 +64,13 @@ export function DoneStep({
 
   const status = receipt?.envelope.status;
   const ready = status === 'completed' && receipt?.documents.every((d) => d.sealed);
-  const firstName = name.split(/\s+/)[0] || name;
+  const known = name || receipt?.recipient.name || '';
+  const firstName = known.split(/\s+/)[0] || known;
 
   return (
     <SigningMessage
       icon={<CheckCircle2 aria-hidden className="h-6 w-6" />}
-      title={`Thank you, ${firstName}`}
+      title={firstName ? `Thank you, ${firstName}` : 'Thank you'}
       tone="success"
     >
       <p>
@@ -90,6 +91,15 @@ export function DoneStep({
                       {receipt.documents.length === 1 ? 'Download your copy' : `Download ${d.name}`}
                     </a>
                   </Button>
+                  {d.certificate ? (
+                    <a
+                      href={`${receiptDocumentUrl(d.id)}?file=certificate`}
+                      download
+                      className="mt-2 inline-block text-sm font-semibold text-primary hover:underline"
+                    >
+                      Download the signing certificate
+                    </a>
+                  ) : null}
                 </li>
               ))}
             </ul>
