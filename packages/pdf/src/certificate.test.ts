@@ -122,7 +122,7 @@ describe('appendCertificate', () => {
 
     expect(text).toContain('aaaaaaaa ... aaaaaaaa');
     expect(text).toContain('a'.repeat(64));
-    expect(text).toContain('Audit trail: 7 events, chain head');
+    expect(text).toContain('Audit trail when sealed: 7 events, chain head');
     expect(text).toContain('f'.repeat(64));
     expect(text).toContain(RECORD_URL);
     expect(text).toContain('Page 1 of 1  ·  Generated 2026-11-19 11:00:00 UTC');

@@ -277,7 +277,7 @@ function drawCertificate(
   if (auditHead) {
     flow.gap(3);
     flow.paragraph(
-      `Audit trail: ${events.length} ${events.length === 1 ? 'event' : 'events'}, chain head`,
+      `Audit trail when sealed: ${events.length} ${events.length === 1 ? 'event' : 'events'}, chain head`,
       small,
     );
     flow.paragraph(machine(auditHead), flow.style('monoSmall'));

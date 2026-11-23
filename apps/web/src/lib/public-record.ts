@@ -68,5 +68,10 @@ export interface PublicRecordView {
   documents: PublicRecordDocument[];
   signers: PublicRecordSigner[];
   trail: PublicRecordEvent[];
-  chain: { valid: boolean; head: string | null };
+  chain: {
+    valid: boolean;
+    head: string | null;
+    /** The head when the document was sealed: the one its certificate page prints. */
+    headAtSealing: string | null;
+  };
 }

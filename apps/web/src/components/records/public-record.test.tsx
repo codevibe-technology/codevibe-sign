@@ -49,7 +49,7 @@ const view: PublicRecordView = {
       hash: '2',
     },
   ],
-  chain: { valid: true, head: 'c'.repeat(64) },
+  chain: { valid: true, head: 'c'.repeat(64), headAtSealing: 'd'.repeat(64) },
 };
 
 describe('PublicRecord', () => {
@@ -62,6 +62,7 @@ describe('PublicRecord', () => {
     expect(screen.getByText('a'.repeat(64))).toBeVisible();
     expect(screen.getByText('b'.repeat(64))).toBeVisible();
     expect(screen.getByText('Chain intact')).toBeVisible();
+    expect(screen.getByText('d'.repeat(64))).toBeVisible();
     expect(screen.getByText('2 recorded steps')).toBeVisible();
     expect(screen.getByText('Sent for signature')).toBeVisible();
   });
@@ -94,7 +95,7 @@ describe('PublicRecord', () => {
       documents: [
         { ...view.documents[0]!, seal: 'pending' as const, sealedSha256: null, sealedAt: null },
       ],
-      chain: { valid: false, head: null },
+      chain: { valid: false, head: null, headAtSealing: null },
     };
     render(<PublicRecord view={pending} />);
     expect(screen.getByTestId('record-seal')).toHaveTextContent('Sealing in progress');

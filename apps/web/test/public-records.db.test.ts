@@ -225,6 +225,22 @@ describe.skipIf(!url)('public records against PostgreSQL', () => {
     const check = await verify(sealed, { trust });
     expect(check).toMatchObject({ valid: true, trustedBy: 'certificate' });
     expect(check.seal.coversWholeDocument).toBe(true);
+
+    // The public verify API gives the same answer for the file and for its hash.
+    const posted = await sign.app.request('/api/v1/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/pdf' },
+      body: Buffer.from(sealed),
+    });
+    const answer = (await posted.json()) as {
+      valid: boolean;
+      sha256: string;
+      envelope: { id: string } | null;
+    };
+    expect(answer).toMatchObject({ valid: true, envelope: { id: envelopeId } });
+    const byHash = await sign.app.request(`/api/v1/verify/${answer.sha256}`);
+    expect(await byHash.json()).toMatchObject({ valid: true, envelope: { id: envelopeId } });
+    expect(JSON.stringify(answer)).not.toContain('TestBrowser');
   });
 
   it('shows the record without addresses, browsers, messages or signature data', async () => {
@@ -244,6 +260,10 @@ describe.skipIf(!url)('public records against PostgreSQL', () => {
       sender: { name: 'Asha Rao', organization: 'Brightside Traders' },
       chain: { valid: true },
     });
+    // The head printed on the certificate is the hash of the last step before sealing.
+    const sealedStep = view.trail.findIndex((e) => e.action === 'document.sealed');
+    expect(view.chain.headAtSealing).toBe(view.trail[sealedStep - 1]!.hash);
+    expect(view.chain.head).toBe(view.trail.at(-1)!.hash);
     expect(view.documents).toHaveLength(1);
     expect(view.documents[0]).toMatchObject({
       name: 'agreement.pdf',

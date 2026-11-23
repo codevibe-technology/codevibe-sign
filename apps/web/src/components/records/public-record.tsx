@@ -243,9 +243,15 @@ export function PublicRecord({ view }: { view: PublicRecordView }) {
               ? 'Each step carries a SHA-256 hash of the one before it. Every hash was recomputed and matches, so no step was changed, removed or added afterwards.'
               : 'A step does not match the hash recorded for it. Ask the sender before relying on this trail.'}
           </p>
+          {view.chain.headAtSealing ? (
+            <div className="mt-2 text-muted">
+              Chain head printed on the certificate (at sealing)
+              <Hash value={view.chain.headAtSealing} />
+            </div>
+          ) : null}
           {view.chain.head ? (
             <div className="mt-2 text-muted">
-              Chain head
+              Chain head now
               <Hash value={view.chain.head} />
             </div>
           ) : null}

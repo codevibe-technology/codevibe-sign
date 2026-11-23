@@ -201,6 +201,12 @@ function actorOf(event: AuditEvent, names: Map<string, string>): string {
   return event.recipientId ? (names.get(event.recipientId) ?? 'Recipient') : 'System';
 }
 
+/** The hash of the last event recorded before the first document was sealed. */
+function headBeforeSealing(events: AuditEvent[]): string | null {
+  const first = events.findIndex((event) => event.action === 'document.sealed');
+  return first > 0 ? (events[first - 1]?.hash ?? null) : null;
+}
+
 export interface SealAnswer {
   valid: boolean;
   /** SHA-256 of the stored sealed file. */
@@ -282,7 +288,11 @@ export async function publicRecordView(
       actor: actorOf(event, names),
       hash: event.hash,
     })),
-    chain: { valid: chain.valid, head: chain.valid ? chain.head : null },
+    chain: {
+      valid: chain.valid,
+      head: chain.valid ? chain.head : null,
+      headAtSealing: chain.valid ? headBeforeSealing(events) : null,
+    },
   };
 }
 
