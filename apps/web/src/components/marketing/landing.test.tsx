@@ -290,6 +290,52 @@ describe('Landing', () => {
   });
 });
 
+describe('Landing in a colour option', () => {
+  it.each(['a', 'b', 'c'] as const)(
+    'option %s keeps the page and shows the plans as cards',
+    (option) => {
+      const { container } = render(
+        <Landing features={FEATURES} pricing={PRICING} option={option} />,
+      );
+      expect(container.firstElementChild).toHaveClass('home-skin', `home-${option}`);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
+      ).toBeInTheDocument();
+      const bands = [...container.querySelectorAll('[data-band]')].map((el) =>
+        el.getAttribute('data-band'),
+      );
+      expect(bands).toEqual([
+        'hero',
+        'proof',
+        'more',
+        'developers',
+        'open',
+        'pricing',
+        'faq',
+        'start',
+      ]);
+      const pricing = container.querySelector('#pricing') as HTMLElement;
+      expect(within(pricing).getAllByRole('article')).toHaveLength(3);
+      const site = screen.getByRole('navigation', { name: 'Site' });
+      expect(within(site).getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+        'href',
+        '#pricing',
+      );
+    },
+  );
+
+  it('leaves the home page itself as it is', () => {
+    const { container } = render(<Landing features={FEATURES} pricing={PRICING} />);
+    expect(container.firstElementChild).not.toHaveClass('home-skin');
+    const site = screen.getByRole('navigation', { name: 'Site' });
+    expect(within(site).getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/#pricing',
+    );
+    expect(screen.queryByRole('button', { name: 'See everything included' })).toBeNull();
+  });
+});
+
 describe('LegalPage', () => {
   it('shows the title, the date and the sections', () => {
     render(

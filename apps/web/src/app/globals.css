@@ -3,7 +3,9 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root,
-[data-theme='light'] {
+[data-theme='light'],
+.home-skin,
+.home-skin .paper {
   color-scheme: light;
   /* Codevibe brand: navy #0D1B2A, blue #1B6AE0, teal #2DD4BF, off-white #F4F5F7. */
   --canvas: #f4f5f7;

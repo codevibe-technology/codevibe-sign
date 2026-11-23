@@ -1,0 +1,249 @@
+/*
+  Three colour options for the home page, shown at /preview/home-a, -b and -c. Each one is the
+  same page with its own section colours: a section names itself with `data-band`, and a skin
+  sets that band's colour tokens, so every component on it stays readable. Anything printed on
+  paper (`.paper`: the app's screens, the plan cards) keeps the light tokens. Every text and
+  background pair declared here is checked for 4.5:1 in home-skins.test.ts; a `--tint-*` value
+  is a colour the band's background reaches, so its text is checked against it too.
+*/
+
+.home-skin {
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.home-skin [data-band]:not([data-band='developers']),
+.home-skin .story {
+  position: relative;
+  isolation: isolate;
+  color: var(--ink);
+  background-color: var(--canvas);
+}
+
+/* Option A: soft tinted bands of the brand blue and teal, each section on its own wash. */
+
+.home-a [data-band='hero'],
+.home-a [data-band='more'] {
+  --canvas: #eef4fe;
+  --surface-2: #e2ebfa;
+  --line: #d3e0f5;
+}
+
+.home-a [data-band='proof'],
+.home-a [data-band='start'] {
+  --canvas: #e7f8f5;
+  --surface-2: #d6f1ec;
+  --line: #c3e7e0;
+}
+
+.home-a .story,
+.home-a [data-band='open'],
+.home-a [data-band='faq'] {
+  --canvas: #ffffff;
+}
+
+.home-a [data-band='pricing'] {
+  --canvas: #eef4fe;
+  --tint-end: #e7f8f5;
+  --line: #cfdcf0;
+  background-image: linear-gradient(180deg, #eef4fe 0%, #e7f8f5 100%);
+}
+
+.home-a [data-band='hero'] {
+  --tint-end: #e7f8f5;
+  background-image: linear-gradient(160deg, #eef4fe 50%, #e7f8f5 100%);
+}
+
+.home-a .plan-card.plan-featured {
+  --canvas: #0d1b2a;
+  --surface: #0d1b2a;
+  --surface-2: #1a2d42;
+  --line: #2a3f57;
+  --line-strong: #3e5672;
+  --ink: #ffffff;
+  --muted: #b9c8db;
+  --primary: #2dd4bf;
+  --primary-hover: #5ee0cf;
+  --primary-ink: #0d1b2a;
+  --primary-text: #7fe6d8;
+  --primary-soft: #16324a;
+  --success: #5ee0cf;
+  --success-text: #5ee0cf;
+  --success-soft: #16324a;
+  color: var(--ink);
+  box-shadow: 0 28px 56px -28px rgb(13 27 42 / 0.7);
+}
+
+/* Option B: a white page with a colour mesh behind the hero and the last call, and pricing on
+   deep navy where the plans stand out as paper. */
+
+.home-b .story {
+  --canvas: #f7faff;
+}
+
+.home-b [data-band='proof'],
+.home-b [data-band='more'],
+.home-b [data-band='open'],
+.home-b [data-band='faq'] {
+  --canvas: #ffffff;
+}
+
+.home-b [data-band='hero'],
+.home-b [data-band='start'] {
+  --canvas: #f7faff;
+  --muted: #3f4d63;
+  --primary-text: #12489f;
+  --tint-teal: #a2eae4;
+  --tint-blue: #b5cff6;
+  background-image: radial-gradient(60% 70% at 92% 8%, rgb(45 212 191 / 0.24), transparent 70%),
+    radial-gradient(55% 60% at 4% 96%, rgb(27 106 224 / 0.16), transparent 70%),
+    radial-gradient(40% 50% at 55% 40%, rgb(207 227 255 / 0.55), transparent 75%);
+}
+
+.home-b [data-band='developers'] {
+  background-image: radial-gradient(50% 60% at 100% 0%, rgb(27 106 224 / 0.35), transparent 70%),
+    radial-gradient(40% 50% at 0% 100%, rgb(45 212 191 / 0.14), transparent 70%);
+}
+
+.home-b [data-band='pricing'] {
+  --canvas: #0d1b2a;
+  --surface: #13263b;
+  --surface-2: #1a2d42;
+  --tint-blue: #133f7c;
+  --tint-teal: #15494f;
+  --line: #2a3f57;
+  --line-strong: #3e5672;
+  --ink: #ffffff;
+  --muted: #c2cfdf;
+  --primary: #2dd4bf;
+  --primary-hover: #5ee0cf;
+  --primary-ink: #0d1b2a;
+  --primary-text: #8fe8dc;
+  --primary-soft: #16324a;
+  --success-text: #5ee0cf;
+  --success-soft: #16324a;
+  background-image: radial-gradient(60% 55% at 0% 0%, rgb(27 106 224 / 0.45), transparent 70%),
+    radial-gradient(50% 50% at 100% 100%, rgb(45 212 191 / 0.25), transparent 70%);
+}
+
+.home-b .plan-featured {
+  outline: 2px solid #2dd4bf;
+  outline-offset: -2px;
+  box-shadow: 0 32px 64px -24px rgb(0 0 0 / 0.55);
+}
+
+.home-b .plan-flag {
+  background: #2dd4bf;
+  color: #0d1b2a;
+}
+
+/* Option C: bold blocks of blue and teal, with paper and ink: warm paper sections, ruled lines,
+   plan cards as sheets with a folded corner and a stamp on the recommended one. */
+
+.home-c [data-band='hero'],
+.home-c [data-band='pricing'] {
+  --canvas: #1860d0;
+  --surface: #0d1b2a;
+  --surface-2: #1557ba;
+  --line: #4f86db;
+  --line-strong: #7fa6e6;
+  --ink: #ffffff;
+  --muted: #dce8fb;
+  --primary: #ffffff;
+  --primary-hover: #e6effc;
+  --primary-ink: #0d1b2a;
+  --primary-text: #bff5ec;
+  --primary-soft: #0d1b2a;
+  --success-text: #bff5ec;
+  --success-soft: #0d1b2a;
+}
+
+.home-c [data-band='proof'],
+.home-c [data-band='start'] {
+  --canvas: #2dd4bf;
+  --surface: #ffffff;
+  --surface-2: #5ee0cf;
+  --line: #1fae9c;
+  --line-strong: #148a7b;
+  --ink: #0d1b2a;
+  --muted: #124b47;
+  --primary: #0d1b2a;
+  --primary-hover: #1a2d42;
+  --primary-ink: #ffffff;
+  --primary-text: #0b3f86;
+  --primary-soft: #d8f7f2;
+  --success-text: #0d4a44;
+}
+
+.home-c .story,
+.home-c [data-band='more'],
+.home-c [data-band='faq'] {
+  --canvas: #fbf8f1;
+  --surface-2: #f2ede1;
+  --line: #e4dccb;
+  --line-strong: #cfc4ad;
+}
+
+.home-c [data-band='open'] {
+  --canvas: #ffffff;
+}
+
+/* The signature crosses from the blue block onto the paper, so it is written in navy ink. */
+.home-c [data-band='hero'] .ink-signature {
+  color: #0d1b2a;
+}
+
+/* Ruled lines, as on a ledger page, with a teal margin rule. */
+.home-c [data-band='more']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: linear-gradient(
+      90deg,
+      transparent calc(1rem - 1px),
+      rgb(45 212 191 / 0.55) 1rem,
+      transparent calc(1rem + 1px)
+    ),
+    repeating-linear-gradient(180deg, transparent 0 31px, rgb(24 96 208 / 0.09) 31px 32px);
+}
+
+.home-c .plan-card {
+  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+
+.home-c .plan-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(225deg, transparent 50%, #d9e2ee 50%);
+}
+
+.home-c .plan-flag {
+  background: transparent;
+  color: #0b6b5f;
+  border: 2px solid currentColor;
+  box-shadow:
+    inset 0 0 0 2px #ffffff,
+    inset 0 0 0 3px currentColor;
+  rotate: -6deg;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.home-c .plan-slot {
+  filter: drop-shadow(0 18px 22px rgb(13 27 42 / 0.28));
+}
+
+.home-c .plan-card.plan-featured {
+  box-shadow: none;
+}
+
+/* The last call starts on its own band in every option, so it needs room above its rule. */
+.home-skin [data-band='start'] {
+  padding-top: 6rem;
+}

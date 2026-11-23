@@ -12,7 +12,16 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/dashboard/', '/api/', '/sign', '/invite/', '/onboarding', '/brand/', '/r/'],
+      disallow: [
+        '/dashboard/',
+        '/api/',
+        '/sign',
+        '/invite/',
+        '/onboarding',
+        '/brand/',
+        '/r/',
+        '/preview/',
+      ],
     },
     sitemap: [`${appUrl}/sitemap.xml`, `${appUrl}/docs/sitemap.xml`],
   };

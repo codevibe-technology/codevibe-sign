@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Minus, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, Minus, Plus, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
   SELF_HOST_DOCS,
   VERIFY_URL,
 } from './links';
+import { PricingPlans } from './pricing-plans';
 import { reveal } from './reveal';
 import { RevealOnScroll } from './reveal-on-scroll';
 import { SAMPLE_TRAIL, shortHash } from './sample-trail';
@@ -257,7 +258,7 @@ function Sheet({ children, className }: { children: ReactNode; className?: strin
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-[3px] bg-surface shadow-[0_1px_0_rgb(13_27_42/0.04),0_24px_48px_-24px_rgb(13_27_42/0.45)] ring-1 ring-line',
+        'paper overflow-hidden rounded-[3px] bg-surface shadow-[0_1px_0_rgb(13_27_42/0.04),0_24px_48px_-24px_rgb(13_27_42/0.45)] ring-1 ring-line',
         className,
       )}
     >
@@ -276,7 +277,7 @@ function InkSignature({ className }: { className?: string }) {
       aria-hidden
       viewBox="0 0 240 90"
       fill="none"
-      className={cn('text-primary', className)}
+      className={cn('ink-signature text-primary', className)}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -439,30 +440,44 @@ function PlanColumn({
   );
 }
 
+/** A colour option for the home page, previewed at `/preview/home-<option>`; see home-skins.css. */
+export type HomeOption = 'a' | 'b' | 'c';
+
+export const HOME_OPTIONS: readonly HomeOption[] = ['a', 'b', 'c'];
+
 /** The public home page of the hosted cloud. A signed-in visitor gets their dashboard instead of "Start free". */
 export function Landing({
   features,
   pricing,
   viewer = null,
+  option,
 }: {
   /** The plan comparison, from `planFeatures`. */
   features: PlanFeature[];
   /** Every price on the page, as text made on the server. */
   pricing: PricingView;
   viewer?: SiteViewer | null;
+  /** Shows the page in one of the colour options, with the plans as cards. */
+  option?: HomeOption;
 }) {
   const rows = pricedFeatures(features, pricing);
   const start = viewer
     ? { href: APP_HOME, label: 'Go to dashboard' }
     : { href: '/sign-in', label: 'Start free' };
   return (
-    <div className="marketing flex min-h-dvh flex-col bg-canvas">
+    <div
+      className={cn(
+        'marketing flex min-h-dvh flex-col bg-canvas',
+        option && `home-skin home-${option}`,
+      )}
+    >
       <SmoothAnchors />
       <RevealOnScroll />
-      <SiteHeader viewer={viewer} />
+      <SiteHeader viewer={viewer} samePage={option !== undefined} />
       <main id="main" className="flex-1">
         <section
           aria-labelledby="hero-title"
+          data-band="hero"
           className="overflow-hidden px-4 pt-8 pb-14 sm:px-6 sm:pt-12 sm:pb-16 lg:flex lg:min-h-[calc(100svh-4rem)] lg:items-center lg:py-10"
         >
           <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
@@ -511,11 +526,11 @@ export function Landing({
               <div className="relative pr-2 pb-2 sm:pr-3">
                 <div
                   aria-hidden
-                  className="absolute inset-0 top-3 left-3 rotate-[1.4deg] rounded-[3px] bg-surface ring-1 ring-line"
+                  className="paper absolute inset-0 top-3 left-3 rotate-[1.4deg] rounded-[3px] bg-surface ring-1 ring-line"
                 />
                 <div
                   aria-hidden
-                  className="absolute inset-0 top-1.5 left-1.5 rotate-[0.6deg] rounded-[3px] bg-surface ring-1 ring-line"
+                  className="paper absolute inset-0 top-1.5 left-1.5 rotate-[0.6deg] rounded-[3px] bg-surface ring-1 ring-line"
                 />
                 <Sheet className="relative">
                   <Clip clip={CLIPS.hero} describedBy="hero-clip-text" eager />
@@ -538,6 +553,7 @@ export function Landing({
         <section
           id="proof"
           aria-labelledby="proof-title"
+          data-band="proof"
           className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
@@ -586,7 +602,11 @@ export function Landing({
           steps={STEPS}
         />
 
-        <section aria-labelledby="more-title" className="px-4 py-20 sm:px-6 sm:py-24">
+        <section
+          aria-labelledby="more-title"
+          data-band="more"
+          className="px-4 py-20 sm:px-6 sm:py-24"
+        >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
             <div {...reveal()}>
               <h2 id="more-title" className="text-3xl font-bold sm:text-4xl">
@@ -610,6 +630,7 @@ export function Landing({
         <section
           id="developers"
           aria-labelledby="developers-title"
+          data-band="developers"
           className="scroll-mt-16 bg-[#0D1B2A] px-4 py-20 text-white sm:px-6 sm:py-28"
         >
           <div className="mx-auto max-w-6xl">
@@ -682,6 +703,7 @@ export function Landing({
         <section
           id="open-source"
           aria-labelledby="open-source-title"
+          data-band="open"
           className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
@@ -751,6 +773,7 @@ docker compose up -d`}</code>
         <section
           id="pricing"
           aria-labelledby="pricing-title"
+          data-band="pricing"
           className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto max-w-6xl">
@@ -763,78 +786,89 @@ docker compose up -d`}</code>
                 only difference.
               </p>
             </div>
-            <div
-              {...reveal(1)}
-              className="mt-12 grid grid-cols-1 divide-y divide-line rounded-[3px] bg-canvas ring-1 ring-line lg:grid-cols-3 lg:divide-x lg:divide-y-0"
-            >
-              <PlanColumn
-                name="Free"
-                price="₹0"
-                note="One cloud workspace for trying it out and for small teams."
-                lines={planLines(rows, 'free')}
-                action={
-                  <>
-                    <Button asChild className="h-11 w-full">
-                      <Link href={start.href}>{start.label}</Link>
-                    </Button>
-                    <p className="mt-2 text-center text-[13px] text-muted">No card needed.</p>
-                  </>
-                }
-                first
-              />
-              <PlanColumn
-                name="Cloud"
-                price={pricing.cloudMonth}
-                per="a month"
-                note={`Unlimited workspaces under one subscription, with ${pricing.includedMembers} members across them. ${pricing.cloudYear} if you pay for a year${pricing.yearSaving ? `, ${pricing.yearSaving}` : ''}. More members are ${pricing.extraMember} each a month.`}
-                lines={planLines(rows, 'cloud')}
-                action={
-                  <>
-                    <Button asChild variant="secondary" className="h-11 w-full">
-                      <Link href={start.href}>
-                        {viewer ? 'Upgrade in your workspace' : 'Start free, upgrade any time'}
-                      </Link>
-                    </Button>
-                    <p className="mt-2 text-center text-[13px] text-muted">
-                      {pricing.paymentsOpen
-                        ? 'Pay by the month or the year. Cancel any time.'
-                        : 'Paying for Cloud opens shortly.'}
-                    </p>
-                  </>
-                }
-              />
-              <PlanColumn
-                name="Self-hosted"
-                price="Free"
-                note="On your own server, under the open-source licences."
-                lines={[
-                  'No limits on envelopes, members or storage',
-                  'Every feature, including the API and webhooks',
-                  'Your documents stay on your server',
-                  'Your own domain and brand',
-                  'Aadhaar eSign with your own eSign provider account',
-                  'Help from the community on GitHub',
-                ]}
-                action={
-                  <>
-                    <Button asChild variant="secondary" className="h-11 w-full">
-                      <ExternalLink href={GITHUB_URL} bare>
-                        Self-host it
-                      </ExternalLink>
-                    </Button>
-                    <p className="mt-2 text-center text-[13px] text-muted">
-                      <Link
-                        className="font-semibold text-primary hover:underline"
-                        href="/install-help"
-                      >
-                        Have it installed for you
-                      </Link>
-                      , {pricing.installHelp} plus GST
-                    </p>
-                  </>
-                }
-              />
-            </div>
+            {option ? (
+              <div {...reveal(1)} className="mt-12">
+                <PricingPlans
+                  rows={rows}
+                  pricing={pricing}
+                  start={start}
+                  signedIn={viewer !== null}
+                />
+              </div>
+            ) : (
+              <div
+                {...reveal(1)}
+                className="mt-12 grid grid-cols-1 divide-y divide-line rounded-[3px] bg-canvas ring-1 ring-line lg:grid-cols-3 lg:divide-x lg:divide-y-0"
+              >
+                <PlanColumn
+                  name="Free"
+                  price="₹0"
+                  note="One cloud workspace for trying it out and for small teams."
+                  lines={planLines(rows, 'free')}
+                  action={
+                    <>
+                      <Button asChild className="h-11 w-full">
+                        <Link href={start.href}>{start.label}</Link>
+                      </Button>
+                      <p className="mt-2 text-center text-[13px] text-muted">No card needed.</p>
+                    </>
+                  }
+                  first
+                />
+                <PlanColumn
+                  name="Cloud"
+                  price={pricing.cloudMonth}
+                  per="a month"
+                  note={`Unlimited workspaces under one subscription, with ${pricing.includedMembers} members across them. ${pricing.cloudYear} if you pay for a year${pricing.yearSaving ? `, ${pricing.yearSaving}` : ''}. More members are ${pricing.extraMember} each a month.`}
+                  lines={planLines(rows, 'cloud')}
+                  action={
+                    <>
+                      <Button asChild variant="secondary" className="h-11 w-full">
+                        <Link href={start.href}>
+                          {viewer ? 'Upgrade in your workspace' : 'Start free, upgrade any time'}
+                        </Link>
+                      </Button>
+                      <p className="mt-2 text-center text-[13px] text-muted">
+                        {pricing.paymentsOpen
+                          ? 'Pay by the month or the year. Cancel any time.'
+                          : 'Paying for Cloud opens shortly.'}
+                      </p>
+                    </>
+                  }
+                />
+                <PlanColumn
+                  name="Self-hosted"
+                  price="Free"
+                  note="On your own server, under the open-source licences."
+                  lines={[
+                    'No limits on envelopes, members or storage',
+                    'Every feature, including the API and webhooks',
+                    'Your documents stay on your server',
+                    'Your own domain and brand',
+                    'Aadhaar eSign with your own eSign provider account',
+                    'Help from the community on GitHub',
+                  ]}
+                  action={
+                    <>
+                      <Button asChild variant="secondary" className="h-11 w-full">
+                        <ExternalLink href={GITHUB_URL} bare>
+                          Self-host it
+                        </ExternalLink>
+                      </Button>
+                      <p className="mt-2 text-center text-[13px] text-muted">
+                        <Link
+                          className="font-semibold text-primary hover:underline"
+                          href="/install-help"
+                        >
+                          Have it installed for you
+                        </Link>
+                        , {pricing.installHelp} plus GST
+                      </p>
+                    </>
+                  }
+                />
+              </div>
+            )}
             <p {...reveal(2)} className="mt-6 text-sm text-muted">
               Prices are in Indian rupees and do not include {pricing.gstPercent}% GST. Every
               payment gets a GST tax invoice. Aadhaar eSign is paid per completed eSign with prepaid
@@ -846,6 +880,7 @@ docker compose up -d`}</code>
         <section
           id="faq"
           aria-labelledby="faq-title"
+          data-band="faq"
           className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
@@ -869,13 +904,10 @@ docker compose up -d`}</code>
                 <details key={item.q} className="group py-5 [&_a]:font-semibold [&_a]:text-primary">
                   <summary className="flex cursor-pointer list-none items-start justify-between gap-6 text-lg font-semibold [&::-webkit-details-marker]:hidden">
                     {item.q}
-                    <span
+                    <Plus
                       aria-hidden
-                      className="mt-1 grid h-5 w-5 shrink-0 place-items-center text-muted transition-transform duration-200 group-open:rotate-45"
-                    >
-                      <span className="absolute h-px w-3 bg-current" />
-                      <span className="absolute h-3 w-px bg-current" />
-                    </span>
+                      className="mt-1 h-5 w-5 shrink-0 text-muted transition-transform duration-200 group-open:rotate-45"
+                    />
                   </summary>
                   <div className="mt-3 max-w-[65ch] text-muted">{item.a}</div>
                 </details>
@@ -884,7 +916,11 @@ docker compose up -d`}</code>
           </div>
         </section>
 
-        <section aria-labelledby="start-title" className="px-4 pb-24 sm:px-6 sm:pb-32">
+        <section
+          aria-labelledby="start-title"
+          data-band="start"
+          className="px-4 pb-24 sm:px-6 sm:pb-32"
+        >
           <div
             className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-10 border-t-2 border-ink pt-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]"
             {...reveal()}
