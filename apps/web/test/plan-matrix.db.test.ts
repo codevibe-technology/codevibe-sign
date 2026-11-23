@@ -880,6 +880,12 @@ const ACTIONS: Record<string, { entry: string; enforcedBy: string } | { free: st
   confirmPaymentAction: { free: 'a purchase; open to every plan' },
   listInvoicesAction: { free: 'reads' },
   creditHistoryAction: { free: 'reads' },
+  startSubscriptionAction: { free: 'a purchase; how a workspace moves to Cloud' },
+  addSeatsAction: { free: 'a purchase; raises the member limit once paid' },
+  scheduleCancelAction: { free: 'ends a paid plan; adds nothing' },
+  setRenewalSeatsAction: { free: 'sets what the next term is charged for; adds nothing now' },
+  bookInstallHelpAction: { free: 'a public purchase; no workspace' },
+  confirmInstallHelpAction: { free: 'a public purchase; no workspace' },
   // brand
   updateBrandAction: { free: 'logo, colour and font are part of every plan' },
   uploadLogoAction: { free: 'logo, colour and font are part of every plan' },
