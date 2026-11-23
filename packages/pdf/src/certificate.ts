@@ -6,7 +6,7 @@ import {
   type IsoDateTime,
   type Recipient,
 } from '@codevibe_technology/sign-core';
-import { AUTH_LABELS, ROLE_LABELS, STATUS_LABELS, shortHash } from './certificate-text';
+import { ROLE_LABELS, STATUS_LABELS, authLabel, shortHash } from './certificate-text';
 import { embedFonts, type FontSet } from './fonts';
 import { loadPdf } from './inspect';
 import { maskEmail, maskPhone } from './mask';
@@ -254,7 +254,7 @@ function drawCertificate(
           { text: ROLE_LABELS[recipient.role], style: small },
         ],
         [{ text: contact(recipient), style: body }],
-        [{ text: recipient.role === 'viewer' ? '' : AUTH_LABELS[recipient.auth], style: body }],
+        [{ text: recipient.role === 'viewer' ? '' : authLabel(recipient), style: body }],
         when,
       ];
     }),

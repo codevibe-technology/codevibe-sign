@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { SignError, type AuditEvent, type Recipient } from '@codevibe_technology/sign-core';
 import { extractText } from './testing/extract';
 import { appendCertificate, certificatePdf, type CertificateData } from './certificate';
+import { authLabel } from './certificate-text';
 import { lockupWidth } from './lockup';
 import {
   A4,
@@ -397,6 +398,22 @@ describe('certificatePdf', () => {
     expect(text).toContain('Signing certificate provided by:');
     const pixels = qrPixels(await pageContent(output, 0));
     expect(jsQR(pixels!.data, pixels!.width, pixels!.height)?.data).toBe(RECORD_URL);
+  });
+
+  it('names the provider an Aadhaar eSign went through', async () => {
+    const aadhaar = recipient({
+      status: 'signed',
+      auth: 'aadhaar',
+      esign: { provider: 'leegality', status: 'signed', signerName: 'SHUBH KUMAR' },
+    });
+    const output = await certificatePdf({
+      ...data,
+      envelope: envelope({ ...data.envelope, recipients: [aadhaar] }),
+    });
+    const text = (await certificateText(output, 0)).join(' ').replace(/\s+/g, ' ');
+    expect(text).toContain('Aadhaar eSign (via Leegality)');
+    expect(authLabel({ auth: 'aadhaar' })).toBe('Aadhaar eSign');
+    expect(authLabel({ auth: 'email_link', esign: aadhaar.esign })).toBe('Email link');
   });
 
   it('puts the certificates of several documents in one file', async () => {

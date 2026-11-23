@@ -33,3 +33,4 @@ export type {
   VerifyResult,
   VerifyTrust,
 } from './trust';
+export { authLabel } from './certificate-text';

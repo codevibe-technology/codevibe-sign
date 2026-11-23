@@ -3,6 +3,7 @@ import type {
   AuditEvent,
   AuthMethod,
   EnvelopeStatus,
+  Recipient,
   RecipientRole,
 } from '@codevibe_technology/sign-core';
 import { maskEmail } from './mask';
@@ -19,6 +20,17 @@ export const AUTH_LABELS: Record<AuthMethod, string> = {
   sms_otp: 'One-time code by SMS',
   aadhaar: 'Aadhaar eSign',
 };
+
+/**
+ * How a recipient signed, as the certificate prints it. An Aadhaar eSign names the provider
+ * it went through once the recipient has been there: `Aadhaar eSign (via Leegality)`.
+ */
+export function authLabel(recipient: Pick<Recipient, 'auth' | 'esign'>): string {
+  const label = AUTH_LABELS[recipient.auth];
+  const provider = recipient.esign?.provider.trim();
+  if (recipient.auth !== 'aadhaar' || !provider) return label;
+  return `${label} (via ${provider.charAt(0).toUpperCase()}${provider.slice(1)})`;
+}
 
 export const STATUS_LABELS: Record<EnvelopeStatus, string> = {
   draft: 'Draft',
