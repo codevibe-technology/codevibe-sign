@@ -372,6 +372,7 @@ cd /opt/codevibe-sign/src/deploy     # the folder with compose.yml
 | `CLOUD_PRICE_INR`, `CLOUD_INCLUDED_MEMBERS`, `CLOUD_EXTRA_MEMBER_INR`    | `999`, `25`, `99`        | The Cloud plan per month, the members it includes and the price of each extra member.                 |
 | `CLOUD_ANNUAL_MONTHS`, `CLOUD_GRACE_DAYS`                                | `10`, `7`                | Months charged for a year, and days after a missed renewal before Free limits apply.                  |
 | `INSTALL_HELP_PRICE_INR`                                                 | `1999`                   | The installation help service.                                                                        |
+| `ORDER_PAYMENT_WINDOW_MINUTES`                                           | `30`                     | How long after an order is opened a payment for it is still honoured (5 to 1440).                     |
 | `OPERATOR_EMAIL`                                                         | none                     | Where notifications for the operator go.                                                              |
 | `HOSTING_OFFERS`                                                         | empty                    | JSON list of `{ "name", "url", "note" }` shown under "Need a server?". Hidden while empty.            |
 | `SECRETS_KEY`                                                            | from `AUTH_SECRET`       | Encrypts provider credentials that workspaces save. 32 characters or more.                            |
@@ -385,8 +386,9 @@ credentials that workspaces saved unreadable. They then have to be entered again
 ### Webhooks to register
 
 - **Razorpay**, Dashboard, Settings, Webhooks: URL `https://<SIGN_HOST>/api/billing/razorpay/webhook`,
-  events `payment.captured` and `order.paid`, and a secret of your choice, which also goes in
-  `RAZORPAY_WEBHOOK_SECRET`. Test mode and live mode each have their own webhook list.
+  events `payment.captured`, `order.paid`, `refund.created`, `refund.processed`,
+  `payment.dispute.created` and `payment.dispute.lost`, and a secret of your choice, which also
+  goes in `RAZORPAY_WEBHOOK_SECRET`. Test mode and live mode each have their own webhook list.
 - **Leegality**, in the workflow named by `LEEGALITY_WORKFLOW_ID`: Webhook and Error Webhook
   `https://<SIGN_HOST>/api/v1/esign/webhooks/leegality` (version 2.5), and Redirect URL
   `https://<SIGN_HOST>/sign?esign=return`.
@@ -439,9 +441,45 @@ credentials that workspaces saved unreadable. They then have to be entered again
    ```
 
    With `BILLING_LIVE=true` a test key or the sandbox URL left behind is refused: that part
-   stays switched off and `problems` says which variable to fix. Without `BILLING_LIVE`, test
-   payment keys together with the production Leegality URL are refused for buying eSign
-   credits, so a test payment can never buy a real eSign.
+   stays switched off and `problems` holds a code (`test_payment_key_while_live`,
+   `sandbox_esign_while_live`, or `settings_invalid` for a value that cannot be read). The
+   health answer is public, so it never names a setting; the server log does, once at start:
+
+   ```sh
+   docker compose logs web | grep '\[billing\]'
+   ```
+
+   Without `BILLING_LIVE`, test payment keys together with the production Leegality URL are
+   refused for buying eSign credits, so a test payment can never buy a real eSign. Once
+   `BILLING_LIVE=true`, an order opened with test keys delivers nothing even if a test payment
+   for it arrives, and eSign credits bought with test payments that are still unused are
+   removed from every workspace within a minute (they show as "Removed" in the credit
+   history).
+
+### Payments that are not applied, refunds and disputes
+
+All of these send an email to `OPERATOR_EMAIL` (set it before taking payments) and leave a row
+in `app_audit_log`.
+
+- **A payment that delivers nothing.** A payment is honoured for
+  `ORDER_PAYMENT_WINDOW_MINUTES` after its order was opened, counted to the moment the payer
+  paid, not to when the news reached the server. A later payment, a payment for extra members
+  priced for a term that has since ended or been renewed, a second payment for the same first
+  term, and a payment for a workspace whose plan you have since set by hand are all kept as
+  `paid_unapplied`: nothing is added, no invoice is issued and the buyer is told a refund is
+  coming. **Refund it from the Razorpay dashboard** (Payments, the payment id in the email,
+  Refund), or apply it by hand.
+- **A refund.** When Razorpay reports a refund processed for the full amount, the order
+  becomes `refunded` and what it bought is taken back as far as it is unused: eSign credits not
+  yet spent or held (the email says how many were already used), extra members for the term
+  they were bought for, a renewal (the workspace goes back to the term before it) or a first
+  term (the workspace moves to Free; nothing is deleted). A partial refund, or one only
+  started, changes nothing and tells you. No credit note is issued; `CREDIT_NOTE_SERIES` is
+  reserved for that. Raise one with your accountant for a refunded tax invoice.
+- **A dispute.** A new dispute only tells you. A lost dispute is treated like a full refund.
+- **A plan set by hand.** `plan-set.mjs` marks the plan as yours. Billing then does not sell,
+  renew, lower or end it, even if the workspace still has a paid term; set the workspace back
+  to `free` to let it buy a plan again.
 
 ### Invoices
 
@@ -493,11 +531,11 @@ enter. Their credentials cannot be read back from the app, by them or by you.
 
 ## Troubleshooting
 
-| What you see                                     | What to check                                                                                 |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `Invalid configuration: ...` in the logs         | The variable named in the message; fix it in `.env` and `docker compose up -d`.               |
-| `SEAL_P12_PATH is not set` or a seal error       | `secrets/seal.p12` exists, belongs to 1001, and `SEAL_PASSPHRASE` matches it.                 |
-| Browser shows Traefik's default certificate      | DNS (step 2), `TRAEFIK_CERTRESOLVER`, and the Traefik logs for the ACME error.                |
-| `404 page not found` from Traefik                | `TRAEFIK_NETWORK` is the network Traefik watches, and `web` is healthy (`docker compose ps`). |
-| `billing.problems` in `/api/health` is not empty | The variable each message names (step 12); fix it and run `./restart.sh`.                     |
-| No sign-in emails                                | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP or Microsoft Graph error.            |
+| What you see                                     | What to check                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `Invalid configuration: ...` in the logs         | The variable named in the message; fix it in `.env` and `docker compose up -d`.                              |
+| `SEAL_P12_PATH is not set` or a seal error       | `secrets/seal.p12` exists, belongs to 1001, and `SEAL_PASSPHRASE` matches it.                                |
+| Browser shows Traefik's default certificate      | DNS (step 2), `TRAEFIK_CERTRESOLVER`, and the Traefik logs for the ACME error.                               |
+| `404 page not found` from Traefik                | `TRAEFIK_NETWORK` is the network Traefik watches, and `web` is healthy (`docker compose ps`).                |
+| `billing.problems` in `/api/health` is not empty | `docker compose logs web \| grep '\[billing\]'` names the variable (step 12); fix it and run `./restart.sh`. |
+| No sign-in emails                                | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP or Microsoft Graph error.                           |
