@@ -70,6 +70,18 @@ export interface SigningViewLabels extends ViewerLabels {
   fillInitials: (count: number) => string;
   missing: (count: number) => string;
   formatDate: (isoDate: string) => string;
+  /** One line under the signature pad saying what adopting a signature means. */
+  adoptTerms: string;
+  /** Ready-made reasons the signer can pick when declining; each fills in the reason box. */
+  declineReasons: string[];
+  /** Shown in the bar once every required field is done. */
+  allDone: string;
+  /** The question before finishing, when `confirmBeforeFinish` is on. */
+  confirmTitle: string;
+  confirmBody: (filled: number) => string;
+  confirmFinish: string;
+  /** The tab in the page margin that points at the field the guide is on. */
+  guideTab: string;
 }
 
 export const defaultSigningViewLabels: SigningViewLabels = {
@@ -112,6 +124,19 @@ export const defaultSigningViewLabels: SigningViewLabels = {
     const date = new Date(`${iso}T00:00:00`);
     return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString();
   },
+  adoptTerms:
+    'By adopting it, you agree this is your electronic signature on this document, as binding as one written by hand.',
+  declineReasons: [
+    'Something in the document needs to change',
+    'The details about me are wrong',
+    'I am not the right person to sign',
+  ],
+  allDone: 'All required fields are done.',
+  confirmTitle: 'Ready to finish?',
+  confirmBody: (filled) =>
+    `You filled in ${filled === 1 ? '1 field' : `${filled} fields`}. When you finish, your signature is applied to the document and the sender is told. You cannot change it afterwards.`,
+  confirmFinish: 'Finish',
+  guideTab: 'Next',
 };
 
 export interface SigningViewProps {
@@ -130,6 +155,8 @@ export interface SigningViewProps {
   pdf?: LoadPdfOptions;
   labels?: Partial<SigningViewLabels>;
   className?: string;
+  /** Asks the signer to confirm before `onSubmit` is called. */
+  confirmBeforeFinish?: boolean;
 }
 
 type Adoptable = 'signature' | 'initials';
@@ -154,6 +181,7 @@ export function SigningView({
   pdf,
   labels: labelOverrides,
   className,
+  confirmBeforeFinish = false,
 }: SigningViewProps) {
   const labels = mergeLabels(defaultSigningViewLabels, labelOverrides);
   const id = useId();
@@ -188,6 +216,7 @@ export function SigningView({
   // Set when the pad was opened by "Fill all my initials": applying fills every empty box.
   const [fillAll, setFillAll] = useState(false);
   const [declining, setDeclining] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState('');
   const [showErrors, setShowErrors] = useState(false);
   const [message, setMessage] = useState('');
@@ -349,7 +378,7 @@ export function SigningView({
     closePad();
   };
 
-  const submit = async () => {
+  const submit = async (confirmed = false) => {
     const result = validateFieldValues(fields, values);
     if (!result.valid) {
       setShowErrors(true);
@@ -362,6 +391,11 @@ export function SigningView({
       return;
     }
     setMessage('');
+    if (confirmBeforeFinish && !confirmed) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     setBusy(true);
     try {
       await onSubmit(toFieldValues(fields, values));
@@ -516,14 +550,26 @@ export function SigningView({
       <>
         {onPage.map((f) => renderField(f, ctx))}
         {flagged && at && (
-          <span
-            className="cvs-guide-flag"
-            aria-hidden="true"
-            data-below={at.top < 34 || undefined}
-            style={{ left: at.left, top: at.top < 34 ? at.top + at.height : at.top }}
-          >
-            {labels.guideFlag(flagged.type)}
-          </span>
+          <>
+            <span
+              className="cvs-guide-flag"
+              aria-hidden="true"
+              data-below={at.top < 34 || undefined}
+              style={{ left: at.left, top: at.top < 34 ? at.top + at.height : at.top }}
+            >
+              {labels.guideFlag(flagged.type)}
+            </span>
+            {at.left > 40 && (
+              <span
+                className="cvs-guide-tab"
+                aria-hidden="true"
+                data-wide={at.left > 96 || undefined}
+                style={{ top: at.top + at.height / 2 }}
+              >
+                <span className="cvs-guide-tab-text">{labels.guideTab}</span>
+              </span>
+            )}
+          </>
         )}
       </>
     );
@@ -562,10 +608,13 @@ export function SigningView({
         aria-label={labels.actions}
         data-pending={pending > 0 || undefined}
       >
-        <div className="cvs-progress-block">
+        <div className="cvs-progress-block" data-done={pending === 0 || undefined}>
           <p className="cvs-progress" id={`${id}-progress`} aria-live="polite">
             {labels.progress(done, required.length)}
           </p>
+          {pending === 0 && required.length > 0 && (
+            <p className="cvs-progress-done">{labels.allDone}</p>
+          )}
           {required.length > 0 && (
             <div className="cvs-progress-track" aria-hidden="true">
               <span style={{ width: `${(done / required.length) * 100}%` }} />
@@ -663,6 +712,37 @@ export function SigningView({
               {padField.type === 'initials' ? labels.reuseInitials : labels.reuseSignature}
             </p>
           )}
+          {labels.adoptTerms && <p className="cvs-adopt-terms">{labels.adoptTerms}</p>}
+        </Dialog>
+      )}
+
+      {confirming && (
+        <Dialog
+          title={labels.confirmTitle}
+          onClose={() => setConfirming(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                className="cvs-button cvs-button--ghost"
+                onClick={() => setConfirming(false)}
+              >
+                {labels.cancel}
+              </button>
+              <button
+                type="button"
+                className="cvs-button cvs-button--primary"
+                onClick={() => void submit(true)}
+                disabled={busy}
+              >
+                {labels.confirmFinish}
+              </button>
+            </>
+          }
+        >
+          <p className="cvs-confirm-body">
+            {labels.confirmBody(fields.filter((f) => hasValue(f, values[f.id])).length)}
+          </p>
         </Dialog>
       )}
 
@@ -690,6 +770,21 @@ export function SigningView({
             </>
           }
         >
+          {labels.declineReasons.length > 0 && (
+            <div className="cvs-reasons">
+              {labels.declineReasons.map((text) => (
+                <button
+                  key={text}
+                  type="button"
+                  className="cvs-reason"
+                  aria-pressed={reason === text}
+                  onClick={() => setReason(text)}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+          )}
           <label className="cvs-label" htmlFor={`${id}-reason`}>
             {labels.declineReason}
           </label>

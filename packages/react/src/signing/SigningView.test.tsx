@@ -338,4 +338,61 @@ describe('SigningView with many signature boxes', () => {
     expect(parseFloat(box.style.width)).toBeGreaterThanOrEqual(96);
     expect(parseFloat(box.style.height)).toBeGreaterThanOrEqual(36);
   });
+
+  it('asks before finishing when told to, and sends only once confirmed', async () => {
+    const { onSubmit } = setup({ confirmBeforeFinish: true });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Checkbox, required' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text, required' }), {
+      target: { value: 'Pune' },
+    });
+    await signWithTypedName();
+    const bar = screen.getByRole('group', { name: 'Signing progress and actions' });
+    expect(within(bar).getByText('All required fields are done.')).toBeInTheDocument();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Finish' }));
+    const dialog = screen.getByRole('dialog', { name: 'Ready to finish?' });
+    expect(dialog).toHaveTextContent('You filled in 4 fields.');
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Finish' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Ready to finish?' })).getByRole('button', {
+        name: 'Finish',
+      }),
+    );
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+  });
+
+  it('does not ask before finishing while required fields are missing', () => {
+    setup({ confirmBeforeFinish: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('3 required fields still need you.');
+  });
+
+  it('fills the decline reason from a ready-made choice', async () => {
+    const { onDecline } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
+    const dialog = screen.getByRole('dialog', { name: 'Decline to sign' });
+    const choice = within(dialog).getByRole('button', {
+      name: 'I am not the right person to sign',
+    });
+    fireEvent.click(choice);
+    expect(choice).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getByLabelText('Tell the sender why you are declining')).toHaveValue(
+      'I am not the right person to sign',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
+    await waitFor(() =>
+      expect(onDecline).toHaveBeenCalledWith('I am not the right person to sign'),
+    );
+  });
+
+  it('says what adopting a signature means under the pad', () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Signature, required' }));
+    expect(
+      within(screen.getByRole('dialog')).getByText(/this is your electronic signature/),
+    ).toBeInTheDocument();
+  });
 });
