@@ -83,6 +83,16 @@ export interface Document {
   pageSizes?: PageSize[];
 }
 
+/** Where a recipient's Aadhaar eSign stands with the eSign provider. */
+export interface RecipientEsign {
+  /** The provider's name, for example `leegality`. */
+  provider: string;
+  status: 'pending' | 'signed' | 'declined' | 'expired' | 'failed';
+  /** The signer's name as the provider reported it. */
+  signerName?: string;
+  signedAt?: IsoDateTime;
+}
+
 export interface Recipient {
   id: Id;
   name: string;
@@ -100,6 +110,8 @@ export interface Recipient {
   viewedAt?: IsoDateTime;
   remindersSent?: number;
   lastRemindedAt?: IsoDateTime;
+  /** Set by the server for a recipient who signs with Aadhaar eSign, once they start. */
+  esign?: RecipientEsign;
 }
 
 export interface ReminderPolicy {

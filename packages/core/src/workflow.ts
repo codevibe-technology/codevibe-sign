@@ -66,6 +66,8 @@ export interface SealInput {
   /** SHA-256 hex of the sealed file. */
   sha256: string;
   context?: AuditContext;
+  /** Extra facts for the sealed event, for example how a provider-signed file was sealed. */
+  data?: Record<string, string | number | boolean>;
 }
 
 class Transition {
@@ -536,7 +538,7 @@ export function recordSeal(
   const t = new Transition(envelope, deps.clock.now().toISOString());
   t.event('document.sealed', {
     context: input.context,
-    data: { documentId: input.documentId, sha256: input.sha256 },
+    data: { ...input.data, documentId: input.documentId, sha256: input.sha256 },
   });
   return t.result();
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDocument, aadhaarIssues, validateForSend } from './builder';
 import { deps, ready, SHA, T0, valuesFor } from './test/fixtures';
-import { send, submit } from './workflow';
+import { recordSeal, send, submit } from './workflow';
 
 const now = new Date(T0);
 const paths = (envelope: Parameters<typeof aadhaarIssues>[0]) =>
@@ -93,6 +93,24 @@ describe('submit with extra event data', () => {
     expect(result.events[0]).toMatchObject({
       action: 'recipient.signed',
       data: { method: 'aadhaar_esign', provider: 'leegality', fields: 1 },
+    });
+  });
+});
+
+describe('recordSeal with extra event data', () => {
+  it('keeps the document and its hash ahead of anything passed in', () => {
+    const { envelope, ids } = ready({ recipients: [ravi] });
+    const sent = send(envelope, deps()).envelope;
+    const done = submit(sent, { recipientId: ids[0]!, values: valuesFor(sent, ids[0]!) }, deps());
+    const documentId = done.envelope.documents[0]!.id;
+    const sealed = recordSeal(
+      done.envelope,
+      { documentId, sha256: SHA, data: { seal: 'countersigned', sha256: 'other' } },
+      deps(),
+    );
+    expect(sealed.events[0]).toMatchObject({
+      action: 'document.sealed',
+      data: { seal: 'countersigned', documentId, sha256: SHA },
     });
   });
 });
