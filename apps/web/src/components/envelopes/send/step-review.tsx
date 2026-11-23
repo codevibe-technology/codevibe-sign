@@ -281,7 +281,9 @@ export function StepReview({
                 {state.recipients.map((r, i) => {
                   const own = state.fields.filter((f) => f.recipientId === r.id);
                   const required = own.filter((f) => f.required).length;
-                  const signs = own.some((f) => f.type === 'signature');
+                  const signs = own.some(
+                    (f) => f.type === (r.auth === 'aadhaar' ? 'aadhaar' : 'signature'),
+                  );
                   return (
                     <li
                       key={r.id}
@@ -306,7 +308,11 @@ export function StepReview({
                       {r.role === 'signer' ? (
                         signs ? (
                           <PenLine
-                            aria-label="Has a signature field"
+                            aria-label={
+                              r.auth === 'aadhaar'
+                                ? 'Has the Aadhaar eSign box'
+                                : 'Has a signature field'
+                            }
                             className="h-4 w-4 shrink-0 text-success"
                           />
                         ) : (
@@ -315,7 +321,7 @@ export function StepReview({
                             className="shrink-0 text-[12.5px] font-semibold text-danger underline"
                             onClick={() => onGoTo('fields')}
                           >
-                            No signature
+                            {r.auth === 'aadhaar' ? 'No Aadhaar eSign box' : 'No signature'}
                           </button>
                         )
                       ) : null}
