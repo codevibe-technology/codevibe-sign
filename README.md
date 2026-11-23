@@ -95,8 +95,10 @@ the [pricing section](https://sign.codevibe.in/#pricing). More in the
 - An append-only audit log chained with SHA-256.
 - Templates and bulk send from a CSV, in the web app.
 - Signed outbound webhooks with retries.
-- An Aadhaar eSign library (`@codevibe_technology/sign-aadhaar`) for your own account with a
-  licensed provider. It is standalone for now: the server and the web app do not call it yet.
+- Aadhaar eSign through a licensed provider (Leegality), built into the server and the web app:
+  the signer confirms with an Aadhaar OTP, and the finished file carries their Aadhaar signature
+  and the seal together. The adapter is also a library of its own
+  (`@codevibe_technology/sign-aadhaar`).
 - React components for signing and field placement, unstyled and themed with CSS variables.
 
 ## How it works
@@ -122,7 +124,7 @@ the [pricing section](https://sign.codevibe.in/#pricing). More in the
 | [`@codevibe_technology/sign-client`](packages/client)       | Apache-2.0 | Typed client for the HTTP API, signing sessions and webhook checks. No dependencies.                    |
 | [`@codevibe_technology/sign-react`](packages/react)         | Apache-2.0 | Signature pad, signing view and field placement components.                                             |
 | [`@codevibe_technology/sign-templates`](packages/templates) | Apache-2.0 | Reusable templates with roles, prefilled fields and bulk send from CSV.                                 |
-| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar)     | Apache-2.0 | Aadhaar eSign through a licensed eSign provider, with your own account. Standalone for now.             |
+| [`@codevibe_technology/sign-aadhaar`](packages/aadhaar)     | Apache-2.0 | Aadhaar eSign through a licensed eSign provider (Leegality). Used by the server and the web app.        |
 | [`@codevibe_technology/sign-server`](packages/server)       | AGPL-3.0   | HTTP API and runtime with adapters for storage, files, mail and OTP, and the `start` command.           |
 | [`apps/web`](apps/web)                                      | AGPL-3.0   | The web app: workspaces, sending, templates, bulk send, webhooks, signing page, docs at `/docs`.        |
 | [`apps/server`](apps/server)                                | AGPL-3.0   | Docker image of the standalone service.                                                                 |
@@ -279,7 +281,9 @@ Codevibe Sign supports two kinds of signature. Under Indian law:
 - **Aadhaar eSign** (`@codevibe_technology/sign-aadhaar`). An electronic signature under IT Act
   s.3A, using a technique in the Second Schedule, issued through a licensed eSign Service
   Provider. Use it, or a DSC, where a law requires a document to be signed in that statutory
-  sense. The package is a standalone library today and is not yet wired into the server.
+  sense. A sender picks it for one signer, who acts last; the provider's signed file is kept
+  byte for byte, the seal is added after it, and the signing certificate is a separate sealed
+  PDF. See the [guide](https://sign.codevibe.in/docs/guides/aadhaar-leegality).
 
 Some documents cannot be signed electronically at all. The IT Act's First Schedule, as amended
 by notification S.O. 4720(E) of 26 September 2022, excludes:
@@ -305,8 +309,8 @@ document.
 
 ## Roadmap
 
-- Aadhaar eSign in the server and the web app, through a licensed eSign provider.
-- More eSign providers behind the same `EsignProvider` interface.
+- eMudhra as a second eSign provider, behind the same `EsignProvider` interface.
+- More than one Aadhaar signer, and more than one document, in an envelope.
 - Translations of the signing experience and emails (i18n).
 
 Ideas and pull requests are welcome; open an issue to discuss larger changes first.

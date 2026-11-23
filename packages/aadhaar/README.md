@@ -72,7 +72,7 @@ import { createLeegalityProvider } from '@codevibe_technology/sign-aadhaar';
 
 const esign = createLeegalityProvider({
   environment: 'sandbox',
-  authToken: process.env.LEEGALITY_AUTH_TOKEN!,
+  authToken: process.env.LEEGALITY_API_KEY!,
   privateSalt: process.env.LEEGALITY_PRIVATE_SALT!,
   profileId: process.env.LEEGALITY_WORKFLOW_ID!,
 });

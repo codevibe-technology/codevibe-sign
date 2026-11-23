@@ -186,7 +186,8 @@ only need that part.
 | [`@codevibe_technology/sign-core`](https://www.npmjs.com/package/@codevibe_technology/sign-core)     | Envelopes, routing, reminders, expiry and the audit chain. No I/O.   |
 | [`@codevibe_technology/sign-react`](https://www.npmjs.com/package/@codevibe_technology/sign-react)   | Signature pad, signing view and field placement components.          |
 
-Aadhaar eSign and templates are separate Apache-2.0 packages:
+Aadhaar eSign (run for you by the server and the web app) and templates are separate Apache-2.0
+packages:
 [`@codevibe_technology/sign-aadhaar`](https://www.npmjs.com/package/@codevibe_technology/sign-aadhaar)
 and
 [`@codevibe_technology/sign-templates`](https://www.npmjs.com/package/@codevibe_technology/sign-templates).
