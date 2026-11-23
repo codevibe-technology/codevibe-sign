@@ -45,9 +45,9 @@ describe('auditTrailPdf', () => {
     expect(joined).toContain('env_01J9Z6Q4');
     expect(joined).toContain('f'.repeat(64));
     expect(joined).toContain('https://sign.example.com/r/abc');
-    expect(text).toContain('Time (UTC and Asia/Kolkata)');
+    expect(text).toContain('Time (Asia/Kolkata and UTC)');
     expect(text).toContain('2026-11-18 09:00:06 UTC');
-    expect(text).toContain('2026-11-18 14:30:06 GMT+5:30 (Asia/Kolkata)');
+    expect(text).toContain('18 Nov 2026 14:30 GMT+5:30');
     expect(text).toContain('Corrected copy created');
     expect(text).toContain('Link shared manually');
     expect(text).toContain('Signed');
@@ -68,6 +68,53 @@ describe('auditTrailPdf', () => {
     }
     expect(joined).not.toContain('dev@acme.example');
     expect(joined).toContain('d****@acme.example');
+  });
+
+  it('shows the document hashes, each recipient and how an Aadhaar eSign was made', async () => {
+    const aadhaar = [
+      event(1, 'envelope.sent'),
+      event(2, 'recipient.signed', {
+        recipientId: 'r1',
+        context: { ip: '198.51.100.4' },
+        data: { method: 'aadhaar_esign', provider: 'leegality', signerName: 'SHUBH KUMAR' },
+      }),
+      event(3, 'document.sealed', { data: { documentId: 'd1', sha256: 'b'.repeat(64) } }),
+    ];
+    const text = await allText(
+      await auditTrailPdf({
+        envelope: envelope({
+          recipients: [
+            {
+              ...envelope().recipients[0]!,
+              auth: 'aadhaar',
+              esign: { provider: 'leegality', status: 'signed' },
+            },
+          ],
+        }),
+        events: aadhaar,
+      }),
+    );
+    const joined = text.join('\n');
+    expect(text).toContain('Provided by');
+    expect(text).toContain('Documents');
+    expect(joined).toContain('a'.repeat(64));
+    expect(text).toContain('SHA-256 of the signed file');
+    expect(joined).toContain('b'.repeat(64));
+    expect(text).toContain('Recipients');
+    expect(text).toContain('Aadhaar eSign (via Leegality)');
+    expect(text.join(' ')).toContain(
+      'Aadhaar eSign (via Leegality), name on the eSign certificate: SHUBH KUMAR',
+    );
+    expect(joined).not.toContain('198.51.100.4');
+  });
+
+  it('prints network addresses only when asked to', async () => {
+    const text = await allText(
+      await auditTrailPdf({ envelope: envelope(), events }, { networkAddresses: true }),
+    );
+    expect(text).toContain('IP 203.0.113.7');
+    expect(text).toContain('IP 203.0.113.9');
+    expect(text.join('\n')).not.toContain('Mozilla');
   });
 
   it('repeats the table header on every page of a long trail', async () => {
