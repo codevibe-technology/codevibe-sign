@@ -4,6 +4,7 @@ import { pdfResponse } from '../http/body';
 import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import { verifyCopyClaim } from '../http/session';
+import { auditTrailFile } from '../runtime/audit-trail';
 import type { Runtime } from '../runtime/context';
 import { certificateFileKey, sealedFileKey } from '../runtime/seal';
 
@@ -15,7 +16,7 @@ const linkInvalid = () =>
 
 /**
  * `/v1/sign/copy/:docId?c=...`: the download link in a completed-copy email whose files were
- * not attached. The signed `c` value names the envelope and recipient; it works only for a
+ * not attached; `&file=certificate` or `&file=audit-trail` picks the other files. The signed `c` value names the envelope and recipient; it works only for a
  * completed envelope that recipient is on.
  */
 export function copyRoutes(rt: Runtime) {
@@ -34,7 +35,13 @@ export function copyRoutes(rt: Runtime) {
     if (envelope.status !== 'completed') throw linkInvalid();
     const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
     if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
-    const certificate = c.req.query('file') === 'certificate';
+    const file = c.req.query('file');
+    if (file === 'audit-trail') {
+      const trail = await auditTrailFile(rt, envelope, stored?.workspaceId);
+      if (!trail) throw new SignError('INVALID_STATE', 'This server cannot draw an audit trail');
+      return pdfResponse(c, trail, envelope.title, 'audit-trail');
+    }
+    const certificate = file === 'certificate';
     const key = certificate ? certificateFileKey : sealedFileKey;
     const sealed = await rt.files.get(key(envelope.id, document.id));
     if (!sealed) throw new SignError('INVALID_STATE', 'The signed copy is not ready yet');

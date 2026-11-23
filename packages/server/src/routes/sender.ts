@@ -1,5 +1,6 @@
 import {
   SignError,
+  adoptAadhaarBox,
   remind,
   send,
   updateEnvelope,
@@ -20,6 +21,7 @@ import { enforce } from '../http/rate-limit';
 import { parseFields, parseJsonObject, parseRecipients, parseSettings } from '../input';
 import type { Runtime } from '../runtime/context';
 import type { EnvelopeListQuery } from '../store/types';
+import { auditTrailFile } from '../runtime/audit-trail';
 import { mutate } from '../runtime/mutate';
 import { certificateFileKey, sealedFileKey } from '../runtime/seal';
 import { assertEsignReady } from '../esign/flow';
@@ -125,7 +127,7 @@ export function senderRoutes(rt: Runtime) {
       rt,
       c.req.param('id'),
       async (current) => {
-        const sent = send(current, deps);
+        const sent = send(adoptAadhaarBox(current), deps);
         await assertEsignReady(rt, scopeOf(c).workspaceId, current);
         return sent;
       },
@@ -228,6 +230,14 @@ export function senderRoutes(rt: Runtime) {
       seal: asIs?.seal ?? 'operator',
       earlierSignatures: asIs?.earlierSignatures ?? (check.earlierSignatures ?? []).map(earlier),
     });
+  });
+
+  app.get('/:id/audit-trail', async (c) => {
+    const scope = scopeOf(c);
+    const envelope = await getEnvelope(rt, c.req.param('id'), scope);
+    const trail = await auditTrailFile(rt, envelope, scope.workspaceId);
+    if (!trail) throw new SignError('INVALID_STATE', 'This server cannot draw an audit trail');
+    return pdfResponse(c, trail, envelope.title, 'audit-trail');
   });
 
   app.get('/:id/certificate', async (c) => {

@@ -43,6 +43,15 @@ export function fakePdfEngine(overrides: Partial<PdfEngine> = {}): PdfEngine {
     async seal(pdf, options) {
       return append(pdf, `sealed;reason=${options.reason}\n`);
     },
+    async auditTrailPdf(input) {
+      const ips = input.networkAddresses
+        ? input.events.flatMap((e) => (e.context?.ip ? [e.context.ip] : []))
+        : [];
+      return encoder.encode(
+        `%PDF-1.7\naudit-trail=${input.envelope.id};events=${input.events.length}` +
+          `;zone=${input.timeZone ?? 'UTC'};ips=${ips.join(',')}\n`,
+      );
+    },
     ...overrides,
   };
 }

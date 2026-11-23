@@ -24,6 +24,7 @@ export {
   type SealOptions,
   type CertificateDetails,
   type CertificateInput,
+  type AuditTrailInput,
   type SealTrust,
   type SealCheck,
   type SignatureSummary,

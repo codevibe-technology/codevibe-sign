@@ -10,6 +10,7 @@ import {
 import { issueCopyClaim } from '../http/session';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { CopyDownload, MailTemplates } from '../templates';
+import { auditTrailFile, auditTrailName } from './audit-trail';
 import type { Runtime } from './context';
 import { certificateFileKey, sealedFileKey, separateCertificates } from './seal';
 import { timeZoneFor } from './time-zone';
@@ -76,10 +77,24 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
 
   if (payload.reason === 'completed_copy') {
     const certificates = separateCertificates(await rt.store.listEvents(envelope.id));
-    const attachments = await sealedAttachments(rt, envelope, certificates);
+    const trail = await auditTrailFile(rt, envelope, workspaceId).catch((err: unknown) => {
+      rt.logger.warn('audit trail was not drawn for the completed copy', {
+        envelope: envelope.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    });
+    const auditTrail = trail !== null;
+    const attachments = await sealedAttachments(rt, envelope, certificates, trail);
     if (attachments) {
       try {
-        const mail = templates.completed({ envelope, recipient, attached: true, downloads: [] });
+        const mail = templates.completed({
+          envelope,
+          recipient,
+          attached: true,
+          auditTrail,
+          downloads: [],
+        });
         await rt.mailer.send({ ...base, ...mail, attachments });
         return;
       } catch (err) {
@@ -90,10 +105,10 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
         });
       }
     }
-    const downloads = copyDownloads(rt, envelope, recipient, certificates);
+    const downloads = copyDownloads(rt, envelope, recipient, certificates, auditTrail);
     await rt.mailer.send({
       ...base,
-      ...templates.completed({ envelope, recipient, attached: false, downloads }),
+      ...templates.completed({ envelope, recipient, attached: false, auditTrail, downloads }),
     });
     return;
   }
@@ -112,16 +127,22 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
   });
 }
 
-/** One personal download link per document, for a completed copy sent without attachments. */
+/**
+ * One personal download link per file, for a completed copy sent without attachments: each
+ * document, its separate certificate, and the audit trail once for the envelope.
+ */
 function copyDownloads(
   rt: Runtime,
   envelope: Envelope,
   recipient: Recipient,
   certificates: ReadonlySet<string>,
+  auditTrail: boolean,
 ): CopyDownload[] {
   const claim = issueCopyClaim(rt.sessionSecret, envelope.id, recipient.id, rt.clock.now());
-  return envelope.documents.flatMap((document) => {
-    const url = `${rt.publicUrl}${rt.basePath}/v1/sign/copy/${encodeURIComponent(document.id)}?c=${claim}`;
+  const urlOf = (documentId: string) =>
+    `${rt.publicUrl}${rt.basePath}/v1/sign/copy/${encodeURIComponent(documentId)}?c=${claim}`;
+  const files = envelope.documents.flatMap((document) => {
+    const url = urlOf(document.id);
     return [
       { name: document.name, url },
       ...(certificates.has(document.id)
@@ -129,19 +150,24 @@ function copyDownloads(
         : []),
     ];
   });
+  const first = envelope.documents[0];
+  return auditTrail && first
+    ? [...files, { name: auditTrailName(envelope), url: `${urlOf(first.id)}&file=audit-trail` }]
+    : files;
 }
 
 const certificateName = (documentName: string) =>
   `${documentName.replace(/\.pdf$/i, '')} (signing certificate).pdf`;
 
 /**
- * The sealed files to attach, or null to send links instead: when one is missing or cannot be
- * read, or together they are over `maxAttachmentBytes`.
+ * The sealed files to attach, with the audit trail after them, or null to send links instead:
+ * when one is missing or cannot be read, or together they are over `maxAttachmentBytes`.
  */
 async function sealedAttachments(
   rt: Runtime,
   envelope: Envelope,
   certificates: ReadonlySet<string>,
+  trail: Uint8Array | null,
 ) {
   const attachments = [];
   let total = 0;
@@ -176,6 +202,15 @@ async function sealedAttachments(
       if (total > rt.limits.maxAttachmentBytes) return null;
       attachments.push({ filename: file.filename, content, contentType: 'application/pdf' });
     }
+  }
+  if (trail) {
+    total += trail.byteLength;
+    if (total > rt.limits.maxAttachmentBytes) return null;
+    attachments.push({
+      filename: auditTrailName(envelope),
+      content: trail,
+      contentType: 'application/pdf',
+    });
   }
   return attachments;
 }

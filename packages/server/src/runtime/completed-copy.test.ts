@@ -1,5 +1,6 @@
 import type { MailMessage, Mailer } from '@codevibe_technology/sign-core';
 import { describe, expect, it } from 'vitest';
+import { fakePdfEngine } from '../testing/fake-pdf';
 import { envelopeBody, harness, PNG } from '../testing/harness';
 
 const oneSigner = {
@@ -23,6 +24,56 @@ const completedCopies = (sent: MailMessage[]) =>
   sent.filter((m) => m.meta?.kind === 'completed_copy');
 
 describe('completed copy delivery', () => {
+  it('attaches the signed copy and the audit trail as a PDF of its own', async () => {
+    const h = harness({ timeZone: 'Asia/Kolkata' });
+    const envelope = await complete(h);
+    const [copy] = completedCopies(h.mailer.sent);
+    expect(copy?.attachments?.map((a) => a.filename)).toEqual([
+      'offer.pdf',
+      'Offer letter (audit trail).pdf',
+    ]);
+    const trail = new TextDecoder().decode(copy!.attachments![1]!.content);
+    expect(trail).toMatch(new RegExp(`^%PDF-1.7\naudit-trail=${envelope.id};events=\\d+`));
+    expect(trail).toContain(';zone=Asia/Kolkata;');
+    expect(copy?.attachments?.[1]?.contentType).toBe('application/pdf');
+    expect(copy?.text).toContain('The signed copy and its audit trail are attached.');
+  });
+
+  it('sends a link to the audit trail with the others when the files are too large', async () => {
+    const h = harness({ limits: { maxAttachmentBytes: 1 } });
+    const envelope = await complete(h);
+    const [copy] = completedCopies(h.mailer.sent);
+    expect(copy?.attachments).toBeUndefined();
+    expect(copy?.text).toContain('The signed copy and its audit trail could not be attached.');
+    const urls = copy!.text.match(/https:\/\/sign\.example\.com\/v1\/sign\/copy\/\S+/g)!;
+    expect(urls).toHaveLength(2);
+    expect(copy?.text).toContain('Offer letter (audit trail).pdf: ');
+    const trailUrl = urls.find((u) => u.endsWith('&file=audit-trail'))!;
+    expect(trailUrl).toContain(`/v1/sign/copy/${envelope.documents[0]!.id}?c=`);
+    const res = await h.call('GET', trailUrl.replace('https://sign.example.com', ''));
+    expect(res.res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.res.headers.get('content-disposition')).toContain('audit-trail.pdf');
+  });
+
+  it('falls back to links when the audit trail pushes the files over the limit', async () => {
+    const probe = harness();
+    await complete(probe);
+    const sealed = completedCopies(probe.mailer.sent)[0]!.attachments![0]!.content.byteLength;
+    const h = harness({ limits: { maxAttachmentBytes: sealed + 1 } });
+    await complete(h);
+    const [copy] = completedCopies(h.mailer.sent);
+    expect(copy?.attachments).toBeUndefined();
+    expect(copy?.text).toContain('&file=audit-trail');
+  });
+
+  it('sends the signed copy alone when the PDF engine draws no audit trail', async () => {
+    const h = harness({ pdf: fakePdfEngine({ auditTrailPdf: undefined }) });
+    await complete(h);
+    const [copy] = completedCopies(h.mailer.sent);
+    expect(copy?.attachments?.map((a) => a.filename)).toEqual(['offer.pdf']);
+    expect(copy?.text).toContain('The sealed copy is attached.');
+  });
+
   it('sends download links when the sealed files are over the attachment limit', async () => {
     const h = harness({ limits: { maxAttachmentBytes: 1 } });
     const envelope = await complete(h);
