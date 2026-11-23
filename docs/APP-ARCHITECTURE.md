@@ -694,7 +694,10 @@ saves or removes the account's own credentials and tests them with one read-only
 are sealed with `sealSecret` (AES-256-GCM under `SECRETS_KEY`, bound to the workspace and the
 purpose) and only `{ configured, keyHint, environment }` ever reaches the browser. Mode and
 credentials cannot change while an eSign is open, because its callback is verified with the
-account it started on.
+account it started on. A started eSign keeps the account it began on (`providerForSession`, from its
+`app_esign_usage` row): the plan is checked only when one starts, so a signer already at the
+provider finishes even if the account drops to Free meanwhile. Starting one and changing the
+mode or the credentials both take the account's row lock, so they never overlap.
 
 The send flow offers "Aadhaar eSign" as an identity check with the core rules as field errors
 (one Aadhaar signer, one document, acts last) and shows the price and the credit balance. The

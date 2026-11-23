@@ -264,6 +264,10 @@ who made it. In a source checkout the same command is
 `pnpm --filter web plan:set <workspace-slug or owner-email> <plan>`.
 Use the workspace's current address; an old one is not accepted here.
 
+Setting a plan by hand ends any paid term the account has, extra members included, and from
+then on billing leaves the plan alone. If the account had paid for time it will not get,
+refund it from the Razorpay dashboard.
+
 A plan belongs to an account: the person who created the workspace, and every workspace they
 created. The command finds the account from one of its workspaces or from its owner's email
 address, moves all of its workspaces together and prints which ones. Upgrading to this
@@ -333,6 +337,25 @@ docker compose logs -f web    # migrations run on start
 Then repeat the smoke test. Set `SIGN_IMAGE_TAG` in `.env` to the new tag so later
 `docker compose` commands use it. Migrations only move forward: to roll back, check out the
 previous release, build it, and restore the backup taken before the upgrade.
+
+### Rolling back past the release that introduced accounts
+
+That release gives every workspace an account (`app_workspaces.account_id`, which may not be
+empty). An older build does not fill the column, so if you run an older build on the upgraded
+database without restoring the backup, existing workspaces keep working but nobody can create
+a new one. Either restore the backup, or drop the rule first:
+
+```sh
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "alter table app_workspaces alter column account_id drop not null"'
+```
+
+Workspaces created by the older build then have no account. Before upgrading again, restore
+the backup or ask for help: the newer build expects every workspace to have one.
+
+A database that ran a build made from the development branch before accounts existed
+(migrations named `0013_billing` or `0014_plan_v2` in `app_migrations`) cannot be upgraded in
+place; the app stops at start-up and says so. Restore the backup taken before that build.
 
 ## 12. Payments, invoices and Aadhaar eSign
 
@@ -524,6 +547,10 @@ enter. Their credentials cannot be read back from the app, by them or by you.
 
 - **Credits expiry.** Credits do not expire today, and the docs say so as the current policy.
   If they should expire, decide the period before the first live sale.
+- **Credits bought on Cloud, spent on Free.** The price of a credit follows the plan at the
+  time of purchase, and credits stay in the account's wallet when the plan changes. An account
+  can therefore buy a pack while on Cloud and use it after going back to Free. Decide whether
+  that is acceptable, or whether credits should carry the plan they were bought on.
 - **SAC code.** `INVOICE_SAC` defaults to `998319` (other information technology services).
   `997331` (licensing services for the right to use computer software) is the other candidate
   commonly used for software sold as a service. Both are taxed at 18%; ask your chartered
