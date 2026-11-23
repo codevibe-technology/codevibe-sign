@@ -170,8 +170,11 @@ core's types. The page shows:
   (with the reason);
 - the document fingerprint: the SHA-256 of the original file (`document.sha256`), in short
   and in full, and the head of the audit chain;
-- `recordUrl`, when given: a QR code and a link to a page that shows this signing's record,
-  such as the public record page of the web app;
+- `recordUrl`, when given: a QR code for a page that shows this signing's record, such as the
+  public record page of the web app. The code is also a link in PDF readers; the address
+  itself is not printed;
+- under the code, "Signing certificate provided by:" and the Codevibe Sign logo, drawn as
+  vector paths so it needs no font;
 - `note`, when given: one line from the sender at the end, such as a company registration
   number.
 

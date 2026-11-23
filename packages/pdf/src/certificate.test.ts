@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { SignError, type AuditEvent, type Recipient } from '@codevibe_technology/sign-core';
 import { extractText } from './testing/extract';
 import { appendCertificate, certificatePdf, type CertificateData } from './certificate';
+import { lockupWidth } from './lockup';
 import {
   A4,
   document,
@@ -16,6 +17,7 @@ import {
   shownText,
 } from './testing/fixtures';
 
+const PAGE = { width: A4[0], height: A4[1] };
 const RECORD_URL = 'https://sign.example.com/r/Zk3vQ9xLm2Tn8RbYc4Wd7HsA';
 
 const signer = recipient({ status: 'signed' });
@@ -125,7 +127,11 @@ describe('appendCertificate', () => {
     expect(text).toContain('a'.repeat(64));
     expect(text).toContain('Audit trail when sealed: 7 events, chain head');
     expect(text).toContain('f'.repeat(64));
-    expect(text).toContain(RECORD_URL);
+    expect(text).not.toContain(RECORD_URL);
+    expect(text).not.toContain('https://');
+    expect(text).not.toContain('Public record');
+    expect(text).toContain('Scan to check this document');
+    expect(text).toContain('Signing certificate provided by:');
     expect(text).toContain('Page 1 of 1  ·  Generated 2026-11-19 11:00:00 UTC');
   });
 
@@ -201,7 +207,7 @@ describe('appendCertificate', () => {
     }
   });
 
-  it('draws a QR code that reads as the record link, and links the text', async () => {
+  it('draws a QR code that reads as the record link, and makes the code the link', async () => {
     const output = await appendCertificate(await makePdf([{ size: A4 }]), {
       envelope: envelope(),
       document: document(),
@@ -219,6 +225,43 @@ describe('appendCertificate', () => {
     expect(link.lookup(PDFName.of('Subtype'))).toBe(PDFName.of('Link'));
     const action = link.lookup(PDFName.of('A'), PDFDict);
     expect(action.lookup(PDFName.of('URI'), PDFString).asString()).toBe(RECORD_URL);
+    const rect = link.lookup(PDFName.of('Rect'), PDFArray).asRectangle();
+    expect(rect.width).toBeCloseTo(104);
+    expect(rect.height).toBeCloseTo(104);
+    expect(rect.x + rect.width).toBeCloseTo(PAGE.width - 44);
+  });
+
+  it('ends the side column with the Codevibe Sign lockup, drawn as paths', async () => {
+    for (const recordUrl of [RECORD_URL, undefined]) {
+      const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+        envelope: envelope(),
+        document: document(),
+        events,
+        ...(recordUrl ? { recordUrl } : {}),
+      });
+      const content = await pageContent(output, 1);
+      expect(shownText(content)).toContain('Signing certificate provided by:');
+      // Navy "codevibe", blue "sign" and the blue and teal strokes of the mark.
+      expect(content).toMatch(/0\.05098\d* 0\.10588\d* 0\.16470?\d* rg/);
+      expect(content).toMatch(/0\.10588\d* 0\.41568\d* 0\.87843\d* rg/);
+      expect(content).toMatch(/0\.10588\d* 0\.41568\d* 0\.87843\d* RG/);
+      expect(content).toMatch(/0\.17647\d* 0\.83137\d* 0\.74901\d* RG/);
+      // Each path is placed with a move, a turn and a flip of the y axis.
+      const origins = [
+        ...content.matchAll(
+          /1 0 0 1 ([\d.-]+) ([\d.-]+) cm\s+1 0 0 1 0 0 cm\s+[\d.]+ 0 0 -[\d.]+ 0 0 cm/g,
+        ),
+      ].map((m) => ({ x: Number(m[1]), y: Number(m[2]) }));
+      expect(origins.length).toBeGreaterThanOrEqual(5);
+      const right = PAGE.width - 44;
+      for (const { x, y } of origins) {
+        expect(x).toBeCloseTo(right - Math.ceil(lockupWidth(24)));
+        // Under the code when there is one, at the top of the column when there is not.
+        expect(y).toBeLessThan(PAGE.height - 44 - (recordUrl ? 104 : 0));
+        expect(y).toBeGreaterThan(PAGE.height - 44 - 200);
+      }
+      expect(Math.ceil(lockupWidth(24))).toBeLessThan(right - 44);
+    }
   });
 
   it('has no code and no link without a record', async () => {
@@ -232,6 +275,7 @@ describe('appendCertificate', () => {
     const text = shownText(content).join('\n');
     expect(text).not.toContain('Public record');
     expect(text).not.toContain('Scan');
+    expect(text).toContain('Signing certificate provided by:');
     const page = (await PDFDocument.load(output)).getPage(1);
     expect(page.node.Annots()?.size() ?? 0).toBe(0);
   });
@@ -349,6 +393,8 @@ describe('certificatePdf', () => {
     expect(text).toContain('Shubh Kumar');
     expect(text).toContain('This certificate summarises a completed signing.');
     expect(text).not.toContain('203.0.113');
+    expect(text).not.toContain(RECORD_URL);
+    expect(text).toContain('Signing certificate provided by:');
     const pixels = qrPixels(await pageContent(output, 0));
     expect(jsQR(pixels!.data, pixels!.width, pixels!.height)?.data).toBe(RECORD_URL);
   });
