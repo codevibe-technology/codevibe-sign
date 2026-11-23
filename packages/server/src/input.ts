@@ -11,11 +11,11 @@ import {
 } from '@codevibe_technology/sign-core';
 import { validation } from './errors';
 
-type Obj = Record<string, unknown>;
+export type Obj = Record<string, unknown>;
 
-const ROUTING: readonly RoutingMode[] = ['sequential', 'parallel'];
-const ROLES: readonly RecipientRole[] = ['signer', 'approver', 'viewer'];
-const AUTH: readonly AuthMethod[] = ['email_link', 'email_otp', 'sms_otp', 'aadhaar'];
+export const ROUTING: readonly RoutingMode[] = ['sequential', 'parallel'];
+export const ROLES: readonly RecipientRole[] = ['signer', 'approver', 'viewer'];
+export const AUTH: readonly AuthMethod[] = ['email_link', 'email_otp', 'sms_otp', 'aadhaar'];
 const FIELD_TYPES: readonly FieldType[] = [
   'signature',
   'initials',
@@ -30,18 +30,18 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 export const DEFAULT_EXPIRY_DAYS = 30;
 
-function isObj(value: unknown): value is Obj {
+export function isObj(value: unknown): value is Obj {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function str(
+export function str(
   obj: Obj,
   key: string,
   path: string,
   opts: { max: number; optional: true },
 ): string | undefined;
-function str(obj: Obj, key: string, path: string, opts: { max: number }): string;
-function str(
+export function str(obj: Obj, key: string, path: string, opts: { max: number }): string;
+export function str(
   obj: Obj,
   key: string,
   path: string,
@@ -62,7 +62,7 @@ function str(
   return value.trim();
 }
 
-function num(
+export function num(
   obj: Obj,
   key: string,
   path: string,
@@ -84,7 +84,7 @@ function num(
   return value;
 }
 
-function oneOf<T extends string>(
+export function oneOf<T extends string>(
   obj: Obj,
   key: string,
   path: string,
@@ -101,7 +101,7 @@ function oneOf<T extends string>(
   return value as T;
 }
 
-function list(obj: Obj, key: string, opts: { min: number; max: number }): unknown[] {
+export function list(obj: Obj, key: string, opts: { min: number; max: number }): unknown[] {
   const value = obj[key];
   if (!Array.isArray(value) || value.length < opts.min || value.length > opts.max) {
     throw validation(`${key} must be a list of ${opts.min} to ${opts.max} items`, { field: key });
@@ -207,16 +207,17 @@ export interface FieldSpec {
   input: Omit<FieldInput, 'documentId' | 'recipientId'>;
 }
 
-export function parseFields(body: Obj): FieldSpec[] {
+/** `owner` is the key that names who fills the field in: a recipient, or a template's role. */
+export function parseFields(body: Obj, owner: 'recipient' | 'role' = 'recipient'): FieldSpec[] {
   const raw = body.fields === undefined ? [] : list(body, 'fields', { min: 0, max: 500 });
   return raw.map((item, i) => {
     const path = `fields[${i}].`;
     const f = parseJsonObject(item, `fields[${i}]`);
     const ref = (key: string) =>
       typeof f[key] === 'string' || typeof f[key] === 'number' ? String(f[key]) : undefined;
-    const recipient = ref('recipient');
+    const recipient = ref(owner);
     if (recipient === undefined) {
-      throw validation(`${path}recipient is required`, { field: `${path}recipient` });
+      throw validation(`${path}${owner} is required`, { field: `${path}${owner}` });
     }
     const rect = isObj(f.rect) ? f.rect : f;
     if (f.required !== undefined && typeof f.required !== 'boolean') {
@@ -253,6 +254,30 @@ export interface EnvelopeSettings {
   metadata?: Record<string, string>;
 }
 
+export function parseReminders(value: unknown): ReminderPolicy {
+  const r = parseJsonObject(value, 'reminders');
+  return {
+    firstAfterDays: num(r, 'firstAfterDays', 'reminders.', { min: 0, max: 365, int: true }),
+    everyDays: num(r, 'everyDays', 'reminders.', { min: 1, max: 365, int: true }),
+    max: num(r, 'max', 'reminders.', { min: 0, max: 50, int: true }),
+  };
+}
+
+export function parseMetadata(value: unknown): Record<string, string> {
+  const entries = Object.entries(parseJsonObject(value, 'metadata'));
+  if (entries.length > 50) throw validation('metadata can have at most 50 keys');
+  const out: Record<string, string> = {};
+  for (const [k, v] of entries) {
+    if (k.length > 100 || typeof v !== 'string' || v.length > 500) {
+      throw validation('metadata keys must be up to 100 characters and values strings up to 500', {
+        field: `metadata.${k}`,
+      });
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
 export function parseSettings(body: Obj, now: Date, isCreate: boolean): EnvelopeSettings {
   const out: EnvelopeSettings = {};
   if (isCreate || body.title !== undefined) out.title = str(body, 'title', '', { max: 200 });
@@ -266,12 +291,7 @@ export function parseSettings(body: Obj, now: Date, isCreate: boolean): Envelope
     out.routing = oneOf(body, 'routing', '', ROUTING, 'sequential');
   }
   if (body.reminders !== undefined) {
-    const r = parseJsonObject(body.reminders, 'reminders');
-    out.reminders = {
-      firstAfterDays: num(r, 'firstAfterDays', 'reminders.', { min: 0, max: 365, int: true }),
-      everyDays: num(r, 'everyDays', 'reminders.', { min: 1, max: 365, int: true }),
-      max: num(r, 'max', 'reminders.', { min: 0, max: 50, int: true }),
-    };
+    out.reminders = parseReminders(body.reminders);
   } else if (isCreate) {
     out.reminders = { ...DEFAULT_REMINDERS };
   }
@@ -289,22 +309,6 @@ export function parseSettings(body: Obj, now: Date, isCreate: boolean): Envelope
         : num(body, 'expiresInDays', '', { min: 1, max: 365, int: true });
     out.expiresAt = new Date(now.getTime() + days * 86_400_000).toISOString();
   }
-  if (body.metadata !== undefined) {
-    const m = parseJsonObject(body.metadata, 'metadata');
-    const entries = Object.entries(m);
-    if (entries.length > 50) throw validation('metadata can have at most 50 keys');
-    out.metadata = {};
-    for (const [k, v] of entries) {
-      if (k.length > 100 || typeof v !== 'string' || v.length > 500) {
-        throw validation(
-          'metadata keys must be up to 100 characters and values strings up to 500',
-          {
-            field: `metadata.${k}`,
-          },
-        );
-      }
-      out.metadata[k] = v;
-    }
-  }
+  if (body.metadata !== undefined) out.metadata = parseMetadata(body.metadata);
   return out;
 }

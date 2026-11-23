@@ -1,7 +1,5 @@
 import {
   SignError,
-  addDocument,
-  createEnvelope,
   remind,
   send,
   updateEnvelope,
@@ -10,34 +8,24 @@ import {
   type Envelope,
   type EnvelopeStatus,
   type Id,
-  type TransitionResult,
 } from '@codevibe_technology/sign-core';
 import { Hono, type Context } from 'hono';
 import { sha256Hex } from '../crypto';
 import { applyParties } from '../draft';
-import { HttpError, VersionConflictError, validation } from '../errors';
-import { authenticate } from '../http/auth';
+import { VersionConflictError, validation } from '../errors';
 import { pdfResponse, readJson } from '../http/body';
 import { idempotency } from '../http/idempotency';
 import { enforce } from '../http/rate-limit';
-import {
-  parseBase64Documents,
-  parseFields,
-  parseJsonObject,
-  parseRecipients,
-  parseSettings,
-  type UploadedDocument,
-} from '../input';
+import { parseFields, parseJsonObject, parseRecipients, parseSettings } from '../input';
 import type { Runtime } from '../runtime/context';
 import type { EnvelopeListQuery } from '../store/types';
-import { create, mutate } from '../runtime/mutate';
+import { mutate } from '../runtime/mutate';
 import { sealedFileKey } from '../runtime/seal';
 import { revisionRoutes } from './revisions';
-import { checkPdf, loadScoped, originalFileKey } from './shared';
-import { principalScope, type Principal } from '../tenancy';
+import { createEnvelopeFromParts } from './create';
+import { checkPdf, loadScoped, readUploadBody, senderAuth, type SenderEnv } from './shared';
+import { principalScope } from '../tenancy';
 import { apiEnvelope, certificateView, envelopeSummary } from '../views';
-
-type SenderEnv = { Variables: { principal: Principal } };
 
 const STATUSES: readonly EnvelopeStatus[] = [
   'draft',
@@ -53,19 +41,7 @@ export function senderRoutes(rt: Runtime) {
   const app = new Hono<SenderEnv>();
   const deps = { clock: rt.clock, ids: rt.ids };
 
-  app.use('*', async (c, next) => {
-    const principal =
-      (rt.authenticate ? await rt.authenticate(c.req.raw) : null) ??
-      authenticate(c.req.header('authorization'), rt.apiKeys);
-    if (!principal.id || !principal.workspaceId) {
-      throw new HttpError('UNAUTHORIZED', 'The credential has no workspace');
-    }
-    if (principal.readOnly && c.req.method !== 'GET' && c.req.method !== 'HEAD') {
-      throw new HttpError('FORBIDDEN', 'This credential can only read envelopes');
-    }
-    c.set('principal', principal);
-    await next();
-  });
+  app.use('*', senderAuth(rt));
   app.use(
     '*',
     idempotency(
@@ -87,10 +63,15 @@ export function senderRoutes(rt: Runtime) {
 
   app.post('/', async (c) => {
     const now = rt.clock.now();
-    const limit = rt.limits.envelopesPerMinute;
-    const scope = principalScope(c.get('principal'));
-    await enforce(rt.limiter, `envelopes:${scope}`, limit, 60_000, now);
-    const { body, documents } = await readCreateBody(c, rt);
+    const principal = c.get('principal');
+    await enforce(
+      rt.limiter,
+      `envelopes:${principalScope(principal)}`,
+      rt.limits.envelopesPerMinute,
+      60_000,
+      now,
+    );
+    const { body, documents } = await readUploadBody(c, rt, 'envelope');
     if (new Set(documents.map((d) => d.key)).size !== documents.length) {
       throw validation('documents must have unique keys');
     }
@@ -101,60 +82,14 @@ export function senderRoutes(rt: Runtime) {
     const recipients = parseRecipients(body, []);
     const fields = parseFields(body);
     const infos = await Promise.all(documents.map((d) => checkPdf(rt, d)));
-
-    const created = createEnvelope(
-      {
-        title: settings.title ?? '',
-        ...(settings.routing ? { routing: settings.routing } : {}),
-        ...(settings.reminders ? { reminders: settings.reminders } : {}),
-        ...(settings.message ? { message: settings.message } : {}),
-        ...(settings.changeNote ? { changeNote: settings.changeNote } : {}),
-        ...(settings.expiresAt ? { expiresAt: settings.expiresAt } : {}),
-        ...(settings.metadata ? { metadata: settings.metadata } : {}),
-      },
-      deps,
-    );
-    let envelope = created.envelope;
-    const documentKeys = new Map<string, Id>();
-    documents.forEach((upload, i) => {
-      const info = infos[i]!;
-      const added = addDocument(
-        envelope,
-        {
-          name: upload.name,
-          sha256: sha256Hex(upload.bytes),
-          pageCount: info.pageCount,
-          pageSizes: info.pages,
-          fileKey: originalFileKey(envelope.id, i),
-        },
-        deps,
-      );
-      envelope = added.envelope;
-      documentKeys.set(upload.key, added.document.id);
-      documentKeys.set(added.document.id, added.document.id);
+    const envelope = await createEnvelopeFromParts(rt, principal.workspaceId, {
+      settings,
+      recipients,
+      fields,
+      documents: documents.map((upload, i) => ({ upload, info: infos[i]! })),
+      send: body.send === true,
     });
-    envelope = applyParties(envelope, documentKeys, recipients, fields, rt.ids);
-
-    let result: TransitionResult = { ...created, envelope };
-    if (body.send === true) {
-      const sent = send(envelope, deps);
-      result = {
-        envelope: sent.envelope,
-        events: [...created.events, ...sent.events],
-        effects: [...created.effects, ...sent.effects],
-      };
-    }
-
-    const keys = envelope.documents.map((d) => d.fileKey);
-    await Promise.all(
-      documents.map((upload, i) => rt.files.put(keys[i]!, upload.bytes, 'application/pdf')),
-    );
-    try {
-      return c.json(apiEnvelope(await create(rt, result, c.get('principal').workspaceId)), 201);
-    } catch (err) {
-      await Promise.allSettled(keys.map((key) => rt.files.delete(key)));
-      throw err;
-    }
+    return c.json(apiEnvelope(envelope), 201);
   });
 
   app.get('/:id', async (c) =>
@@ -358,42 +293,4 @@ function parseListQuery(query: Record<string, string>): EnvelopeListQuery {
     ...(search ? { search } : {}),
     ...(query.cursor ? { cursor: query.cursor } : {}),
   };
-}
-
-async function readCreateBody(c: Context, rt: Runtime) {
-  const type = c.req.header('content-type') ?? '';
-  if (!type.startsWith('multipart/form-data')) {
-    const body = parseJsonObject(await readJson(c));
-    return { body, documents: parseBase64Documents(body, rt.limits.maxDocuments) };
-  }
-  const form = await c.req.parseBody({ all: true });
-  const raw = form.envelope;
-  if (typeof raw !== 'string') {
-    throw validation('Send the envelope as JSON in a form field named "envelope"');
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw validation('The "envelope" form field must be valid JSON');
-  }
-  const body = parseJsonObject(parsed, 'envelope');
-  const files = ([] as unknown[])
-    .concat(form.documents ?? [])
-    .filter((f): f is File => f instanceof File);
-  if (files.length === 0 || files.length > rt.limits.maxDocuments) {
-    throw validation(`Attach 1 to ${rt.limits.maxDocuments} PDF files as "documents"`);
-  }
-  const described = Array.isArray(body.documents) ? body.documents : [];
-  const documents: UploadedDocument[] = await Promise.all(
-    files.map(async (file, i) => {
-      const meta: unknown = described[i];
-      const record =
-        typeof meta === 'object' && meta !== null ? (meta as Record<string, unknown>) : {};
-      const key = typeof record.key === 'string' ? record.key : String(i);
-      const name = typeof record.name === 'string' ? record.name : file.name || `Document ${i + 1}`;
-      return { key, name: name.slice(0, 200), bytes: new Uint8Array(await file.arrayBuffer()) };
-    }),
-  );
-  return { body, documents };
 }
