@@ -215,6 +215,7 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
             { text: 'Webhooks', link: '/guides/webhooks' },
             { text: 'Fix an envelope after sending', link: '/guides/fix-after-sending' },
             { text: 'Fields across pages and tags', link: '/guides/field-tags' },
+            { text: 'Plans and pricing', link: '/guides/pricing' },
           ],
         },
         {

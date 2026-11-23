@@ -50,11 +50,37 @@ logos are not covered by either licence. Details in [LICENSING.md](LICENSING.md)
 
 ## Plans
 
-| Plan      | Price                         | What you get                                                                                                          |
-| --------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Free      | Rs 0                          | A workspace on sign.codevibe.in: 10 envelopes a month, 3 members, 5 templates, 1 webhook and the API.                 |
-| Cloud     | Coming soon, upgrade by email | Higher limits, your own signing domain and no badge. Write to hello@codevibe.in from a Free workspace to be upgraded. |
-| Self-host | Free and unlimited            | The same app on your own server with Docker. No usage limits, and your documents never leave your server.             |
+<!-- plans:start -->
+
+|                                         | Free                               | Cloud                                                | Self-hosted                          |
+| --------------------------------------- | ---------------------------------- | ---------------------------------------------------- | ------------------------------------ |
+| Envelopes sent                          | 10 envelopes a month               | Unlimited                                            | Unlimited                            |
+| Members                                 | 2 members                          | 25 members included, more can be added               | Unlimited                            |
+| Active templates                        | 2 templates                        | Unlimited                                            | Unlimited                            |
+| Bulk send                               | Up to 10 rows in one send          | Up to 500 rows in one send (fair use)                | Unlimited                            |
+| API requests                            | 100 requests a month               | Unlimited, up to 10,000 requests a day (fair use)    | Unlimited                            |
+| Webhooks                                | Not included                       | Up to 10 endpoints (fair use)                        | Included                             |
+| PDF size                                | 10 MB a file, 25 MB an envelope    | 25 MB a file, 100 MB an envelope                     | Set by you                           |
+| Stored documents                        | 200 MB                             | 20 GB (fair use)                                     | Your own disk                        |
+| Your own signing domain                 | Not included                       | Included                                             | Included                             |
+| "Secured by Codevibe Sign" badge        | Always shown                       | Optional                                             | Optional                             |
+| Aadhaar eSign                           | Pay per eSign with prepaid credits | Pay per eSign with prepaid credits, at a lower price | With your own eSign provider account |
+| Connect your own eSign provider account | Not included                       | Included                                             | Included                             |
+
+<!-- plans:end -->
+
+- **Free** is a workspace on sign.codevibe.in at no charge.
+- **Cloud** is Rs 999 a month for a workspace, or Rs 9,990 for a year (ten months), plus 18% GST.
+  Members beyond the 25 included are Rs 99 each a month. You pay for each term up front from
+  Settings, Plan and usage, and get a GST tax invoice; nothing is charged automatically.
+- **Self-hosted** is the same app on your own server with Docker: free, with no usage limits,
+  and your documents never leave your server. If you want it installed for you, installation
+  help is Rs 1,999 plus GST, done within 4 working hours: see
+  [sign.codevibe.in/install-help](https://sign.codevibe.in/install-help).
+
+Aadhaar eSign is paid per completed eSign with prepaid credits; the price for each plan is on
+the [pricing section](https://sign.codevibe.in/#pricing). More in the
+[plans and pricing guide](https://sign.codevibe.in/docs/guides/pricing).
 
 ## Features
 
@@ -279,7 +305,6 @@ document.
 
 ## Roadmap
 
-- The Cloud plan on sign.codevibe.in.
 - Aadhaar eSign in the server and the web app, through a licensed eSign provider.
 - More eSign providers behind the same `EsignProvider` interface.
 - Translations of the signing experience and emails (i18n).

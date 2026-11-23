@@ -262,6 +262,8 @@ released.
 | `app_webhook_deliveries`        | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days.    |
 | `app_usage`                     | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.         |
 | `app_plan_changes`              | Who moved a workspace from one plan to another, and when.                                                   |
+| `app_subscriptions`             | One Cloud subscription per workspace: term, dates, extra members, status.                                   |
+| `app_install_bookings`          | A booking for installation help: contact, server, time, paid and notified times.                            |
 | `app_first_run`                 | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.                |
 | `sign_*`                        | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                       |
 
@@ -558,6 +560,52 @@ back as it was.
 The matrix in `test/plan-matrix.db.test.ts` runs every entry point on Free, Cloud, Unlimited
 and a self-hosted install, and fails when a server action or a changing route of the sign API
 is not listed in it.
+
+## Paying for Cloud and installation help
+
+Sold through the order engine in `src/server/billing` (`createOrder`, `confirmCheckout`,
+`fulfilOrder`), the same one that sells eSign credits and issues GST invoices. Each kind of
+order registers what paying for it delivers, and that runs once, inside the transaction that
+marks the order paid.
+
+**Terms, not mandates.** A Cloud term is one month or one year (twelve calendar months,
+charged as `CLOUD_ANNUAL_MONTHS`), paid up front. Nothing is charged automatically, so the
+whole flow works with test keys and needs no stored payment method. `app_subscriptions` holds
+one row per workspace: the term, its start and end, the extra members of this term and of the
+next, and a status of `active`, `grace` or `ended`.
+
+| Step                | Rule (`src/server/billing/subscriptions.ts`)                                                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First term          | Starts when the payment is confirmed; sets `plan = 'cloud'` and `extra_seats`, and records the change in `app_plan_changes`.                                                  |
+| Next term           | Can be paid in the last 7 days or in the grace days. It starts where the paid term ends, whenever it is paid.                                                                 |
+| Extra members       | Mid-term: the term price of a member times the days left over the days in the term, half a paisa rounded up (`proratedPrice`). Effective at once and included in later terms. |
+| Fewer members       | `renewal_seats` only; the current term keeps what was paid for. No refunds.                                                                                                   |
+| Cancel              | `cancel_at_period_end`; Cloud stays until the term ends, then the workspace is Free. Can be undone until then.                                                                |
+| Not renewed         | `grace` for `CLOUD_GRACE_DAYS` (7), then `ended`: `plan = 'free'`, `extra_seats = 0`. Nothing is deleted; the rules for a workspace over the Free limits apply.               |
+| Set by the operator | A paid plan with no subscription row (`plan:set`) is never sold, reminded or ended here.                                                                                      |
+
+Dates are calendar months in India time (`addMonths` in `src/lib/billing/terms.ts`): a term
+that starts on 31 January ends on the last day of February.
+
+`runSubscriptionTick` runs from the background timer. It sends reminders 7, 3 and 1 days before
+a term ends (to the billing address and the owners), starts the grace days and ends
+subscriptions. Every step is a guarded update or runs under the workspace row lock, the same
+lock the plan checks take, so several processes or a repeated run change nothing more. Each
+transition writes `app_audit_log` (`subscription.started`, `renewed`, `seats_changed`,
+`cancel_scheduled`, `cancel_undone`, `grace_started`, `ended`).
+
+Prices reach a page only as finished text from `pricingView` (`src/server/billing/pricing.ts`):
+the Cloud prices, the price of one Aadhaar eSign on each plan, or "Price coming soon". How a
+price is made up never leaves the operator's settings. The home page, the Plan and usage page
+and the upgrade prompt (`components/billing/upgrade-prompt.tsx`, shown for every `PLAN_LIMIT`
+refusal) all read from there and from `planFeatures`.
+
+**Installation help** (`/install-help`, hosted only) is a public purchase with no account: the
+form is checked with the billing details rules, refuses text that looks like a pasted
+password, and is limited per address and overall. The booking is stored in
+`app_install_bookings`, paid through an order without a workspace, invoiced by email, and the
+operator is told at `OPERATOR_EMAIL` once, with retries from the timer. "Need a server?" lists
+`HOSTING_OFFERS` and is absent while that is empty.
 
 ## Extension points for the next lanes
 
