@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, Minus, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -384,6 +384,9 @@ function AuditSheet() {
   );
 }
 
+/** A line for something the plan does not have, which gets a dash instead of a tick. */
+const absent = (line: string) => line.endsWith(': not included');
+
 function PlanColumn({
   name,
   price,
@@ -419,8 +422,12 @@ function PlanColumn({
       <p className="mt-2 text-muted">{note}</p>
       <ul className="mt-6 flex-1 space-y-2.5 border-t border-line pt-5 text-sm">
         {lines.map((line) => (
-          <li key={line} className="flex gap-2">
-            <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+          <li key={line} className={cn('flex gap-2', absent(line) && 'text-muted')}>
+            {absent(line) ? (
+              <Minus aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+            ) : (
+              <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            )}
             {line}
           </li>
         ))}
@@ -764,9 +771,12 @@ docker compose up -d`}</code>
                 note="A cloud workspace for trying it out and for small teams."
                 lines={planLines(rows, 'free')}
                 action={
-                  <Button asChild className="h-11 w-full">
-                    <Link href={start.href}>{start.label}</Link>
-                  </Button>
+                  <>
+                    <Button asChild className="h-11 w-full">
+                      <Link href={start.href}>{start.label}</Link>
+                    </Button>
+                    <p className="mt-2 text-center text-[13px] text-muted">No card needed.</p>
+                  </>
                 }
                 first
               />
@@ -785,7 +795,7 @@ docker compose up -d`}</code>
                     </Button>
                     <p className="mt-2 text-center text-[13px] text-muted">
                       {pricing.paymentsOpen
-                        ? 'Upgrade from Settings, Plan and usage. Cancel any time.'
+                        ? 'Pay by the month or the year. Cancel any time.'
                         : 'Paying for Cloud opens shortly.'}
                     </p>
                   </>

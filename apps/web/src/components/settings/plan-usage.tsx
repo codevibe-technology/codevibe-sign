@@ -62,7 +62,8 @@ export function PlanUsage({
         />
         <ul className="divide-y divide-line">
           {meters.map((meter) => {
-            const state = meter.max === null ? null : tone(meter.used, meter.max);
+            const state =
+              meter.max === null || meter.max === 0 ? null : tone(meter.used, meter.max);
             const width =
               meter.max === null || meter.max === 0
                 ? 0
@@ -73,10 +74,14 @@ export function PlanUsage({
                   <p className="font-semibold">{meter.label}</p>
                   <p className="text-sm text-muted">
                     <span className="font-semibold text-ink">{meter.usedText}</span>
-                    {meter.maxText ? ` of ${meter.maxText}` : ' (no limit)'}
+                    {meter.max === 0
+                      ? ' (not on this plan)'
+                      : meter.maxText
+                        ? ` of ${meter.maxText}`
+                        : ' (no limit)'}
                   </p>
                 </div>
-                {meter.max !== null ? (
+                {meter.max !== null && meter.max > 0 ? (
                   <div
                     role="meter"
                     aria-label={meter.label}
