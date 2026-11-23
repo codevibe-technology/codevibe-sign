@@ -57,9 +57,29 @@ try {
 
   const signIn = await get('/sign-in');
   check(
-    signIn.status === 200 && (await signIn.text()).includes('Email me a sign-in link'),
-    'sign-in page renders',
+    signIn.status === 200 && (await signIn.text()).includes('Email me a link instead'),
+    'sign-in page renders, with the password and the emailed link',
   );
+  const oldPath = await get('/w/anything/envelopes');
+  check(
+    oldPath.status === 308 && oldPath.headers.get('location') === '/dashboard/anything/envelopes',
+    'old /w addresses redirect to /dashboard',
+  );
+  const json = (body: unknown) => ({
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: base },
+    body: JSON.stringify(body),
+  });
+  const openSignUp = await get(
+    '/api/auth/sign-up/email',
+    json({ email: 'open@example.com', password: 'mango-river-lantern', name: 'Open' }),
+  );
+  check(openSignUp.status >= 400, 'nobody registers with a password alone');
+  const wrongPassword = await get(
+    '/api/auth/sign-in/email',
+    json({ email: 'nobody@example.com', password: 'not-the-password' }),
+  );
+  check(wrongPassword.status === 401, 'a wrong email and password pair is refused');
   const guarded = await get('/dashboard/anything');
   check(
     [307, 308].includes(guarded.status) && guarded.headers.get('location')?.includes('/sign-in'),
@@ -81,10 +101,10 @@ try {
   const verified = await get(link!.replace(base, ''));
   const cookie = verified.headers.get('set-cookie')?.split(';')[0] ?? '';
   check(cookie.startsWith('cvs.session_token='), 'magic link signs the person in');
-  const home = await get('/', { headers: { cookie } });
+  const home = await get('/dashboard', { headers: { cookie } });
   check(
     home.headers.get('location')?.endsWith('/onboarding'),
-    'a new person is sent to onboarding',
+    'a new person is sent from the dashboard to onboarding',
   );
   const onboarding = await get('/onboarding', { headers: { cookie } });
   check(
