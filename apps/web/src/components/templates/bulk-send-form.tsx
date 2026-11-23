@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Send, X } from 'lucide-react';
+import { showActionError } from '@/components/billing/upgrade-toast';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -98,7 +99,7 @@ export function BulkSendForm({
         skipProblems: skip,
       });
       if (!result.ok) {
-        toast.error(result.error);
+        showActionError(result);
         return;
       }
       toast.success(`Sending ${result.data.count} envelopes. You can leave this page.`);

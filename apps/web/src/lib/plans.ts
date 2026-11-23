@@ -252,7 +252,7 @@ export const formatReset = (period: Period, date: Date) =>
 export const upgradeHint = (plan: Plan) =>
   plan === 'free'
     ? 'Upgrade to Cloud on the Plan and usage page.'
-    : `To raise it, write to ${UPGRADE_EMAIL}.`;
+    : 'See what your plan includes on the Plan and usage page.';
 
 export interface Meter {
   key: CountedLimit;

@@ -1,6 +1,8 @@
 'use client';
 
 import { LocalTime } from '@/components/ui/local-time';
+import { showActionError } from '@/components/billing/upgrade-toast';
+import type { ActionResult } from '@/server/actions/action';
 import {
   Archive,
   ArchiveRestore,
@@ -44,11 +46,11 @@ export function TemplatesList({
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  function run(work: () => Promise<{ ok: boolean; error?: string }>, success: string) {
+  function run(work: () => Promise<ActionResult<unknown>>, success: string) {
     start(async () => {
       const result = await work();
       if (!result.ok) {
-        toast.error(result.error ?? 'That did not work.');
+        showActionError(result);
         return;
       }
       toast.success(success);

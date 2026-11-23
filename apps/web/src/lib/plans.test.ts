@@ -164,9 +164,9 @@ describe('formatting', () => {
     expect(formatBytes(12)).toBe('12 bytes');
   });
 
-  it('points free workspaces at the upgrade and others at raising the limit', () => {
+  it('points free workspaces at the upgrade and others at their plan page', () => {
     expect(upgradeHint('free')).toBe('Upgrade to Cloud on the Plan and usage page.');
-    expect(upgradeHint('cloud')).toBe('To raise it, write to hello@codevibe.in.');
+    expect(upgradeHint('cloud')).toBe('See what your plan includes on the Plan and usage page.');
   });
 });
 

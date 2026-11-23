@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { showActionError } from '@/components/billing/upgrade-toast';
 import type { ActionResult } from '@/server/actions/action';
 
 /**
  * Runs a server action, shows a toast for the outcome, and keeps a failed field's message so
- * the form can show it next to that field.
+ * the form can show it next to that field. A plan limit shows the upgrade prompt.
  */
 export function useAction() {
   const [pending, start] = useTransition();
@@ -25,7 +26,8 @@ export function useAction() {
         return;
       }
       if (result.field) setErrors({ [result.field]: result.error });
-      else toast.error(result.error);
+      // A plan limit also gets the upgrade prompt, wherever the form shows the message.
+      if (!result.field || result.code === 'PLAN_LIMIT') showActionError(result);
     });
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import '@codevibe_technology/sign-react/styles.css';
+import { showActionError } from '@/components/billing/upgrade-toast';
 import type { Field as PlacedField } from '@codevibe_technology/sign-core';
 import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -117,7 +118,7 @@ export function TemplateEditor({ slug, workspaceId, initial }: TemplateEditorPro
           setServerProblems({ [result.field]: result.error });
           setStep(stepOf(result.field));
         }
-        toast.error(result.error);
+        showActionError(result);
         return;
       }
       toast.success(
