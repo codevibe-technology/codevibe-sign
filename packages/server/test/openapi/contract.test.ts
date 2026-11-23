@@ -113,7 +113,9 @@ describe('the OpenAPI document', () => {
   it('maps every error code to the status the server sends', async () => {
     const { statusFor } = await import('../../src/errors');
     const codes = spec.components.schemas.ErrorCode;
+    const hostedOnly = (codes['x-hosted-only'] ?? []) as string[];
     for (const code of codes.enum) {
+      if (hostedOnly.includes(code)) continue;
       expect(statusFor(code as never), code).toBe(
         (codes['x-status'] as Record<string, number>)[code],
       );

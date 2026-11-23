@@ -16,25 +16,31 @@ info:
     ## Errors
 
     Every error has the same JSON body, `{ "error": { "code", "message", "details"? } }`,
-    and each code always comes with the same HTTP status:
+    and each code always comes with the same HTTP status, except `PLAN_LIMIT` (below):
 
     | Status | Codes |
     | ------ | ----- |
     | 400 | `VALIDATION` |
     | 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |
-    | 403 | `FIELD_NOT_YOURS`, `FORBIDDEN` |
+    | 403 | `FIELD_NOT_YOURS`, `FORBIDDEN`, `PLAN_LIMIT` |
     | 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |
     | 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |
     | 410 | `ENVELOPE_EXPIRED` |
     | 413 | `DOCUMENT_TOO_LARGE` |
     | 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |
     | 423 | `OTP_LOCKED` |
-    | 429 | `RATE_LIMITED` |
+    | 429 | `RATE_LIMITED`, `PLAN_LIMIT` |
     | 500 | `SEAL_FAILED`, `INTERNAL` |
     | 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |
 
     Validation errors list each problem in `details.issues` as `{ path, message }`, for
     example `recipients[1].email`. Stack traces never leave the server.
+
+    `PLAN_LIMIT` comes only from a hosted install with plans, such as sign.codevibe.in, never
+    from a self-hosted server. `details` names the `limit`, the `used` count, the `max` and the
+    `plan`. It is `429` with a `Retry-After` header for the API request counts, which start
+    again by themselves, and `403` for every other limit, which needs fewer items or a bigger
+    plan.
 
     ## Workspaces
 
@@ -2604,6 +2610,7 @@ components:
         - PDF_ALREADY_SIGNED
         - OTP_LOCKED
         - RATE_LIMITED
+        - PLAN_LIMIT
         - SEAL_FAILED
         - INTERNAL
         - PROVIDER_ERROR
@@ -2631,6 +2638,7 @@ components:
         PDF_ALREADY_SIGNED: 422
         OTP_LOCKED: 423
         RATE_LIMITED: 429
+        PLAN_LIMIT: [403, 429]
         SEAL_FAILED: 500
         INTERNAL: 500
         PROVIDER_ERROR: 502
@@ -2658,11 +2666,14 @@ components:
         PDF_ALREADY_SIGNED: A file already carries digital signatures. Upload the unsigned original.
         OTP_LOCKED: Too many wrong guesses, or too many codes for this envelope (`details.reason`).
         RATE_LIMITED: Too many requests. Wait the number of seconds in `Retry-After`.
+        PLAN_LIMIT: Hosted plans only. A plan limit was reached (`details.limit`, `details.used`, `details.max`). `429` with `Retry-After` for the monthly or daily API request count, `403` for every other limit.
         SEAL_FAILED: The sealed PDF could not be produced. Safe to retry with the same `Idempotency-Key`.
         INTERNAL: An unexpected server error. Safe to retry with the same `Idempotency-Key`.
         PROVIDER_ERROR: An outside provider, such as an Aadhaar eSign service, failed or answered with something unexpected.
         WEBHOOK_INVALID: A provider's callback could not be verified.
-      description: 'A stable error code. `x-status` maps each code to the HTTP status it always comes with.'
+      description: 'A stable error code. `x-status` maps each code to the HTTP status it comes with; a list means the code can come with any of them. `x-hosted-only` lists the codes only a hosted install with plans sends.'
+      x-hosted-only:
+        - PLAN_LIMIT
     Error:
       type: object
       additionalProperties: false

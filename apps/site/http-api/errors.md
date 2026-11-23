@@ -10,7 +10,7 @@ outline: false
 
 # Errors
 
-Every error has the same JSON body. `code` is stable and always comes with the same HTTP status; `message` is for people and may change, so branch on `code`. `details` carries extra facts for some codes.
+Every error has the same JSON body. `code` is stable and comes with the HTTP status listed below; `message` is for people and may change, so branch on `code`. `details` carries extra facts for some codes.
 
 ::: code-group
 
@@ -61,6 +61,7 @@ With the Node.js client every failure is a `SignApiError` carrying `code`, `stat
 | <span id="pdf-already-signed">`PDF_ALREADY_SIGNED`</span> | 422 Unprocessable Content | A file already carries digital signatures. Upload the unsigned original. |
 | <span id="otp-locked">`OTP_LOCKED`</span> | 423 Locked | Too many wrong guesses, or too many codes for this envelope (`details.reason`). |
 | <span id="rate-limited">`RATE_LIMITED`</span> | 429 Too Many Requests | Too many requests. Wait the number of seconds in `Retry-After`. |
+| <span id="plan-limit">`PLAN_LIMIT`</span> | 403 Forbidden or 429 Too Many Requests | Hosted plans only. A plan limit was reached (`details.limit`, `details.used`, `details.max`). `429` with `Retry-After` for the monthly or daily API request count, `403` for every other limit. |
 | <span id="seal-failed">`SEAL_FAILED`</span> | 500 Internal Server Error | The sealed PDF could not be produced. Safe to retry with the same `Idempotency-Key`. |
 | <span id="internal">`INTERNAL`</span> | 500 Internal Server Error | An unexpected server error. Safe to retry with the same `Idempotency-Key`. |
 | <span id="provider-error">`PROVIDER_ERROR`</span> | 502 Bad Gateway | An outside provider, such as an Aadhaar eSign service, failed or answered with something unexpected. |
@@ -69,6 +70,7 @@ With the Node.js client every failure is a `SignApiError` carrying `code`, `stat
 ## Retrying {#retrying}
 
 - `429 RATE_LIMITED`: wait the number of seconds in the `Retry-After` header, then retry.
+- `429 PLAN_LIMIT`: the plan's API request count is used up. It starts again at the time in `Retry-After`; retrying sooner is refused. `403 PLAN_LIMIT` does not change by waiting: remove something or move to a bigger plan.
 - `500` and `502`: retry with backoff, sending the same `Idempotency-Key` so nothing is created twice.
 - `409 CONFLICT`: another request got there first. Fetch the envelope again and retry if it still makes sense.
 - Every other `4xx`: fix the request first. Sending it again unchanged gets the same answer.

@@ -5,7 +5,7 @@
     "title": "Codevibe Sign HTTP API",
     "version": "1",
     "summary": "Send documents for signature, sign them, seal the PDF and verify it.",
-    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n## Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status:\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS`, `FORBIDDEN` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n## Workspaces\n\nEvery envelope belongs to the workspace of the credential that created it. A sender only\nsees and acts on its own workspace's envelopes; an id from another workspace answers\n`ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for\nexample a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.\n\nTemplates follow the same rule: one from another workspace answers `NOT_FOUND`.\n\n## Versioning\n\nThe version is in the path and covers the whole API: every route is under `/v1`, and\nevery answer carries `Codevibe-Api-Version: 1`. Within `/v1` changes only add. An operation\nthat is going away is marked `deprecated` here at least six months before, and its\nanswers carry `Deprecation`, `Sunset` and a `Link` with `rel=\"deprecation\"`.\n\n## Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n## Rate limits\n\nLimits are per API key (creating envelopes and templates), per signing token and per\nclient IP (signer routes and public verification), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
+    "description": "The HTTP API of `@codevibe_technology/sign-server`. It has two audiences:\n\n- **Senders** (your backend) create envelopes, send them and download the sealed PDFs.\n  Every sender route needs `Authorization: Bearer <api key>`.\n- **Signers** (the recipient's browser) open their signing link, verify a one-time code\n  when the recipient needs one, and sign, approve or decline. Signer routes are\n  authorised by the signing token in the path.\n\n## Errors\n\nEvery error has the same JSON body, `{ \"error\": { \"code\", \"message\", \"details\"? } }`,\nand each code always comes with the same HTTP status, except `PLAN_LIMIT` (below):\n\n| Status | Codes |\n| ------ | ----- |\n| 400 | `VALIDATION` |\n| 401 | `UNAUTHORIZED`, `TOKEN_INVALID`, `OTP_INVALID`, `OTP_EXPIRED` |\n| 403 | `FIELD_NOT_YOURS`, `FORBIDDEN`, `PLAN_LIMIT` |\n| 404 | `ENVELOPE_NOT_FOUND`, `RECIPIENT_NOT_FOUND`, `NOT_FOUND` |\n| 409 | `INVALID_STATE`, `NOT_YOUR_TURN`, `CONFLICT` |\n| 410 | `ENVELOPE_EXPIRED` |\n| 413 | `DOCUMENT_TOO_LARGE` |\n| 422 | `REQUIRED_FIELDS_MISSING`, `INVALID_FIELD_VALUE`, `DOCUMENT_INVALID`, `PDF_ALREADY_SIGNED` |\n| 423 | `OTP_LOCKED` |\n| 429 | `RATE_LIMITED`, `PLAN_LIMIT` |\n| 500 | `SEAL_FAILED`, `INTERNAL` |\n| 502 | `PROVIDER_ERROR`, `WEBHOOK_INVALID` |\n\nValidation errors list each problem in `details.issues` as `{ path, message }`, for\nexample `recipients[1].email`. Stack traces never leave the server.\n\n`PLAN_LIMIT` comes only from a hosted install with plans, such as sign.codevibe.in, never\nfrom a self-hosted server. `details` names the `limit`, the `used` count, the `max` and the\n`plan`. It is `429` with a `Retry-After` header for the API request counts, which start\nagain by themselves, and `403` for every other limit, which needs fewer items or a bigger\nplan.\n\n## Workspaces\n\nEvery envelope belongs to the workspace of the credential that created it. A sender only\nsees and acts on its own workspace's envelopes; an id from another workspace answers\n`ENVELOPE_NOT_FOUND`, exactly like one that does not exist. A read-only credential (for\nexample a viewer's) may only call `GET` routes and gets `FORBIDDEN` otherwise.\n\nTemplates follow the same rule: one from another workspace answers `NOT_FOUND`.\n\n## Versioning\n\nThe version is in the path and covers the whole API: every route is under `/v1`, and\nevery answer carries `Codevibe-Api-Version: 1`. Within `/v1` changes only add. An operation\nthat is going away is marked `deprecated` here at least six months before, and its\nanswers carry `Deprecation`, `Sunset` and a `Link` with `rel=\"deprecation\"`.\n\n## Retries\n\nPOST routes accept an `Idempotency-Key` header. A retry with the same key and the same\nbody within 24 hours gets the first response back, marked `Idempotent-Replayed: true`.\nServer errors (5xx) are not stored, so they can be retried with the same key.\n\n## Rate limits\n\nLimits are per API key (creating envelopes and templates), per signing token and per\nclient IP (signer routes and public verification), and per recipient (one-time codes). A request over a limit gets `429`\nwith `RATE_LIMITED` and a `Retry-After` header in seconds.\n",
     "license": {
       "name": "AGPL-3.0-only",
       "url": "https://github.com/codevibe-technology/codevibe-sign/blob/main/LICENSING.md"
@@ -2444,6 +2444,7 @@
           "PDF_ALREADY_SIGNED",
           "OTP_LOCKED",
           "RATE_LIMITED",
+          "PLAN_LIMIT",
           "SEAL_FAILED",
           "INTERNAL",
           "PROVIDER_ERROR",
@@ -2472,6 +2473,7 @@
           "PDF_ALREADY_SIGNED": 422,
           "OTP_LOCKED": 423,
           "RATE_LIMITED": 429,
+          "PLAN_LIMIT": [403, 429],
           "SEAL_FAILED": 500,
           "INTERNAL": 500,
           "PROVIDER_ERROR": 502,
@@ -2500,12 +2502,14 @@
           "PDF_ALREADY_SIGNED": "A file already carries digital signatures. Upload the unsigned original.",
           "OTP_LOCKED": "Too many wrong guesses, or too many codes for this envelope (`details.reason`).",
           "RATE_LIMITED": "Too many requests. Wait the number of seconds in `Retry-After`.",
+          "PLAN_LIMIT": "Hosted plans only. A plan limit was reached (`details.limit`, `details.used`, `details.max`). `429` with `Retry-After` for the monthly or daily API request count, `403` for every other limit.",
           "SEAL_FAILED": "The sealed PDF could not be produced. Safe to retry with the same `Idempotency-Key`.",
           "INTERNAL": "An unexpected server error. Safe to retry with the same `Idempotency-Key`.",
           "PROVIDER_ERROR": "An outside provider, such as an Aadhaar eSign service, failed or answered with something unexpected.",
           "WEBHOOK_INVALID": "A provider's callback could not be verified."
         },
-        "description": "A stable error code. `x-status` maps each code to the HTTP status it always comes with."
+        "description": "A stable error code. `x-status` maps each code to the HTTP status it comes with; a list means the code can come with any of them. `x-hosted-only` lists the codes only a hosted install with plans sends.",
+        "x-hosted-only": ["PLAN_LIMIT"]
       },
       "Error": {
         "type": "object",

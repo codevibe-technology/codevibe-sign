@@ -16,6 +16,9 @@ Version 1 is not yet declared stable. Until it is, a breaking change may still h
 
 ### November 2026
 
+- **Documented**: the `PLAN_LIMIT` error code that a hosted install with plans already sends:
+  `429` with `Retry-After` for the API request counts, `403` for every other plan limit. It is
+  now part of the `ErrorCode` list in the OpenAPI document.
 - **Added**: Aadhaar eSign. A signer can have `auth: "aadhaar"`; the signing page starts the
   eSign with `GET` and `POST /v1/sign/{token}/esign`, and the provider calls back on
   `POST /v1/esign/webhooks/{provider}`. New: the `ESIGN_UNAVAILABLE` error code, the

@@ -706,10 +706,18 @@ export function referenceIndexPage(doc: OpenApiDocument = spec): string {
   return lines.join('\n');
 }
 
+/** `429 Too Many Requests`, or `403 Forbidden or 429 Too Many Requests` for a code with several. */
+function statusCell(status: number | number[] | undefined): string {
+  if (status === undefined) return '';
+  return (Array.isArray(status) ? status : [status])
+    .map((s) => `${s} ${STATUS_TEXT[String(s)] ?? ''}`.trim())
+    .join(' or ');
+}
+
 /** Every error code with its status, its meaning and the routes that can return it. */
 export function errorsPage(doc: OpenApiDocument = spec): string {
   const schema = doc.components.schemas.ErrorCode as Schema & {
-    'x-status'?: Record<string, number>;
+    'x-status'?: Record<string, number | number[]>;
     'x-descriptions'?: Record<string, string>;
   };
   const codes = (schema.enum ?? []).map(String);
@@ -732,7 +740,7 @@ export function errorsPage(doc: OpenApiDocument = spec): string {
     '',
     '# Errors',
     '',
-    'Every error has the same JSON body. `code` is stable and always comes with the same HTTP status; `message` is for people and may change, so branch on `code`. `details` carries extra facts for some codes.',
+    'Every error has the same JSON body. `code` is stable and comes with the HTTP status listed below; `message` is for people and may change, so branch on `code`. `details` carries extra facts for some codes.',
     '',
     codeGroup([
       fence(
@@ -750,12 +758,13 @@ export function errorsPage(doc: OpenApiDocument = spec): string {
     '| ---- | ------ | ------- |',
     ...codes.map(
       (code) =>
-        `| <span id="${code.toLowerCase().replace(/_/g, '-')}">\`${code}\`</span> | ${status[code] ?? ''} ${STATUS_TEXT[String(status[code])] ?? ''} | ${cell(descriptions[code] ?? '')} |`,
+        `| <span id="${code.toLowerCase().replace(/_/g, '-')}">\`${code}\`</span> | ${statusCell(status[code])} | ${cell(descriptions[code] ?? '')} |`,
     ),
     '',
     '## Retrying {#retrying}',
     '',
     '- `429 RATE_LIMITED`: wait the number of seconds in the `Retry-After` header, then retry.',
+    "- `429 PLAN_LIMIT`: the plan's API request count is used up. It starts again at the time in `Retry-After`; retrying sooner is refused. `403 PLAN_LIMIT` does not change by waiting: remove something or move to a bigger plan.",
     '- `500` and `502`: retry with backoff, sending the same `Idempotency-Key` so nothing is created twice.',
     '- `409 CONFLICT`: another request got there first. Fetch the envelope again and retry if it still makes sense.',
     '- Every other `4xx`: fix the request first. Sending it again unchanged gets the same answer.',
