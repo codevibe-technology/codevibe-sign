@@ -93,7 +93,7 @@ npm i codevibe-sign
 - 🗂️ **Templates and bulk send** from a CSV, in the web app and through `/v1/templates` in the API.
 - 🏢 **Workspaces** with their own address (old links redirect), time zone for signed documents, brand, team and sign-in by password or email link.
 - 🔔 **Signed outbound webhooks** with retries, and an **HTTP API** with an OpenAPI description and a Postman collection.
-- 🇮🇳 **Aadhaar eSign** through a licensed provider (Leegality), built into the server and the web app: the signer confirms with an Aadhaar OTP, and the finished file carries their Aadhaar signature and the seal together. The adapter is also a library of its own (`@codevibe_technology/sign-aadhaar`).
+- 🇮🇳 **Aadhaar eSign** through a licensed provider (Leegality), built into the server and the web app: the signer confirms with an Aadhaar OTP, and the signed file carries their Aadhaar signature and the seal, with the certificate and audit trail as a separate PDF. The adapter is also a library of its own (`@codevibe_technology/sign-aadhaar`).
 - ⚛️ **React components** for signing and field placement, unstyled and themed with CSS variables.
 
 ## How it works
@@ -141,13 +141,14 @@ What a PDF reader shows for the seal is explained in [How the seal works in PDF 
 ## Aadhaar eSign
 
 <p align="center">
-  <img src=".github/assets/aadhaar.png" alt="Aadhaar eSign through Leegality in three steps: pick Aadhaar eSign for a signer in the send flow, they confirm with an OTP on Leegality's page, and one sealed PDF comes back with the certificate page and an audit trail PDF. The send flow is shown with a signer set to Aadhaar eSign. One eSign costs Rs 35 on the Free plan and Rs 25 on Cloud, plus GST, paid only when it is completed. An illustration of the OTP step." width="100%">
+  <img src=".github/assets/aadhaar.png" alt="Aadhaar eSign through Leegality in three steps: pick Aadhaar eSign for a signer in the send flow, they confirm with an OTP on Leegality's page, and two PDFs come back: the signed PDF with their Aadhaar signature and the seal, and a separate certificate and audit trail PDF. The signature position is set in the Leegality workflow. The send flow is shown with a signer set to Aadhaar eSign. One eSign costs Rs 35 on the Free plan and Rs 25 on Cloud, plus GST, paid only when it is completed. An illustration of the OTP step." width="100%">
 </p>
 
 When a law asks for an electronic signature listed in the IT Act's Second Schedule, pick
 Aadhaar eSign for a signer under Identity check in the send flow. They confirm with a one-time
-code on Leegality's page; Codevibe Sign never sees or stores their Aadhaar number. You get back
-one sealed PDF with their Aadhaar signature, the seal and the certificate page, plus an audit
+code on Leegality's page; Codevibe Sign never sees or stores their Aadhaar number. Leegality
+places the signature where your Leegality workflow says, so you place no box. You get back the
+signed PDF with their Aadhaar signature and the seal, plus a separate certificate and audit
 trail PDF. One Aadhaar signer per envelope for now.
 
 An eSign costs Rs 35 on Free and Rs 25 on Cloud, plus GST, from prepaid credits, and only a
@@ -361,9 +362,9 @@ Codevibe Sign supports two kinds of signature. Under Indian law:
 - **Aadhaar eSign** (`@codevibe_technology/sign-aadhaar`). An electronic signature under IT Act
   s.3A, using a technique in the Second Schedule, issued through a licensed eSign Service
   Provider. Use it, or a DSC, where a law requires a document to be signed in that statutory
-  sense. A sender picks it for one signer, who acts last; the provider's signed file is kept
-  byte for byte, the seal is added after it, and the signing certificate is a separate sealed
-  PDF. See the [guide](https://sign.codevibe.in/docs/guides/aadhaar-leegality).
+  sense. A sender picks it for one signer, who acts last; Leegality signs the document as the
+  sender approved it, its signed file is kept byte for byte, the seal is added after it without
+  touching a page, and the certificate and audit trail are a separate sealed PDF. See the [guide](https://sign.codevibe.in/docs/guides/aadhaar-leegality).
 
 Some documents cannot be signed electronically at all. The IT Act's First Schedule, as amended
 by notification S.O. 4720(E) of 26 September 2022, excludes:

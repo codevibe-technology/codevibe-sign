@@ -31,7 +31,7 @@ server README). The web app does the same from its settings. You can also call t
 from your own backend, as shown below, and store the signed file yourself.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/codevibe-technology/codevibe-sign/main/.github/assets/aadhaar.png" alt="Aadhaar eSign in the Codevibe Sign app, in three steps: pick Aadhaar eSign for a signer in the send flow, they confirm with an OTP on Leegality's page, and one sealed PDF comes back with the certificate page and an audit trail PDF. On the hosted app one eSign costs Rs 35 on the Free plan and Rs 25 on Cloud, plus GST, paid only when it is completed. An illustration of the OTP step." width="100%">
+  <img src="https://raw.githubusercontent.com/codevibe-technology/codevibe-sign/main/.github/assets/aadhaar.png" alt="Aadhaar eSign in the Codevibe Sign app, in three steps: pick Aadhaar eSign for a signer in the send flow, they confirm with an OTP on Leegality's page, and two PDFs come back: the signed PDF with their Aadhaar signature and the seal, and a separate certificate and audit trail PDF. The signature position is set in the Leegality workflow. On the hosted app one eSign costs Rs 35 on the Free plan and Rs 25 on Cloud, plus GST, paid only when it is completed. An illustration of the OTP step." width="100%">
 </p>
 
 ## What Aadhaar eSign is
