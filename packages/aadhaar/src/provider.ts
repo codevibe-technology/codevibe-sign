@@ -9,6 +9,11 @@ export interface SignaturePosition {
 
 export interface EsignRequest {
   envelopeId: Id;
+  /**
+   * Your own reference for this request, when one envelope can lead to several (a signer who
+   * starts again). Defaults to `envelopeId`.
+   */
+  reference?: string;
   recipient: Pick<Recipient, 'name' | 'email' | 'phone'>;
   /** The PDF to be signed. */
   documentBytes: Uint8Array;
@@ -49,4 +54,15 @@ export interface EsignProvider {
   parseWebhook(headers: WebhookHeaders, rawBody: string | Uint8Array): Promise<EsignEvent | null>;
   /** The signed PDF. Throws `SignError('INVALID_STATE')` until every signer has signed. */
   fetchSignedDocument(providerRef: string): Promise<Uint8Array>;
+  /**
+   * The provider reference a webhook body names, read without verifying anything, or null.
+   * A server that holds several provider accounts uses it to find whose credentials must
+   * verify the webhook. Never act on it before `parseWebhook` has accepted the same body.
+   */
+  webhookRef?(rawBody: string | Uint8Array): string | null;
+  /**
+   * Makes one read-only call with the configured credentials. Resolves when the provider
+   * accepts them and throws `SignError('PROVIDER_ERROR')` otherwise.
+   */
+  checkCredentials?(): Promise<void>;
 }

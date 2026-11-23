@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { SignError } from '@codevibe_technology/sign-core';
 import { readLimited, request, type FetchLike, type HttpOptions } from '../http';
 import type {
@@ -16,7 +17,7 @@ import {
   type StatusRequest,
   type StatusResponseData,
 } from './api';
-import { checkHeader, verifyWebhook } from './webhook';
+import { checkHeader, peekDocumentId, verifyWebhook } from './webhook';
 
 export const LEEGALITY_BASE_URLS = {
   sandbox: 'https://sandbox.leegality.com/api',
@@ -200,11 +201,12 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
         field: 'recipient.email',
       });
     }
-    if (!IRN_PATTERN.test(input.envelopeId)) {
+    const reference = input.reference ?? input.envelopeId;
+    if (!IRN_PATTERN.test(reference)) {
       throw new SignError(
         'VALIDATION',
-        'Envelope id has characters Leegality does not accept as a reference',
-        { field: 'envelopeId' },
+        'The reference has characters Leegality does not accept',
+        { field: input.reference === undefined ? 'envelopeId' : 'reference' },
       );
     }
     if (documentBytes.byteLength > LEEGALITY_MAX_UPLOAD_BYTES) {
@@ -228,7 +230,7 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
         file: Buffer.from(documentBytes).toString('base64'),
       },
       invitees: [invitee],
-      irn: input.envelopeId,
+      irn: reference,
     };
 
     const envelope = await request(
@@ -331,5 +333,30 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     );
   }
 
-  return { name: 'leegality', createRequest, parseWebhook, fetchSignedDocument };
+  /**
+   * Asks for the status of a document id that cannot exist. Leegality answers "no document
+   * found" to an account it recognises and refuses one it does not.
+   */
+  async function checkCredentials(): Promise<void> {
+    try {
+      await transactionStatus(`check-${randomUUID()}`);
+    } catch (error) {
+      if (error instanceof SignError && error.details?.reason === 'not_found') return;
+      throw error;
+    }
+    throw new SignError('PROVIDER_ERROR', 'Leegality returned an unexpected response', {
+      provider: PROVIDER,
+      reason: 'malformed_response',
+      retryable: false,
+    });
+  }
+
+  return {
+    name: 'leegality',
+    createRequest,
+    parseWebhook,
+    fetchSignedDocument,
+    webhookRef: peekDocumentId,
+    checkCredentials,
+  };
 }

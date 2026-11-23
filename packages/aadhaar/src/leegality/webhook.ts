@@ -95,3 +95,19 @@ export function verifyWebhook(rawBody: string | Uint8Array, privateSalt: string)
   if (typeof request.invitationUrl === 'string') result.invitationUrl = request.invitationUrl;
   return result;
 }
+
+/** The document id a webhook body names, without checking its mac. */
+export function peekDocumentId(rawBody: string | Uint8Array): string | null {
+  const size =
+    typeof rawBody === 'string' ? Buffer.byteLength(rawBody, 'utf8') : rawBody.byteLength;
+  if (size > MAX_WEBHOOK_BYTES) return null;
+  try {
+    const body: unknown = JSON.parse(
+      typeof rawBody === 'string' ? rawBody : new TextDecoder().decode(rawBody),
+    );
+    if (!isRecord(body)) return null;
+    return typeof body.documentId === 'string' && body.documentId !== '' ? body.documentId : null;
+  } catch {
+    return null;
+  }
+}

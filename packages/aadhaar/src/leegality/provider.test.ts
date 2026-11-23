@@ -573,3 +573,66 @@ describe('fetchSignedDocument', () => {
     expect(error.details).toMatchObject({ reason: 'not_found' });
   });
 });
+
+describe('webhookRef', () => {
+  it('reads the document id without checking the mac', () => {
+    const { provider } = setup(() => json({}));
+    expect(provider.webhookRef?.(JSON.stringify({ documentId: 'DOC123', mac: 'nope' }))).toBe(
+      'DOC123',
+    );
+    expect(provider.webhookRef?.(new TextEncoder().encode('{"documentId":"DOC9"}'))).toBe('DOC9');
+  });
+
+  it('answers null for a body that names no document', () => {
+    const { provider } = setup(() => json({}));
+    expect(provider.webhookRef?.('not json')).toBeNull();
+    expect(provider.webhookRef?.('[]')).toBeNull();
+    expect(provider.webhookRef?.('{"documentId":7}')).toBeNull();
+    expect(provider.webhookRef?.('x'.repeat(MAX_WEBHOOK_BYTES + 1))).toBeNull();
+  });
+});
+
+describe('checkCredentials', () => {
+  const notFound = {
+    status: 0,
+    messages: [{ code: 'no.document.found', message: 'No document found' }],
+  };
+
+  it('accepts an account that answers "no document found"', async () => {
+    const { provider, fetch } = setup(() => json(notFound));
+    await expect(provider.checkCredentials?.()).resolves.toBeUndefined();
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(url).toContain('/v3.2/sign/request?documentId=check-');
+    expect(init?.method).toBe('GET');
+  });
+
+  it('refuses credentials the provider rejects', async () => {
+    const { provider } = setup(() => json({}, 401));
+    await expect(provider.checkCredentials?.()).rejects.toMatchObject({
+      code: 'PROVIDER_ERROR',
+      details: { reason: 'unauthorized' },
+    });
+  });
+
+  it('refuses another rejection and an unexpected success', async () => {
+    const rejected = setup(() =>
+      json({ status: 0, messages: [{ code: 'auth.invalid', message: 'Invalid token' }] }),
+    );
+    await expect(rejected.provider.checkCredentials?.()).rejects.toMatchObject({
+      details: { reason: 'rejected' },
+    });
+    const odd = setup(() => json({ status: 1, data: { documentId: 'x' } }));
+    await expect(odd.provider.checkCredentials?.()).rejects.toMatchObject({
+      details: { reason: 'malformed_response' },
+    });
+  });
+});
+
+describe('reference', () => {
+  it('sends its own reference as the irn when given', async () => {
+    const { provider, fetch } = setup(() => json(created));
+    await provider.createRequest(signRequest({ reference: 'es_abc123' }));
+    const body = JSON.parse(String(fetch.mock.calls[0]![1]?.body)) as { irn: string };
+    expect(body.irn).toBe('es_abc123');
+  });
+});
