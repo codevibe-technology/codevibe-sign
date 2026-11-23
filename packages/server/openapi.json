@@ -728,14 +728,17 @@
         "operationId": "downloadDocument",
         "tags": ["Documents"],
         "summary": "Download a PDF",
-        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is one file too: the\ncertificate page goes on before the signer signs, so the Aadhaar eSign and the seal\ncover it. Only an Aadhaar eSign started before that change has its certificate as a\nsealed file of its own: `version=certificate`.\n",
+        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is the file the eSign\nprovider signed, with the seal added as a further signature and no page added or\nchanged. Its signing certificate and the audit trail are one sealed file of their own,\n`version=certificate`, saved as \"<title> (certificate and audit trail).pdf\", and the\nprovider's own audit trail, when it was kept, is `version=provider-audit-trail`.\n",
         "parameters": [
           {
             "name": "version",
             "in": "query",
             "required": false,
-            "description": "`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file).",
-            "schema": { "type": "string", "enum": ["original", "sealed", "certificate"] }
+            "description": "`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished), `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file) or `provider-audit-trail` (fails with `INVALID_STATE` when the eSign provider handed over no audit trail).",
+            "schema": {
+              "type": "string",
+              "enum": ["original", "sealed", "certificate", "provider-audit-trail"]
+            }
           }
         ],
         "responses": {
@@ -1632,7 +1635,7 @@
         "operationId": "startEsign",
         "tags": ["Signing"],
         "summary": "Start an Aadhaar eSign",
-        "description": "For a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:\nthe recipient's field values and their consent. The server draws the values on the\ndocument, asks the eSign provider to sign that file and answers the provider's\nsigning page; send the signer there. The recipient becomes `signed` once the\nprovider reports the signature. Asking again while an attempt is open answers the\nsame page.\n",
+        "description": "For a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:\nthe recipient's consent and, as they have no fields, no values. The server sends the\ndocument with the values of the signers before them drawn on it, and nothing else, to\nthe eSign provider and answers the provider's signing page; send the signer there.\nThe provider places the signature where its workflow says. The recipient becomes `signed` once the\nprovider reports the signature. Asking again while an attempt is open answers the\nsame page.\n",
         "security": [{}, { "linkCookie": [] }],
         "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
         "requestBody": {
@@ -2594,7 +2597,7 @@
       "FieldType": {
         "type": "string",
         "enum": ["signature", "initials", "date_signed", "name", "text", "checkbox", "aadhaar"],
-        "description": "`aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a\nsigner has exactly one, required, and no `signature` or `initials` fields; nobody else\ncan have one. It takes no value: the signer signs the whole file at the eSign provider.\nA request that gives an Aadhaar eSign signer one `signature` field and nothing else to\nsign with is still accepted: that field becomes the box when the envelope is sent.\n"
+        "description": "A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature\nwhere its own workflow says, and signs the document as the sender approved it, with\nthe values of the signers before them. `signature`, `initials` and `aadhaar` fields\ngiven to such a signer are dropped when the envelope is sent, so older requests still\nwork; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar\neSign box, is read on envelopes sent while it marked where the signer signs; it takes\nno value, and only an Aadhaar eSign signer may have one.\n"
       },
       "AuditAction": {
         "type": "string",
@@ -2617,6 +2620,7 @@
           "recipient.corrected",
           "recipient.esign_started",
           "recipient.esign_failed",
+          "recipient.esign_name_differs",
           "envelope.recalled",
           "envelope.revised",
           "document.sealed"
@@ -2718,7 +2722,7 @@
               "status": { "$ref": "#/components/schemas/EsignStatus" },
               "signerName": {
                 "type": "string",
-                "description": "The signer's name as the provider reported it."
+                "description": "The name on the signer's eSign certificate in the signed file, or the name the provider reported when the file carried none that could be read."
               },
               "signedAt": { "$ref": "#/components/schemas/Timestamp" },
               "ref": {
@@ -3125,7 +3129,7 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["id", "name", "sealed", "certificate"],
+              "required": ["id", "name", "sealed", "certificate", "certificateWithAuditTrail"],
               "properties": {
                 "id": { "$ref": "#/components/schemas/Id" },
                 "name": { "type": "string" },
@@ -3135,7 +3139,11 @@
                 },
                 "certificate": {
                   "type": "boolean",
-                  "description": "The signing certificate is a file of its own (`?file=certificate`), as for an Aadhaar eSign started before the certificate page went on the file signed. Otherwise it is the last page of the signed copy."
+                  "description": "The signing certificate is a file of its own (`?file=certificate`), as for a document signed with Aadhaar eSign. Otherwise it is the last page of the signed copy."
+                },
+                "certificateWithAuditTrail": {
+                  "type": "boolean",
+                  "description": "That file holds the audit trail after the certificate: \"Certificate and audit trail\"."
                 }
               }
             }

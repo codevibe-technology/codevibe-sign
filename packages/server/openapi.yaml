@@ -838,21 +838,23 @@ paths:
       summary: Download a PDF
       description: |
         The sealed PDF once the envelope is complete, otherwise the original. Ask for one of
-        them with `version`. A document signed with Aadhaar eSign is one file too: the
-        certificate page goes on before the signer signs, so the Aadhaar eSign and the seal
-        cover it. Only an Aadhaar eSign started before that change has its certificate as a
-        sealed file of its own: `version=certificate`.
+        them with `version`. A document signed with Aadhaar eSign is the file the eSign
+        provider signed, with the seal added as a further signature and no page added or
+        changed. Its signing certificate and the audit trail are one sealed file of their own,
+        `version=certificate`, saved as "<title> (certificate and audit trail).pdf", and the
+        provider's own audit trail, when it was kept, is `version=provider-audit-trail`.
       parameters:
         - name: version
           in: query
           required: false
           description: >-
-            `original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or
+            `original`, `sealed` (fails with `INVALID_STATE` until sealing has finished),
             `certificate` (fails with `INVALID_STATE` when the certificate is the last page of
-            the sealed file).
+            the sealed file) or `provider-audit-trail` (fails with `INVALID_STATE` when the
+            eSign provider handed over no audit trail).
           schema:
             type: string
-            enum: [original, sealed, certificate]
+            enum: [original, sealed, certificate, provider-audit-trail]
       responses:
         '200':
           $ref: '#/components/responses/Pdf'
@@ -1838,9 +1840,10 @@ paths:
       summary: Start an Aadhaar eSign
       description: |
         For a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:
-        the recipient's field values and their consent. The server draws the values on the
-        document, asks the eSign provider to sign that file and answers the provider's
-        signing page; send the signer there. The recipient becomes `signed` once the
+        the recipient's consent and, as they have no fields, no values. The server sends the
+        document with the values of the signers before them drawn on it, and nothing else, to
+        the eSign provider and answers the provider's signing page; send the signer there.
+        The provider places the signature where its workflow says. The recipient becomes `signed` once the
         provider reports the signature. Asking again while an attempt is open answers the
         same page.
       security:
@@ -2771,11 +2774,13 @@ components:
       type: string
       enum: [signature, initials, date_signed, name, text, checkbox, aadhaar]
       description: |
-        `aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
-        signer has exactly one, required, and no `signature` or `initials` fields; nobody else
-        can have one. It takes no value: the signer signs the whole file at the eSign provider.
-        A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
-        sign with is still accepted: that field becomes the box when the envelope is sent.
+        A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature
+        where its own workflow says, and signs the document as the sender approved it, with
+        the values of the signers before them. `signature`, `initials` and `aadhaar` fields
+        given to such a signer are dropped when the envelope is sent, so older requests still
+        work; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar
+        eSign box, is read on envelopes sent while it marked where the signer signs; it takes
+        no value, and only an Aadhaar eSign signer may have one.
     AuditAction:
       type: string
       enum:
@@ -2797,6 +2802,7 @@ components:
         - recipient.corrected
         - recipient.esign_started
         - recipient.esign_failed
+        - recipient.esign_name_differs
         - envelope.recalled
         - envelope.revised
         - document.sealed
@@ -2926,7 +2932,9 @@ components:
               $ref: '#/components/schemas/EsignStatus'
             signerName:
               type: string
-              description: The signer's name as the provider reported it.
+              description: >-
+                The name on the signer's eSign certificate in the signed file, or the name the
+                provider reported when the file carried none that could be read.
             signedAt:
               $ref: '#/components/schemas/Timestamp'
             ref:
@@ -3379,7 +3387,7 @@ components:
           items:
             type: object
             additionalProperties: false
-            required: [id, name, sealed, certificate]
+            required: [id, name, sealed, certificate, certificateWithAuditTrail]
             properties:
               id:
                 $ref: '#/components/schemas/Id'
@@ -3391,9 +3399,14 @@ components:
               certificate:
                 type: boolean
                 description: >-
-                  The signing certificate is a file of its own (`?file=certificate`), as for an
-                  Aadhaar eSign started before the certificate page went on the file signed.
-                  Otherwise it is the last page of the signed copy.
+                  The signing certificate is a file of its own (`?file=certificate`), as for a
+                  document signed with Aadhaar eSign. Otherwise it is the last page of the
+                  signed copy.
+              certificateWithAuditTrail:
+                type: boolean
+                description: >-
+                  That file holds the audit trail after the certificate: "Certificate and audit
+                  trail".
     SignerView:
       type: object
       additionalProperties: false

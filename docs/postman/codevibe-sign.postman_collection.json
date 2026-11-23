@@ -355,7 +355,7 @@
                 {
                   "key": "version",
                   "value": "",
-                  "description": "`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file).",
+                  "description": "`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished), `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file) or `provider-audit-trail` (fails with `INVALID_STATE` when the eSign provider handed over no audit trail).",
                   "disabled": true
                 }
               ],
@@ -368,7 +368,7 @@
                 }
               ]
             },
-            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is one file too: the\ncertificate page goes on before the signer signs, so the Aadhaar eSign and the seal\ncover it. Only an Aadhaar eSign started before that change has its certificate as a\nsealed file of its own: `version=certificate`."
+            "description": "Download a PDF\n\nThe sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is the file the eSign\nprovider signed, with the seal added as a further signature and no page added or\nchanged. Its signing certificate and the audit trail are one sealed file of their own,\n`version=certificate`, saved as \"<title> (certificate and audit trail).pdf\", and the\nprovider's own audit trail, when it was kept, is `version=provider-audit-trail`."
           }
         },
         {
@@ -1122,7 +1122,7 @@
                 }
               ]
             },
-            "description": "Start an Aadhaar eSign\n\nFor a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:\nthe recipient's field values and their consent. The server draws the values on the\ndocument, asks the eSign provider to sign that file and answers the provider's\nsigning page; send the signer there. The recipient becomes `signed` once the\nprovider reports the signature. Asking again while an attempt is open answers the\nsame page.",
+            "description": "Start an Aadhaar eSign\n\nFor a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:\nthe recipient's consent and, as they have no fields, no values. The server sends the\ndocument with the values of the signers before them drawn on it, and nothing else, to\nthe eSign provider and answers the provider's signing page; send the signer there.\nThe provider places the signature where its workflow says. The recipient becomes `signed` once the\nprovider reports the signature. Asking again while an attempt is open answers the\nsame page.",
             "auth": { "type": "noauth" },
             "body": {
               "mode": "raw",

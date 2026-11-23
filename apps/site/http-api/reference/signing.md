@@ -211,11 +211,13 @@ This recipient's fields only.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-`aadhaar` is the Aadhaar eSign box: where a recipient with `auth: aadhaar` signs. Such a
-signer has exactly one, required, and no `signature` or `initials` fields; nobody else
-can have one. It takes no value: the signer signs the whole file at the eSign provider.
-A request that gives an Aadhaar eSign signer one `signature` field and nothing else to
-sign with is still accepted: that field becomes the box when the envelope is sent.
+A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature
+where its own workflow says, and signs the document as the sender approved it, with
+the values of the signers before them. `signature`, `initials` and `aadhaar` fields
+given to such a signer are dropped when the envelope is sent, so older requests still
+work; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar
+eSign box, is read on envelopes sent while it marked where the signer signs; it takes
+no value, and only an Aadhaar eSign signer may have one.
 
 <p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code></p>
 
@@ -580,7 +582,8 @@ func main() {
       "id": "string",
       "name": "string",
       "sealed": true,
-      "certificate": true
+      "certificate": true,
+      "certificateWithAuditTrail": true
     }
   ]
 }
@@ -2274,9 +2277,10 @@ func main() {
 <p class="api-route"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/esign</code></p>
 
 For a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:
-the recipient's field values and their consent. The server draws the values on the
-document, asks the eSign provider to sign that file and answers the provider's
-signing page; send the signer there. The recipient becomes `signed` once the
+the recipient's consent and, as they have no fields, no values. The server sends the
+document with the values of the signers before them drawn on it, and nothing else, to
+the eSign provider and answers the provider's signing page; send the signer there.
+The provider places the signature where its workflow says. The recipient becomes `signed` once the
 provider reports the signature. Asking again while an attempt is open answers the
 same page.
 

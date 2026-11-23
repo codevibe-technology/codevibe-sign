@@ -41,6 +41,7 @@ Webhook targets are set in the server options, or in workspace settings on the c
 <li><code>recipient.corrected</code></li>
 <li><code>recipient.esign_started</code></li>
 <li><code>recipient.esign_failed</code></li>
+<li><code>recipient.esign_name_differs</code></li>
 <li><code>envelope.recalled</code></li>
 <li><code>envelope.revised</code></li>
 <li><code>document.sealed</code></li>
@@ -209,7 +210,7 @@ The delivery id; the same on every retry.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-<p class="api-field__meta">One of <code>envelope.created</code> <code>envelope.updated</code> <code>envelope.sent</code> <code>envelope.completed</code> <code>envelope.declined</code> <code>envelope.expired</code> <code>envelope.voided</code> <code>recipient.notified</code> <code>recipient.reminded</code> <code>recipient.viewed</code> <code>recipient.authenticated</code> <code>recipient.signed</code> <code>recipient.approved</code> <code>recipient.declined</code> <code>recipient.link_shared</code> <code>recipient.corrected</code> <code>recipient.esign_started</code> <code>recipient.esign_failed</code> <code>envelope.recalled</code> <code>envelope.revised</code> <code>document.sealed</code></p>
+<p class="api-field__meta">One of <code>envelope.created</code> <code>envelope.updated</code> <code>envelope.sent</code> <code>envelope.completed</code> <code>envelope.declined</code> <code>envelope.expired</code> <code>envelope.voided</code> <code>recipient.notified</code> <code>recipient.reminded</code> <code>recipient.viewed</code> <code>recipient.authenticated</code> <code>recipient.signed</code> <code>recipient.approved</code> <code>recipient.declined</code> <code>recipient.link_shared</code> <code>recipient.corrected</code> <code>recipient.esign_started</code> <code>recipient.esign_failed</code> <code>recipient.esign_name_differs</code> <code>envelope.recalled</code> <code>envelope.revised</code> <code>document.sealed</code></p>
 
 </div>
 <div class="api-field">

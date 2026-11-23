@@ -128,10 +128,11 @@ Size of each page in PDF points, in page order.
 <p class="api-route"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/documents/{docId}</code></p>
 
 The sealed PDF once the envelope is complete, otherwise the original. Ask for one of
-them with `version`. A document signed with Aadhaar eSign is one file too: the
-certificate page goes on before the signer signs, so the Aadhaar eSign and the seal
-cover it. Only an Aadhaar eSign started before that change has its certificate as a
-sealed file of its own: `version=certificate`.
+them with `version`. A document signed with Aadhaar eSign is the file the eSign
+provider signed, with the seal added as a further signature and no page added or
+changed. Its signing certificate and the audit trail are one sealed file of their own,
+`version=certificate`, saved as "<title> (certificate and audit trail).pdf", and the
+provider's own audit trail, when it was kept, is `version=provider-audit-trail`.
 
 <p class="api-auth"><span class="api-auth__label">Auth</span> Sender API key, as <code>Authorization: Bearer &lt;key&gt;</code></p>
 
@@ -161,9 +162,9 @@ The document id, from `documents[].id`.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">version</code> <span class="api-field__type">string</span></p>
 
-`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file).
+`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished), `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file) or `provider-audit-trail` (fails with `INVALID_STATE` when the eSign provider handed over no audit trail).
 
-<p class="api-field__meta">One of <code>original</code> <code>sealed</code> <code>certificate</code></p>
+<p class="api-field__meta">One of <code>original</code> <code>sealed</code> <code>certificate</code> <code>provider-audit-trail</code></p>
 
 </div>
 

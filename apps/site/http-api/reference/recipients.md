@@ -141,7 +141,7 @@ The eSign provider.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">signerName</code> <span class="api-field__type">string</span></p>
 
-The signer's name as the provider reported it.
+The name on the signer's eSign certificate in the signed file, or the name the provider reported when the file carried none that could be read.
 
 </div>
 <div class="api-field">
