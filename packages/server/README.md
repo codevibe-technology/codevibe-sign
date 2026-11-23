@@ -178,6 +178,48 @@ the link alone is enough, or `sms_otp` with a phone number.
 Field boxes are in PDF points from the top-left corner of the page. For multipart uploads,
 send the same JSON in a form field named `envelope` and the files as `documents`.
 
+## Templates
+
+A template keeps the PDFs, the roles (Employee, HR), the fields of each role and the envelope
+settings. Same API key, workspace rules, `Idempotency-Key` and errors as envelopes; a template
+in another workspace answers `404 NOT_FOUND`.
+
+| Route                              | What it does                                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET /v1/templates`                | The caller's templates, newest first: `?q=offer&limit=25&cursor=`.                                     |
+| `POST /v1/templates`               | Create one (JSON with base64 documents, or multipart with the JSON in a `template` field).             |
+| `GET /v1/templates/:id`            | The template with its documents, roles and fields.                                                     |
+| `PATCH /v1/templates/:id`          | Change the settings, roles or fields. The documents cannot change.                                     |
+| `DELETE /v1/templates/:id`         | Remove it and its PDFs. Envelopes already made keep their own copies.                                  |
+| `POST /v1/templates/:id/envelopes` | An envelope with a person per role: `{ "roles": { "Employee": { name, email } }, "prefill", "send" }`. |
+
+Templates live in the store (`sign_templates`, migration `0004`). Pass `templateStore` to keep
+them in a table of your own, for example with your own quotas; a store without one answers
+`409 INVALID_STATE` on these routes.
+
+## Public verification
+
+`POST /v1/verify` (a PDF as multipart `file`, or as an `application/pdf` body) and
+`GET /v1/verify/:sha256` say whether a file is exactly what this server sealed:
+`{ valid, reason, sha256, checks, signer, signedAt, certificateSha256, envelope }`. For a
+valid file `envelope` carries what the certificate page inside it prints: title, signers with
+masked contacts, the audit events and the chain head. No IP addresses, no full addresses.
+
+These two routes need no API key, on purpose: whoever is handed a sealed document must be
+able to check it. They are limited per client address (`limits.verifyPer10Minutes`, default
+30; `verifySharedPer10Minutes` when the address is unknown), to `limits.maxPdfBytes`, and to
+`limits.maxConcurrentVerifications` files at a time. The file is parsed under the same limits
+as every upload and nothing about it is stored. `server.verifyPdf(bytes)` gives the same
+answer to a page of your own.
+
+## Versioning
+
+Every route of the API is under `/v1` and every answer carries `Codevibe-Api-Version: 1`.
+An operation marked `deprecated: true` in `openapi.yaml` must also carry `x-deprecated-since`
+and `x-sunset` dates at least six months apart; its answers then carry `Deprecation`
+(RFC 9745), `Sunset` (RFC 8594) and `Link: <...>; rel="deprecation"`. Nothing is deprecated
+today.
+
 ## Workspaces
 
 Every envelope belongs to one workspace, fixed when it is created. A sender sees and acts on
