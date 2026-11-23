@@ -438,23 +438,23 @@ export function Landing({
       <main id="main" className="flex-1">
         <section
           aria-labelledby="hero-title"
-          className="overflow-hidden px-4 pt-12 pb-20 sm:px-6 sm:pt-20 sm:pb-28"
+          className="overflow-hidden px-4 pt-8 pb-14 sm:px-6 sm:pt-12 sm:pb-16 lg:flex lg:min-h-[calc(100svh-4rem)] lg:items-center lg:py-10"
         >
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)]">
-            <h1
-              id="hero-title"
-              className="text-[clamp(2.9rem,8.6vw,6rem)] leading-[0.94] font-bold tracking-[-0.035em] lg:col-span-2"
-            >
-              Get it signed. <br />
-              <span className="text-primary">Keep the proof.</span>
-            </h1>
-            <div className="lg:pt-2">
-              <p className=" max-w-[34rem] text-lg text-muted">
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+            <div>
+              <h1
+                id="hero-title"
+                className="enter text-[clamp(2.4rem,1.2rem+3.2vw,3.4rem)] leading-[1.02] font-bold tracking-[-0.03em]"
+              >
+                Get it signed. <br />
+                <span className="text-primary">Keep the proof.</span>
+              </h1>
+              <p className="enter mt-5 max-w-[34rem] text-muted sm:text-lg [--enter-order:1]">
                 Upload a PDF, place the fields and send. People sign on any phone or laptop, and you
                 get back a sealed PDF with a certificate page that anyone can check, no account
                 needed.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <div className="enter mt-7 flex flex-col gap-3 sm:flex-row [--enter-order:2]">
                 <Button asChild className="h-12 px-6 text-base">
                   <Link href={start.href}>
                     {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
@@ -466,19 +466,21 @@ export function Landing({
                   </ExternalLink>
                 </Button>
               </div>
-              <p className="mt-5 text-sm text-muted">
-                Start on the Free plan, no card needed. Or self-host it, free and unlimited.
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Received a signed PDF?{' '}
-                <Link
-                  href={VERIFY_URL}
-                  className="font-semibold text-primary underline underline-offset-2 hover:no-underline"
-                >
-                  Check it here
-                </Link>
-                .
-              </p>
+              <div className="enter [--enter-order:3]">
+                <p className="mt-5 text-sm text-muted">
+                  Start on the Free plan, no card needed. Or self-host it, free and unlimited.
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Received a signed PDF?{' '}
+                  <Link
+                    href={VERIFY_URL}
+                    className="font-semibold text-primary underline underline-offset-2 hover:no-underline"
+                  >
+                    Check it here
+                  </Link>
+                  .
+                </p>
+              </div>
             </div>
             <figure className="min-w-0">
               <div className="relative pr-2 pb-2 sm:pr-3">
@@ -495,12 +497,12 @@ export function Landing({
                 </Sheet>
               </div>
               <div className="relative -mt-8 flex items-end pl-4 sm:-mt-10 sm:pl-8">
-                <InkSignature className="pointer-events-none absolute -top-9 left-[38%] z-20 w-[36%] max-w-[15rem] sm:left-[53%] sm:w-[37%] sm:-top-12" />
-                <div className="relative z-10 w-[min(19rem,72%)]">
+                <InkSignature className="pointer-events-none absolute -top-9 left-[34%] z-20 w-[36%] max-w-[13rem] sm:left-[45%] sm:w-[32%] sm:-top-11" />
+                <div className="enter relative z-10 w-[min(18rem,72%)] [--enter-order:4]">
                   <SealSlip />
                 </div>
               </div>
-              <figcaption id="hero-clip-text" className="mt-4 text-sm text-muted">
+              <figcaption id="hero-clip-text" className="mt-3 text-sm text-muted">
                 The real app, with made-up people: fields placed on a PDF, the sealed copy, and the
                 public seal check.
               </figcaption>
