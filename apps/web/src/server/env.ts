@@ -49,12 +49,24 @@ const schema = z.object({
   TRUST_PROXY: flag,
   WEBHOOK_ALLOW_INSECURE: flag,
   SIGN_TICK_SECONDS: z.coerce.number().int().min(0).default(60),
+  TURNSTILE_SITE_KEY: z.string().max(200).optional(),
+  TURNSTILE_SECRET_KEY: z.string().max(200).optional(),
 });
 
 const GRAPH_VARS = ['MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET'] as const;
 const MAILBOX = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 const checked = schema.superRefine((config, ctx) => {
+  if (Boolean(config.TURNSTILE_SITE_KEY) !== Boolean(config.TURNSTILE_SECRET_KEY)) {
+    const [set, missing] = config.TURNSTILE_SITE_KEY
+      ? ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY']
+      : ['TURNSTILE_SECRET_KEY', 'TURNSTILE_SITE_KEY'];
+    ctx.addIssue({
+      code: 'custom',
+      path: [missing],
+      message: `${missing} is required when ${set} is set; set both or neither (see deploy/README.md, "Bot protection")`,
+    });
+  }
   if (config.MAIL_TRANSPORT !== 'graph') return;
   for (const name of GRAPH_VARS) {
     if (!config[name]) {

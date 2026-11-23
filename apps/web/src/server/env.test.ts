@@ -101,3 +101,28 @@ describe('parseEnv seal timestamp settings', () => {
     );
   });
 });
+
+describe('parseEnv Turnstile settings', () => {
+  it('is off without keys, and blank keys count as unset', () => {
+    const config = parseEnv({ ...required, TURNSTILE_SITE_KEY: '', TURNSTILE_SECRET_KEY: '' });
+    expect(config.TURNSTILE_SITE_KEY).toBeUndefined();
+    expect(config.TURNSTILE_SECRET_KEY).toBeUndefined();
+  });
+
+  it('takes both keys together', () => {
+    const config = parseEnv({
+      ...required,
+      TURNSTILE_SITE_KEY: '0x4AAAAAAAsite',
+      TURNSTILE_SECRET_KEY: '0x4AAAAAAAsecret',
+    });
+    expect(config.TURNSTILE_SITE_KEY).toBe('0x4AAAAAAAsite');
+  });
+
+  it('names the missing key when only one is set, without echoing the other', () => {
+    const onlySite = problems({ ...required, TURNSTILE_SITE_KEY: '0x4AAAAAAAsite' });
+    expect(onlySite).toContain('TURNSTILE_SECRET_KEY is required when TURNSTILE_SITE_KEY is set');
+    const onlySecret = problems({ ...required, TURNSTILE_SECRET_KEY: '0x4AAAAAAAsecret' });
+    expect(onlySecret).toContain('TURNSTILE_SITE_KEY is required');
+    expect(onlySecret).not.toContain('0x4AAAAAAAsecret');
+  });
+});

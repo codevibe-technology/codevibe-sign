@@ -4,7 +4,8 @@ export type AppErrorCode =
   | 'NOT_FOUND'
   | 'VALIDATION'
   | 'CONFLICT'
-  | 'PLAN_LIMIT';
+  | 'PLAN_LIMIT'
+  | 'HUMAN_CHECK';
 
 /**
  * A failure the person can act on. `field` names the form field to fix, so the form can put the
