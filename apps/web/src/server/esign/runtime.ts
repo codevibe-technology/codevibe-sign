@@ -27,7 +27,13 @@ import {
   settleOwedEsigns,
 } from '../billing/credits';
 import { planSettings, workspaceEntitlements } from '../plans';
-import { getEsignSettings, ownCredentials, type EsignMode, type OwnCredentials } from './settings';
+import {
+  getEsignSettings,
+  lockEsignAccount,
+  ownCredentials,
+  type EsignMode,
+  type OwnCredentials,
+} from './settings';
 import { getEsignUsage, markUnbilled, recordEsignOutcome, recordEsignStart } from './usage';
 
 type Sql = postgres.Sql;
@@ -62,6 +68,8 @@ export const ESIGN_BLOCKED: Record<string, string> = {
   no_credits:
     'This account has no Aadhaar eSign credits left. Its owner can buy credits in Settings, Billing.',
 };
+
+const SIGNER_RETRY = 'Aadhaar eSign could not be started just now. Try again in a moment.';
 
 export interface EsignState {
   mode: EsignMode;
@@ -248,23 +256,18 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
   const { sql } = deps;
   const cache = new Map<string, { key: string; provider: EsignProvider }>();
 
-  async function provider(workspaceId: string): Promise<EsignProvider | null> {
-    const accountId = await accountIdOfWorkspace(sql, workspaceId);
-    const saved = await getEsignSettings(sql, accountId);
-    if (saved.mode === 'own') {
-      const entitlements = await workspaceEntitlements(sql, workspaceId);
-      if (!entitlements.ownEsignAccount) return null;
-      const key = `own:${saved.version}`;
-      const hit = cache.get(accountId);
-      if (hit?.key === key) return hit.provider;
-      const credentials = await ownCredentials(sql, accountId);
-      if (!credentials) return null;
-      // A sandbox signature has no legal effect, so a live install does not make them.
-      if (credentials.environment === 'sandbox' && safeConfig(deps)?.live) return null;
-      const made = fromOwn(credentials, deps.fetch);
-      cache.set(accountId, { key, provider: made });
-      return made;
-    }
+  async function ownProvider(accountId: string, version: number): Promise<EsignProvider | null> {
+    const key = `own:${version}`;
+    const hit = cache.get(accountId);
+    if (hit?.key === key) return hit.provider;
+    const credentials = await ownCredentials(sql, accountId);
+    if (!credentials) return null;
+    const made = fromOwn(credentials, deps.fetch);
+    cache.set(accountId, { key, provider: made });
+    return made;
+  }
+
+  function platformProvider(): EsignProvider | null {
     const config = safeConfig(deps)?.leegality;
     if (!config) return null;
     const key = `platform:${digest(config)}`;
@@ -275,6 +278,34 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
     return made;
   }
 
+  /** The account a new eSign would use; the plan and the live switch are checked here only. */
+  async function provider(workspaceId: string): Promise<EsignProvider | null> {
+    const accountId = await accountIdOfWorkspace(sql, workspaceId);
+    const saved = await getEsignSettings(sql, accountId);
+    if (saved.mode !== 'own') return platformProvider();
+    const entitlements = await workspaceEntitlements(sql, workspaceId);
+    if (!entitlements.ownEsignAccount) return null;
+    // A sandbox signature has no legal effect, so a live install does not start them.
+    if (saved.own.environment === 'sandbox' && safeConfig(deps)?.live) return null;
+    return ownProvider(accountId, saved.version);
+  }
+
+  /**
+   * The account a started eSign runs on: the one noted when it started. A downgrade or a
+   * plan change since then does not strand a signer who is already at the provider, and the
+   * account's details cannot have changed, because that is refused while an eSign is open.
+   */
+  async function providerForSession(input: {
+    ref: string;
+    workspaceId: string;
+  }): Promise<EsignProvider | null> {
+    const usage = await getEsignUsage(sql, input.ref);
+    if (!usage || usage.workspaceId !== input.workspaceId) return provider(input.workspaceId);
+    if (usage.mode !== 'own') return platformProvider();
+    const saved = await getEsignSettings(sql, usage.accountId);
+    return ownProvider(usage.accountId, saved.version);
+  }
+
   async function available(workspaceId: string): Promise<EsignUnavailable | null> {
     const { blocked } = await esignState(deps, workspaceId);
     return blocked ? { ...blocked, signerMessage: SIGNER_NO_CREDITS } : null;
@@ -282,6 +313,7 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
 
   return {
     provider,
+    providerForSession,
     available,
     sessionTtlMs: sessionHours() * 60 * 60 * 1000,
     ...(flagOn(process.env.ESIGN_ACCEPT_UNREADABLE_SIGNATURES)
@@ -293,7 +325,12 @@ export function createEsignOptions(deps: EsignRuntimeDeps): EsignOptions {
       const accountId = await accountIdOfWorkspace(sql, input.workspaceId);
       const billed = state.mode === 'platform' && state.creditsRequired;
       // One transaction: a credit is never left held without the row that gives it back.
+      // It holds the account's lock, so the mode noted here is the mode the eSign runs on.
       await sql.begin(async (tx) => {
+        await lockEsignAccount(tx, accountId);
+        if ((await getEsignSettings(tx, accountId)).mode !== state.mode) {
+          throw new SignError('ESIGN_UNAVAILABLE', SIGNER_RETRY, { reason: 'settings_changed' });
+        }
         if (
           billed &&
           (state.owed > 0 || !(await reserveCredit(tx, { accountId, ref: input.ref })))

@@ -108,12 +108,14 @@ export async function ownCredentials(sql: Sql, accountId: string): Promise<OwnCr
   }
 }
 
-/** eSigns of the account that were started and have not ended yet. */
+/**
+ * eSigns of the account that were started and have not ended yet. Every started eSign ends:
+ * signed, declined, failed, or expired once the wait for it is over.
+ */
 export async function openEsigns(sql: Sql, accountId: string): Promise<number> {
   const [row] = await sql<{ count: number }[]>`
     select count(*)::int as count from app_esign_usage
-    where account_id = ${accountId} and outcome is null
-      and started_at > now() - interval '25 hours'`;
+    where account_id = ${accountId} and outcome is null`;
   return row?.count ?? 0;
 }
 
@@ -130,68 +132,96 @@ async function assertNoneOpen(sql: Sql, accountId: string): Promise<void> {
   }
 }
 
-export async function setEsignMode(
+/**
+ * Locks the account's row for the rest of the transaction. Starting an eSign takes the same
+ * lock, so a change to the mode or the credentials and a start never overlap: the start
+ * sees the settings either before the change or after it.
+ */
+export async function lockEsignAccount(tx: Sql, accountId: string): Promise<void> {
+  await tx`select 1 from app_accounts where id = ${accountId} for update`;
+}
+
+/** Runs a settings change under the account lock, in its own transaction when not in one. */
+async function changing<T>(
   sql: Sql,
+  accountId: string,
+  change: (tx: Sql) => Promise<T>,
+): Promise<T> {
+  const run = async (tx: Sql) => {
+    await lockEsignAccount(tx, accountId);
+    return change(tx);
+  };
+  return 'begin' in sql ? ((await sql.begin((tx) => run(tx))) as T) : run(sql);
+}
+
+export async function setEsignMode(
+  outer: Sql,
   input: { accountId: string; userId: string; mode: EsignMode },
 ): Promise<EsignSettings> {
-  const current = await getEsignSettings(sql, input.accountId);
-  if (current.mode === input.mode) return current;
-  if (input.mode === 'own' && !current.own.configured) {
-    throw new AppError('VALIDATION', 'Add your Leegality account details first.', 'credentials');
-  }
-  await assertNoneOpen(sql, input.accountId);
-  await sql`
-    insert into app_esign_settings (account_id, mode, version, updated_by)
-    values (${input.accountId}, ${input.mode}, 1, ${input.userId})
-    on conflict (account_id) do update
-    set mode = excluded.mode, version = app_esign_settings.version + 1,
-        updated_by = excluded.updated_by, updated_at = now()`;
-  return getEsignSettings(sql, input.accountId);
+  return changing(outer, input.accountId, async (sql) => {
+    const current = await getEsignSettings(sql, input.accountId);
+    if (current.mode === input.mode) return current;
+    if (input.mode === 'own' && !current.own.configured) {
+      throw new AppError('VALIDATION', 'Add your Leegality account details first.', 'credentials');
+    }
+    await assertNoneOpen(sql, input.accountId);
+    await sql`
+      insert into app_esign_settings (account_id, mode, version, updated_by)
+      values (${input.accountId}, ${input.mode}, 1, ${input.userId})
+      on conflict (account_id) do update
+      set mode = excluded.mode, version = app_esign_settings.version + 1,
+          updated_by = excluded.updated_by, updated_at = now()`;
+    return getEsignSettings(sql, input.accountId);
+  });
 }
 
 export async function saveOwnCredentials(
-  sql: Sql,
+  outer: Sql,
   input: { accountId: string; userId: string; credentials: OwnCredentials },
 ): Promise<EsignSettings> {
-  const { accountId, credentials } = input;
-  const current = await getEsignSettings(sql, accountId);
-  if (current.mode === 'own') await assertNoneOpen(sql, accountId);
-  const apiKey = sealSecret(credentials.apiKey, context(accountId, 'apiKey'));
-  const salt = sealSecret(credentials.privateSalt, context(accountId, 'privateSalt'));
-  const hint = credentials.apiKey.slice(-4);
-  await sql`
-    insert into app_esign_settings (
-      account_id, own_api_key, own_private_salt, own_workflow_id, own_environment,
-      own_key_hint, own_saved_at, version, updated_by
-    ) values (
-      ${accountId}, ${apiKey}, ${salt}, ${credentials.workflowId}, ${credentials.environment},
-      ${hint}, now(), 1, ${input.userId}
-    )
-    on conflict (account_id) do update
-    set own_api_key = excluded.own_api_key, own_private_salt = excluded.own_private_salt,
-        own_workflow_id = excluded.own_workflow_id, own_environment = excluded.own_environment,
-        own_key_hint = excluded.own_key_hint, own_saved_at = now(),
-        own_tested_at = null, own_test_ok = null,
-        version = app_esign_settings.version + 1,
-        updated_by = excluded.updated_by, updated_at = now()`;
-  return getEsignSettings(sql, accountId);
+  return changing(outer, input.accountId, async (sql) => {
+    const { accountId, credentials } = input;
+    const current = await getEsignSettings(sql, accountId);
+    if (current.mode === 'own') await assertNoneOpen(sql, accountId);
+    const apiKey = sealSecret(credentials.apiKey, context(accountId, 'apiKey'));
+    const salt = sealSecret(credentials.privateSalt, context(accountId, 'privateSalt'));
+    const hint = credentials.apiKey.slice(-4);
+    await sql`
+      insert into app_esign_settings (
+        account_id, own_api_key, own_private_salt, own_workflow_id, own_environment,
+        own_key_hint, own_saved_at, version, updated_by
+      ) values (
+        ${accountId}, ${apiKey}, ${salt}, ${credentials.workflowId}, ${credentials.environment},
+        ${hint}, now(), 1, ${input.userId}
+      )
+      on conflict (account_id) do update
+      set own_api_key = excluded.own_api_key, own_private_salt = excluded.own_private_salt,
+          own_workflow_id = excluded.own_workflow_id, own_environment = excluded.own_environment,
+          own_key_hint = excluded.own_key_hint, own_saved_at = now(),
+          own_tested_at = null, own_test_ok = null,
+          version = app_esign_settings.version + 1,
+          updated_by = excluded.updated_by, updated_at = now()`;
+    return getEsignSettings(sql, accountId);
+  });
 }
 
 /** Forgets the account's own account and goes back to the install's. */
 export async function removeOwnCredentials(
-  sql: Sql,
+  outer: Sql,
   input: { accountId: string; userId: string },
 ): Promise<EsignSettings> {
-  const current = await getEsignSettings(sql, input.accountId);
-  if (current.mode === 'own') await assertNoneOpen(sql, input.accountId);
-  await sql`
-    update app_esign_settings
-    set mode = 'platform', own_api_key = null, own_private_salt = null, own_workflow_id = null,
-        own_environment = null, own_key_hint = null, own_saved_at = null, own_tested_at = null,
-        own_test_ok = null, version = version + 1, updated_by = ${input.userId},
-        updated_at = now()
-    where account_id = ${input.accountId}`;
-  return getEsignSettings(sql, input.accountId);
+  return changing(outer, input.accountId, async (sql) => {
+    const current = await getEsignSettings(sql, input.accountId);
+    if (current.mode === 'own') await assertNoneOpen(sql, input.accountId);
+    await sql`
+      update app_esign_settings
+      set mode = 'platform', own_api_key = null, own_private_salt = null, own_workflow_id = null,
+          own_environment = null, own_key_hint = null, own_saved_at = null, own_tested_at = null,
+          own_test_ok = null, version = version + 1, updated_by = ${input.userId},
+          updated_at = now()
+      where account_id = ${input.accountId}`;
+    return getEsignSettings(sql, input.accountId);
+  });
 }
 
 export async function recordConnectionTest(

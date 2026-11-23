@@ -821,6 +821,84 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' }),
       ).rejects.toThrow(/signing with Aadhaar eSign right now/);
     });
+
+    it('still refuses the change however long ago the eSign started', async () => {
+      const ws = await workspace('cloud', 1);
+      await saveOwnCredentials(sql, { accountId: ws.accountId, userId: ws.owner.id, credentials });
+      const { email } = await send(ws);
+      expect((await start(tokenFor(email))).status).toBe(200);
+      await sql`
+        update app_esign_usage set started_at = now() - interval '40 days'
+        where account_id = ${ws.accountId}`;
+      await expect(
+        setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' }),
+      ).rejects.toThrow(/signing with Aadhaar eSign right now/);
+      // Once it has ended, the account may change.
+      expect((await hook(provider.webhook(provider.last(), 'Rejected'))).status).toBe(200);
+      const changed = await setEsignMode(sql, {
+        accountId: ws.accountId,
+        userId: ws.owner.id,
+        mode: 'own',
+      });
+      expect(changed.mode).toBe('own');
+    });
+
+    it('lets a signer already at the provider finish after the account drops to Free', async () => {
+      const ws = await workspace('cloud');
+      await saveOwnCredentials(sql, { accountId: ws.accountId, userId: ws.owner.id, credentials });
+      await setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' });
+      const { res, email } = await send(ws);
+      const envelope = (await res.json()) as Envelope;
+      expect((await start(tokenFor(email))).status).toBe(200);
+      const document = provider.last();
+
+      await sql`update app_accounts set plan = 'free' where id = ${ws.accountId}`;
+      const options = createEsignOptions({
+        sql,
+        config: () => billingConfig(ENV),
+        fetch: provider.fetch,
+      });
+      // Nothing new starts on the own account, but the open request keeps it.
+      expect(await options.provider(ws.id)).toBeNull();
+      expect((await hook(provider.webhook(document, 'Signed', OWN_SALT))).status).toBe(200);
+      await sign.tick();
+      expect((await envelopeOf(ws, envelope.id)).status).toBe('completed');
+      expect((await listEsignUsage(sql, ws.accountId))[0]).toMatchObject({
+        mode: 'own',
+        outcome: 'signed',
+      });
+    });
+
+    it('starts nothing when the account changes between the first look and the hold', async () => {
+      const ws = await workspace('cloud', 1);
+      await saveOwnCredentials(sql, { accountId: ws.accountId, userId: ws.owner.id, credentials });
+      const options = createEsignOptions({
+        sql,
+        config: () => billingConfig(ENV),
+        fetch: provider.fetch,
+      });
+      const real = options.onStart!;
+      const input = {
+        workspaceId: ws.id,
+        envelopeId: 'env_race',
+        recipientId: 'rec_race',
+        ref: `race_${randomUUID()}`,
+      };
+      // The owner switches account just after the start read the settings.
+      const spy = vi.spyOn(sql, 'begin');
+      spy.mockImplementationOnce(async (...args: unknown[]) => {
+        spy.mockRestore();
+        await setEsignMode(sql, { accountId: ws.accountId, userId: ws.owner.id, mode: 'own' });
+        return (sql.begin as (...a: unknown[]) => unknown)(...args);
+      });
+      await expect(real(input)).rejects.toMatchObject({
+        code: 'ESIGN_UNAVAILABLE',
+        details: { reason: 'settings_changed' },
+      });
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 1, reserved: 0 });
+      const [row] = await sql`select 1 from app_esign_usage where ref = ${input.ref}`;
+      expect(row).toBeUndefined();
+    });
   });
 
   describe('the settings actions', () => {
