@@ -183,10 +183,13 @@ time of signing as a full ISO date-time in UTC; a date the signer sends is ignor
 signature cannot be back-dated. Render it in the signer's time zone if you like: the
 certificate page shows the exact UTC time from the audit log.
 
-An `aadhaar` field marks where a signer with `auth: 'aadhaar'` signs at the eSign provider.
-It takes no value. `validateForSend` wants exactly one, required, for that signer, no
-signature or initials fields for them, and none for anyone else; `adoptAadhaarBox(envelope)`
-turns the lone signature field of such a signer, as older clients sent it, into the box.
+A signer with `auth: 'aadhaar'` has no fields: the eSign provider places their signature where
+its own workflow says, so the file it signs is exactly what the sender approved, with the
+values of the signers before them. `validateForSend` refuses any field for that signer.
+`dropAadhaarSignatureFields(envelope)` removes the signature, initials and `aadhaar` fields
+older clients gave such a signer, so those requests still send; other fields are left for
+`validateForSend` to name. The `aadhaar` field type stays readable for envelopes sent while
+it marked where the signer signs; it takes no value.
 
 Values the sender prefilled count towards required fields, so the signer does not have to
 send them again. A field added with `readOnly: true` keeps the sender's value: `submit`
