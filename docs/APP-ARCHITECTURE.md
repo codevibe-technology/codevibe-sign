@@ -262,6 +262,16 @@ released.
 | `app_webhook_deliveries`        | `(webhook_id, delivery_id)`: event, exact body, status, attempts, last answer, next retry; kept 30 days.    |
 | `app_usage`                     | `(workspace_id, metric, period)`: envelopes sent per month, API-key requests per day, stored bytes.         |
 | `app_plan_changes`              | Who moved a workspace from one plan to another, and when.                                                   |
+| `app_audit_log`                 | Who did what in a workspace outside an envelope: billing, credentials, eSign starts and ends. No secrets.   |
+| `app_billing_details`           | One row per workspace: legal name, GSTIN, address, state, billing email.                                    |
+| `app_billing_orders`            | One order: what is bought, amounts and tax split in paise, buyer and seller as they were, Razorpay ids.     |
+| `app_invoice_counters`          | The running number of each invoice series, one row per prefix.                                              |
+| `app_invoices`                  | One invoice per paid order: number, file key, whether the email went out.                                   |
+| `app_razorpay_events`           | Ids of Razorpay webhook events already handled, so a replay does nothing.                                   |
+| `app_esign_credits`             | A workspace's Aadhaar eSign credits: available and held.                                                    |
+| `app_esign_credit_ledger`       | Every grant, hold, use and return, unique per workspace, kind and reference.                                |
+| `app_esign_settings`            | Which account a workspace signs with, and its own Leegality credentials, encrypted.                         |
+| `app_esign_usage`               | One row per eSign attempt: the account used, whether it was billed, how it ended.                           |
 | `app_subscriptions`             | One Cloud subscription per workspace: term, dates, extra members, status.                                   |
 | `app_install_bookings`          | A booking for installation help: contact, server, time, paid and notified times.                            |
 | `app_first_run`                 | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.                |
@@ -607,6 +617,75 @@ password, and is limited per address and overall. The booking is stored in
 operator is told at `OPERATOR_EMAIL` once, with retries from the timer. "Need a server?" lists
 `HOSTING_OFFERS` and is absent while that is empty.
 
+## Aadhaar eSign in the app
+
+The sign server runs the flow (see "Aadhaar eSign" in [ARCHITECTURE.md](ARCHITECTURE.md) and
+the server README); the app decides whose provider account is used and what it costs.
+`src/server/esign/runtime.ts` builds the server's `esign` option:
+
+- **`provider(workspaceId)`** returns the Leegality adapter for the workspace. In `platform`
+  mode it is the install's account from the environment (`platformLeegality()`); in `own` mode
+  it is built from the workspace's credentials, and only while its plan allows an own account.
+  A workspace that lost that right is refused; it never falls back to the install's account.
+- **`available(workspaceId)`** is asked when an envelope with an Aadhaar signer is sent and
+  when the signer starts. On a hosted install the platform account needs its keys, a published
+  price and at least one credit. The sender is told what is missing; the signer only that the
+  document is not available right now.
+- **`onStart`** holds one credit under the session reference before the provider is called.
+  **`onEnd`** uses it on `signed` and returns it on `declined`, `expired` or `failed`. A
+  signature reported after the hold was returned takes a credit again; with none left it writes
+  one `esign.unbilled` audit row and the balance stays at zero.
+- Credits apply exactly when `PLAN_MODE=hosted`. A self-hosted install with Leegality keys in
+  its environment signs without credits.
+
+**Settings, Aadhaar eSign** (`esign.manage`: admins and owners) switches the mode, saves or
+removes the workspace's own credentials and tests them with one read-only call. Credentials
+are sealed with `sealSecret` (AES-256-GCM under `SECRETS_KEY`, bound to the workspace and the
+purpose) and only `{ configured, keyHint, environment }` ever reaches the browser. Mode and
+credentials cannot change while an eSign is open, because its callback is verified with the
+account it started on.
+
+The send flow offers "Aadhaar eSign" as an identity check with the core rules as field errors
+(one Aadhaar signer, one document, acts last) and shows the price and the credit balance. The
+signing page posts the signer's values to `/api/v1/sign/link/esign`, sends them to the
+provider, and on `/sign?esign=return` polls until the server has the result. A completed
+envelope offers the certificate as its own file, and the envelope, record and verify pages
+name the method "Aadhaar eSign (via Leegality)".
+
+## Billing
+
+Everything that is sold goes through one order engine in `src/server/billing/`. Nothing here
+runs unless Razorpay keys and the seller's details are set; pages then show "coming soon".
+
+- **Settings** are read from the environment on each call (`billingConfig()`), never cached in
+  a page. Customers only ever see finished prices: `creditsOffer` and `PricingView` are the
+  only pricing objects passed to a page, and they hold no operator cost settings.
+- **Orders** (`orders.ts`). `createOrder` computes the amount on the server, snapshots buyer,
+  seller, SAC and GST rate, and opens a Razorpay order for exactly the invoice total. Kinds:
+  `esign_credits`, `cloud_subscription`, `extra_seats`, `install_help`; each registers a
+  fulfilment handler.
+- **Confirmation.** The browser's checkout signature is verified, then the payment is fetched
+  from Razorpay and must be captured, in INR, for the same order and amount. The webhook
+  (`POST /api/billing/razorpay/webhook`, `payment.captured` and `order.paid`) does the same
+  without a browser. Both end in `fulfilOrder`: one transaction that locks the order, returns
+  early if it is already paid, runs the handler and takes the next invoice number.
+- **Tax** (`lib/billing/gst.ts`). All money is integer paise. GST is added on top; a buyer in
+  the seller's state pays CGST and SGST, anyone else IGST, each rounded half up to the paisa.
+- **Invoices** (`invoices.ts`, `invoice-pdf.ts`). Numbers are `CV-<financial year><serial>`
+  (`CV-2026270001`), gapless per series, allocated under a row lock. The PDF is rendered after
+  the transaction, sealed when the install has a seal key, stored in the file store and emailed
+  once; the timer retries rendering and mail. Test-mode payments get their own `T-` series and
+  are marked as not tax documents.
+- **Credits ledger** (`credits.ts`). `grantCredits`, `reserveCredit`, `consumeCredit` and
+  `releaseCredit` are idempotent on a reference and guarded so a balance cannot go below zero,
+  whatever runs at the same time.
+- **Audit log** (`audit.ts`). `app_audit_log` records billing detail changes, orders, captured
+  payments, invoices, credit grants, eSign settings and credential changes, and every eSign
+  start and end, with ids and amounts only.
+- **Access.** Billing pages and actions need `billing.manage` (admins and owners) in the named
+  workspace; invoices of another workspace answer 404. Order creation, confirmation and the
+  webhook are rate limited per process.
+
 ## Extension points for the next lanes
 
 | Lane                    | Starts from                                                                                           |
@@ -615,3 +694,5 @@ operator is told at `OPERATOR_EMAIL` once, with retries from the timer. "Need a 
 | SMS codes               | An `OtpSender` for SMS in `src/server/sign/server.ts`, then `SMS_CODES = true`.                       |
 | Prefill from a template | Needs `values` on `POST /v1/envelopes`; then lift the refusal of prefill columns in `previewBulkCsv`. |
 | Templates over the API  | `/v1/templates` routes in the app that call `sendFromTemplate`, guarded by API keys.                  |
+| eMudhra eSign           | A second `EsignProvider` in `packages/aadhaar`; then a provider choice in `src/server/esign`.         |
+| Credit notes, refunds   | `CREDIT_NOTE_SERIES` is reserved; an order kind and a ledger entry that takes credits back.           |

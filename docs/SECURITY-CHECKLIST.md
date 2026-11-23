@@ -94,6 +94,21 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 - [ ] Make `esign.onStart` and `esign.onEnd` idempotent on `ref`: they are where credits are
       reserved and settled, and `onEnd` is retried.
 
+## Payments and billing (web app, if used)
+
+- [ ] Set `RAZORPAY_WEBHOOK_SECRET` and register the webhook; without the secret the webhook
+      route answers 404 and a payment is confirmed only when the buyer's browser returns.
+- [ ] Keep `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` and the Leegality values out of
+      shell history and logs: set them with `deploy/set-secret.sh`, which reads them hidden.
+- [ ] Set `BILLING_LIVE=true` when real money is taken, so a test key or the eSign sandbox left
+      behind is refused, and check `GET /api/health` shows no `problems`.
+- [ ] Set `SECRETS_KEY` (32 characters or more) and back it up with the database. Workspaces'
+      own Leegality credentials are encrypted with it and cannot be read without it.
+- [ ] Set the `INVOICE_SELLER_*` values to your own company. An install never issues invoices
+      in another company's name, and nothing is sold until they are set.
+- [ ] Confirm the SAC code (`INVOICE_SAC`) and the invoice series with your accountant before
+      the first live payment; issued numbers cannot be reused.
+
 ## Rate limits behind a proxy
 
 - [ ] Tell the server how many proxies sit in front of it so it takes the client IP from the
