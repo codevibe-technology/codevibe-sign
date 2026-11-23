@@ -264,3 +264,15 @@ html [data-sonner-toaster][data-sonner-theme] {
   --info-border: color-mix(in srgb, var(--primary) 30%, transparent);
   --info-text: var(--primary-text);
 }
+
+/* The home page's step-by-step story: the page snaps to each step, one per scroll or swipe,
+   and only near the steps (proximity), so the rest of the page scrolls freely. */
+@media (prefers-reduced-motion: no-preference) {
+  :root:has([data-story]) {
+    scroll-snap-type: y proximity;
+  }
+  .story-step {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}
