@@ -20,6 +20,7 @@ const KIND_LABELS: Record<string, string> = {
   subscription_grace: 'Plan term ended',
   subscription_ended: 'Moved to the Free plan',
   install_help_booking: 'Installation booking',
+  operator_notice: 'Notice to the operator',
 };
 
 export const mailKindLabel = (kind: string) => KIND_LABELS[kind] ?? 'Other';

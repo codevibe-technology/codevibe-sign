@@ -57,7 +57,7 @@ export async function createInstallBooking(
     email: booking.email,
   };
   const bookingId = randomId('book');
-  const { order, checkout } = await createOrder(sql, deps, {
+  const { checkout } = await createOrder(sql, deps, {
     workspaceId: null,
     kind: 'install_help',
     lines: [{ description: SUMMARY, quantity: 1, unitPaise: deps.config.installHelpPaise }],
@@ -66,21 +66,26 @@ export async function createInstallBooking(
     createdBy: null,
     summary: SUMMARY,
     ip: input.ip ?? null,
+    // The booking is saved with its order or not at all, so no order can be paid without one.
+    alongside: async (tx, orderId) => {
+      await tx`
+        insert into app_install_bookings (
+          id, order_id, name, email, phone, company, provider, server_details, preferred_time
+        ) values (
+          ${bookingId}, ${orderId}, ${booking.name}, ${booking.email}, ${booking.phone},
+          ${booking.legalName}, ${booking.provider}, ${booking.serverDetails},
+          ${booking.preferredTime}
+        )`;
+    },
   });
-  await sql`
-    insert into app_install_bookings (
-      id, order_id, name, email, phone, company, provider, server_details, preferred_time
-    ) values (
-      ${bookingId}, ${order.id}, ${booking.name}, ${booking.email}, ${booking.phone},
-      ${booking.legalName}, ${booking.provider}, ${booking.serverDetails},
-      ${booking.preferredTime}
-    )`;
   return { bookingId, checkout };
 }
 
 /** Paying marks the booking paid; the operator is told after the payment is saved. */
 export const fulfilInstallHelp: Fulfilment = async (tx, order, { now }) => {
-  await tx`update app_install_bookings set paid_at = ${now} where order_id = ${order.id}`;
+  const rows = await tx`
+    update app_install_bookings set paid_at = ${now} where order_id = ${order.id} returning id`;
+  if (rows.length !== 1) throw new Error(`Booking order ${order.id} has no booking`);
 };
 
 interface BookingRow {

@@ -16,6 +16,7 @@ import {
 } from './config';
 import type { InvoiceAssets, InvoiceLine } from './invoice-pdf';
 import { finishInvoice } from './invoices';
+import { queueOperatorNotice, type NoticeData } from './notices';
 import {
   RazorpayError,
   isRazorpayId,
@@ -24,6 +25,7 @@ import {
   verifyWebhookSignature,
   type RazorpayClient,
   type RazorpayPayment,
+  type RazorpayWebhook,
 } from './razorpay';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
@@ -54,7 +56,19 @@ export const ORDER_KINDS = [
   'install_help',
 ] as const;
 export type OrderKind = (typeof ORDER_KINDS)[number];
-export type OrderStatus = 'created' | 'paid' | 'failed' | 'expired';
+/**
+ * `paid_unapplied`: money arrived for an order that could no longer be honoured, so nothing was
+ * delivered and the operator refunds it. `refunded`: the payment went back to the buyer.
+ */
+export type OrderStatus = 'created' | 'paid' | 'failed' | 'expired' | 'paid_unapplied' | 'refunded';
+
+/** Why a captured payment delivered nothing. */
+export type UnappliedReason =
+  | 'expired'
+  | 'test_order'
+  | 'term_changed'
+  | 'seat_limit'
+  | 'plan_managed';
 export type OrderPayload = Record<string, string | number | boolean | null>;
 
 export interface BillingOrder {
@@ -94,16 +108,42 @@ export interface CheckoutSession {
 
 /**
  * Delivers what a paid order bought, inside the transaction that marks it paid. It runs once
- * per order; throwing leaves the order unpaid so the payment is tried again.
+ * per order; throwing leaves the order unpaid so the payment is tried again. Answering
+ * `{ unapplied }`, having changed nothing, says the order can no longer be honoured: the
+ * payment is kept apart for a refund and no invoice is issued.
  */
-export type Fulfilment = (tx: Tx, order: BillingOrder, context: { now: Date }) => Promise<void>;
+export type Fulfilment = (
+  tx: Tx,
+  order: BillingOrder,
+  context: { now: Date },
+) => Promise<void | { unapplied: UnappliedReason }>;
 
-const holder = globalThis as unknown as { __cvsFulfilments?: Map<OrderKind, Fulfilment> };
+/**
+ * Takes back what a refunded order delivered, as far as it is still there, inside the
+ * transaction that marks the order refunded. What it answers goes into the audit row and the
+ * operator's notice.
+ */
+export type Reversal = (
+  tx: Tx,
+  order: BillingOrder,
+  context: { now: Date },
+) => Promise<NoticeData | void>;
+
+const holder = globalThis as unknown as {
+  __cvsFulfilments?: Map<OrderKind, Fulfilment>;
+  __cvsReversals?: Map<OrderKind, Reversal>;
+};
 const fulfilments = () => (holder.__cvsFulfilments ??= new Map());
+const reversals = () => (holder.__cvsReversals ??= new Map());
 
 /** Says what paying for an order of `kind` delivers. One handler per kind; the last one wins. */
 export function registerFulfilment(kind: OrderKind, handler: Fulfilment): void {
   fulfilments().set(kind, handler);
+}
+
+/** Says what a refund of an order of `kind` takes back. */
+export function registerReversal(kind: OrderKind, handler: Reversal): void {
+  reversals().set(kind, handler);
 }
 
 interface OrderRow {
@@ -126,6 +166,7 @@ interface OrderRow {
   razorpay_order_id: string;
   razorpay_payment_id: string | null;
   payment_method?: string | null;
+  unapplied_reason?: UnappliedReason | null;
   created_by: string | null;
   created_at: Date;
   paid_at: Date | null;
@@ -204,6 +245,8 @@ export interface NewOrder {
   /** One line for the payment window, for example "50 Aadhaar eSign credits". */
   summary: string;
   ip?: string | null;
+  /** Rows that must exist exactly when the order does, written in the same transaction. */
+  alongside?: (tx: Tx, orderId: string) => Promise<void>;
 }
 
 /**
@@ -242,19 +285,22 @@ export async function createOrder(
     })
     .catch(providerFailure);
 
+  const createdAt = deps.now();
   const [row] = await sql.begin(async (tx) => {
     const rows = await tx<OrderRow[]>`
       insert into app_billing_orders (
         id, workspace_id, kind, payload, lines, buyer, seller, sac, gst_percent, taxable_paise,
-        cgst_paise, sgst_paise, igst_paise, total_paise, mode, razorpay_order_id, created_by
+        cgst_paise, sgst_paise, igst_paise, total_paise, mode, razorpay_order_id, created_by,
+        created_at, updated_at
       ) values (
         ${id}, ${input.workspaceId}, ${input.kind}, ${tx.json(input.payload)},
         ${tx.json(lines as never)}, ${tx.json(input.buyer as never)}, ${tx.json(seller as never)},
         ${deps.config.sac}, ${deps.config.gstPercent}, ${tax.taxablePaise}, ${tax.cgstPaise},
         ${tax.sgstPaise}, ${tax.igstPaise}, ${tax.totalPaise}, ${keys.mode}, ${remote.id},
-        ${input.createdBy}
+        ${input.createdBy}, ${createdAt}, ${createdAt}
       )
       returning *`;
+    await input.alongside?.(tx, id);
     await recordAudit(tx, {
       workspaceId: input.workspaceId,
       actorId: input.createdBy,
@@ -287,9 +333,12 @@ export interface IssuedInvoice {
 
 export interface FulfilmentResult {
   order: BillingOrder;
-  invoice: IssuedInvoice;
-  /** False when the order had been fulfilled before this call. */
+  /** Null when the payment was not applied: nothing was delivered, so nothing is invoiced. */
+  invoice: IssuedInvoice | null;
+  /** False when the order had been settled before this call. */
   fresh: boolean;
+  /** Why the payment delivered nothing, when it did not. */
+  unapplied: UnappliedReason | null;
 }
 
 /** The payment does not belong to the order, or is not for its exact amount. */
@@ -303,21 +352,49 @@ export class PaymentMismatchError extends AppError {
   }
 }
 
-async function nextInvoiceNumber(tx: Tx, config: BillingConfig, order: BillingOrder, now: Date) {
+/**
+ * Why a payment for this order must not deliver anything, before its kind is even asked: the
+ * order was opened with test keys on an install that is now live, or the payment was made
+ * after the order's prices stopped standing. A payment made in time counts however late the
+ * news of it arrives.
+ */
+function refusedUpFront(
+  config: BillingConfig,
+  order: BillingOrder,
+  payment: RazorpayPayment,
+  now: Date,
+): UnappliedReason | null {
+  if (config.live && order.mode !== 'live') return 'test_order';
+  const paidAt = payment.createdAt ?? now;
+  if (paidAt.getTime() - order.createdAt.getTime() > config.orderWindowMs) return 'expired';
+  return null;
+}
+
+/**
+ * One lock for every invoice number, taken before the clock is read, so numbers, dates and
+ * the financial year in the prefix all run in the same order.
+ */
+async function nextInvoice(tx: Tx, deps: BillingDeps, order: BillingOrder) {
+  await tx`select pg_advisory_xact_lock(hashtext('cvs_invoice_number'))`;
+  const issuedAt = deps.now();
   // Test payments get their own series, so the tax series has no gaps and no test documents.
   const prefix =
-    order.mode === 'test' ? seriesPrefix('T-{FYS}-', now) : seriesPrefix(config.series, now);
+    order.mode === 'test'
+      ? seriesPrefix('T-{FYS}-', issuedAt)
+      : seriesPrefix(deps.config.series, issuedAt);
   const [row] = await tx<{ last_sequence: number }[]>`
     insert into app_invoice_counters (prefix, last_sequence) values (${prefix}, 1)
     on conflict (prefix) do update set last_sequence = app_invoice_counters.last_sequence + 1
     returning last_sequence`;
-  return invoiceNumber(prefix, row!.last_sequence);
+  return { number: invoiceNumber(prefix, row!.last_sequence), issuedAt };
 }
 
 /**
  * Marks an order paid, delivers what it bought and issues its invoice, all in one transaction
  * with the order row locked. Safe to call any number of times, from the browser confirmation
- * and from webhooks at once: only the first call does anything.
+ * and from webhooks at once: only the first call does anything. A payment for an order that
+ * can no longer be honoured is recorded as `paid_unapplied` instead: nothing is delivered, no
+ * invoice is issued and the operator is told to refund it.
  */
 export async function fulfilOrder(
   sql: postgres.Sql,
@@ -331,10 +408,19 @@ export async function fulfilOrder(
       select * from app_billing_orders where razorpay_order_id = ${razorpayOrderId} for update`;
     if (!row) throw new AppError('NOT_FOUND', 'Order not found');
     const order = toOrder(row);
-    if (order.status === 'paid') {
+    if (
+      order.status === 'paid' ||
+      order.status === 'paid_unapplied' ||
+      order.status === 'refunded'
+    ) {
       const [invoice] = await tx<IssuedInvoice[]>`
         select id, number from app_invoices where order_id = ${order.id}`;
-      return { order, invoice: invoice!, fresh: false };
+      return {
+        order,
+        invoice: invoice ?? null,
+        fresh: false,
+        unapplied: invoice ? null : (row.unapplied_reason ?? 'expired'),
+      };
     }
     if (
       payment.status !== 'captured' ||
@@ -354,12 +440,35 @@ export async function fulfilOrder(
       where id = ${order.id}
       returning *`;
     const paidOrder = toOrder(paid!);
-    await handler(tx, paidOrder, { now });
-    const number = await nextInvoiceNumber(tx, deps.config, paidOrder, now);
+    const unapplied =
+      refusedUpFront(deps.config, order, payment, now) ??
+      (await handler(tx, paidOrder, { now }))?.unapplied ??
+      null;
+    if (unapplied) {
+      const [kept] = await tx<OrderRow[]>`
+        update app_billing_orders
+        set status = 'paid_unapplied', unapplied_reason = ${unapplied}
+        where id = ${order.id}
+        returning *`;
+      await recordAudit(tx, {
+        workspaceId: order.workspaceId,
+        action: 'billing.payment_unapplied',
+        target: order.id,
+        data: { paymentId: payment.id, totalPaise: order.tax.totalPaise, reason: unapplied },
+      });
+      await queueOperatorNotice(tx, {
+        kind: 'payment_unapplied',
+        orderId: order.id,
+        workspaceId: order.workspaceId,
+        data: { reason: unapplied },
+      });
+      return { order: toOrder(kept!), invoice: null, fresh: true, unapplied };
+    }
+    const { number, issuedAt } = await nextInvoice(tx, deps, paidOrder);
     const invoice = { id: randomId('inv'), number };
     await tx`
       insert into app_invoices (id, number, order_id, workspace_id, issued_at)
-      values (${invoice.id}, ${number}, ${order.id}, ${order.workspaceId}, ${now})`;
+      values (${invoice.id}, ${number}, ${order.id}, ${order.workspaceId}, ${issuedAt})`;
     await recordAudit(tx, {
       workspaceId: order.workspaceId,
       action: 'billing.payment_captured',
@@ -372,7 +481,7 @@ export async function fulfilOrder(
       target: invoice.id,
       data: { number, orderId: order.id, totalPaise: order.tax.totalPaise },
     });
-    return { order: paidOrder, invoice, fresh: true };
+    return { order: paidOrder, invoice, fresh: true, unapplied: null };
   });
 }
 
@@ -380,7 +489,18 @@ export type CheckoutOutcome =
   | { status: 'paid'; orderId: string; kind: OrderKind; invoice: IssuedInvoice }
   /** The payment exists but is not captured yet; the webhook finishes it. */
   | { status: 'pending' }
-  | { status: 'failed' };
+  | { status: 'failed' }
+  /**
+   * The order could no longer be honoured. `charged` says whether money was taken (and will
+   * be refunded) or the payment was left uncaptured.
+   */
+  | {
+      status: 'unapplied';
+      orderId: string;
+      kind: OrderKind;
+      reason: UnappliedReason;
+      charged: boolean;
+    };
 
 const UNVERIFIED =
   'This payment could not be verified. If money left your account it will be confirmed shortly; nothing needs to be paid again.';
@@ -419,6 +539,21 @@ export async function confirmCheckout(
   if (payment.orderId !== row.razorpay_order_id) throw new PaymentMismatchError();
   if (payment.status === 'authorized') {
     if (payment.amount !== Number(row.total_paise)) throw new PaymentMismatchError();
+    // An order that cannot be honoured any more is not captured, so no money is taken.
+    const order = toOrder(row);
+    const refused =
+      order.status === 'created' || order.status === 'expired'
+        ? refusedUpFront(deps.config, order, payment, deps.now())
+        : null;
+    if (refused) {
+      return {
+        status: 'unapplied',
+        orderId: order.id,
+        kind: order.kind,
+        reason: refused,
+        charged: false,
+      };
+    }
     payment = await razorpay
       .capturePayment(payment.id, payment.amount)
       // Another request or the account's auto-capture may have captured it first.
@@ -427,6 +562,15 @@ export async function confirmCheckout(
   if (payment.status === 'failed') return { status: 'failed' };
   if (payment.status !== 'captured') return { status: 'pending' };
   const result = await fulfilOrder(sql, deps, row.razorpay_order_id, payment);
+  if (!result.invoice) {
+    return {
+      status: 'unapplied',
+      orderId: result.order.id,
+      kind: result.order.kind,
+      reason: result.unapplied ?? 'expired',
+      charged: true,
+    };
+  }
   if (result.fresh) await afterFulfil(result);
   return {
     status: 'paid',
@@ -435,6 +579,20 @@ export async function confirmCheckout(
     invoice: result.invoice,
   };
 }
+
+const UNAPPLIED_WHY: Record<UnappliedReason, string> = {
+  expired: 'the order had expired before it was paid',
+  test_order: 'the order was opened while payments were in test mode',
+  term_changed: 'the Cloud term changed after the order was opened',
+  seat_limit: 'it would go over the most extra members a workspace can have',
+  plan_managed: 'the plan of this workspace is managed by our team',
+};
+
+/** What to tell the buyer whose payment delivered nothing. */
+export const unappliedMessage = (reason: UnappliedReason, charged: boolean) =>
+  charged
+    ? `Your payment was received but could not be applied, because ${UNAPPLIED_WHY[reason]}. Nothing was added and no invoice was issued. We have been told and will refund it; you do not need to do anything.`
+    : `This order can no longer be paid, because ${UNAPPLIED_WHY[reason]}. No money was taken; a hold on your account, if any, is released by your bank. Start again from this page.`;
 
 export type WebhookOutcome = 'processed' | 'duplicate' | 'ignored';
 
@@ -475,7 +633,7 @@ export async function handleRazorpayWebhook(
     if (known) {
       try {
         const result = await fulfilOrder(sql, deps, orderId, payment);
-        if (result.fresh) await afterFulfil(result);
+        if (result.fresh && result.invoice) await afterFulfil(result);
         outcome = 'processed';
       } catch (err) {
         if (!(err instanceof PaymentMismatchError)) throw err;
@@ -488,12 +646,107 @@ export async function handleRazorpayWebhook(
       }
     }
   }
+  if (await reverseFromWebhook(sql, deps, webhook)) outcome = 'processed';
   if (eventId) {
     await sql`
       insert into app_razorpay_events (event_id, event) values (${eventId}, ${webhook.event})
       on conflict (event_id) do nothing`;
   }
   return outcome;
+}
+
+const NOTICE_ONLY: Record<string, 'refund_started' | 'payment_disputed'> = {
+  'refund.created': 'refund_started',
+  'payment.dispute.created': 'payment_disputed',
+};
+const REVERSING: Record<string, 'payment_refunded' | 'dispute_lost'> = {
+  'refund.processed': 'payment_refunded',
+  'payment.dispute.lost': 'dispute_lost',
+};
+
+/**
+ * Acts on a refund or a dispute. A refund processed in full, or a lost dispute, marks the
+ * order refunded and takes back what it delivered as far as that is still unused; anything
+ * else only tells the operator. Either way the order row is locked and the event leaves an
+ * audit row. False when the event is not about a payment of one of our orders.
+ */
+async function reverseFromWebhook(
+  sql: postgres.Sql,
+  deps: BillingDeps,
+  webhook: RazorpayWebhook,
+): Promise<boolean> {
+  const noticeOnly = NOTICE_ONLY[webhook.event];
+  const reversing = REVERSING[webhook.event];
+  const paymentId = webhook.reversal?.paymentId ?? webhook.payment?.id;
+  if ((!noticeOnly && !reversing) || !paymentId) return false;
+  const now = deps.now();
+  return sql.begin(async (tx) => {
+    const [row] = await tx<OrderRow[]>`
+      select * from app_billing_orders where razorpay_payment_id = ${paymentId} for update`;
+    if (!row) return false;
+    const order = toOrder(row);
+    const amount = webhook.reversal?.amount ?? null;
+    const refundedInFull =
+      webhook.event === 'payment.dispute.lost' ||
+      webhook.payment?.status === 'refunded' ||
+      (webhook.payment?.amountRefunded ?? 0) >= order.tax.totalPaise ||
+      (amount ?? 0) >= order.tax.totalPaise;
+    const base = { event: webhook.event, amountPaise: amount };
+    if (!reversing || !refundedInFull || order.status === 'refunded') {
+      if (order.status === 'refunded') return true;
+      await recordAudit(tx, {
+        workspaceId: order.workspaceId,
+        action: 'billing.refund_noted',
+        target: order.id,
+        data: { ...base, paymentId, partial: Boolean(reversing) },
+      });
+      await queueOperatorNotice(tx, {
+        kind: noticeOnly ?? 'refund_started',
+        orderId: order.id,
+        workspaceId: order.workspaceId,
+        data: { ...base, partial: Boolean(reversing) },
+      });
+      return true;
+    }
+    const delivered = order.status === 'paid';
+    const [refunded] = await tx<OrderRow[]>`
+      update app_billing_orders
+      set status = 'refunded', reversed_at = ${now}, updated_at = ${now}
+      where id = ${order.id}
+      returning *`;
+    const taken = delivered
+      ? ((await reversals().get(order.kind)?.(tx, toOrder(refunded!), { now })) ?? {})
+      : {};
+    await recordAudit(tx, {
+      workspaceId: order.workspaceId,
+      action: 'billing.payment_refunded',
+      target: order.id,
+      data: { ...base, paymentId, ...taken },
+    });
+    // A refund of a payment that was never applied is the operator's own doing.
+    if (delivered) {
+      await queueOperatorNotice(tx, {
+        kind: reversing,
+        orderId: order.id,
+        workspaceId: order.workspaceId,
+        data: { ...base, ...taken },
+      });
+    }
+    return true;
+  });
+}
+
+/**
+ * Marks orders nobody paid within the payment window as expired. A payment made in time for
+ * one of them is still honoured when the news of it arrives late.
+ */
+export async function expireOrders(sql: Sql, deps: Pick<BillingDeps, 'config' | 'now'>) {
+  const now = deps.now();
+  const rows = await sql`
+    update app_billing_orders set status = 'expired', updated_at = ${now}
+    where status = 'created' and created_at < ${new Date(now.getTime() - deps.config.orderWindowMs)}
+    returning id`;
+  return rows.length;
 }
 
 /** Deletes webhook delivery ids older than 30 days; Razorpay retries for one day. */
@@ -507,6 +760,7 @@ async function finishInvoiceQuietly(
   deps: BillingDeps,
   result: FulfilmentResult,
 ) {
+  if (!result.invoice) return;
   await finishInvoice(sql, deps, result.invoice.id).catch((err: unknown) =>
     console.error('[billing] invoice', err instanceof Error ? err.message : err),
   );

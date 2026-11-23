@@ -16,7 +16,13 @@ import {
 import { saveBillingDetails } from '../billing/details';
 import { listInvoices } from '../billing/invoices';
 import { enforceBillingLimit } from '../billing/limits';
-import { confirmCheckout, type CheckoutSession, type OrderKind } from '../billing/orders';
+import {
+  confirmCheckout,
+  unappliedMessage,
+  type CheckoutSession,
+  type OrderKind,
+} from '../billing/orders';
+import { AppError } from '../errors';
 import { summarizeInvoice, type InvoiceSummary } from '../billing/overview';
 import { billingDeps } from '../billing/runtime';
 import { workspacePlan } from '../plans';
@@ -81,6 +87,9 @@ export const confirmPaymentAction = workspaceAction(
       paymentId: input.paymentId,
       signature: input.signature,
     });
+    if (outcome.status === 'unapplied') {
+      throw new AppError('CONFLICT', unappliedMessage(outcome.reason, outcome.charged));
+    }
     if (outcome.status !== 'paid') return { status: outcome.status };
     refresh(ctx.workspace.slug);
     return {

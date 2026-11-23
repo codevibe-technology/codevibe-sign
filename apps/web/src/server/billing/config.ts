@@ -104,6 +104,8 @@ export interface BillingConfig {
     graceDays: number;
   };
   installHelpPaise: Paise;
+  /** How long after an order is opened a payment for it is still honoured. */
+  orderWindowMs: number;
   /** Where notifications for the operator go. */
   operatorEmail: string | null;
   hostingOffers: HostingOffer[];
@@ -386,6 +388,7 @@ export function billingConfig(source: Source = process.env): BillingConfig {
       graceDays: whole(source, 'CLOUD_GRACE_DAYS', 7, 0, 90),
     },
     installHelpPaise: amount(source, 'INSTALL_HELP_PRICE_INR', '1999'),
+    orderWindowMs: whole(source, 'ORDER_PAYMENT_WINDOW_MINUTES', 30, 5, 1440) * 60_000,
     operatorEmail,
     hostingOffers: hostingOffers(source),
     leegality: live && esignAccount?.environment === 'sandbox' ? null : esignAccount,

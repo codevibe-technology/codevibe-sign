@@ -353,6 +353,7 @@ describe('Razorpay signatures', () => {
     expect(parseWebhook(body)).toEqual({
       event: 'payment.captured',
       orderId: 'order_XYZ98765',
+      reversal: null,
       payment: {
         id: 'pay_ABC123456',
         orderId: 'order_XYZ98765',
@@ -367,7 +368,13 @@ describe('Razorpay signatures', () => {
       event: 'refund.created',
       payment: null,
       orderId: null,
+      reversal: null,
     });
+    expect(
+      parseWebhook(
+        '{"event":"refund.processed","payload":{"refund":{"entity":{"id":"rfnd_ABC12345","payment_id":"pay_ABC123456","amount":500}}}}',
+      )?.reversal,
+    ).toEqual({ paymentId: 'pay_ABC123456', amount: 500 });
     expect(
       parseWebhook(
         '{"event":"payment.captured","payload":{"payment":{"entity":{"id":"../x","amount":1}}}}',

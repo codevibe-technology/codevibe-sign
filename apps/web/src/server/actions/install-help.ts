@@ -11,7 +11,7 @@ import {
   enforceBookingLimit,
   notifyInstallBookings,
 } from '../billing/install-help';
-import { confirmCheckout, type CheckoutSession } from '../billing/orders';
+import { confirmCheckout, unappliedMessage, type CheckoutSession } from '../billing/orders';
 import { billingDeps } from '../billing/runtime';
 import { isHosted } from '../plans';
 import { publicAction } from './action';
@@ -53,6 +53,9 @@ export const confirmInstallHelpAction = publicAction(
       paymentId: input.paymentId,
       signature: input.signature,
     });
+    if (outcome.status === 'unapplied') {
+      throw new AppError('CONFLICT', unappliedMessage(outcome.reason, outcome.charged));
+    }
     if (outcome.status !== 'paid') return { status: outcome.status };
     if (outcome.kind !== 'install_help') throw new AppError('NOT_FOUND', 'Order not found');
     await notifyInstallBookings(sql, deps);

@@ -20,6 +20,10 @@ export interface RazorpayPayment {
   status: string;
   /** How it was paid: `upi`, `card`, `netbanking`, `wallet` and so on, when the service says. */
   method?: string | undefined;
+  /** When the payer made the payment, when the service says. */
+  createdAt?: Date | undefined;
+  /** How much of it has been refunded so far. */
+  amountRefunded?: Paise | undefined;
 }
 
 export interface RazorpayClient {
@@ -70,6 +74,13 @@ function paymentOf(value: unknown): RazorpayPayment | null {
       typeof body.method === 'string' && /^[a-z_]{2,24}$/.test(body.method)
         ? body.method
         : undefined,
+    createdAt:
+      Number.isSafeInteger(body.created_at) && (body.created_at as number) > 0
+        ? new Date((body.created_at as number) * 1000)
+        : undefined,
+    amountRefunded: Number.isSafeInteger(body.amount_refunded)
+      ? (body.amount_refunded as number)
+      : undefined,
   };
 }
 
@@ -209,6 +220,8 @@ export interface RazorpayWebhook {
   event: string;
   payment: RazorpayPayment | null;
   orderId: string | null;
+  /** The refund or dispute an event is about: the payment it concerns and its amount. */
+  reversal: { paymentId: string; amount: Paise | null } | null;
 }
 
 /** Reads a webhook body that has already passed `verifyWebhookSignature`. Null when it is not one. */
@@ -224,8 +237,16 @@ export function parseWebhook(rawBody: string): RazorpayWebhook | null {
   const payload = record(body.payload);
   const payment = paymentOf(record(record(payload?.payment)?.entity));
   const order = record(record(payload?.order)?.entity);
+  const about = record(record(payload?.refund)?.entity) ?? record(record(payload?.dispute)?.entity);
   return {
     event: body.event,
+    reversal:
+      about && isRazorpayId(about.payment_id)
+        ? {
+            paymentId: about.payment_id,
+            amount: Number.isSafeInteger(about.amount) ? (about.amount as number) : null,
+          }
+        : null,
     payment,
     orderId: payment?.orderId ?? (isRazorpayId(order?.id) ? order.id : null),
   };
