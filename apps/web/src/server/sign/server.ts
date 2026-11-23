@@ -20,6 +20,7 @@ import { completedCopyAttachmentLimit } from '../mail-transport';
 import { appRuntime } from '../runtime';
 import { findMembership, workspaceTimeZone } from '../workspaces';
 import { planSettings } from '../plans';
+import { certificateSender, ensurePublicRecord, recordUrl } from '../public-records';
 import { isSampleEnvelope } from '../sample-envelope';
 import { getTemplate } from '../templates';
 import { createWorkspaceMail } from './mail';
@@ -122,6 +123,16 @@ function build(): SignServer {
     certificateNote: async (workspaceId) =>
       (await getBrand(sql, workspaceId)).certificateFooter ??
       defaultCertificateNote(new URL(config.APP_URL).host),
+    certificateDetails: async ({ workspaceId, envelope }) => {
+      const [sender, recordId] = await Promise.all([
+        certificateSender(sql, workspaceId, envelope.id),
+        ensurePublicRecord(sql, { workspaceId, envelopeId: envelope.id }),
+      ]);
+      return {
+        ...(sender ? { sender } : {}),
+        ...(recordId ? { recordUrl: recordUrl(config.APP_URL, recordId) } : {}),
+      };
+    },
     basePath: SIGN_BASE_PATH,
     publicUrl: config.APP_URL,
     signingPageUrl: `${config.APP_URL}/sign`,

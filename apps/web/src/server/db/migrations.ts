@@ -326,4 +326,20 @@ create index app_workspace_address_changes_workspace_idx
 alter table app_invitations add column name text;
 `,
   },
+  {
+    name: '0012_public_records',
+    sql: `
+alter table app_workspaces add column public_records boolean not null default true;
+
+create table app_public_records (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  envelope_id text not null unique,
+  created_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  revoked_by text references auth_users (id) on delete set null
+);
+create index app_public_records_workspace_idx on app_public_records (workspace_id);
+`,
+  },
 ];
