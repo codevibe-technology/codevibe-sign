@@ -547,7 +547,8 @@ export function Landing({
             </ul>
           </div>
 
-          <figure className="enter relative mx-auto mt-14 max-w-6xl [--enter-order:5]">
+          {/* On a desktop the frame and its caption stay within one screen under the header. */}
+          <figure className="enter relative mx-auto mt-14 max-w-6xl [--enter-order:5] md:max-w-[min(72rem,calc((100svh-11rem)*1.6))]">
             <Toast
               icon={Check}
               tone="green"
@@ -682,9 +683,9 @@ export function Landing({
         <section
           id="proof"
           aria-labelledby="proof-title"
-          className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+          className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:scroll-mt-16 lg:px-8 lg:py-10"
         >
-          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-20">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
             <div {...reveal()}>
               <p
                 className={cn(
@@ -700,11 +701,11 @@ export function Landing({
               >
                 Every signature comes with its evidence
               </h2>
-              <p className="mt-4 text-lg text-muted">
+              <p className="mt-4 text-lg text-muted lg:mt-3">
                 The signer sees the document only after typing a one-time code from their email.
                 Every step after that goes on a record you can show anyone.
               </p>
-              <ul className="mt-8 space-y-6">
+              <ul className="mt-8 space-y-6 lg:mt-6 lg:space-y-5">
                 {PROOF.map((item) => (
                   <li key={item.title} className="flex gap-4">
                     <IconTile icon={item.icon} tone={item.tone} />
@@ -715,7 +716,7 @@ export function Landing({
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-8 flex flex-wrap gap-3 lg:mt-6">
                 <Button pill asChild variant="secondary" className="h-11 px-5">
                   <Link href={VERIFY_URL}>Check a signed PDF</Link>
                 </Button>
