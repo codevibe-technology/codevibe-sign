@@ -245,9 +245,7 @@ function sealFollowsDirectly(bytes: Uint8Array, from: number): boolean {
     .toString('latin1');
   const count = (pattern: RegExp) => [...tail.matchAll(pattern)].length;
   return (
-    /^(\r\n|\r|\n)?\d+ \d+ obj\b/.test(tail) &&
-    count(/startxref/g) === 1 &&
-    count(/%%EOF/g) === 1
+    /^(\r\n|\r|\n)?\d+ \d+ obj\b/.test(tail) && count(/startxref/g) === 1 && count(/%%EOF/g) === 1
   );
 }
 
