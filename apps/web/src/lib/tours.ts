@@ -143,7 +143,7 @@ export const SEND_TOUR: TourDefinition = {
       chapter: 'recipients',
       targets: ['[data-tour="identity-check"]', '[data-tour="recipients-add"]'],
       title: 'Identity check',
-      body: 'Choose how each signer proves who they are: the email link, a code by email or SMS, or Aadhaar eSign as an identity check.',
+      body: 'Choose how each signer proves who they are: the email link alone, the email link with a code, or Aadhaar eSign as an identity check.',
     },
     {
       id: 'signer',
