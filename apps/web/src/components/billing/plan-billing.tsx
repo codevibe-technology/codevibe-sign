@@ -33,7 +33,10 @@ export interface PlanBillingProps {
   testMode: boolean;
   hasBillingDetails: boolean;
   /** Admins and owners pay; everyone else reads. */
+  /** The signed-in person owns the account this workspace is on. */
   canManage: boolean;
+  /** The account owner's name, for everyone else. */
+  managedBy?: string | null;
 }
 
 const MAX_SEATS = 500;
@@ -95,6 +98,7 @@ export function PlanBilling({
   testMode,
   hasBillingDetails,
   canManage,
+  managedBy = null,
 }: PlanBillingProps) {
   const router = useRouter();
   const [term, setTerm] = useState<Term>(subscription.term ?? 'month');
@@ -161,7 +165,11 @@ export function PlanBilling({
       <span className="ml-1">Paying for Cloud opens shortly. Nothing here can be charged yet.</span>
     </p>
   ) : !canManage ? (
-    <p className="text-sm text-muted">An admin or owner of this workspace can change the plan.</p>
+    <p className="text-sm text-muted" data-testid="plan-managed-by">
+      {managedBy
+        ? `This workspace is on ${managedBy}'s account. Only they can change the plan or pay for it.`
+        : 'Only the owner of the account this workspace is on can change the plan or pay for it.'}
+    </p>
   ) : !hasBillingDetails ? (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-muted">

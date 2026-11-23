@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition, type FormEvent } from 'react';
+import { UpgradePrompt, type UpgradeLimit } from '@/components/billing/upgrade-prompt';
 import { AddressField, blocksSubmit, useAddressCheck } from '@/components/workspace/address-field';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
@@ -27,6 +28,9 @@ export function CreateWorkspaceForm({
   const [slug, setSlug] = useState('');
   const [edited, setEdited] = useState(false);
   const [errors, setErrors] = useState<{ yourName?: string; name?: string; slug?: string }>({});
+  const [limit, setLimit] = useState<{ message: string; limit?: UpgradeLimit | undefined } | null>(
+    null,
+  );
   const [pending, start] = useTransition();
   const check = useAddressCheck(slug);
 
@@ -68,6 +72,10 @@ export function CreateWorkspaceForm({
         router.push(`/dashboard/${result.data.slug}`);
         return;
       }
+      if (result.code === 'PLAN_LIMIT') {
+        setLimit({ message: result.error, limit: result.limit });
+        return;
+      }
       const field = result.field === 'name' || result.field === 'yourName' ? result.field : 'slug';
       setErrors({ [field]: result.error });
     });
@@ -75,6 +83,7 @@ export function CreateWorkspaceForm({
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
+      {limit ? <UpgradePrompt message={limit.message} limit={limit.limit} /> : null}
       {askName ? (
         <Field
           label="Your name"

@@ -36,6 +36,53 @@ const meters: UsageMeter[] = [
 ];
 
 describe('PlanUsage', () => {
+  it('breaks the usage of the account down by workspace and marks the one you are in', () => {
+    render(
+      <PlanUsage
+        plan="free"
+        limits={FREE_PLAN_LIMITS}
+        meters={meters}
+        currentWorkspaceId="ws_2"
+        workspaces={[
+          {
+            id: 'ws_1',
+            slug: 'acme-hr',
+            name: 'Acme HR',
+            members: 2,
+            activeTemplates: 1,
+            envelopes: 7,
+            apiRequests: 40,
+            storageText: '12 MB',
+            esigns: 3,
+          },
+          {
+            id: 'ws_2',
+            slug: 'acme-legal',
+            name: 'Acme Legal',
+            members: 1,
+            activeTemplates: 1,
+            envelopes: 3,
+            apiRequests: 0,
+            storageText: '1 MB',
+            esigns: 0,
+          },
+        ]}
+      />,
+    );
+    const table = screen.getByTestId('workspace-breakdown');
+    expect(within(table).getByText(/one person in the count above/)).toBeInTheDocument();
+    const hr = within(screen.getByTestId('breakdown-acme-hr'));
+    expect(hr.getByText('Acme HR')).toBeInTheDocument();
+    expect(hr.getByText('40')).toBeInTheDocument();
+    expect(within(screen.getByTestId('breakdown-acme-legal')).getByText('(this one)')).toBeTruthy();
+    expect(screen.getByText(/Counted across every workspace on this account/)).toBeTruthy();
+  });
+
+  it('leaves the breakdown out when there is nothing to break down', () => {
+    render(<PlanUsage plan="free" limits={FREE_PLAN_LIMITS} meters={meters} />);
+    expect(screen.queryByTestId('workspace-breakdown')).toBeNull();
+  });
+
   it('shows the plan, every meter, the reset date and the way to pay', () => {
     render(
       <PlanUsage

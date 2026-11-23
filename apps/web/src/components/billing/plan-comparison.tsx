@@ -30,7 +30,7 @@ export function PlanComparison({
     <Card data-testid="plan-comparison">
       <CardHeader
         title="Free and Cloud"
-        description={`Cloud is ${pricing.cloudMonth} a month for a workspace, or ${pricing.cloudYear} a year, plus ${pricing.gstPercent}% GST.`}
+        description={`Cloud is ${pricing.cloudMonth} a month for your account and all its workspaces, or ${pricing.cloudYear} a year, plus ${pricing.gstPercent}% GST.`}
       />
       <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-4 border-b border-line px-5 py-2.5 text-[13px] font-semibold sm:grid">
         <span className="text-muted">What you get</span>

@@ -118,6 +118,23 @@ describe('EsignSettingsPanel', () => {
     expect(container.textContent).not.toMatch(/markup|at cost|provider cost|\+ ₹10/i);
   });
 
+  it('shows an admin who does not own the account everything, and lets them change nothing', () => {
+    render(
+      <EsignSettingsPanel
+        workspaceId="ws_1"
+        slug="acme"
+        overview={esign()}
+        canManage={false}
+        managedBy="Asha Rao"
+      />,
+    );
+    expect(screen.getByTestId('managed-by')).toHaveTextContent('Managed by Asha Rao.');
+    expect(document.querySelector('fieldset')).toBeDisabled();
+    for (const button of document.querySelectorAll('fieldset button')) {
+      expect(button).toBeDisabled();
+    }
+  });
+
   it('says price coming soon while none is published', () => {
     render(
       <EsignSettingsPanel
@@ -231,6 +248,7 @@ describe('EsignSettingsPanel', () => {
   it('lists recent eSigns with what happened to the credit', () => {
     const line = {
       ref: 'a',
+      accountId: 'acct_1',
       workspaceId: 'ws_1',
       envelopeId: 'env_1',
       recipientId: 'r1',
@@ -240,6 +258,7 @@ describe('EsignSettingsPanel', () => {
       startedAt: '2026-11-23T10:00:00.000Z',
       endedAt: '2026-11-23T10:02:00.000Z',
       envelopeTitle: 'Appointment letter',
+      workspaceName: 'Acme',
     };
     render(
       <EsignSettingsPanel

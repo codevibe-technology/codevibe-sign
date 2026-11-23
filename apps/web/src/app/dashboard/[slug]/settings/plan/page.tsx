@@ -4,7 +4,7 @@ import { PlanBilling } from '@/components/billing/plan-billing';
 import { PlanComparison } from '@/components/billing/plan-comparison';
 import { PlanUsage } from '@/components/settings/plan-usage';
 import { planFeatures } from '@/lib/plans';
-import { can } from '@/lib/roles';
+import { accountOfWorkspace, accountOwnerName } from '@/server/accounts';
 import { requireWorkspace } from '@/server/auth/guards';
 import { billingConfig } from '@/server/billing/config';
 import { getBillingDetails } from '@/server/billing/details';
@@ -26,15 +26,18 @@ function prices() {
 
 export default async function PlanSettings({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { workspace, role } = await requireWorkspace(slug);
+  const { workspace, user } = await requireWorkspace(slug);
   if (!isHosted()) notFound();
   const sql = db();
   const settings = planSettings();
   const pricing = currentPricing();
-  const [report, subscription, details] = await Promise.all([
+  const account = await accountOfWorkspace(sql, workspace.id);
+  const canManage = account.ownerUserId === user.id;
+  const [report, subscription, details, owner] = await Promise.all([
     usageReport(sql, workspace.id),
-    subscriptionView(sql, workspace.id, new Date()),
-    getBillingDetails(sql, workspace.id),
+    subscriptionView(sql, account.id, new Date()),
+    getBillingDetails(sql, account.id),
+    canManage ? null : accountOwnerName(sql, workspace.id),
   ]);
   return (
     <>
@@ -42,6 +45,12 @@ export default async function PlanSettings({ params }: { params: Promise<{ slug:
         plan={report.plan}
         limits={report.limits}
         meters={report.lines}
+        workspaces={
+          // Only the account owner is sure to be in every workspace; others see their own.
+          canManage ? report.workspaces : report.workspaces.filter((w) => w.id === workspace.id)
+        }
+        currentWorkspaceId={workspace.id}
+        wholeAccount={canManage}
         billing={
           report.plan === 'unlimited' && subscription.state !== 'managed' ? null : (
             <PlanBilling
@@ -52,7 +61,8 @@ export default async function PlanSettings({ params }: { params: Promise<{ slug:
               paymentsOpen={pricing.paymentsOpen}
               testMode={pricing.testMode}
               hasBillingDetails={details !== null}
-              canManage={can(role, 'billing.manage')}
+              canManage={canManage}
+              managedBy={owner}
             />
           )
         }

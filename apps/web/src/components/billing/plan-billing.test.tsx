@@ -154,7 +154,7 @@ describe('PlanBilling', () => {
     expect(screen.queryByRole('button', { name: 'Upgrade to Cloud' })).toBeNull();
     unmount();
     show({ canManage: false });
-    expect(screen.getByText(/An admin or owner/)).toBeInTheDocument();
+    expect(screen.getByText(/Only the owner of the account/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Upgrade to Cloud' })).toBeNull();
   });
 
@@ -259,7 +259,9 @@ describe('PlanComparison', () => {
     const features = planFeatures({ mode: 'hosted', freeOverrides: {} });
     render(<PlanComparison features={features} pricing={PRICING} current="free" />);
     const table = screen.getByTestId('plan-comparison');
-    expect(table).toHaveTextContent('Cloud is ₹999 a month for a workspace, or ₹9,990 a year');
+    expect(table).toHaveTextContent(
+      'Cloud is ₹999 a month for your account and all its workspaces, or ₹9,990 a year',
+    );
     for (const row of features) expect(within(table).getByText(row.label)).toBeInTheDocument();
     expect(table).toHaveTextContent('₹35 per eSign, prepaid');
     expect(table).toHaveTextContent('Price coming soon, prepaid');

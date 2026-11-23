@@ -200,7 +200,11 @@ describe('Landing', () => {
     );
     const pricing = document.getElementById('pricing')!;
     expect(within(pricing).getByText('Envelopes sent: 20 envelopes a month')).toBeTruthy();
-    expect(within(pricing).getByText(`Members: ${FREE_PLAN_LIMITS.members} members`)).toBeTruthy();
+    expect(
+      within(pricing).getByText(
+        `Members: ${FREE_PLAN_LIMITS.members} members across your workspaces`,
+      ),
+    ).toBeTruthy();
     expect(within(pricing).getByText('Webhooks: not included')).toBeTruthy();
     expect(within(pricing).getByText('Envelopes sent: unlimited')).toBeTruthy();
     expect(within(pricing).getByText('₹999')).toBeTruthy();

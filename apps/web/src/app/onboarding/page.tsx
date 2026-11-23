@@ -1,11 +1,13 @@
 import { Lock } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { UpgradePrompt } from '@/components/billing/upgrade-prompt';
 import { AuthFrame, StatusPage } from '@/components/shell/status-page';
 import { hasName } from '@/lib/person-name';
 import { requireUser } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { env } from '@/server/env';
-import { countWorkspaces, listWorkspacesForUser } from '@/server/workspaces';
+import { countWorkspaces, listWorkspacesForUser, newWorkspaceBlock } from '@/server/workspaces';
 import { CreateWorkspaceForm } from './create-workspace-form';
 
 export const metadata: Metadata = { title: 'Create a workspace' };
@@ -23,6 +25,36 @@ export default async function OnboardingPage() {
     );
   }
   const existing = await listWorkspacesForUser(sql, user.id);
+  const block = await newWorkspaceBlock(sql, user.id);
+  if (block) {
+    return (
+      <AuthFrame>
+        <p className="eyebrow">New workspace</p>
+        <h1 className="mt-2 text-[26px] leading-tight font-bold">
+          Your plan includes one workspace
+        </h1>
+        <p className="mt-1.5 mb-5 text-muted">
+          On Cloud you can create as many workspaces as you need under one subscription, with
+          members, templates and usage shared across them.
+        </p>
+        <UpgradePrompt
+          message={block.error.message}
+          limit={block.error.details()}
+          slug={block.slug ?? undefined}
+        />
+        {block.slug ? (
+          <p className="mt-5 text-sm">
+            <Link
+              className="font-semibold text-primary underline"
+              href={`/dashboard/${block.slug}`}
+            >
+              Back to your workspace
+            </Link>
+          </p>
+        ) : null}
+      </AuthFrame>
+    );
+  }
   return (
     <AuthFrame>
       <p className="eyebrow">

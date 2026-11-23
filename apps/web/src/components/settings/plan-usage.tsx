@@ -14,10 +14,23 @@ export interface UsageMeter {
   resetsAt: string | null;
 }
 
+/** What one workspace adds to the account's counts. */
+export interface WorkspaceBreakdown {
+  id: string;
+  slug: string;
+  name: string;
+  members: number;
+  activeTemplates: number;
+  envelopes: number;
+  apiRequests: number;
+  storageText: string;
+  esigns: number;
+}
+
 const PLAN_LINES: Record<Plan, string> = {
   free: 'Free while you try it out, with room for a small team.',
   cloud: 'For teams that send every day: no monthly envelope count, webhooks and your own brand.',
-  unlimited: 'No limits on this workspace.',
+  unlimited: 'No limits on this account.',
 };
 
 function tone(used: number, max: number) {
@@ -27,16 +40,27 @@ function tone(used: number, max: number) {
   return { bar: 'bg-primary', badge: null, text: null };
 }
 
-/** The workspace's plan, how to pay for it, and a meter for every running limit. */
+/**
+ * The plan of the account a workspace is on, how to pay for it, a meter for every running
+ * limit counted over all the account's workspaces, and what each workspace adds.
+ */
 export function PlanUsage({
   plan,
   limits,
   meters,
+  workspaces = [],
+  wholeAccount = true,
+  currentWorkspaceId,
   billing,
 }: {
   plan: Plan;
   limits: PlanLimits;
   meters: UsageMeter[];
+  /** The workspaces on the account the reader may see, for the breakdown. */
+  workspaces?: WorkspaceBreakdown[];
+  /** False when only the reader's own workspace is listed: they do not own the account. */
+  wholeAccount?: boolean;
+  currentWorkspaceId?: string;
   /** The part that pays for the plan; left out where nothing is sold. */
   billing?: ReactNode;
 }) {
@@ -58,7 +82,7 @@ export function PlanUsage({
       <Card>
         <CardHeader
           title="Usage"
-          description="Counted as things happen. Each monthly count says when it starts again."
+          description="Counted across every workspace on this account, as things happen. Each monthly count says when it starts again."
         />
         <ul className="divide-y divide-line">
           {meters.map((meter) => {
@@ -103,6 +127,69 @@ export function PlanUsage({
           })}
         </ul>
       </Card>
+
+      {workspaces.length > 0 ? (
+        <Card data-testid="workspace-breakdown">
+          <CardHeader
+            title="By workspace"
+            description={
+              wholeAccount
+                ? 'What each workspace on this account adds. Someone who is in several workspaces is one person in the count above.'
+                : 'What this workspace adds to the counts above. The account owner sees every workspace on the account here.'
+            }
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="text-xs text-muted">
+                <tr className="border-b border-line">
+                  <th scope="col" className="px-5 py-2 font-semibold">
+                    Workspace
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">
+                    Members
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">
+                    Templates
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">
+                    Envelopes
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">
+                    API requests
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-semibold">
+                    Stored
+                  </th>
+                  <th scope="col" className="px-5 py-2 text-right font-semibold">
+                    eSigns
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {workspaces.map((row) => (
+                  <tr key={row.id} data-testid={`breakdown-${row.slug}`}>
+                    <th scope="row" className="px-5 py-3 font-semibold">
+                      {row.name}
+                      {row.id === currentWorkspaceId ? (
+                        <span className="ml-2 font-normal text-muted">(this one)</span>
+                      ) : null}
+                    </th>
+                    <td className="px-3 py-3 text-right tabular-nums">{row.members}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{row.activeTemplates}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{row.envelopes}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{row.apiRequests}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{row.storageText}</td>
+                    <td className="px-5 py-3 text-right tabular-nums">{row.esigns}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-5 py-3 text-xs text-muted">
+            Envelopes, API requests and eSigns are for the current month.
+          </p>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader title="Each send" description="These apply to every upload and bulk send." />

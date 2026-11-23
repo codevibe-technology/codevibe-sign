@@ -11,6 +11,7 @@ import { Field, Input, NativeSelect } from '@/components/ui/field';
 import { LocalTime } from '@/components/ui/local-time';
 import { formatInr } from '@/lib/billing/money';
 import { cn } from '@/lib/cn';
+import { ManagedBy } from '@/components/billing/managed-by';
 import { planPagePath } from '@/lib/plans';
 import {
   removeEsignCredentialsAction,
@@ -101,10 +102,16 @@ export function EsignSettingsPanel({
   workspaceId,
   slug,
   overview,
+  canManage = true,
+  managedBy = null,
 }: {
   workspaceId: string;
   slug: string;
   overview: EsignOverview;
+  /** False for an admin who does not own the account: everything is shown, nothing can change. */
+  canManage?: boolean;
+  /** The account owner's name, for that admin. */
+  managedBy?: string | null;
 }) {
   const { settings, credits } = overview;
   const [sheet, setSheet] = useState(false);
@@ -145,275 +152,282 @@ export function EsignSettingsPanel({
 
   return (
     <>
-      <Card>
-        <CardHeader
-          title="Aadhaar eSign"
-          description="Ask a signer to sign with an Aadhaar one-time code through Leegality, a licensed eSign provider. Use it for documents a law requires to be signed; for most others the built-in signature is enough."
-          action={
-            overview.sandbox && settings.mode === 'platform' && overview.platformConfigured ? (
-              <Badge tone="warning">Test mode</Badge>
-            ) : undefined
-          }
-        />
-        <CardBody className="space-y-4">
-          {overview.blocked ? (
-            <p
-              role="status"
-              data-testid="esign-blocked"
-              className="rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-ink"
-            >
-              <span className="font-semibold">Sending with Aadhaar eSign is off. </span>
-              {overview.blocked.message}
-            </p>
-          ) : (
-            <p
-              role="status"
-              data-testid="esign-ready"
-              className="flex items-center gap-2 rounded-lg border border-success/40 bg-success-soft px-4 py-3 text-sm text-ink"
-            >
-              <ShieldCheck aria-hidden className="h-4 w-4 shrink-0 text-success" />
-              Ready. Choose Aadhaar eSign as the identity check for a signer when you send.
-            </p>
-          )}
+      {canManage ? null : (
+        <ManagedBy owner={managedBy} what="Aadhaar eSign and its credits are set up once" />
+      )}
+      <fieldset disabled={!canManage} className="m-0 min-w-0 space-y-6 border-0 p-0">
+        <Card>
+          <CardHeader
+            title="Aadhaar eSign"
+            description="Ask a signer to sign with an Aadhaar one-time code through Leegality, a licensed eSign provider. Use it for documents a law requires to be signed; for most others the built-in signature is enough."
+            action={
+              overview.sandbox && settings.mode === 'platform' && overview.platformConfigured ? (
+                <Badge tone="warning">Test mode</Badge>
+              ) : undefined
+            }
+          />
+          <CardBody className="space-y-4">
+            {overview.blocked ? (
+              <p
+                role="status"
+                data-testid="esign-blocked"
+                className="rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-ink"
+              >
+                <span className="font-semibold">Sending with Aadhaar eSign is off. </span>
+                {overview.blocked.message}
+              </p>
+            ) : (
+              <p
+                role="status"
+                data-testid="esign-ready"
+                className="flex items-center gap-2 rounded-lg border border-success/40 bg-success-soft px-4 py-3 text-sm text-ink"
+              >
+                <ShieldCheck aria-hidden className="h-4 w-4 shrink-0 text-success" />
+                Ready. Choose Aadhaar eSign as the identity check for a signer when you send.
+              </p>
+            )}
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <ModeCard
-              testId="esign-mode-platform"
-              selected={settings.mode === 'platform'}
-              title="Use Codevibe Sign's account"
-              badge={platformOff ? <Badge>Coming soon</Badge> : undefined}
-              footer={
-                <>
-                  {overview.creditsRequired && !platformOff ? (
-                    <Button asChild size="sm" variant="secondary">
-                      <Link href={billingHref}>Buy credits</Link>
-                    </Button>
-                  ) : null}
-                  {settings.mode !== 'platform' ? (
-                    <Button size="sm" pending={mode.pending} onClick={() => choose('platform')}>
-                      Use this
-                    </Button>
-                  ) : null}
-                </>
-              }
-            >
-              {platformOff ? (
-                <p>
-                  {overview.billingVisible
-                    ? 'Not switched on yet. You will be able to buy prepaid credits here and use them straight away.'
-                    : 'The operator of this server has not connected a Leegality account.'}
-                </p>
-              ) : overview.creditsRequired ? (
-                <>
-                  <p>Nothing to set up. Each completed eSign uses one prepaid credit.</p>
-                  <dl className="grid grid-cols-2 gap-2 pt-1 text-ink">
-                    <div className="rounded-lg border border-line bg-surface px-3 py-2">
-                      <dt className="text-[12px] text-muted">Credits left</dt>
-                      <dd className="font-display text-xl font-bold" data-testid="esign-credits">
-                        {credits.available}
-                      </dd>
-                      {credits.reserved > 0 ? (
-                        <dd className="text-[12px] text-muted">{credits.reserved} in use now</dd>
-                      ) : null}
-                      {overview.owed > 0 ? (
-                        <dd
-                          className="text-[12px] font-medium text-danger"
-                          data-testid="esign-owed"
-                        >
-                          {overview.owed === 1 ? '1 eSign owed' : `${overview.owed} eSigns owed`}.
-                          New credits pay for {overview.owed === 1 ? 'it' : 'them'} first.
-                        </dd>
-                      ) : null}
-                    </div>
-                    <div className="rounded-lg border border-line bg-surface px-3 py-2">
-                      <dt className="text-[12px] text-muted">Price</dt>
-                      <dd className="text-[15px] font-semibold" data-testid="esign-price">
-                        {price}
-                      </dd>
-                      <dd className="text-[12px] text-muted">plus GST</dd>
-                    </div>
-                  </dl>
-                  <p>A credit is held when a signer starts and comes back if they do not finish.</p>
-                </>
-              ) : (
-                <p>Uses the Leegality account set up for this server. No credits are needed.</p>
-              )}
-            </ModeCard>
-
-            <ModeCard
-              testId="esign-mode-own"
-              selected={settings.mode === 'own'}
-              title="Use your own Leegality account"
-              badge={
-                !overview.ownAllowed ? (
-                  <Badge tone="accent">Cloud plan</Badge>
-                ) : settings.own.environment === 'sandbox' ? (
-                  <Badge tone="warning">Sandbox</Badge>
-                ) : undefined
-              }
-              footer={
-                overview.ownAllowed ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <ModeCard
+                testId="esign-mode-platform"
+                selected={settings.mode === 'platform'}
+                title="Use Codevibe Sign's account"
+                badge={platformOff ? <Badge>Coming soon</Badge> : undefined}
+                footer={
                   <>
-                    <Button size="sm" variant="secondary" onClick={() => setSheet(true)}>
-                      <PlugZap aria-hidden className="h-4 w-4" />
-                      {settings.own.configured ? 'Replace details' : 'Connect account'}
-                    </Button>
-                    {settings.own.configured ? (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        pending={test.pending}
-                        onClick={() =>
-                          test.run(() => testEsignConnectionAction({ workspaceId }), {
-                            onSuccess: setTestResult,
-                          })
-                        }
-                      >
-                        Test connection
+                    {overview.creditsRequired && !platformOff ? (
+                      <Button asChild size="sm" variant="secondary">
+                        <Link href={billingHref}>Buy credits</Link>
                       </Button>
                     ) : null}
-                    {settings.own.configured && settings.mode !== 'own' ? (
-                      <Button size="sm" pending={mode.pending} onClick={() => choose('own')}>
+                    {settings.mode !== 'platform' ? (
+                      <Button size="sm" pending={mode.pending} onClick={() => choose('platform')}>
                         Use this
                       </Button>
                     ) : null}
-                    {settings.own.configured ? (
-                      <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(true)}>
-                        Remove
+                  </>
+                }
+              >
+                {platformOff ? (
+                  <p>
+                    {overview.billingVisible
+                      ? 'Not switched on yet. You will be able to buy prepaid credits here and use them straight away.'
+                      : 'The operator of this server has not connected a Leegality account.'}
+                  </p>
+                ) : overview.creditsRequired ? (
+                  <>
+                    <p>Nothing to set up. Each completed eSign uses one prepaid credit.</p>
+                    <dl className="grid grid-cols-2 gap-2 pt-1 text-ink">
+                      <div className="rounded-lg border border-line bg-surface px-3 py-2">
+                        <dt className="text-[12px] text-muted">Credits left</dt>
+                        <dd className="font-display text-xl font-bold" data-testid="esign-credits">
+                          {credits.available}
+                        </dd>
+                        {credits.reserved > 0 ? (
+                          <dd className="text-[12px] text-muted">{credits.reserved} in use now</dd>
+                        ) : null}
+                        {overview.owed > 0 ? (
+                          <dd
+                            className="text-[12px] font-medium text-danger"
+                            data-testid="esign-owed"
+                          >
+                            {overview.owed === 1 ? '1 eSign owed' : `${overview.owed} eSigns owed`}.
+                            New credits pay for {overview.owed === 1 ? 'it' : 'them'} first.
+                          </dd>
+                        ) : null}
+                      </div>
+                      <div className="rounded-lg border border-line bg-surface px-3 py-2">
+                        <dt className="text-[12px] text-muted">Price</dt>
+                        <dd className="text-[15px] font-semibold" data-testid="esign-price">
+                          {price}
+                        </dd>
+                        <dd className="text-[12px] text-muted">plus GST</dd>
+                      </div>
+                    </dl>
+                    <p>
+                      A credit is held when a signer starts and comes back if they do not finish.
+                    </p>
+                  </>
+                ) : (
+                  <p>Uses the Leegality account set up for this server. No credits are needed.</p>
+                )}
+              </ModeCard>
+
+              <ModeCard
+                testId="esign-mode-own"
+                selected={settings.mode === 'own'}
+                title="Use your own Leegality account"
+                badge={
+                  !overview.ownAllowed ? (
+                    <Badge tone="accent">Cloud plan</Badge>
+                  ) : settings.own.environment === 'sandbox' ? (
+                    <Badge tone="warning">Sandbox</Badge>
+                  ) : undefined
+                }
+                footer={
+                  overview.ownAllowed ? (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => setSheet(true)}>
+                        <PlugZap aria-hidden className="h-4 w-4" />
+                        {settings.own.configured ? 'Replace details' : 'Connect account'}
                       </Button>
+                      {settings.own.configured ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          pending={test.pending}
+                          onClick={() =>
+                            test.run(() => testEsignConnectionAction({ workspaceId }), {
+                              onSuccess: setTestResult,
+                            })
+                          }
+                        >
+                          Test connection
+                        </Button>
+                      ) : null}
+                      {settings.own.configured && settings.mode !== 'own' ? (
+                        <Button size="sm" pending={mode.pending} onClick={() => choose('own')}>
+                          Use this
+                        </Button>
+                      ) : null}
+                      {settings.own.configured ? (
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(true)}>
+                          Remove
+                        </Button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Button asChild size="sm" variant="secondary">
+                      <Link href={planPagePath(slug)}>See the Cloud plan</Link>
+                    </Button>
+                  )
+                }
+              >
+                {!overview.ownAllowed ? (
+                  <p className="flex gap-2">
+                    <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      Part of the Cloud plan. Leegality then bills you directly and no credits are
+                      used.
+                      {settings.mode === 'own'
+                        ? ' Your saved account is switched off until this workspace is on Cloud again.'
+                        : ''}
+                    </span>
+                  </p>
+                ) : settings.own.configured ? (
+                  <>
+                    <p>
+                      Connected. Auth Token ending{' '}
+                      <code className="rounded bg-surface-2 px-1 text-[13px] text-ink">
+                        {settings.own.keyHint}
+                      </code>
+                      , {settings.own.environment === 'production' ? 'production' : 'sandbox'}.
+                      Leegality bills you directly.
+                    </p>
+                    {settings.own.testedAt ? (
+                      <p data-testid="esign-test-state">
+                        {settings.own.testOk ? 'Last check passed ' : 'Last check failed '}
+                        <LocalTime iso={settings.own.testedAt} format="relative" />.
+                      </p>
                     ) : null}
                   </>
                 ) : (
-                  <Button asChild size="sm" variant="secondary">
-                    <Link href={planPagePath(slug)}>See the Cloud plan</Link>
-                  </Button>
-                )
-              }
-            >
-              {!overview.ownAllowed ? (
-                <p className="flex gap-2">
-                  <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Part of the Cloud plan. Leegality then bills you directly and no credits are
-                    used.
-                    {settings.mode === 'own'
-                      ? ' Your saved account is switched off until this workspace is on Cloud again.'
-                      : ''}
-                  </span>
-                </p>
-              ) : settings.own.configured ? (
-                <>
                   <p>
-                    Connected. Auth Token ending{' '}
-                    <code className="rounded bg-surface-2 px-1 text-[13px] text-ink">
-                      {settings.own.keyHint}
-                    </code>
-                    , {settings.own.environment === 'production' ? 'production' : 'sandbox'}.
-                    Leegality bills you directly.
+                    Enter your Leegality API details. Leegality bills you directly and no credits
+                    are used.
                   </p>
-                  {settings.own.testedAt ? (
-                    <p data-testid="esign-test-state">
-                      {settings.own.testOk ? 'Last check passed ' : 'Last check failed '}
-                      <LocalTime iso={settings.own.testedAt} format="relative" />.
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <p>
-                  Enter your Leegality API details. Leegality bills you directly and no credits are
-                  used.
-                </p>
-              )}
-              {testResult ? (
-                <p
-                  role="status"
-                  className={cn('font-medium', testResult.ok ? 'text-success' : 'text-danger')}
-                >
-                  {testResult.message}
-                </p>
-              ) : null}
-              {mode.errors.mode || mode.errors.credentials ? (
-                <p role="alert" className="text-danger">
-                  {mode.errors.mode ?? mode.errors.credentials}
-                </p>
-              ) : null}
-            </ModeCard>
-          </div>
+                )}
+                {testResult ? (
+                  <p
+                    role="status"
+                    className={cn('font-medium', testResult.ok ? 'text-success' : 'text-danger')}
+                  >
+                    {testResult.message}
+                  </p>
+                ) : null}
+                {mode.errors.mode || mode.errors.credentials ? (
+                  <p role="alert" className="text-danger">
+                    {mode.errors.mode ?? mode.errors.credentials}
+                  </p>
+                ) : null}
+              </ModeCard>
+            </div>
 
-          <p className="flex gap-2 text-[13px] text-muted">
-            <Fingerprint aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-            The signer types their Aadhaar number and one-time code on Leegality's page. Codevibe
-            Sign never sees or stores an Aadhaar number.
-          </p>
-        </CardBody>
-      </Card>
-
-      {overview.ownAllowed ? (
-        <Card>
-          <CardHeader
-            title="Set up your Leegality workflow"
-            description="Only for your own account. In Leegality, open the workflow whose ID you entered and set these."
-          />
-          <CardBody className="space-y-4">
-            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-              <li>Choose Aadhaar eSign as the signature type for the invitee.</li>
-              <li>Place the signature box where the signature should appear.</li>
-              <li>
-                Under the invitee's custom URLs and webhooks, paste the two addresses below and
-                choose webhook version 2.5.
-              </li>
-            </ol>
-            <CopyRow label="Webhook and error webhook" value={overview.webhookUrl} />
-            <CopyRow label="Redirect URL" value={overview.redirectUrl} />
-          </CardBody>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader title="Recent Aadhaar eSigns" description="The latest 20, newest first." />
-        {overview.usage.length ? (
-          <ul className="divide-y divide-line" data-testid="esign-usage">
-            {overview.usage.map((line) => {
-              const outcome = line.outcome ? OUTCOMES[line.outcome] : null;
-              return (
-                <li key={line.ref} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/dashboard/${slug}/envelopes/${line.envelopeId}`}
-                      className="block truncate font-medium text-ink hover:text-primary hover:underline"
-                    >
-                      {line.envelopeTitle ?? 'Envelope'}
-                    </Link>
-                    <p className="text-sm text-muted">
-                      Started <LocalTime iso={line.startedAt} format="short" /> ·{' '}
-                      {line.mode === 'own'
-                        ? 'your Leegality account'
-                        : line.billed
-                          ? line.outcome === 'signed'
-                            ? '1 credit used'
-                            : line.outcome
-                              ? 'credit returned'
-                              : '1 credit held'
-                          : "this server's account"}
-                    </p>
-                  </div>
-                  {outcome ? (
-                    <Badge tone={outcome.tone}>{outcome.label}</Badge>
-                  ) : (
-                    <Badge tone="primary">In progress</Badge>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <CardBody>
-            <p className="text-sm text-muted">
-              Nothing yet. An eSign shows here when a signer starts one.
+            <p className="flex gap-2 text-[13px] text-muted">
+              <Fingerprint aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+              The signer types their Aadhaar number and one-time code on Leegality's page. Codevibe
+              Sign never sees or stores an Aadhaar number.
             </p>
           </CardBody>
-        )}
-      </Card>
+        </Card>
+
+        {overview.ownAllowed ? (
+          <Card>
+            <CardHeader
+              title="Set up your Leegality workflow"
+              description="Only for your own account. In Leegality, open the workflow whose ID you entered and set these."
+            />
+            <CardBody className="space-y-4">
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+                <li>Choose Aadhaar eSign as the signature type for the invitee.</li>
+                <li>Place the signature box where the signature should appear.</li>
+                <li>
+                  Under the invitee's custom URLs and webhooks, paste the two addresses below and
+                  choose webhook version 2.5.
+                </li>
+              </ol>
+              <CopyRow label="Webhook and error webhook" value={overview.webhookUrl} />
+              <CopyRow label="Redirect URL" value={overview.redirectUrl} />
+            </CardBody>
+          </Card>
+        ) : null}
+
+        <Card>
+          <CardHeader title="Recent Aadhaar eSigns" description="The latest 20, newest first." />
+          {overview.usage.length ? (
+            <ul className="divide-y divide-line" data-testid="esign-usage">
+              {overview.usage.map((line) => {
+                const outcome = line.outcome ? OUTCOMES[line.outcome] : null;
+                return (
+                  <li key={line.ref} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/dashboard/${slug}/envelopes/${line.envelopeId}`}
+                        className="block truncate font-medium text-ink hover:text-primary hover:underline"
+                      >
+                        {line.envelopeTitle ?? 'Envelope'}
+                      </Link>
+                      <p className="text-sm text-muted">
+                        Started <LocalTime iso={line.startedAt} format="short" /> ·{' '}
+                        {line.mode === 'own'
+                          ? 'your Leegality account'
+                          : line.billed
+                            ? line.outcome === 'signed'
+                              ? '1 credit used'
+                              : line.outcome
+                                ? 'credit returned'
+                                : '1 credit held'
+                            : "this server's account"}
+                      </p>
+                    </div>
+                    {outcome ? (
+                      <Badge tone={outcome.tone}>{outcome.label}</Badge>
+                    ) : (
+                      <Badge tone="primary">In progress</Badge>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <CardBody>
+              <p className="text-sm text-muted">
+                Nothing yet. An eSign shows here when a signer starts one.
+              </p>
+            </CardBody>
+          )}
+        </Card>
+      </fieldset>
 
       <DialogRoot
         open={sheet}

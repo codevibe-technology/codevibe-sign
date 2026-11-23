@@ -183,8 +183,8 @@ const faq = (pricing: PricingView): { q: string; a: ReactNode }[] => [
           {pricing.esignCloud} on Cloud, plus GST. An eSign that is not completed costs nothing.
         </p>
         <p className="mt-3">
-          A Cloud workspace can also connect its own Leegality account and be billed by Leegality
-          directly. Self-hosted installs use their own account.
+          On Cloud you can also connect your own Leegality account, once for all your workspaces,
+          and be billed by Leegality directly. Self-hosted installs use their own account.
         </p>
       </>
     ),
@@ -208,7 +208,8 @@ const faq = (pricing: PricingView): { q: string; a: ReactNode }[] => [
         downloadable. A new send that would go past a limit is refused with a message that names the
         limit and what to do. The monthly envelope count starts again on the 1st (UTC). To go
         further, upgrade to Cloud from Settings, Plan and usage in your workspace: it takes effect
-        as soon as the payment is confirmed.
+        as soon as the payment is confirmed. The Free plan includes one workspace, and its limits on
+        members, templates and API requests are counted across your account.
       </p>
     ),
   },
@@ -216,12 +217,13 @@ const faq = (pricing: PricingView): { q: string; a: ReactNode }[] => [
     q: 'How does paying for Cloud work?',
     a: (
       <p>
-        Cloud is {pricing.cloudMonth} a month for a workspace with {pricing.includedMembers}{' '}
-        members, or {pricing.cloudYear} for a year, plus {pricing.gstPercent}% GST. You pay for each
-        term up front by card, UPI or net banking and get a GST tax invoice by email. There is no
-        automatic charge: we remind you before a term ends, and if it is not renewed the workspace
-        has {pricing.graceDays} more days on Cloud and then moves back to the Free plan with all its
-        documents. You can cancel at any time and keep Cloud until the end of the term you paid for.
+        Cloud is {pricing.cloudMonth} a month for your account, with as many workspaces as you need
+        and {pricing.includedMembers} members across them, or {pricing.cloudYear} for a year, plus{' '}
+        {pricing.gstPercent}% GST. You pay for each term up front by card, UPI or net banking and
+        get a GST tax invoice by email. There is no automatic charge: we remind you before a term
+        ends, and if it is not renewed your workspaces have {pricing.graceDays} more days on Cloud
+        and then move back to the Free plan with all their documents. You can cancel at any time and
+        keep Cloud until the end of the term you paid for.
       </p>
     ),
   },
@@ -768,7 +770,7 @@ docker compose up -d`}</code>
               <PlanColumn
                 name="Free"
                 price="₹0"
-                note="A cloud workspace for trying it out and for small teams."
+                note="One cloud workspace for trying it out and for small teams."
                 lines={planLines(rows, 'free')}
                 action={
                   <>
@@ -784,7 +786,7 @@ docker compose up -d`}</code>
                 name="Cloud"
                 price={pricing.cloudMonth}
                 per="a month"
-                note={`For one workspace with ${pricing.includedMembers} members. ${pricing.cloudYear} if you pay for a year${pricing.yearSaving ? `, ${pricing.yearSaving}` : ''}. More members are ${pricing.extraMember} each a month.`}
+                note={`Unlimited workspaces under one subscription, with ${pricing.includedMembers} members across them. ${pricing.cloudYear} if you pay for a year${pricing.yearSaving ? `, ${pricing.yearSaving}` : ''}. More members are ${pricing.extraMember} each a month.`}
                 lines={planLines(rows, 'cloud')}
                 action={
                   <>
