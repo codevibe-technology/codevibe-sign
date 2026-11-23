@@ -104,6 +104,23 @@ describe('POST /v1/verify', () => {
     expect(res.res.headers.get('cache-control')).toBe('no-store');
   });
 
+  it('reports a broken audit chain without a head, and masks phone numbers', async () => {
+    const h = verifying();
+    const { id, sealed } = await completed(h);
+    const stored = (await h.store.load(id))!;
+    stored.envelope.recipients[0]!.email = undefined;
+    stored.envelope.recipients[0]!.phone = '+919876543210';
+    const events = await h.store.listEvents(id);
+    h.store.get = async () => stored.envelope;
+    h.store.listEvents = async () =>
+      events.map((e, i) => (i === 1 ? { ...e, at: e.at.replace('2026', '2025') } : e));
+    const res = await h.call('POST', '/v1/verify', { body: upload(sealed) });
+    expect(res.json.valid).toBe(true);
+    expect(res.json.envelope.chain).toEqual({ valid: false, head: null, events: events.length });
+    expect(res.json.envelope.recipients[0].contact).toMatch(/^\+91\*+\d{2,4}$/);
+    expect(JSON.stringify(res.json)).not.toContain('9876543210');
+  });
+
   it('takes the PDF as a raw body too', async () => {
     const h = verifying();
     const { sealed } = await completed(h);

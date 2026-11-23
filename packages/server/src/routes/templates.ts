@@ -322,11 +322,13 @@ export function templateRoutes(rt: Runtime) {
     const settings = parseSettings(
       {
         title: body.title ?? template.title,
-        ...(body.message !== undefined
-          ? { message: body.message }
-          : template.message !== undefined
-            ? { message: template.message }
-            : {}),
+        ...(body.message === null
+          ? {}
+          : body.message !== undefined
+            ? { message: body.message }
+            : template.message !== undefined
+              ? { message: template.message }
+              : {}),
         routing: template.routing,
         reminders: body.reminders ?? template.reminders,
         ...(body.expiresAt !== undefined

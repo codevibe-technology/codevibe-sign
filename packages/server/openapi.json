@@ -3400,10 +3400,10 @@
             "description": "Replaces the template's title for this envelope."
           },
           "message": {
-            "type": "string",
+            "type": ["string", "null"],
             "minLength": 1,
             "maxLength": 5000,
-            "description": "Replaces the template's message for this envelope."
+            "description": "Replaces the template's message for this envelope; null sends none."
           },
           "reminders": { "$ref": "#/components/schemas/Reminders" },
           "expiresAt": {

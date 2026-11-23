@@ -267,7 +267,8 @@ export interface EnvelopeFromTemplateInput {
   /** Values for text fields, keyed by field label or field id. */
   prefill?: Record<string, string>;
   title?: string;
-  message?: string;
+  /** Replaces the template's message; `null` sends none. */
+  message?: string | null;
   reminders?: ReminderPolicy;
   expiresAt?: IsoDateTime | Date;
   expiresInDays?: number;

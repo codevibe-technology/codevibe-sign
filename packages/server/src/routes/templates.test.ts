@@ -355,6 +355,13 @@ describe('an envelope from a template', () => {
     });
     expect(created.json.values).toHaveLength(1);
     expect(h.mailer.sent).toHaveLength(0);
+
+    await h.call('PATCH', `/v1/templates/${template.id}`, { body: { message: 'From HR.' } });
+    const roles = { [employee!.id]: people.Employee, [hr!.id]: people.HR };
+    const at = `/v1/templates/${template.id}/envelopes`;
+    expect((await h.call('POST', at, { body: { roles } })).json.message).toBe('From HR.');
+    const silent = await h.call('POST', at, { body: { roles, message: null } });
+    expect(silent.json.message).toBeUndefined();
   });
 
   it('points every problem at the role or prefill key it came from', async () => {
