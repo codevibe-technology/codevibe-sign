@@ -16,6 +16,8 @@ const answer = (overrides: Partial<PublicVerification> = {}): PublicVerification
   signer: { commonName: 'Codevibe Sign Seal', organization: 'Codevibe' },
   signedAt: '2026-11-20T10:05:01.000Z',
   certificateSha256: 'c'.repeat(64),
+  seal: 'operator',
+  earlierSignatures: [],
   envelope: {
     id: 'env_1',
     title: 'Offer letter',
