@@ -67,6 +67,22 @@ describe('PublicVerifyPanel', () => {
     expect(within(status).getAllByText('Signed')).toHaveLength(2);
   });
 
+  it('names the eSign provider of a signer who used Aadhaar eSign', async () => {
+    const recipient = { ...valid.evidence!.recipients[0]!, auth: 'aadhaar' as const };
+    await drop({
+      ok: true,
+      data: {
+        ...valid,
+        evidence: {
+          ...valid.evidence!,
+          recipients: [{ ...recipient, esign: { provider: 'leegality' } }],
+        },
+      },
+    });
+    const status = await screen.findByRole('status');
+    expect(within(status).getByText(/Aadhaar eSign \(via Leegality\)/)).toBeInTheDocument();
+  });
+
   it('warns when the seal is valid but this site has no record of the envelope', async () => {
     await drop({ ok: true, data: { ...valid, evidence: null } });
     expect(await screen.findByText('Seal is valid, no record here')).toBeInTheDocument();

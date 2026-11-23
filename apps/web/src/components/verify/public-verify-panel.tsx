@@ -37,6 +37,7 @@ export interface PublicEvidence {
     status: RecipientStatus;
     auth: AuthMethod;
     actedAt: string | null;
+    esign?: { provider: string };
   }[];
   events: { seq: number; action: AuditAction; at: string; recipient: string | null }[];
   chain: { valid: boolean; head: string | null; events: number };
