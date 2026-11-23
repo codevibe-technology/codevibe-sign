@@ -23,8 +23,10 @@ pnpm --filter web db:migrate                      # or keep AUTO_MIGRATE=true
 pnpm --filter web dev
 ```
 
-Open http://localhost:3000 and sign in with any email address. With `MAIL_TRANSPORT=console`
-the sign-in link is printed in the terminal running `dev`.
+Open http://localhost:3000 and sign in with any email address: choose "Email me a link
+instead". With `MAIL_TRANSPORT=console` the sign-in link is printed in the terminal running
+`dev`. The link creates your account; add a password afterwards under Settings, Personal, and
+from then on sign in with either. The signed-in app is at `/dashboard`.
 
 ## Sending a document
 
@@ -96,19 +98,20 @@ Traefik, from [Dockerfile](Dockerfile).
 
 ## Scripts
 
-| Script       | What it does                                                                           |
-| ------------ | -------------------------------------------------------------------------------------- |
-| `dev`        | Next.js in development mode.                                                           |
-| `build`      | Production build.                                                                      |
-| `start`      | Serves the production build.                                                           |
-| `db:migrate` | Migrates `DATABASE_URL`: the sign server's tables, then the app's.                     |
-| `plan:set`   | Moves a workspace to another plan and records the change.                              |
-| `build:docs` | Builds the docs site and copies it into `docs-dist` for `/docs`.                       |
-| `build:ops`  | Bundles `migrate` and `plan:set` into `ops/` for the Docker image.                     |
-| `sample:pdf` | Regenerates the first-run sample agreement PDF.                                        |
-| `dev:seal`   | Writes a self-signed seal certificate to `data/dev-seal.p12`.                          |
-| `test`       | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.          |
-| `smoke`      | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API. |
+| Script        | What it does                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `dev`         | Next.js in development mode.                                                                                               |
+| `build`       | Production build.                                                                                                          |
+| `start`       | Serves the production build.                                                                                               |
+| `db:migrate`  | Migrates `DATABASE_URL`: the sign server's tables, then the app's.                                                         |
+| `plan:set`    | Moves a workspace to another plan and records the change.                                                                  |
+| `build:docs`  | Builds the docs site and copies it into `docs-dist` for `/docs`.                                                           |
+| `build:ops`   | Bundles `migrate` and `plan:set` into `ops/` for the Docker image.                                                         |
+| `sample:pdf`  | Regenerates the first-run sample agreement PDF.                                                                            |
+| `dev:seal`    | Writes a self-signed seal certificate to `data/dev-seal.p12`.                                                              |
+| `test`        | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.                                              |
+| `smoke`       | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API.                                     |
+| `brand:icons` | Draws the favicon, touch icon, 192 and 512 icons and the docs' copies from `apps/site/public/mark.svg`, the one logo file. |
 
 ## Configuration
 

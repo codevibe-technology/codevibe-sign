@@ -115,11 +115,23 @@ Rules the server enforces:
 Better Auth runs at `/api/auth/*` with:
 
 - **Email magic link** (plugin `magicLink`): links expire after 10 minutes and work once. In
-  development (`MAIL_TRANSPORT=console`) the link is printed to the server console.
+  development (`MAIL_TRANSPORT=console`) the link is printed to the server console. This is
+  how an account is created.
+- **Email and password**, for people who have an account: sign-up by password is off
+  (`disableSignUp`). A password is set in personal settings, by "Forgot password" (a 30-minute
+  link by email, which signs every session out), or on the invitation page by someone invited
+  who has no account yet. `guardPasswords` wraps the handler with the rules the library lacks:
+  the common-password check on every new password, and a pause on an address after five wrong
+  passwords in fifteen minutes. See "Passwords for senders" in the threat model.
 - **Google** when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set; the button is hidden
   otherwise.
 - Database sessions in an HttpOnly, `SameSite=Lax`, `Secure` (on https) cookie, 30 days,
   refreshed daily. Telemetry is off.
+
+After signing in, everyone lands on `/dashboard`, which opens their workspace at
+`/dashboard/[slug]` (or onboarding when they have none); a `next` parameter may name another
+path on the same site. The public home page stays public and shows a signed-in visitor a
+Dashboard button. The app used to live under `/w`; those paths redirect.
 
 Better Auth talks to PostgreSQL through Kysely with the `kysely-postgres-js` dialect, so the
 whole app has one driver and one pool. Its tables are created by our own SQL migration
@@ -170,7 +182,7 @@ released.
 | ------------------------ | -------------------------------------------------------------------------------------------------------- |
 | `auth_users`             | Person: name, email (unique, lower-case), avatar, email verified.                                        |
 | `auth_sessions`          | Better Auth sessions (token, expiry, IP, user agent).                                                    |
-| `auth_accounts`          | Linked sign-in methods (Google).                                                                         |
+| `auth_accounts`          | Linked sign-in methods (Google) and the password hash.                                                   |
 | `auth_verifications`     | Magic-link tokens.                                                                                       |
 | `app_workspaces`         | `id`, `slug` (unique, used in URLs), `name`, `created_by`.                                               |
 | `app_members`            | `(workspace_id, user_id)` primary key, `role`.                                                           |
@@ -187,6 +199,23 @@ released.
 | `app_plan_changes`       | Who moved a workspace from one plan to another, and when.                                                |
 | `app_first_run`          | The sample envelope of a new Free workspace and whether its "Start here" card was dismissed.             |
 | `sign_*`                 | The sign server's own tables, now with `sign_envelopes.workspace_id`.                                    |
+
+### Time zones
+
+Two zones matter, and they are kept apart:
+
+- **The reader's zone, on screen.** Every date and time in the app goes through `LocalTime`
+  (`src/components/ui/local-time.tsx`): the zone saved in personal settings when there is one,
+  otherwise the browser's. A time of day always has its zone next to it
+  (`23 Nov 2026, 00:23 GMT+5:30`); a bare day or "5 min ago" names it on hover. The server only
+  knows a zone someone saved, so without one the HTML says the time in UTC and the browser
+  swaps it on load.
+- **The workspace's zone, on paper.** `app_workspaces.time_zone` (Settings, Workspace) is
+  the zone for the dates printed on signed documents, the local time on the certificate page
+  and the expiry written in emails. Null means the install's default, `SIGN_TIME_ZONE`, or UTC
+  when that is unset. The signing page shows the signing date in this zone and says which zone
+  it is, so a signer elsewhere sees the date that will be printed. The certificate always
+  shows UTC as well.
 
 Ids are prefixed random strings (`ws_…`, `key_…`, `inv_…`). Secrets (API keys, invitation
 tokens) are 32 random bytes, shown once, stored only as SHA-256.

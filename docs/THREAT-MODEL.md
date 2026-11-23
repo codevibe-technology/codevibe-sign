@@ -246,10 +246,14 @@ Residual risk: length differences leak, which is harmless for fixed-length hashe
   formatted from that value (in the signer's time zone when the server passes one), and the
   certificate page shows the exact UTC time of every event, so the two can always be compared.
 - **Dates on the signed document.** The date drawn in a `date_signed` field and under each
-  signature is the server's time of signing in the zone set by `timeZone` (`TIME_ZONE`,
-  `SIGN_TIME_ZONE` in the web app), UTC when none is set. The certificate page always shows UTC
-  and adds the local time next to it. Set the zone your signers expect: in UTC, a document
-  signed at 2 am in India carries the previous day's date.
+  signature is the server's time of signing in the workspace's time zone: the one
+  `workspaceTimeZone` returns (the "Time zone" setting of a workspace in the web app), else
+  `timeZone` (`TIME_ZONE`, `SIGN_TIME_ZONE` in the web app), else UTC. The certificate page
+  always shows UTC and adds that zone's time next to it, so the printed date can be checked
+  against the exact moment. Changing the setting affects documents sealed afterwards only; a
+  sealed file never changes. The zone comes from the workspace, never from the signer's
+  browser, so a signer cannot pick the date that is printed. On screen the web app shows every
+  time in the reader's own zone and names the zone.
 - **The web app's browser policy.** `apps/web` sends a Content-Security-Policy that loads
   scripts, styles, images and connections from its own origin only and forbids framing, and
   `Referrer-Policy: no-referrer` on the signing link, page and API (`src/lib/security-headers.ts`).
@@ -258,6 +262,38 @@ Residual risk: length differences leak, which is harmless for fixed-length hashe
 - **Sign-in links.** The web app sends one address at most five sign-in links in fifteen
   minutes, so the form cannot be used to flood an inbox (`src/server/auth/magic-link-limit.ts`).
   The count is kept in memory per process.
+- **Passwords for senders.** People who send documents may sign in to the web app with an
+  email and password instead of an emailed link. Signers are not affected: they keep the
+  personal link and one-time code.
+  - _Where accounts come from._ There is no open registration with a password. An account
+    starts from an emailed sign-in link, or from an invitation, where a new person chooses a
+    password on the invitation page; in both cases holding the emailed link confirms the
+    address first. An invitation never sets a password on an account that already exists
+    (`createInvitedAccount`), so it cannot be used to take one over.
+  - _Storage._ Better Auth hashes passwords with scrypt (N 16384, r 16, p 1, a random salt per
+    password) and compares in constant time. Only the hash is stored, in `auth_accounts`.
+  - _Rules._ 10 to 128 characters, no composition rules. Passwords built from common words
+    however decorated (`P@ssw0rd123`, `Welcome@2026`), keyboard runs, repeats and the account's
+    own email or name are refused (`src/lib/password.ts`). The list is local: no password or
+    hash leaves the server. A breach-corpus check (for example Have I Been Pwned's range API)
+    is not wired in.
+  - _Guessing._ After five wrong passwords for one address in fifteen minutes, password
+    sign-in pauses for that address until the window ends, whatever IP the tries come from
+    (`password-lockout.ts`); wrong "current password" entries in settings count too. The
+    library also limits sign-in requests per IP (three in ten seconds). The emailed link keeps
+    working during a pause, so pausing someone's password does not lock them out. Counts are
+    in memory per process, like the other limits.
+  - _Enumeration._ A wrong password, an account with no password and an unknown address get
+    the same answer after the same hashing work. "Forgot password" answers the same for any
+    address, and over its cap of five emails per address in fifteen minutes it drops the
+    email silently rather than answer differently.
+  - _Reset links._ Valid for 30 minutes, usable once, sent only to the account's address.
+    Using one signs every session of the account out. The reset and invitation pages send no
+    referrer. Someone who can read the mailbox can take the account, as with sign-in links.
+  - _Stolen session._ A session can set a first password without proving anything more, since
+    there is no old password to ask for; changing an existing one needs the current password.
+    Every set, change or reset emails the account's address, and settings can sign every
+    other session out.
 - **Viewers and the completed copy.** Every recipient, including viewers, is sent the completed
   copy. Senders should treat the recipient list as the distribution list.
 - **Provider signing links.** The Aadhaar adapter refuses a signing link that is not `https`, so a

@@ -170,10 +170,24 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 
 ## Dates on signed documents
 
-- [ ] Set the time zone your signers expect: `TIME_ZONE` for the standalone server,
+- [ ] Set the default time zone your signers expect: `TIME_ZONE` for the standalone server,
       `SIGN_TIME_ZONE` for the web app, or the `timeZone` option, as an IANA name such as
       `Asia/Kolkata`. Without it the date under each signature is the UTC date, which is the
       previous day for anyone signing before 5:30 am in India.
+- [ ] In the web app, check each workspace's own zone under Settings, Workspace, Time zone. It
+      overrides the default for that workspace's documents and emails.
+
+## Sign-in to the web app
+
+- [ ] Serve the app over https only, so passwords and session cookies never cross the network
+      in the clear, and set `TRUST_PROXY=true` only behind a proxy you control: the per-IP
+      sign-in limit reads the client address from it.
+- [ ] Make sure email works before inviting people: sign-in links, invitations, password
+      resets and "your password was changed" notices all go by email.
+- [ ] Run one process, or accept that the wrong-password pause and the email caps are counted
+      per process.
+- [ ] Tell admins that removing someone from a workspace does not delete their account; they
+      can still sign in, and see nothing.
 
 ## Before go-live
 
@@ -184,6 +198,8 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       valid.
 - [ ] Sign a test document and confirm the date under the signature is today's date where
       your signers are.
+- [ ] Sign in with a password, enter a wrong one six times and confirm the sixth is refused
+      with a wait; then confirm "Email me a link instead" still signs you in.
 - [ ] Open a signing link and confirm the browser lands on the signing page with no token in
       its address bar.
 - [ ] Try a wrong OTP six times and confirm the code locks.

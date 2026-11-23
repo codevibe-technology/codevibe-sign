@@ -69,16 +69,16 @@ and waits for running work before disconnecting.
 These checks are on unless you turn them off, and each opt-out is meant for local
 development only.
 
-| What         | Default                                                                                                                                          | Opt-out                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| Seal key     | Opened at start-up; the server refuses to start with an unreadable, expired, under-2048-bit RSA or SHA-1 certificate.                            | `sealer.allowWeakKey: true`                                |
-| Sealed files | Verified with `verify()` against the operator certificate before they are stored. Add old certificates after a rotation in `sealer.trust`.       | none                                                       |
-| Webhook URLs | `https` on a host name; each delivery resolves it, refuses private and reserved addresses, connects to the checked address, no redirects.        | `webhookSecurity: { allowInsecure: true }` or `allowHosts` |
-| Client IP    | The socket address. Behind your proxies, the `X-Forwarded-For` entry `trustedProxyHops` (default 1) from the right.                              | `trustProxy: true` turns the header on                     |
-| API keys     | Hashed with SHA-256 at start-up and compared in constant time. Pass `{ id, sha256 }` to keep plain keys out of the config.                       | none                                                       |
-| Logs         | Signing tokens, codes, session values, credentials and bodies are removed from every line. `accessLog: true` adds one redacted line per request. | none                                                       |
-| OTP          | 5 codes per 15 minutes and 10 per recipient over the envelope's life; each new code replaces the last; checks are saved atomically.              | `limits.otpCodesPerRecipient`                              |
-| Signed dates | Dates on signed documents are in UTC; the certificate page shows UTC and, with a zone set, the local time next to it.                            | `timeZone: 'Asia/Kolkata'` (`TIME_ZONE`)                   |
+| What         | Default                                                                                                                                          | Opt-out                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Seal key     | Opened at start-up; the server refuses to start with an unreadable, expired, under-2048-bit RSA or SHA-1 certificate.                            | `sealer.allowWeakKey: true`                                                    |
+| Sealed files | Verified with `verify()` against the operator certificate before they are stored. Add old certificates after a rotation in `sealer.trust`.       | none                                                                           |
+| Webhook URLs | `https` on a host name; each delivery resolves it, refuses private and reserved addresses, connects to the checked address, no redirects.        | `webhookSecurity: { allowInsecure: true }` or `allowHosts`                     |
+| Client IP    | The socket address. Behind your proxies, the `X-Forwarded-For` entry `trustedProxyHops` (default 1) from the right.                              | `trustProxy: true` turns the header on                                         |
+| API keys     | Hashed with SHA-256 at start-up and compared in constant time. Pass `{ id, sha256 }` to keep plain keys out of the config.                       | none                                                                           |
+| Logs         | Signing tokens, codes, session values, credentials and bodies are removed from every line. `accessLog: true` adds one redacted line per request. | none                                                                           |
+| OTP          | 5 codes per 15 minutes and 10 per recipient over the envelope's life; each new code replaces the last; checks are saved atomically.              | `limits.otpCodesPerRecipient`                                                  |
+| Signed dates | Dates on signed documents are in UTC; the certificate page shows UTC and, with a zone set, the local time next to it.                            | `timeZone: 'Asia/Kolkata'` (`TIME_ZONE`), or `workspaceTimeZone` per workspace |
 
 ## OpenAPI
 

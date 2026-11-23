@@ -231,9 +231,13 @@ curl -fsS https://sign.codevibe.in/robots.txt
 
 Then in a browser:
 
-1. Open `https://sign.codevibe.in`, press **Start free** and sign in with your email. The
-   link arrives by email (check `docker compose logs web` if it does not).
-2. Create a workspace. The dashboard shows **Start here** with a sample agreement.
+1. Open `https://sign.codevibe.in`, press **Start free**, choose **Email me a link instead**
+   and enter your email. The link arrives by email (check `docker compose logs web` if it does
+   not) and creates your account.
+2. Create a workspace. The dashboard, at `/dashboard`, shows **Start here** with a sample
+   agreement. Under **Settings → Personal** set a password, sign out, and sign in with it.
+   Under **Settings → Workspace** check the time zone: it is `SIGN_TIME_ZONE` until you save
+   another.
 3. Open the sample, press **Send**, open the email, sign, and download the sealed copy.
 4. On **Verify**, upload the sealed copy: it should say the seal is valid.
 5. **Settings → Plan and usage** shows the Free plan with its meters (hosted mode).
