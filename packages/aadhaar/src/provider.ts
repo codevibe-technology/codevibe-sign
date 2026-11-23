@@ -45,6 +45,8 @@ export type WebhookHeaders = Record<string, string | string[] | undefined> | Hea
 
 export interface EsignProvider {
   readonly name: string;
+  /** `sandbox` when requests go to the provider's test environment. */
+  readonly environment?: 'sandbox' | 'production';
   createRequest(request: EsignRequest): Promise<EsignSession>;
   /**
    * Verifies a webhook and returns its event. Throws `SignError('WEBHOOK_INVALID')` for a body

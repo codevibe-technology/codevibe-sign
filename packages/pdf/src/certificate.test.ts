@@ -413,6 +413,9 @@ describe('certificatePdf', () => {
     const text = (await certificateText(output, 0)).join(' ').replace(/\s+/g, ' ');
     expect(text).toContain('Aadhaar eSign (via Leegality)');
     expect(authLabel({ auth: 'aadhaar' })).toBe('Aadhaar eSign');
+    expect(authLabel({ auth: 'aadhaar', esign: { ...aadhaar.esign!, sandbox: true } })).toBe(
+      'Aadhaar eSign (via Leegality sandbox, test only)',
+    );
     expect(authLabel({ auth: 'email_link', esign: aadhaar.esign })).toBe('Email link');
   });
 

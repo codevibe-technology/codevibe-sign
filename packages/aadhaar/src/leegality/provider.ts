@@ -354,6 +354,7 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
 
   return {
     name: 'leegality',
+    environment: baseUrl === LEEGALITY_BASE_URLS.production ? 'production' : options.environment,
     createRequest,
     parseWebhook,
     fetchSignedDocument,

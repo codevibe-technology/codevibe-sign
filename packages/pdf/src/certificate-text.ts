@@ -23,13 +23,17 @@ export const AUTH_LABELS: Record<AuthMethod, string> = {
 
 /**
  * How a recipient signed, as the certificate prints it. An Aadhaar eSign names the provider
- * it went through once the recipient has been there: `Aadhaar eSign (via Leegality)`.
+ * it went through once the recipient has been there: `Aadhaar eSign (via Leegality)`. One
+ * made in the provider's test environment says so, because it has no legal effect.
  */
 export function authLabel(recipient: Pick<Recipient, 'auth' | 'esign'>): string {
   const label = AUTH_LABELS[recipient.auth];
   const provider = recipient.esign?.provider.trim();
   if (recipient.auth !== 'aadhaar' || !provider) return label;
-  return `${label} (via ${provider.charAt(0).toUpperCase()}${provider.slice(1)})`;
+  const name = `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`;
+  return recipient.esign?.sandbox
+    ? `${label} (via ${name} sandbox, test only)`
+    : `${label} (via ${name})`;
 }
 
 export const STATUS_LABELS: Record<EnvelopeStatus, string> = {

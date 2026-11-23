@@ -91,6 +91,10 @@ export interface RecipientEsign {
   /** The signer's name as the provider reported it. */
   signerName?: string;
   signedAt?: IsoDateTime;
+  /** The server's reference for the eSign request that was signed. */
+  ref?: string;
+  /** The provider's test environment was used; such a signature has no legal effect. */
+  sandbox?: boolean;
 }
 
 export interface Recipient {
