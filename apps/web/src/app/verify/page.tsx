@@ -43,7 +43,11 @@ export default async function PublicVerifyPage() {
   const viewer = hosted ? await siteViewer() : null;
   const certificate = seal();
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
+    <div
+      className={
+        hosted ? 'marketing flex min-h-dvh flex-col bg-white' : 'flex min-h-dvh flex-col bg-canvas'
+      }
+    >
       {hosted ? (
         <SiteHeader viewer={viewer} />
       ) : (
@@ -55,7 +59,10 @@ export default async function PublicVerifyPage() {
           </div>
         </header>
       )}
-      <main id="main" className="page-enter flex-1 px-4 py-10 sm:px-6 sm:py-14">
+      <main
+        id="main"
+        className={`page-enter flex-1 px-4 py-10 sm:px-6 sm:py-14 ${hosted ? 'bg-[linear-gradient(180deg,#F2F7FF_0,#FFFFFF_22rem)]' : ''}`}
+      >
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="min-w-0">
             <p className="eyebrow mb-2 flex items-center gap-2">

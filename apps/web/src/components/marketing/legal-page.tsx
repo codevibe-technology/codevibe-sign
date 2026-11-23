@@ -17,12 +17,17 @@ export function LegalPage({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
+    <div className="marketing flex min-h-dvh flex-col bg-white">
       <SiteHeader viewer={viewer} />
-      <main id="main" className="page-enter flex-1 px-4 py-12 sm:px-6 sm:py-16">
+      <main
+        id="main"
+        className="page-enter flex-1 bg-[linear-gradient(180deg,#F2F7FF_0,#FFFFFF_22rem)] px-4 py-12 sm:px-6 sm:py-16"
+      >
         <article className="mx-auto max-w-2xl">
-          <p className="text-sm font-semibold text-primary">Codevibe Sign cloud</p>
-          <h1 className="mt-1 text-3xl font-bold sm:text-4xl">{title}</h1>
+          <p className="inline-flex rounded-full bg-[#E6EFFC] px-3 py-1 text-[13px] font-semibold text-[#1860D0]">
+            Codevibe Sign cloud
+          </p>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{title}</h1>
           <p className="mt-2 text-sm text-muted">Last updated {updated}</p>
           <div className="mt-6 text-lg text-ink">{intro}</div>
           <div className="mt-8 space-y-8">{children}</div>

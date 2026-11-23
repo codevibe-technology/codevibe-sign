@@ -33,13 +33,20 @@ export default async function InstallHelpPage() {
   if (!isHosted()) notFound();
   const pricing = currentPricing();
   return (
-    <div className="marketing flex min-h-dvh flex-col bg-canvas">
+    <div className="marketing flex min-h-dvh flex-col bg-white">
       <SiteHeader viewer={await siteViewer()} />
-      <main id="main" className="page-enter flex-1 px-4 py-12 sm:px-6 sm:py-16">
+      <main
+        id="main"
+        className="page-enter flex-1 bg-[linear-gradient(180deg,#F2F7FF_0,#FFFFFF_22rem)] px-4 py-12 sm:px-6 sm:py-16"
+      >
         <div className="mx-auto grid max-w-6xl gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
           <div>
-            <p className="text-sm font-semibold text-primary">Self-hosting</p>
-            <h1 className="mt-1 text-3xl font-bold sm:text-4xl">We install it on your server.</h1>
+            <p className="inline-flex rounded-full bg-[#DDF7F2] px-3 py-1 text-[13px] font-semibold text-[#0E7466]">
+              Self-hosting
+            </p>
+            <h1 className="mt-4 text-3xl font-bold sm:text-[2.6rem] sm:leading-[1.1]">
+              We install it on your server.
+            </h1>
             <p className="mt-4 text-lg text-muted">
               Codevibe Sign is free to run on your own server. If you would rather not set it up
               yourself, an experienced engineer does it for you within {INSTALL_HELP_HOURS} working
@@ -75,7 +82,7 @@ export default async function InstallHelpPage() {
                 <p className="mt-2 text-muted">
                   These hosts work well for Codevibe Sign, at 20% off through our partner links.
                 </p>
-                <ul className="mt-4 divide-y divide-line rounded-[3px] bg-surface ring-1 ring-line">
+                <ul className="mt-4 divide-y divide-line rounded-2xl bg-white ring-1 ring-line">
                   {pricing.hostingOffers.map((offer) => (
                     <li
                       key={offer.url}
@@ -98,7 +105,7 @@ export default async function InstallHelpPage() {
             ) : null}
           </div>
 
-          <div className="rounded-[3px] bg-surface p-6 shadow-card ring-1 ring-line sm:p-8">
+          <div className="self-start rounded-2xl bg-white p-6 shadow-[0_28px_56px_-28px_rgb(27_106_224/0.45)] ring-1 ring-line sm:p-8">
             <h2 className="text-2xl font-bold">Book an installation</h2>
             {pricing.paymentsOpen ? (
               <>
@@ -122,7 +129,7 @@ export default async function InstallHelpPage() {
                 </p>
                 {pricing.operatorEmail ? (
                   <a
-                    className="inline-flex h-11 items-center rounded-md bg-primary px-5 font-semibold text-primary-ink hover:bg-primary-hover"
+                    className="inline-flex h-11 items-center rounded-full bg-primary px-5 font-semibold text-primary-ink hover:bg-primary-hover"
                     href={`mailto:${pricing.operatorEmail}?subject=${encodeURIComponent('Codevibe Sign installation help')}`}
                   >
                     Write to {pricing.operatorEmail}
