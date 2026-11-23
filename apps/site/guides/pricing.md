@@ -95,13 +95,15 @@ eSign with prepaid credits, bought in packs from Settings, Billing.
 - A Cloud workspace can connect its own Leegality account instead; Leegality then bills it
   directly and no credits are used.
 
-See [Aadhaar eSign with Leegality](/guides/aadhaar-leegality).
+See [Aadhaar eSign with Leegality](/guides/aadhaar-leegality) and
+[Credits and billing](/guides/credits-and-billing).
 
 ## Self-hosted
 
 The same app on your own server, free and without limits, under the open-source licences. See
 [Self-host with Docker](/getting-started/docker). A self-hosted install has no plans and no
-billing pages, and uses your own eSign provider account for Aadhaar eSign.
+billing pages, and uses your own eSign provider account for Aadhaar eSign. No invoice is ever
+issued in Codevibe's name by a self-hosted install.
 
 ### Installation help
 
