@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib';
 import { randomUUID } from 'node:crypto';
 import { computeLeegalityMac } from '@codevibe_technology/sign-aadhaar';
 import { SignError, type Envelope } from '@codevibe_technology/sign-core';
@@ -253,9 +254,9 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
           })),
           {
             recipient: 'r1',
-            type: 'signature',
+            type: 'aadhaar',
             page: 0,
-            rect: { x: 72, y: 600, width: 180, height: 48 },
+            rect: { x: 72, y: 600, width: 200, height: 64 },
           },
         ],
       }),
@@ -277,12 +278,16 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
   }
 
   async function start(token: string) {
-    const view = (await (await signer(token)).json()) as { fields: { id: string }[] };
+    const view = (await (await signer(token)).json()) as {
+      fields: { id: string; type: string }[];
+    };
     return signer(token, '/esign', {
       method: 'POST',
       body: JSON.stringify({
         consent: true,
-        values: view.fields.map((f) => ({ fieldId: f.id, value: PNG })),
+        values: view.fields
+          .filter((f) => f.type !== 'aadhaar')
+          .map((f) => ({ fieldId: f.id, value: PNG })),
       }),
     });
   }
@@ -416,11 +421,22 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         )
       ).json()) as { valid: boolean };
       expect(check.valid).toBe(true);
+      // One file: the page and the certificate page under the Aadhaar eSign and the seal.
+      expect((await PDFDocument.load(sealed!)).getPageCount()).toBe(2);
       const certificate = await api(
         ws.key,
         `/v1/envelopes/${envelope.id}/documents/${done.documents[0]!.id}?version=certificate`,
       );
-      expect(certificate.status).toBe(200);
+      expect(certificate.status).toBe(409);
+      const trail = await api(ws.key, `/v1/envelopes/${envelope.id}/audit-trail`);
+      expect(trail.headers.get('content-type')).toBe('application/pdf');
+      const completedCopy = mailer.sent.find(
+        (m) => m.meta?.kind === 'completed_copy' && m.to === email,
+      );
+      expect(completedCopy?.attachments?.map((a) => a.filename)).toEqual([
+        'letter.pdf',
+        'Appointment letter (audit trail).pdf',
+      ]);
 
       const actions = (await listAudit(sql, { accountId: ws.accountId }, { prefix: 'esign.' })).map(
         (row) => row.action,
