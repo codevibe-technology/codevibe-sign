@@ -12,6 +12,7 @@ const config: NextConfig = {
   // and are bundled anyway, which they support; installed from npm they stay external.
   serverExternalPackages: [
     '@codevibe_technology/sign-server',
+    '@codevibe_technology/sign-aadhaar',
     '@codevibe_technology/sign-pdf',
     'postgres',
     'nodemailer',

@@ -12,6 +12,7 @@ import { defaultCertificateNote } from '@/lib/brand';
 import { getBrand } from '../brand';
 import { auth } from '../auth/auth';
 import { db } from '../db';
+import { createEsignOptions } from '../esign/runtime';
 import { senderOf } from '../envelopes';
 import { env, type Env } from '../env';
 import { mailSenderOnDecline } from '../decline-mail';
@@ -140,6 +141,7 @@ function build(): SignServer {
     ...(config.SIGN_TIME_ZONE ? { timeZone: config.SIGN_TIME_ZONE } : {}),
     workspaceTimeZone: (workspaceId) => workspaceTimeZone(sql, workspaceId),
     effects: 'background',
+    esign: createEsignOptions({ sql }),
     sessionSecret: sessionSecret(config),
   });
 }

@@ -22,6 +22,7 @@
     "brand:icons": "tsx scripts/brand-icons.ts"
   },
   "dependencies": {
+    "@codevibe_technology/sign-aadhaar": "workspace:*",
     "@codevibe_technology/sign-core": "workspace:*",
     "@codevibe_technology/sign-pdf": "workspace:*",
     "@codevibe_technology/sign-react": "workspace:*",

@@ -452,6 +452,80 @@ alter table app_workspaces add column if not exists extra_seats integer not null
 `,
   },
   {
+    name: '0016_esign_settings',
+    sql: `
+create table app_esign_settings (
+  workspace_id text primary key references app_workspaces(id) on delete cascade,
+  mode text not null default 'platform' check (mode in ('platform', 'own')),
+  own_api_key text,
+  own_private_salt text,
+  own_workflow_id text,
+  own_environment text check (own_environment in ('sandbox', 'production')),
+  own_key_hint text,
+  own_saved_at timestamptz,
+  own_tested_at timestamptz,
+  own_test_ok boolean,
+  version integer not null default 0,
+  updated_by text references auth_users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table app_esign_usage (
+  ref text primary key,
+  workspace_id text not null references app_workspaces(id) on delete cascade,
+  envelope_id text not null,
+  recipient_id text not null,
+  mode text not null check (mode in ('platform', 'own')),
+  billed boolean not null,
+  outcome text check (outcome in ('signed', 'declined', 'expired', 'failed')),
+  unbilled boolean not null default false,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+create index app_esign_usage_workspace on app_esign_usage (workspace_id, started_at desc);
+`,
+  },
+  {
+    name: '0015_subscriptions',
+    sql: `
+create table app_subscriptions (
+  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  term text not null check (term in ('month', 'year')),
+  seats integer not null default 0 check (seats >= 0),
+  renewal_seats integer not null default 0 check (renewal_seats >= 0),
+  period_start timestamptz not null,
+  period_end timestamptz not null,
+  status text not null check (status in ('active', 'grace', 'ended')),
+  cancel_at_period_end boolean not null default false,
+  grace_ends_at timestamptz,
+  last_reminder text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index app_subscriptions_due_idx on app_subscriptions (period_end) where status <> 'ended';
+
+create table app_install_bookings (
+  id text primary key,
+  order_id text not null unique references app_billing_orders (id),
+  name text not null,
+  email text not null,
+  phone text not null,
+  company text not null,
+  provider text not null,
+  server_details text not null,
+  preferred_time text not null,
+  paid_at timestamptz,
+  notified_at timestamptz,
+  notify_attempts integer not null default 0,
+  notify_claimed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index app_install_bookings_unnotified_idx on app_install_bookings (paid_at)
+  where notified_at is null;
+`,
+  },
+  {
     name: '0017_invoice_payment_method',
     sql: `
 alter table app_billing_orders add column payment_method text;

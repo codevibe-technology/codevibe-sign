@@ -106,6 +106,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@codevibe_technology/sign-aadhaar':
+        specifier: workspace:*
+        version: link:../../packages/aadhaar
       '@codevibe_technology/sign-core':
         specifier: workspace:*
         version: link:../../packages/core

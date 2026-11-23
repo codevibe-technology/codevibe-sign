@@ -33,6 +33,7 @@ export type Permission =
   | 'webhooks.manage'
   | 'team.manage'
   | 'billing.manage'
+  | 'esign.manage'
   | 'owners.manage'
   | 'workspace.delete';
 
@@ -48,6 +49,7 @@ const MINIMUM: Record<Permission, Role> = {
   'webhooks.manage': 'admin',
   'team.manage': 'admin',
   'billing.manage': 'admin',
+  'esign.manage': 'admin',
   'owners.manage': 'owner',
   'workspace.delete': 'owner',
 };
