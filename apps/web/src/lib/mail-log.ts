@@ -12,6 +12,8 @@ const KIND_LABELS: Record<string, string> = {
   otp: 'Signing code',
   sign_in: 'Sign-in link',
   team_invite: 'Team invitation',
+  password_reset: 'Password reset',
+  password_changed: 'Password changed',
   decline_notice: 'Declined notice',
 };
 

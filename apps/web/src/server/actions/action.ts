@@ -88,3 +88,15 @@ export function userAction<S extends z.ZodType, T>(
     return run(() => handler(user, parsed.data));
   };
 }
+
+/** A server action for someone who is not signed in yet. The handler checks what it needs. */
+export function publicAction<S extends z.ZodType, T>(
+  schema: S,
+  handler: (input: z.infer<S>) => Promise<T>,
+) {
+  return async (raw: unknown): Promise<ActionResult<T>> => {
+    const parsed = schema.safeParse(toObject(raw));
+    if (!parsed.success) return firstIssue(parsed.error);
+    return run(() => handler(parsed.data));
+  };
+}

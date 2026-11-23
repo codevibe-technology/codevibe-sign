@@ -109,7 +109,14 @@ describe.skipIf(!url)('against PostgreSQL', () => {
 
   describe('Better Auth', () => {
     const options = (send: (email: string, link: string) => Promise<void>) =>
-      authOptions({ sql, appUrl: APP_URL, secret: SECRET, sendMagicLink: send });
+      authOptions({
+        sql,
+        appUrl: APP_URL,
+        secret: SECRET,
+        sendMagicLink: send,
+        sendPasswordReset: async () => undefined,
+        passwordChanged: async () => undefined,
+      });
 
     it('finds every table and column it needs in our migration', async () => {
       const plan = await getMigrations(options(async () => undefined));

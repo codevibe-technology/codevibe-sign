@@ -1,8 +1,10 @@
 import type { BetterAuthOptions } from 'better-auth';
+import { nextCookies } from 'better-auth/next-js';
 import { magicLink } from 'better-auth/plugins/magic-link';
 import { Kysely } from 'kysely';
 import { PostgresJSDialect } from 'kysely-postgres-js';
 import type postgres from 'postgres';
+import { PASSWORD_MAX, PASSWORD_MIN } from '@/lib/password';
 
 export interface AuthConfigInput {
   sql: postgres.Sql;
@@ -10,7 +12,14 @@ export interface AuthConfigInput {
   secret: string;
   google?: { clientId: string; clientSecret: string };
   sendMagicLink: (email: string, url: string) => Promise<void>;
+  /** Emails the link that lets someone choose a new password. */
+  sendPasswordReset: (email: string, url: string) => Promise<void>;
+  /** Tells the account's owner their password was just set or changed. */
+  passwordChanged: (email: string) => Promise<void>;
 }
+
+/** A reset link is as good as the password, so it does not live long. */
+export const RESET_LINK_MINUTES = 30;
 
 const timestamps = { createdAt: 'created_at', updatedAt: 'updated_at' } as const;
 
@@ -65,7 +74,18 @@ export function authOptions(input: AuthConfigInput) {
       modelName: 'auth_verifications',
       fields: { expiresAt: 'expires_at', ...timestamps },
     },
-    emailAndPassword: { enabled: false },
+    // Accounts are only ever created from an emailed link (sign-in or invitation), so the
+    // address is confirmed before a password exists. A password is added afterwards.
+    emailAndPassword: {
+      enabled: true,
+      disableSignUp: true,
+      minPasswordLength: PASSWORD_MIN,
+      maxPasswordLength: PASSWORD_MAX,
+      resetPasswordTokenExpiresIn: RESET_LINK_MINUTES * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: ({ user, url }) => input.sendPasswordReset(user.email, url),
+      onPasswordReset: ({ user }) => input.passwordChanged(user.email),
+    },
     socialProviders: input.google
       ? { google: { clientId: input.google.clientId, clientSecret: input.google.clientSecret } }
       : {},
@@ -79,6 +99,8 @@ export function authOptions(input: AuthConfigInput) {
         storeToken: 'hashed',
         sendMagicLink: ({ email, url }) => input.sendMagicLink(email, url),
       }),
+      // Lets a server action that changes the session (a new password) set its cookie.
+      nextCookies(),
     ],
   } satisfies BetterAuthOptions;
 }

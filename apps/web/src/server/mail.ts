@@ -60,3 +60,37 @@ export async function sendInvitation(
     meta: { kind: 'team_invite', workspaceId: input.workspaceId },
   });
 }
+
+export async function sendPasswordReset(mailer: Mailer, to: string, url: string, minutes: number) {
+  const body = layout(
+    'Choose a new password',
+    [
+      `Use the button below to choose a new password for Codevibe Sign. The link works once and expires in ${minutes} minutes.`,
+      'If you did not ask for this, you can ignore this email. Your password stays as it is.',
+    ],
+    { label: 'Choose a new password', url },
+  );
+  await mailer.send({
+    to,
+    subject: 'Choose a new password for Codevibe Sign',
+    ...body,
+    meta: { kind: 'password_reset' },
+  });
+}
+
+export async function sendPasswordChanged(mailer: Mailer, to: string, signInUrl: string) {
+  const body = layout(
+    'Your password was changed',
+    [
+      'The password for your Codevibe Sign account was just set or changed.',
+      'If that was you, there is nothing to do. If it was not, choose a new password now with "Forgot password" on the sign-in page, and tell the admin of your workspace.',
+    ],
+    { label: 'Open the sign-in page', url: signInUrl },
+  );
+  await mailer.send({
+    to,
+    subject: 'Your Codevibe Sign password was changed',
+    ...body,
+    meta: { kind: 'password_changed' },
+  });
+}

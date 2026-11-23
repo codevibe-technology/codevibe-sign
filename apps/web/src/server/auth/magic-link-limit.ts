@@ -29,3 +29,17 @@ export function limitMagicLinks(send: Send, now: () => Date = () => new Date()):
     await send(email, url);
   };
 }
+
+/**
+ * The same cap for "forgot password" emails. Over the cap the email is dropped without an
+ * error: the answer must not differ between an address that has an account and one that has
+ * not.
+ */
+export function limitResetLinks(send: Send, now: () => Date = () => new Date()): Send {
+  const limiter = memoryRateLimiter({ maxKeys: 50_000 });
+  return async (email, url) => {
+    const key = `reset:${email.trim().toLowerCase()}`;
+    const result = await limiter.hit(key, MAGIC_LINKS_PER_WINDOW, WINDOW_MS, now());
+    if (result.allowed) await send(email, url);
+  };
+}
