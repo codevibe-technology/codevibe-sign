@@ -6,11 +6,13 @@ import { setAccountPlanByName } from '../src/server/plan-admin';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
+// Bundled into ops/plan-set.mjs for the Docker image, where it is run with plain node.
+const command = import.meta.url.endsWith('.mjs')
+  ? 'node ops/plan-set.mjs'
+  : 'pnpm --filter web plan:set';
 const [target, plan] = process.argv.slice(2);
 if (!target || !plan) {
-  console.error(
-    `Usage: pnpm --filter web plan:set <workspace-slug or owner-email> <${PLANS.join('|')}>`,
-  );
+  console.error(`Usage: ${command} <workspace-slug or owner-email> <${PLANS.join('|')}>`);
   process.exit(1);
 }
 const url = process.env.DATABASE_URL;
