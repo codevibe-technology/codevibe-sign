@@ -113,13 +113,14 @@ describe('the OpenAPI document', () => {
   it('maps every error code to the status the server sends', async () => {
     const { statusFor } = await import('../../src/errors');
     const codes = spec.components.schemas.ErrorCode;
+    const status = codes['x-status'] as Record<string, number | number[]>;
     const hostedOnly = (codes['x-hosted-only'] ?? []) as string[];
     for (const code of codes.enum) {
+      // Sent by a hosted install in front of this server, never by the server itself.
       if (hostedOnly.includes(code)) continue;
-      expect(statusFor(code as never), code).toBe(
-        (codes['x-status'] as Record<string, number>)[code],
-      );
+      expect(statusFor(code as never), code).toBe(status[code]);
     }
+    expect(status.PLAN_LIMIT).toEqual([403, 429]);
   });
 
   it('describes every error code in a sentence', () => {
