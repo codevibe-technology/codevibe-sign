@@ -114,12 +114,25 @@ export const ROLE_OPTIONS: { value: RecipientRole; label: string; hint: string }
  * Identity checks a sender can pick, the default first. A one-time code is the default
  * because a link alone proves only access to the inbox, which is weaker evidence.
  */
-export const AUTH_OPTIONS: { value: AuthMethod; label: string }[] = [
+/**
+ * Whether this install can send one-time codes by text message. No SMS provider is connected
+ * yet, so the SMS option is hidden and refused until one is.
+ */
+export const SMS_CODES_AVAILABLE = false;
+
+const ALL_AUTH_OPTIONS: { value: AuthMethod; label: string }[] = [
   { value: 'email_otp', label: 'Email link + code (recommended)' },
   { value: 'sms_otp', label: 'Email link + SMS code' },
   { value: 'email_link', label: 'Email link only' },
   { value: 'aadhaar', label: 'Aadhaar eSign' },
 ];
+
+export const AUTH_OPTIONS = ALL_AUTH_OPTIONS.filter(
+  (option) => SMS_CODES_AVAILABLE || option.value !== 'sms_otp',
+);
+
+export const SMS_UNAVAILABLE_MESSAGE =
+  'SMS codes are not available yet. Choose "Email link + code" instead.';
 
 /** Templates fix their signers before the documents are known, so Aadhaar eSign is left out. */
 export const TEMPLATE_AUTH_OPTIONS = AUTH_OPTIONS.filter(

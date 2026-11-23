@@ -8,6 +8,7 @@ import {
   type ReminderPolicy,
   type RoutingMode,
 } from '@codevibe_technology/sign-core';
+import { SMS_CODES_AVAILABLE, SMS_UNAVAILABLE_MESSAGE } from './envelopes';
 import type { Template as SignTemplate } from '@codevibe_technology/sign-templates';
 import {
   MAX_DOCUMENTS,
@@ -302,7 +303,9 @@ export function sendProblems(
       seen.set(`${email}:${role.type}`, role.name);
     }
     const phone = cleanPhone(person.phone);
-    if (role.auth === 'sms_otp' && !phone) {
+    if (role.auth === 'sms_otp' && !SMS_CODES_AVAILABLE) {
+      problems[`${at}.phone`] = SMS_UNAVAILABLE_MESSAGE;
+    } else if (role.auth === 'sms_otp' && !phone) {
       problems[`${at}.phone`] = `Enter the ${role.name}'s mobile number for the SMS code.`;
     } else if (phone && !isValidPhone(phone)) {
       problems[`${at}.phone`] = 'Use the international format, for example +919812345678.';

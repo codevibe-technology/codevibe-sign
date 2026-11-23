@@ -238,15 +238,15 @@ describe('step 2: recipients', () => {
     expect(calls).toEqual([]);
   });
 
-  it('asks for a mobile number when the code goes by SMS', async () => {
+  it('does not offer SMS codes while no SMS provider is connected', async () => {
     const user = userEvent.setup();
     await toRecipients(user);
     await user.click(screen.getByRole('button', { name: 'Add me' }));
-    expect(screen.queryByLabelText('Mobile number')).toBeNull();
-    await user.selectOptions(screen.getByLabelText('Identity check'), 'sms_otp');
-    await next(user);
-    expect(screen.getByLabelText('Mobile number')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('Enter a mobile number for the SMS code.')).toBeTruthy();
+    const options = Array.from(
+      (screen.getByLabelText('Identity check') as HTMLSelectElement).options,
+    ).map((o) => o.value);
+    expect(options).not.toContain('sms_otp');
+    expect(options).toContain('email_otp');
   });
 
   it('reorders people and switches between in order and all at once', async () => {

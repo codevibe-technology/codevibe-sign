@@ -25,6 +25,7 @@ import { createPlanGate } from './plan-gate';
 import { appTemplateStore } from './templates';
 import { createAuthenticate } from './principal';
 import { recordDelivery } from '../webhooks';
+import { SMS_CODES_AVAILABLE } from '@/lib/envelopes';
 import { webhookSecurity, webhookTargets } from './webhooks';
 
 export const SIGN_BASE_PATH = '/api';
@@ -33,7 +34,7 @@ export const SIGN_BASE_PATH = '/api';
  * Whether this install can send one-time codes by text message. Codes go out by email only
  * (`createOtpSender`), so the signing page tells SMS recipients to ask for an email instead.
  */
-export const SMS_CODES = false;
+export const SMS_CODES = SMS_CODES_AVAILABLE;
 
 /** Largest request body the sign server accepts; its default. */
 const MAX_REQUEST_BYTES = 50 * 1024 * 1024;

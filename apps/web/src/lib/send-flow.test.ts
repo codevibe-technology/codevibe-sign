@@ -112,12 +112,14 @@ describe('recipients', () => {
     );
   });
 
-  it('asks for a mobile number in international format for SMS codes', () => {
-    const r = person({ id: 'r1', auth: 'sms_otp' });
-    expect(recipientProblems([r])['recipients.r1.phone']).toMatch(/mobile number/);
-    expect(recipientProblems([{ ...r, phone: '98123' }])['recipients.r1.phone']).toMatch(
-      /\+919812345678/,
-    );
+  it('refuses SMS codes while no SMS provider is connected', () => {
+    const r = person({ id: 'r1', auth: 'sms_otp', phone: '+919812345678' });
+    expect(recipientProblems([r])['recipients.r1.auth']).toMatch(/SMS codes are not available/);
+  });
+
+  it('still checks the format of a mobile number that is given', () => {
+    const r = person({ id: 'r1', phone: '98123' });
+    expect(recipientProblems([r])['recipients.r1.phone']).toMatch(/\+919812345678/);
     expect(recipientProblems([{ ...r, phone: '+91 98123 45678' }])).toEqual({});
   });
 

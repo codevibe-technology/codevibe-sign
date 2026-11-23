@@ -7,6 +7,7 @@ import {
   type RecipientRole,
   type RoutingMode,
 } from '@codevibe_technology/sign-core';
+import { SMS_CODES_AVAILABLE, SMS_UNAVAILABLE_MESSAGE } from './envelopes';
 import type { ApiEnvelope as Envelope } from '@codevibe_technology/sign-server';
 
 /** Matches the sign server's limits, so a file is refused before it is uploaded. */
@@ -162,7 +163,9 @@ export function recipientProblems(recipients: DraftRecipient[]): Problems {
     }
     if (email) seen.add(`${email}:${r.role}`);
     const phone = r.phone.replace(/[\s()-]/g, '');
-    if (r.auth === 'sms_otp' && !phone) {
+    if (r.auth === 'sms_otp' && !SMS_CODES_AVAILABLE) {
+      problems[`${at}.auth`] = SMS_UNAVAILABLE_MESSAGE;
+    } else if (r.auth === 'sms_otp' && !phone) {
       problems[`${at}.phone`] = 'Enter a mobile number for the SMS code.';
     } else if (phone && !isValidPhone(phone)) {
       problems[`${at}.phone`] = 'Use the international format, for example +919812345678.';

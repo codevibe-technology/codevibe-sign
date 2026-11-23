@@ -192,9 +192,15 @@ describe('sending from a template', () => {
     });
     const sms = { roles: [{ ...roles[0]!, auth: 'sms_otp' as const }] };
     expect(sendProblems(sms, { r_emp: { name: 'A', email: 'a@example.com', phone: '' } })).toEqual({
-      'people.r_emp.phone': expect.stringMatching(/mobile number/),
+      'people.r_emp.phone': expect.stringMatching(/SMS codes are not available/),
     });
-    expect(sendProblems(sms, { r_emp: { name: 'A', email: 'nope', phone: '98123' } })).toEqual({
+    expect(
+      sendProblems(definition, {
+        r_emp: { name: 'A', email: 'nope', phone: '98123' },
+        r_mgr: { name: 'B', email: 'b@example.com', phone: '' },
+        r_hr: { name: 'C', email: 'c@example.com', phone: '' },
+      }),
+    ).toEqual({
       'people.r_emp.email': 'This email address does not look right.',
       'people.r_emp.phone': expect.stringMatching(/international format/),
     });
