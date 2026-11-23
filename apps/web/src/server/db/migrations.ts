@@ -342,4 +342,106 @@ create table app_public_records (
 create index app_public_records_workspace_idx on app_public_records (workspace_id);
 `,
   },
+  {
+    name: '0013_billing',
+    sql: `
+create table app_audit_log (
+  id text primary key,
+  workspace_id text references app_workspaces (id) on delete set null,
+  actor_id text references auth_users (id) on delete set null,
+  action text not null,
+  target text,
+  data jsonb not null default '{}',
+  ip text,
+  created_at timestamptz not null default now()
+);
+create index app_audit_log_workspace_idx on app_audit_log (workspace_id, created_at desc);
+
+create table app_billing_details (
+  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  legal_name text not null,
+  gstin text,
+  address_line1 text not null,
+  address_line2 text,
+  city text not null,
+  pin text not null,
+  state_code text not null,
+  email text not null,
+  updated_by text references auth_users (id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+create table app_billing_orders (
+  id text primary key,
+  workspace_id text references app_workspaces (id) on delete set null,
+  kind text not null,
+  payload jsonb not null default '{}',
+  lines jsonb not null,
+  buyer jsonb not null,
+  seller jsonb not null,
+  sac text not null,
+  gst_percent numeric(5, 2) not null,
+  taxable_paise bigint not null check (taxable_paise > 0),
+  cgst_paise bigint not null check (cgst_paise >= 0),
+  sgst_paise bigint not null check (sgst_paise >= 0),
+  igst_paise bigint not null check (igst_paise >= 0),
+  total_paise bigint not null check (total_paise = taxable_paise + cgst_paise + sgst_paise + igst_paise),
+  status text not null default 'created' check (status in ('created', 'paid', 'failed', 'expired')),
+  mode text not null check (mode in ('test', 'live')),
+  razorpay_order_id text not null unique,
+  razorpay_payment_id text unique,
+  created_by text references auth_users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  paid_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+create index app_billing_orders_workspace_idx on app_billing_orders (workspace_id, created_at desc);
+
+create table app_invoice_counters (
+  prefix text primary key,
+  last_sequence integer not null check (last_sequence > 0)
+);
+
+create table app_invoices (
+  id text primary key,
+  number text not null unique,
+  order_id text not null unique references app_billing_orders (id),
+  workspace_id text references app_workspaces (id) on delete set null,
+  issued_at timestamptz not null,
+  file_key text,
+  emailed_at timestamptz,
+  attempts integer not null default 0,
+  claimed_at timestamptz,
+  last_error text
+);
+create index app_invoices_workspace_idx on app_invoices (workspace_id, issued_at desc);
+create index app_invoices_unfinished_idx on app_invoices (issued_at) where emailed_at is null;
+
+create table app_razorpay_events (
+  event_id text primary key,
+  event text not null,
+  received_at timestamptz not null default now()
+);
+
+create table app_esign_credits (
+  workspace_id text primary key references app_workspaces (id) on delete cascade,
+  available integer not null default 0 check (available >= 0),
+  reserved integer not null default 0 check (reserved >= 0),
+  updated_at timestamptz not null default now()
+);
+
+create table app_esign_credit_ledger (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  kind text not null check (kind in ('grant', 'reserve', 'consume', 'release')),
+  credits integer not null check (credits > 0),
+  ref text not null,
+  reason text,
+  created_at timestamptz not null default now(),
+  unique (workspace_id, kind, ref)
+);
+create index app_esign_credit_ledger_workspace_idx
+  on app_esign_credit_ledger (workspace_id, created_at desc);
+`,
+  },
 ];

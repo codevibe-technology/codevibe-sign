@@ -15,6 +15,7 @@ const KIND_LABELS: Record<string, string> = {
   password_reset: 'Password reset',
   password_changed: 'Password changed',
   decline_notice: 'Declined notice',
+  invoice: 'Tax invoice',
 };
 
 export const mailKindLabel = (kind: string) => KIND_LABELS[kind] ?? 'Other';
