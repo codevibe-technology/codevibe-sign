@@ -53,7 +53,8 @@ describe('Landing', () => {
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
     expect(screen.queryByRole('link', { name: /Start free/ })).toBeNull();
     const toDashboard = screen.getAllByRole('link', { name: /Go to dashboard/ });
-    expect(toDashboard).toHaveLength(2);
+    // the hero, the Free plan and the closing call to action
+    expect(toDashboard).toHaveLength(3);
     for (const link of toDashboard) expect(link).toHaveAttribute('href', '/dashboard');
     expect(
       screen.getByRole('heading', { level: 1, name: 'Send documents for signature in minutes' }),
@@ -74,12 +75,69 @@ describe('Landing', () => {
 
   it('has every section, reachable from the header', () => {
     render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
-    for (const id of ['how-it-works', 'features', 'open-source', 'pricing', 'faq']) {
+    for (const id of ['features', 'developers', 'open-source', 'pricing', 'faq']) {
       expect(document.getElementById(id)).not.toBeNull();
     }
     const nav = screen.getByRole('navigation', { name: 'Site' });
+    expect(within(nav).getByRole('link', { name: 'How it works' })).toHaveAttribute(
+      'href',
+      '/#features',
+    );
+    expect(within(nav).getByRole('link', { name: 'Developers' })).toHaveAttribute(
+      'href',
+      '/#developers',
+    );
     expect(within(nav).getByRole('link', { name: 'Pricing' })).toHaveAttribute('href', '/#pricing');
     expect(within(nav).getByRole('link', { name: 'Docs' })).toHaveAttribute('href', '/docs');
+  });
+
+  it('sends everyone else to sign-in from every call to action', () => {
+    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    const ways = screen.getAllByRole('link', { name: /Start free/ });
+    // the header, the hero, the Free plan and the closing call to action
+    expect(ways).toHaveLength(4);
+    for (const link of ways) expect(link).toHaveAttribute('href', '/sign-in');
+    expect(screen.queryByRole('link', { name: /Go to dashboard/ })).toBeNull();
+  });
+
+  it('shows each step with its clip and a description of it', () => {
+    const { container } = render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    for (const [id, clip] of [
+      ['send', 'send'],
+      ['sign', 'sign-phone'],
+      ['seal', 'sealed'],
+      ['audit', 'audit'],
+      ['verify', 'verify'],
+      ['templates', 'bulk'],
+    ] as const) {
+      const row = document.getElementById(id)!;
+      expect(within(row).getByRole('heading', { level: 3 })).toBeInTheDocument();
+      expect(row.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.webm`);
+      expect(row.querySelector('img')).toHaveAttribute('src', `/home/${clip}.webp`);
+      const text = document.getElementById(`${id}-text`)!;
+      expect(text.textContent!.length).toBeGreaterThan(40);
+      expect(within(row).getByRole('button', { name: /^Play the clip: / })).toHaveAttribute(
+        'aria-describedby',
+        `${id}-text`,
+      );
+    }
+    const videos = container.querySelectorAll('video');
+    expect(videos).toHaveLength(8);
+    for (const video of videos) {
+      expect(video).toHaveAttribute('preload', 'none');
+      expect(video).not.toHaveAttribute('autoplay');
+    }
+    expect(screen.getAllByRole('button', { name: /^Play the clip: / })).toHaveLength(8);
+  });
+
+  it('shows the API with a working client call', () => {
+    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    const developers = document.getElementById('developers')!;
+    const code = within(developers).getByLabelText(
+      'Sending an envelope with the TypeScript client',
+    );
+    expect(code.textContent).toContain("from '@codevibe_technology/sign-client'");
+    expect(code.textContent).toContain('sign.envelopes.create(');
   });
 
   it('prices from the plan limits it is given', () => {

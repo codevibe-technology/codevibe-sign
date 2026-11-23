@@ -1,21 +1,16 @@
 import {
   ArrowRight,
   BadgeCheck,
-  Braces,
   Check,
-  FileCheck2,
-  FileStack,
-  FileUp,
+  Clock3,
+  FileCode2,
   KeyRound,
   Link2,
   ListOrdered,
   Mail,
-  MousePointerClick,
   Palette,
-  PenLine,
-  Send,
   ShieldCheck,
-  Table2,
+  UserRoundPen,
   UsersRound,
   Webhook,
   type LucideIcon,
@@ -25,86 +20,185 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { formatBytes, type PlanLimits } from '@/lib/plans';
-import { CONTACT_EMAIL, GITHUB_URL, SELF_HOST_DOCS, VERIFY_URL } from './links';
 import { APP_HOME } from '@/lib/safe-next';
+import { Clip, type ClipSpec } from './clip';
+import { CLIPS } from './clips';
+import { CONTACT_EMAIL, DOCS_URL, GITHUB_URL, SELF_HOST_DOCS, VERIFY_URL } from './links';
 import { SiteFooter } from './site-footer';
 import { SiteHeader, type SiteViewer } from './site-header';
 
-const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
+/** Only what the product does today: every line here can be checked in the code. */
+const TRUST: { icon: LucideIcon; title: string; text: string }[] = [
   {
-    icon: FileUp,
-    title: 'Upload',
-    text: 'Add one or more PDFs: contracts, offer letters, NDAs, anything you can save as a PDF.',
-  },
-  {
-    icon: UsersRound,
-    title: 'Add people',
-    text: 'Signers, approvers and people who only need a copy. Pick an order, or let everyone sign at once.',
-  },
-  {
-    icon: MousePointerClick,
-    title: 'Place fields',
-    text: 'Drag signature, initials, date, name and text boxes onto the pages for each person.',
-  },
-  {
-    icon: Send,
-    title: 'Send',
-    text: 'Each person gets an email with their own link when it is their turn. Reminders go out on their own.',
-  },
-];
-
-const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
-  {
-    icon: FileCheck2,
-    title: 'Sealed PDF with a PAdES seal',
-    text: 'Every completed document carries a PAdES seal. Any later change to the file breaks it, and PDF readers show that.',
+    icon: ShieldCheck,
+    title: 'PAdES seal',
+    text: 'On every completed PDF. Any later change breaks it.',
   },
   {
     icon: Link2,
     title: 'Hash-chained audit trail',
-    text: 'Each step, from sent to signed, is recorded with a hash of the one before, so the history cannot be quietly edited.',
+    text: 'Each step carries a SHA-256 hash of the one before.',
   },
   {
     icon: KeyRound,
-    title: 'Email codes',
-    text: 'Ask a signer to type a one-time code from their inbox before the document opens.',
+    title: 'One-time email codes',
+    text: 'The document opens only after the signer types the code.',
   },
   {
-    icon: ListOrdered,
-    title: 'Signing order',
-    text: 'One person after another, or everyone at once. Expiry dates and reminders are set per envelope.',
-  },
-  {
-    icon: FileStack,
-    title: 'Templates',
-    text: 'Keep the documents you send often with roles and fields in place. Fill in the names and send.',
-  },
-  {
-    icon: Table2,
-    title: 'Bulk send from CSV',
-    text: 'One template, one CSV, one envelope per row. Every row is checked and its problems shown before anything goes out.',
+    icon: BadgeCheck,
+    title: 'Public verify page',
+    text: 'Anyone can check a signed PDF, no account needed.',
   },
   {
     icon: Webhook,
-    title: 'Webhooks',
-    text: 'Signed events to your own systems when envelopes are sent, signed, completed or declined, with a log of every delivery.',
+    title: 'Signed webhooks',
+    text: 'HMAC-SHA256 on every delivery, with a delivery log.',
   },
   {
-    icon: Braces,
-    title: 'HTTP API',
-    text: 'Workspace API keys, an OpenAPI description and a Postman collection. Everything in the app is in the API.',
+    icon: FileCode2,
+    title: 'Open source',
+    text: 'Libraries under Apache-2.0, the app under AGPL-3.0.',
+  },
+];
+
+interface Feature {
+  id: string;
+  eyebrow: string;
+  title: string;
+  text: string;
+  points: string[];
+  clip: ClipSpec;
+  /** The phone recording sits in a phone frame; the rest in a browser window. */
+  phone?: boolean;
+}
+
+const FEATURES: Feature[] = [
+  {
+    id: 'send',
+    eyebrow: 'Send',
+    title: 'Send a document in a minute',
+    text: 'Upload a PDF, add who signs, drag signature and date boxes onto the page, and send. The draft saves as you go.',
+    points: [
+      'Signers, approvers and people who only get a copy',
+      'One after another, or everyone at once',
+      'Reminders and an expiry date for each envelope',
+    ],
+    clip: CLIPS.send,
+  },
+  {
+    id: 'sign',
+    eyebrow: 'Sign',
+    title: 'Signing that works on any phone',
+    text: 'The signer opens the link from their email, types the one-time code we send them and signs with a finger. No account and no app.',
+    points: [
+      'A one-time code before the document opens',
+      'Draw, type or upload a signature',
+      'Your logo and colour on the signing page',
+    ],
+    clip: CLIPS.sign,
+    phone: true,
+  },
+  {
+    id: 'seal',
+    eyebrow: 'Seal',
+    title: 'A sealed PDF with its certificate',
+    text: 'When the last person signs, the PDF gets a PAdES seal and a certificate page: who signed, when, from which IP address and device, and a SHA-256 fingerprint of every file.',
+    points: [
+      'Any later change to the file breaks the seal',
+      'Times in UTC and in your workspace time zone',
+      'Everyone gets the signed copy by email',
+    ],
+    clip: CLIPS.sealed,
+  },
+  {
+    id: 'audit',
+    eyebrow: 'Track',
+    title: 'An audit trail nobody can quietly edit',
+    text: 'Every step, from draft to sealed, is recorded with a hash of the step before it. The envelope page checks the chain and shows the whole history live.',
+    points: [
+      'Opened, verified, signed: each with its time and IP address',
+      'A log of every email the workspace sent',
+      'The evidence record as JSON, for your own files',
+    ],
+    clip: CLIPS.audit,
+  },
+  {
+    id: 'verify',
+    eyebrow: 'Verify',
+    title: 'Anyone can check a signed PDF',
+    text: 'Drop a signed PDF on the public verify page. It shows whether the seal is intact, who signed and when, and whether the audit trail is complete.',
+    points: [
+      'A changed file is caught, down to a single byte',
+      'Checked in memory, not stored or logged',
+      'No account needed, so you can send the link to anyone',
+    ],
+    clip: CLIPS.verify,
+  },
+  {
+    id: 'templates',
+    eyebrow: 'Scale',
+    title: 'Templates and bulk send',
+    text: 'Keep the documents you send often with roles and fields in place. Then send one to a whole list from a CSV file: every row is checked before anything goes out.',
+    points: [
+      'Problems named by row and column',
+      'Skip the rows with problems, or fix them and upload again',
+      'Sending carries on in the background',
+    ],
+    clip: CLIPS.bulk,
+  },
+];
+
+const MORE: { icon: LucideIcon; title: string; text: string }[] = [
+  {
+    icon: ListOrdered,
+    title: 'Signing order',
+    text: 'One after another or all at once, with reminders that go out on their own.',
+  },
+  {
+    icon: UserRoundPen,
+    title: 'Fix after sending',
+    text: 'Correct a mistyped email, resend a link, or recall the envelope to edit it.',
   },
   {
     icon: Palette,
-    title: 'Your brand and your emails',
-    text: 'Your logo, colour and font on the signing page, and your own words in every email people receive.',
+    title: 'Your brand and words',
+    text: 'Logo, colour and font on the signing page, and your own text in every email.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Public verify page',
-    text: 'Anyone holding a signed PDF can drop it on the verify page, no account needed, and see whether it is unchanged, who signed and when.',
+    icon: Clock3,
+    title: 'Time zones',
+    text: 'Each workspace picks its zone; every date on screen and on paper names it.',
+  },
+  {
+    icon: UsersRound,
+    title: 'Team workspaces',
+    text: 'Invite people by email and give each the role they need.',
+  },
+  {
+    icon: Mail,
+    title: 'Email log',
+    text: 'See every message sent from the workspace, and to whom.',
   },
 ];
+
+const API_SNIPPET = `import { createSignClient } from '@codevibe_technology/sign-client';
+
+const sign = createSignClient({
+  baseUrl: 'https://sign.codevibe.in/api',
+  apiKey: process.env.SIGN_API_KEY!,
+});
+
+await sign.envelopes.create({
+  title: 'Design services agreement',
+  send: true,
+  documents: [{ key: 'deal', name: 'agreement.pdf', content: pdf }],
+  recipients: [
+    { key: 'rohan', name: 'Rohan Mehta', email: 'rohan@example.com', auth: 'email_otp' },
+  ],
+  fields: [
+    { recipient: 'rohan', type: 'signature', page: 0, x: 306, y: 330, width: 210, height: 58 },
+  ],
+});`;
 
 const FAQ: { q: string; a: ReactNode }[] = [
   {
@@ -170,6 +264,16 @@ const FAQ: { q: string; a: ReactNode }[] = [
       </p>
     ),
   },
+  {
+    q: 'Can I use it outside India?',
+    a: (
+      <p>
+        Yes. Each workspace picks its own time zone, and the dates on signed documents, in emails
+        and on the certificate use it. Every time shown on screen names its zone, so people in
+        different countries read the same moment. The app is in English.
+      </p>
+    ),
+  },
 ];
 
 const count = (n: number | null, unit: string, many = `${unit}s`) =>
@@ -194,6 +298,21 @@ function planLines(limits: PlanLimits): string[] {
   ];
 }
 
+/** The Codevibe section label: a mono eyebrow with a short teal rule. */
+function Eyebrow({ children, onDark = false }: { children: ReactNode; onDark?: boolean }) {
+  return (
+    <p
+      className={cn(
+        'flex items-center gap-2.5 font-mono text-xs font-medium tracking-[0.12em] uppercase',
+        onDark ? 'text-white/75' : 'text-muted',
+      )}
+    >
+      <span aria-hidden className="h-px w-6 bg-accent" />
+      {children}
+    </p>
+  );
+}
+
 function Section({
   id,
   eyebrow,
@@ -216,61 +335,99 @@ function Section({
       className={cn('scroll-mt-16 px-4 py-16 sm:px-6 sm:py-24', className)}
     >
       <div className="mx-auto max-w-6xl">
-        <p className="text-sm font-semibold tracking-wide text-primary uppercase">{eyebrow}</p>
-        <h2 id={`${id}-title`} className="mt-2 max-w-2xl text-3xl font-bold sm:text-4xl">
+        <Eyebrow>{eyebrow}</Eyebrow>
+        <h2 id={`${id}-title`} className="mt-3 max-w-2xl text-3xl font-bold sm:text-4xl">
           {title}
         </h2>
         {intro ? <p className="mt-3 max-w-2xl text-lg text-muted">{intro}</p> : null}
-        <div className="mt-10">{children}</div>
+        <div className="mt-10 sm:mt-12">{children}</div>
       </div>
     </section>
   );
 }
 
-/** A small picture of the product: a page with a placed signature and the seal check. */
-function HeroVisual() {
+/** A browser window around a desktop clip, so it reads as the product and not as a picture. */
+function BrowserFrame({
+  clip,
+  describedBy,
+  eager,
+  className,
+}: {
+  clip: ClipSpec;
+  describedBy?: string;
+  eager?: boolean;
+  className?: string;
+}) {
   return (
-    <div aria-hidden className="relative mx-auto w-full max-w-md lg:max-w-none">
-      <div className="absolute -top-6 right-0 h-40 w-40 rounded-full bg-accent/25 blur-2xl" />
-      <div className="relative rotate-1 rounded-2xl border border-white/10 bg-surface p-5 text-ink shadow-2xl sm:p-6">
-        <div className="flex items-center justify-between">
-          <p className="font-display text-sm font-semibold">Offer letter.pdf</p>
-          <span className="rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning">
-            Waiting for Mia
-          </span>
-        </div>
-        <div className="mt-4 space-y-2">
-          <div className="h-2.5 w-11/12 rounded bg-surface-2" />
-          <div className="h-2.5 w-full rounded bg-surface-2" />
-          <div className="h-2.5 w-4/5 rounded bg-surface-2" />
-          <div className="h-2.5 w-10/12 rounded bg-surface-2" />
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <div className="rounded-lg border-2 border-[var(--cvs-recipient-0)] bg-primary-soft/60 p-3">
-            <p className="text-[11px] font-semibold text-[var(--cvs-recipient-0)]">Asha signed</p>
-            <p className="mt-1 font-serif text-xl text-ink italic">Asha Rao</p>
-          </div>
-          <div className="rounded-lg border-2 border-dashed border-[var(--cvs-recipient-1)] p-3">
-            <p className="text-[11px] font-semibold text-[var(--cvs-recipient-1)]">
-              Mia: signature
-            </p>
-            <p className="mt-1 flex items-center gap-1 text-sm text-muted">
-              <PenLine className="h-4 w-4" /> Sign here
-            </p>
-          </div>
-        </div>
+    <div
+      className={cn(
+        'overflow-hidden rounded-xl border border-line bg-surface shadow-[0_24px_60px_-20px_rgb(13_27_42/0.35)]',
+        className,
+      )}
+    >
+      <div
+        aria-hidden
+        className="flex h-8 items-center gap-1.5 border-b border-line bg-surface-2 px-3"
+      >
+        <span className="h-2.5 w-2.5 rounded-full bg-[#F26B5B]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#F5BE4F]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#4CC38A]" />
       </div>
-      <div className="relative -mt-4 ml-auto w-64 -rotate-2 rounded-xl border border-line bg-surface p-4 text-ink shadow-xl sm:-mr-4">
-        <p className="flex items-center gap-2 text-sm font-semibold text-success">
-          <BadgeCheck className="h-5 w-5" /> Seal is valid
-        </p>
-        <p className="mt-1 text-xs text-muted">Not changed since it was sealed.</p>
+      <Clip clip={clip} describedBy={describedBy} eager={eager} />
+    </div>
+  );
+}
+
+function PhoneFrame({ clip, describedBy }: { clip: ClipSpec; describedBy?: string }) {
+  return (
+    <div className="mx-auto w-full max-w-[280px] rounded-[2.4rem] bg-[#0D1B2A] p-2.5 shadow-[0_24px_60px_-20px_rgb(13_27_42/0.5)]">
+      <div className="overflow-hidden rounded-[1.9rem]">
+        <Clip clip={clip} describedBy={describedBy} />
       </div>
     </div>
   );
 }
 
-/** The public home page of the hosted cloud, for visitors who are not signed in. */
+function FeatureRow({ feature, index }: { feature: Feature; index: number }) {
+  const flip = index % 2 === 1;
+  return (
+    <li
+      id={feature.id}
+      className="grid scroll-mt-20 grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-14"
+    >
+      <div className={cn('lg:col-span-5', flip && 'lg:order-2')}>
+        <p className="font-mono text-xs font-medium tracking-[0.12em] text-primary uppercase">
+          {String(index + 1).padStart(2, '0')} · {feature.eyebrow}
+        </p>
+        <h3 id={`${feature.id}-title`} className="mt-3 text-2xl font-bold sm:text-3xl">
+          {feature.title}
+        </h3>
+        <p id={`${feature.id}-text`} className="mt-3 text-lg text-muted">
+          {feature.text}
+        </p>
+        <ul className="mt-5 space-y-2.5">
+          {feature.points.map((point) => (
+            <li key={point} className="flex gap-2.5">
+              <Check aria-hidden className="mt-1 h-4 w-4 shrink-0 text-success" />
+              {point}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className={cn('min-w-0 lg:col-span-7', flip && 'lg:order-1')}>
+        {feature.phone ? (
+          <div className="rounded-2xl bg-gradient-to-br from-primary-soft via-surface to-accent-soft px-6 py-8 sm:py-10">
+            <PhoneFrame clip={feature.clip} describedBy={`${feature.id}-text`} />
+          </div>
+        ) : (
+          <BrowserFrame clip={feature.clip} describedBy={`${feature.id}-text`} />
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** The public home page of the hosted cloud. A signed-in visitor gets their dashboard instead of "Start free". */
 export function Landing({
   free,
   cloud,
@@ -278,7 +435,6 @@ export function Landing({
 }: {
   free: PlanLimits;
   cloud: PlanLimits;
-  /** The signed-in visitor, who is offered their dashboard instead of "Start free". */
   viewer?: SiteViewer | null;
 }) {
   const start = viewer
@@ -288,23 +444,33 @@ export function Landing({
     <div className="flex min-h-dvh flex-col bg-canvas">
       <SiteHeader viewer={viewer} />
       <main id="main" className="flex-1">
-        <section className="relative overflow-hidden bg-header px-4 pt-14 pb-20 text-header-ink sm:px-6 sm:pt-20 sm:pb-28">
+        <section
+          aria-labelledby="hero-title"
+          className="relative overflow-hidden bg-header px-4 pt-14 pb-16 text-header-ink sm:px-6 sm:pt-20 sm:pb-24"
+        >
           <div
             aria-hidden
             className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:48px_48px]"
           />
-          <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 lg:grid-cols-[1.1fr_1fr]">
+          <div
+            aria-hidden
+            className="absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-accent/20 blur-3xl"
+          />
+          <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-[1fr_1.15fr] lg:gap-14">
             <div>
               <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm font-medium text-white/85">
                 <span className="h-2 w-2 rounded-full bg-accent" />
                 Open-source e-signatures
               </p>
-              <h1 className="mt-5 text-4xl leading-[1.08] font-bold text-white sm:text-5xl lg:text-6xl">
+              <h1
+                id="hero-title"
+                className="mt-5 text-4xl leading-[1.06] font-bold text-white sm:text-5xl lg:text-[3.5rem]"
+              >
                 Send documents for signature in minutes
               </h1>
               <p className="mt-5 max-w-xl text-lg text-white/80">
-                Upload a PDF, add who signs, drop the boxes on the page and send. People sign in
-                their browser, and you get back a sealed PDF with a certificate anyone can check.
+                Upload a PDF, place the fields and send. People sign on any phone or laptop, and you
+                get back a sealed PDF with a certificate anyone can check.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild className="h-12 px-6 text-base">
@@ -322,93 +488,155 @@ export function Landing({
                   </a>
                 </Button>
               </div>
-              <p className="mt-4 text-sm text-white/65">
+              <p className="mt-4 text-sm text-white/70">
                 A free cloud workspace, no card needed. Or run it on your own server with no limits.
               </p>
-              <p className="mt-2 text-sm text-white/65">
+              <p className="mt-2 text-sm text-white/70">
                 Received a signed PDF?{' '}
                 <Link
                   href={VERIFY_URL}
-                  className="font-semibold text-white underline-offset-2 hover:underline"
+                  className="font-semibold text-white underline underline-offset-2 hover:no-underline"
                 >
                   Check it here
                 </Link>
                 .
               </p>
             </div>
-            <HeroVisual />
+            <figure className="min-w-0">
+              <BrowserFrame
+                clip={CLIPS.hero}
+                describedBy="hero-clip-text"
+                eager
+                className="border-white/10"
+              />
+              <figcaption id="hero-clip-text" className="mt-3 text-sm text-white/70">
+                The real app: fields placed on a PDF, the sealed copy, and the public seal check.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="trust-title"
+          className="border-b border-line bg-surface px-4 sm:px-6"
+        >
+          <div className="mx-auto max-w-6xl py-10">
+            <h2 id="trust-title" className="sr-only">
+              Built to be checked
+            </h2>
+            <ul className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+              {TRUST.map((item) => (
+                <li key={item.title} className="flex gap-3.5">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#0D1B2A] text-accent">
+                    <item.icon aria-hidden className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h3 className="font-semibold">{item.title}</h3>
+                    <p className="text-sm text-muted">{item.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
         <Section
-          id="how-it-works"
+          id="features"
           eyebrow="How it works"
-          title="From PDF to signed copy in four steps"
-          intro="The draft saves as you go, so you can stop and pick it up later."
+          title="From PDF to sealed copy, on any device"
+          intro="Each clip below is the real app, recorded with made-up people and companies."
         >
-          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map((step, i) => (
-              <li
-                key={step.title}
-                className="rounded-xl border border-line bg-surface p-5 shadow-card"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                    <step.icon aria-hidden className="h-5 w-5" />
-                  </span>
-                  <span className="font-display text-sm font-semibold text-muted">
-                    Step {i + 1}
-                  </span>
-                </div>
-                <h3 className="mt-4 text-lg font-semibold">{step.title}</h3>
-                <p className="mt-1 text-muted">{step.text}</p>
-              </li>
+          <ol className="space-y-20 sm:space-y-28">
+            {FEATURES.map((feature, i) => (
+              <FeatureRow key={feature.id} feature={feature} index={i} />
             ))}
           </ol>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
-              <h3 className="flex items-center gap-2 text-lg font-semibold">
-                <PenLine aria-hidden className="h-5 w-5 text-primary" />
-                They sign in their browser
-              </h3>
-              <p className="mt-1 text-muted">
-                No account and no app. The signing page opens on any phone or laptop, in your brand,
-                and walks them from one field to the next.
-              </p>
-            </div>
-            <div className="rounded-xl border border-accent/60 bg-accent-soft p-5 shadow-card">
-              <h3 className="flex items-center gap-2 text-lg font-semibold">
-                <BadgeCheck aria-hidden className="h-5 w-5" />
-                You get a sealed PDF with a certificate
-              </h3>
-              <p className="mt-1 text-ink/80">
-                When the last person signs, the PDF is sealed and a certificate is added: who
-                signed, when, from where, and a fingerprint of every document.
-              </p>
-            </div>
+          <div className="mt-24 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+            <h3 className="text-xl font-bold">Also in the box</h3>
+            <ul className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+              {MORE.map((item) => (
+                <li key={item.title} className="flex gap-3.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                    <item.icon aria-hidden className="h-[18px] w-[18px]" />
+                  </span>
+                  <div>
+                    <h4 className="font-semibold">{item.title}</h4>
+                    <p className="text-sm text-muted">{item.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </Section>
 
-        <Section
-          id="features"
-          eyebrow="Features"
-          title="Everything a signing tool needs, and the evidence to back it"
-          className="bg-surface"
+        <section
+          id="developers"
+          aria-labelledby="developers-title"
+          className="scroll-mt-16 bg-header px-4 py-16 text-header-ink sm:px-6 sm:py-24"
         >
-          <ul className="grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => (
-              <li key={f.title} className="flex gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-ink">
-                  <f.icon aria-hidden className="h-5 w-5" />
-                </span>
-                <div>
-                  <h3 className="font-semibold">{f.title}</h3>
-                  <p className="mt-1 text-muted">{f.text}</p>
+          <div className="mx-auto max-w-6xl">
+            <Eyebrow onDark>Developers</Eyebrow>
+            <h2
+              id="developers-title"
+              className="mt-3 max-w-2xl text-3xl font-bold text-white sm:text-4xl"
+            >
+              An API for everything in the app
+            </h2>
+            <p className="mt-3 max-w-2xl text-lg text-white/80">
+              Make an API key for each system, send envelopes from your backend, and get a signed
+              webhook when something happens.
+            </p>
+            <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10">
+              <div className="min-w-0">
+                <pre
+                  tabIndex={0}
+                  aria-label="Sending an envelope with the TypeScript client"
+                  className="overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-5 font-mono text-[13px] leading-6 text-white/90"
+                >
+                  <code>{API_SNIPPET}</code>
+                </pre>
+                <ul className="mt-6 grid gap-3 text-white/85 sm:grid-cols-2">
+                  {[
+                    'OpenAPI 3.1 and a Postman collection',
+                    'Webhooks signed with HMAC-SHA256',
+                    'Idempotency keys: a retry never sends twice',
+                    'Typed client for Node, browsers and edge',
+                  ].map((point) => (
+                    <li key={point} className="flex gap-2.5 text-sm">
+                      <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+                  <a
+                    className="text-accent underline-offset-2 hover:underline"
+                    href={`${DOCS_URL}/http-api/`}
+                  >
+                    Read the API docs
+                  </a>
+                  <a
+                    className="text-accent underline-offset-2 hover:underline"
+                    href={`${DOCS_URL}/guides/webhooks`}
+                  >
+                    Verify webhooks
+                  </a>
                 </div>
-              </li>
-            ))}
-          </ul>
-        </Section>
+              </div>
+              <figure className="min-w-0">
+                <BrowserFrame
+                  clip={CLIPS.api}
+                  describedBy="api-clip-text"
+                  className="border-white/10"
+                />
+                <figcaption id="api-clip-text" className="mt-3 text-sm text-white/70">
+                  Creating an API key for a billing system, then a webhook endpoint for the events
+                  it needs.
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
 
         <Section
           id="open-source"
@@ -442,7 +670,7 @@ export function Landing({
               <pre
                 tabIndex={0}
                 aria-label="Commands to self-host with Docker"
-                className="mt-4 overflow-x-auto rounded-lg bg-black/30 p-4 text-sm leading-6 text-white/90"
+                className="mt-4 overflow-x-auto rounded-lg bg-black/30 p-4 font-mono text-sm leading-6 text-white/90"
               >
                 <code>{`git clone ${GITHUB_URL}.git
 cd codevibe-sign/deploy
@@ -544,6 +772,40 @@ docker compose up -d`}</code>
             ))}
           </div>
         </Section>
+
+        <section aria-labelledby="start-title" className="px-4 pb-20 sm:px-6 sm:pb-28">
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-header px-6 py-12 text-center sm:px-12 sm:py-16">
+            <div
+              aria-hidden
+              className="absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-primary/30 blur-3xl"
+            />
+            <div
+              aria-hidden
+              className="absolute -top-32 -right-24 h-72 w-72 rounded-full bg-accent/25 blur-3xl"
+            />
+            <h2 id="start-title" className="relative text-3xl font-bold text-white sm:text-4xl">
+              Send your first document today
+            </h2>
+            <p className="relative mx-auto mt-3 max-w-xl text-lg text-white/80">
+              A free cloud workspace takes a minute to set up. Or run the same app on your own
+              server.
+            </p>
+            <div className="relative mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button asChild className="h-12 px-6 text-base">
+                <Link href={start.href}>
+                  {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                className="h-12 border border-white/25 px-6 text-base text-white hover:bg-white/10"
+              >
+                <a href={DOCS_URL}>Read the docs</a>
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
       <SiteFooter />
     </div>

@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { preload } from 'react-dom';
+import { CLIPS, posterOf } from '@/components/marketing/clips';
 import { Landing } from '@/components/marketing/landing';
+import {
+  HOME_DESCRIPTION as DESCRIPTION,
+  HOME_TITLE as TITLE,
+  jsonLdScript,
+  softwareApplicationJsonLd,
+} from '@/lib/home-seo';
 import { limitsFor } from '@/lib/plans';
 import { APP_HOME } from '@/lib/safe-next';
 import { getSessionUser } from '@/server/auth/session';
 import { env } from '@/server/env';
 import { planSettings } from '@/server/plans';
-
-const TITLE = 'Codevibe Sign: send documents for signature in minutes';
-const DESCRIPTION =
-  'Open-source e-signatures. Upload a PDF, add who signs, place the fields and send. Signers sign in the browser and you get a sealed PDF with a signing certificate. Free cloud workspace, or self-host with Docker.';
 
 export async function generateMetadata(): Promise<Metadata> {
   const appUrl = env().APP_URL;
@@ -40,11 +44,19 @@ export default async function Home() {
   const user = await getSessionUser();
   const settings = planSettings();
   if (settings.mode !== 'hosted') redirect(user ? APP_HOME : '/sign-in');
+  // The hero clip's poster is the largest thing in the first view.
+  preload(posterOf(CLIPS.hero), { as: 'image', fetchPriority: 'high' });
   return (
-    <Landing
-      free={limitsFor('free', settings)}
-      cloud={limitsFor('cloud', settings)}
-      viewer={user ? { name: user.name, email: user.email } : null}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(softwareApplicationJsonLd(env().APP_URL)) }}
+      />
+      <Landing
+        free={limitsFor('free', settings)}
+        cloud={limitsFor('cloud', settings)}
+        viewer={user ? { name: user.name, email: user.email } : null}
+      />
+    </>
   );
 }
