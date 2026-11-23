@@ -119,8 +119,14 @@ try {
     const res = await get(path, { headers: { cookie } });
     return res.status === 200 && (await res.text()).includes(text);
   };
-  check(await page(`/dashboard/${slug}/templates`, 'No templates yet'), 'the templates page renders');
-  check(await page(`/dashboard/${slug}/templates/new`, 'New template'), 'the template editor renders');
+  check(
+    await page(`/dashboard/${slug}/templates`, 'No templates yet'),
+    'the templates page renders',
+  );
+  check(
+    await page(`/dashboard/${slug}/templates/new`, 'New template'),
+    'the template editor renders',
+  );
   const templateId = `tpl_${randomBytes(10).toString('hex')}`;
   const definition = {
     title: '',

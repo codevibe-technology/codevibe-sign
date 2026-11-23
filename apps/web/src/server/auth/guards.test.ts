@@ -41,7 +41,9 @@ beforeEach(() => {
 describe('requireWorkspace', () => {
   it('sends visitors to sign-in and back', async () => {
     state.user = null;
-    await expect(requireWorkspace('acme')).rejects.toThrow('REDIRECT /sign-in?next=%2Fdashboard%2Facme');
+    await expect(requireWorkspace('acme')).rejects.toThrow(
+      'REDIRECT /sign-in?next=%2Fdashboard%2Facme',
+    );
   });
 
   it('answers not found for people outside the workspace', async () => {
