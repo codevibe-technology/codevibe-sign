@@ -379,7 +379,7 @@ How it runs:
    update (`countersign` in the PDF package) that adds no page and changes none, so both
    signatures stay valid. The signing certificate, now naming the eSign certificate, its
    issuer and the time of the signature, and the audit trail after it become one sealed file
-   of their own, "<title> (certificate and audit trail).pdf": `?version=certificate` on the
+   of their own, for example "Offer letter (certificate and audit trail).pdf": `?version=certificate` on the
    document route, `?file=certificate` on the receipt and copy routes, and a second
    attachment on the completed email in place of the audit trail. The provider's audit trail
    is `?version=provider-audit-trail` on the document route, and goes with the email when it

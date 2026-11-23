@@ -105,8 +105,8 @@ differently:
    invisible signature field, the form and the first page's annotation list. The provider's
    signature and the seal are both valid; `verify` accepts the seal over earlier signatures
    and reports them.
-3. The certificate and the audit trail are one sealed file of their own, "<title>
-   (certificate and audit trail).pdf". The certificate says what the signature in the file
+3. The certificate and the audit trail are one sealed file of their own, for example "Offer
+   letter (certificate and audit trail).pdf". The certificate says what the signature in the file
    says: the name on the signer's eSign certificate, its issuer and the time of the
    signature (its timestamp, else its signing time), and the SHA-256 of the signed file.
 4. The provider's own audit trail, when it hands one over, is kept as further evidence and
