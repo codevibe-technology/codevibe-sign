@@ -203,11 +203,9 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     }
     const reference = input.reference ?? input.envelopeId;
     if (!IRN_PATTERN.test(reference)) {
-      throw new SignError(
-        'VALIDATION',
-        'The reference has characters Leegality does not accept',
-        { field: input.reference === undefined ? 'envelopeId' : 'reference' },
-      );
+      throw new SignError('VALIDATION', 'The reference has characters Leegality does not accept', {
+        field: input.reference === undefined ? 'envelopeId' : 'reference',
+      });
     }
     if (documentBytes.byteLength > LEEGALITY_MAX_UPLOAD_BYTES) {
       throw new SignError('DOCUMENT_TOO_LARGE', 'Leegality accepts PDFs up to 15 MB', {

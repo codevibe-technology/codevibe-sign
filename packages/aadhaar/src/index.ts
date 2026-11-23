@@ -14,4 +14,7 @@ export {
   LEEGALITY_MAX_UPLOAD_BYTES,
   type LeegalityOptions,
 } from './leegality/provider';
-export { computeMac as computeLeegalityMac } from './leegality/webhook';
+export {
+  computeMac as computeLeegalityMac,
+  peekDocumentId as leegalityWebhookRef,
+} from './leegality/webhook';
