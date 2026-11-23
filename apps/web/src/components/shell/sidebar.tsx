@@ -1,6 +1,7 @@
 'use client';
 
 import { BookOpen } from 'lucide-react';
+import { NewTabMark, newTab } from '@/components/ui/new-tab';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
@@ -72,10 +73,14 @@ export function Sidebar({
       <div className="flex w-full flex-col items-center gap-2 px-2 pt-2">
         <a
           href="/docs"
+          {...newTab}
           className={cn(railItem, 'text-nav-muted hover:bg-nav-raised/60 hover:text-white')}
         >
           <BookOpen aria-hidden strokeWidth={1.8} className="h-5 w-5" />
-          <span>Docs</span>
+          <span className="inline-flex items-center gap-0.5">
+            Docs
+            <NewTabMark className="h-2.5 w-2.5" />
+          </span>
         </a>
         <UserMenu user={user} personalHref={`/dashboard/${current.slug}/settings/personal`} />
       </div>

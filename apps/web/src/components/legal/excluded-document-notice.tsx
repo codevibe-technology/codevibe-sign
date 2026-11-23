@@ -2,6 +2,7 @@
 
 import { Info, X } from 'lucide-react';
 import { useState } from 'react';
+import { NewTabMark, newTab } from '@/components/ui/new-tab';
 import { EXCLUDED_DOCUMENTS, looksExcluded } from '@/lib/excluded-documents';
 
 const LEGAL_NOTES = '/docs/legal';
@@ -33,8 +34,13 @@ export function ExcludedDocumentNotice({ names }: { names: string[] }) {
         </ul>
         <p className="mt-1.5 text-muted">
           You can still send it. Check with your lawyer first. This is not legal advice.{' '}
-          <a href={LEGAL_NOTES} className="font-semibold text-primary hover:underline">
+          <a
+            href={LEGAL_NOTES}
+            {...newTab}
+            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+          >
             Read the legal notes
+            <NewTabMark />
           </a>
         </p>
       </div>
