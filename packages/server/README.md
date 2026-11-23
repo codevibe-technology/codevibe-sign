@@ -354,24 +354,36 @@ createSignServer({
 
 How it runs:
 
-1. The signer fills their fields on your signing page and posts them to
-   `POST /v1/sign/:token/esign`. The server draws every value on the document, asks the
-   provider to sign that file and answers `{ signUrl, expiresAt }`. Send the signer to
-   `signUrl`. Asking again while the attempt is open answers the same page.
+1. The signer has no fields: the provider places the signature where its own workflow says.
+   They give their consent on your signing page, which posts to
+   `POST /v1/sign/:token/esign`. The server sends the document as the sender approved it,
+   with the values of the signers before them drawn on it and nothing else, to the provider
+   and answers `{ signUrl, expiresAt }`. Send the signer to `signUrl`. Asking again while the
+   attempt is open answers the same page. `signature`, `initials` and `aadhaar` fields given
+   to such a signer are dropped when the envelope is sent; any other field is refused.
 2. The provider calls `POST /v1/esign/webhooks/<provider name>`. The body names the
    request; the server finds the workspace that started it and verifies the body with that
    workspace's provider before acting. The signing page can also poll
    `GET /v1/sign/:token/esign`, which asks the provider at most once every ten seconds, so a
    late or missing webhook does not leave the signer waiting.
 3. When the provider reports the signature, the server fetches the signed file, marks the
-   recipient signed (the `recipient.signed` event carries `method: 'aadhaar_esign'`, the
-   provider, its reference, the signer name the provider gave and the SHA-256 of the signing
-   certificate) and the envelope completes.
+   recipient signed and the envelope completes. The `recipient.signed` event carries
+   `method: 'aadhaar_esign'`, the provider and its reference, `signerName` from the subject
+   of the eSign certificate in the signed file (the name the provider reported is kept as
+   `providerSignerName` only when it differs), the certificate's issuer and SHA-256, and
+   `providerAuditTrail: true` when the provider's own audit trail was kept
+   (`EsignProvider.fetchAuditTrail`). When the certificate names someone other than the
+   recipient, a `recipient.esign_name_differs` event records both names for the sender; it
+   does not stop the envelope.
 4. Sealing never rewrites the provider's file. The seal is added after it as an incremental
-   update (`countersign` in the PDF package), so both signatures stay valid, and the signing
-   certificate becomes a sealed file of its own: `?version=certificate` on the document
-   route, `?file=certificate` on the receipt and copy routes, and a second attachment on the
-   completed email. A file the provider locked against further signatures is kept exactly
+   update (`countersign` in the PDF package) that adds no page and changes none, so both
+   signatures stay valid. The signing certificate, now naming the eSign certificate, its
+   issuer and the time of the signature, and the audit trail after it become one sealed file
+   of their own, "<title> (certificate and audit trail).pdf": `?version=certificate` on the
+   document route, `?file=certificate` on the receipt and copy routes, and a second
+   attachment on the completed email in place of the audit trail. The provider's audit trail
+   is `?version=provider-audit-trail` on the document route, and goes with the email when it
+   is under 2 MB and fits. A file the provider locked against further signatures is kept exactly
    as it came and is recognised by its SHA-256 (`seal: 'provider_only'` in the
    `document.sealed` event and in verification answers).
 

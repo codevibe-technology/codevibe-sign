@@ -41,9 +41,9 @@ Envelope ──< Document ──< Field >── Recipient
   `order` used in sequential routing, an authentication method (`email_link`,
   `email_otp`, `sms_otp`, `aadhaar`) and a status.
 - **Field**: a placed box on a page, in PDF points with a top-left origin:
-  `signature`, `initials`, `date_signed`, `name`, `text`, `checkbox`, and `aadhaar`, the
-  box where an Aadhaar eSign signer signs (it takes no value). Each field belongs to one
-  recipient and may be required.
+  `signature`, `initials`, `date_signed`, `name`, `text`, `checkbox`, and `aadhaar`, read
+  on envelopes sent while it marked where an Aadhaar eSign signer signs (it takes no value;
+  such a signer now has no fields). Each field belongs to one recipient and may be required.
 - **AuditEvent**: every action, append-only, chained by SHA-256 (`hash = sha256(prevHash + canonical(event))`).
   The chain head is printed on the certificate page and the chain can be verified offline.
 
@@ -90,32 +90,42 @@ has not changed since sealing. Signer intent is proven by the audit trail.
 ### After an Aadhaar eSign
 
 A recipient with `auth: 'aadhaar'` signs at an eSign provider, which puts its own digital
-signature on the file. They draw nothing: in place of signature and initials fields they have
-one `aadhaar` box, which marks where the signature goes. Nothing but another signature can be
-added to a signed PDF without breaking that signature, so such an envelope is sealed
-differently, and still ends as one file:
+signature on the file, following the provider's standard process. They have no fields here:
+the provider places its signature where its own workflow says. Nothing but another signature
+can be added to a signed PDF without breaking that signature, so such an envelope is sealed
+differently:
 
-1. When the signer starts, the server draws every field value and the Aadhaar eSign box on
-   the document, appends the certificate page (written for a signature still to come: that
-   signer's row says they sign with Aadhaar eSign on this file) and sends that file to the
-   provider. This is why the Aadhaar signer acts last, and why the envelope holds one
-   document and one Aadhaar signer.
-2. The provider's signed file is stored as it came. The seal is added after it as an
-   incremental update that changes none of its bytes, so the provider's signature and the
-   seal are both valid; `verify` accepts the seal over earlier signatures and reports them.
-3. What exists only after signing, the time of the eSign and the signer's certificate, is in
-   the digital signature and in the audit trail PDF that goes with the completed copy.
-4. If the provider locked the file against any further signature, it is kept exactly as the
-   provider signed it, certificate page included, without the seal, and recognised by the
-   SHA-256 recorded in the audit trail.
+1. When the signer starts, the server draws the values of the signers before them on the
+   document and sends that file to the provider, with nothing else on it: no box, no label,
+   no certificate page. A document nobody filled in goes as it was uploaded. This is why the
+   Aadhaar signer acts last, and why the envelope holds one document and one Aadhaar signer.
+2. The provider's signed file is checked (it must end with a signature that covers all of it
+   and verifies; BER as well as DER is read) and stored as it came. The seal is added after
+   it as an incremental update that changes none of its bytes and draws on no page: an
+   invisible signature field, the form and the first page's annotation list. The provider's
+   signature and the seal are both valid; `verify` accepts the seal over earlier signatures
+   and reports them.
+3. The certificate and the audit trail are one sealed file of their own, "<title>
+   (certificate and audit trail).pdf". The certificate says what the signature in the file
+   says: the name on the signer's eSign certificate, its issuer and the time of the
+   signature (its timestamp, else its signing time), and the SHA-256 of the signed file.
+4. The provider's own audit trail, when it hands one over, is kept as further evidence and
+   offered on the envelope page.
+5. If the provider locked the file against any further signature, it is kept exactly as the
+   provider signed it, without the seal, and recognised by the SHA-256 recorded in the audit
+   trail.
 
-The provider's API (Leegality v3.0) takes the position of its own signature mark from the
-provider's workflow, not from the request, so the request's `signaturePositions` (the box)
-are not sent. An eSign started before the certificate page went into the signed file keeps
-its certificate as a sealed one-page PDF of its own.
+The signer's name is the subject of their eSign certificate, not the name the provider
+reports, which can come from its own records. When the name on the certificate and the
+recipient's name differ beyond case, spacing and initials, `recipient.esign_name_differs`
+records it for the sender.
 
-The server keeps the signer name the provider reports and the subject, issuer and SHA-256
-of the signing certificate. It never receives an Aadhaar number.
+Requests started while the certificate page went on the file before signing keep that page
+in their signed file and get no separate certificate. The provider's API (Leegality v3.0)
+takes the position of its signature from the provider's workflow, not from the request.
+
+The server keeps the subject, issuer and SHA-256 of the signing certificate. It never
+receives an Aadhaar number.
 
 ## Legal position (India, and in general)
 
