@@ -27,6 +27,19 @@ describe('validateTemplate', () => {
     expect(paths(edit((t) => (t.roles = [{ name: 'Legal', type: 'viewer' }])))).toEqual(['roles']);
   });
 
+  it('takes the Aadhaar eSign box as the signature of an Aadhaar eSign role only', () => {
+    const boxed = (auth: 'aadhaar' | 'email_otp') =>
+      edit((t) => {
+        const role = t.roles[0]!;
+        role.auth = auth;
+        role.fields = (role.fields ?? []).map((f) =>
+          f.type === 'signature' ? { ...f, type: 'aadhaar' } : f,
+        );
+      });
+    expect(validateTemplate(boxed('aadhaar'))).toEqual([]);
+    expect(validateTemplate(boxed('email_otp')).map((i) => i.path)).toEqual(['roles.0.fields']);
+  });
+
   it('checks routing, reminders and expiry', () => {
     expect(
       paths(

@@ -22,6 +22,7 @@ const FIELD_TYPES: readonly FieldType[] = [
   'name',
   'text',
   'checkbox',
+  'aadhaar',
 ];
 
 export function throwIf(issues: ValidationIssue[]): void {
@@ -153,10 +154,18 @@ function roleIssues(
   fields.forEach((field, i) =>
     issues.push(...fieldIssues(field, documents, `${path}.fields.${i}`)),
   );
-  if (type === 'signer' && !fields.some((f) => f.type === 'signature' && f.required !== false)) {
+  // An Aadhaar eSign role signs in its Aadhaar eSign box; an older template's signature field
+  // stands in for the box when the envelope is sent.
+  const signs = (f: TemplateField) =>
+    f.required !== false &&
+    (f.type === 'signature' || (role.auth === 'aadhaar' && f.type === 'aadhaar'));
+  if (type === 'signer' && !fields.some(signs)) {
     issues.push({
       path: `${path}.fields`,
-      message: `Place at least one required signature field for ${role.name || 'this role'}`,
+      message:
+        role.auth === 'aadhaar'
+          ? `Place the Aadhaar eSign box for ${role.name || 'this role'}`
+          : `Place at least one required signature field for ${role.name || 'this role'}`,
     });
   }
   return issues;
