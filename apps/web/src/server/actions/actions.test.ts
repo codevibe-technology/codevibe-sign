@@ -37,6 +37,9 @@ vi.mock('../workspaces', () => ({
   createWorkspace: record('createWorkspace', WORKSPACE),
   renameWorkspace: record('renameWorkspace', 'Renamed'),
 }));
+vi.mock('../workspace-address', () => ({
+  changeWorkspaceAddress: record('changeWorkspaceAddress', { from: 'acme', to: 'acme-hr' }),
+}));
 vi.mock('../brand', () => ({
   updateBrand: record('updateBrand'),
   updateEmailSettings: record('updateEmailSettings'),
@@ -85,7 +88,9 @@ const {
   removeMemberAction,
   revokeInvitationAction,
 } = await import('./team');
-const { createWorkspaceAction, renameWorkspaceAction } = await import('./workspace');
+const { changeWorkspaceAddressAction, createWorkspaceAction, renameWorkspaceAction } = await import(
+  './workspace'
+);
 
 const logo = () => {
   const form = new FormData();
@@ -96,6 +101,7 @@ const logo = () => {
 /** Every workspace action, the lowest role allowed to use it, and a valid input. */
 const workspaceActions: [string, Role, (input: unknown) => Promise<unknown>, () => unknown][] = [
   ['renameWorkspace', 'admin', renameWorkspaceAction, () => ({ name: 'New name' })],
+  ['changeWorkspaceAddress', 'admin', changeWorkspaceAddressAction, () => ({ slug: 'acme-hr' })],
   [
     'updateBrand',
     'admin',

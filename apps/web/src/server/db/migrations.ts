@@ -297,4 +297,27 @@ create index app_mail_log_created_idx on app_mail_log (created_at);
 alter table app_workspaces add column time_zone text;
 `,
   },
+  {
+    name: '0010_workspace_addresses',
+    sql: `
+create table app_workspace_slug_history (
+  slug text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  retired_at timestamptz not null default now()
+);
+create index app_workspace_slug_history_workspace_idx
+  on app_workspace_slug_history (workspace_id, retired_at desc);
+
+create table app_workspace_address_changes (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  from_slug text not null,
+  to_slug text not null,
+  changed_by text references auth_users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index app_workspace_address_changes_workspace_idx
+  on app_workspace_address_changes (workspace_id, created_at desc);
+`,
+  },
 ];

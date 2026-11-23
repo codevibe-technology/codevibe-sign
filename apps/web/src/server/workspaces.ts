@@ -2,10 +2,19 @@ import 'server-only';
 import type postgres from 'postgres';
 import { limitsFor, type Plan, type PlanSettings } from '@/lib/plans';
 import { isTimeZone } from '@/lib/preferences';
+import { suggestAddress } from '@/lib/workspace-address';
 import type { Role } from '@/lib/roles';
 import { randomId } from './crypto';
 import { AppError } from './errors';
 import { assertRoom, planSettings } from './plans';
+import {
+  assertAddressFree,
+  claimAddress,
+  freeAlternatives,
+  isSlugConflict,
+  lockAddresses,
+  unavailableAddresses,
+} from './workspace-address';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
@@ -22,19 +31,6 @@ export interface Membership {
 
 export const WORKSPACE_NAME_MAX = 80;
 
-/** A URL-safe slug from a name: lower case, ASCII letters and digits, single dashes. */
-export function slugify(name: string): string {
-  const slug = name
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/g, '');
-  return slug || 'workspace';
-}
-
 export function cleanWorkspaceName(name: string): string {
   const clean = name.replace(/\s+/g, ' ').trim();
   if (!clean) throw new AppError('VALIDATION', 'Give the workspace a name', 'name');
@@ -49,41 +45,55 @@ export function cleanWorkspaceName(name: string): string {
 }
 
 /**
- * Creates a workspace with `userId` as its owner and default brand settings, atomically. In
- * hosted mode it starts on the Free plan, and a person may own only so many Free workspaces;
- * the user's row is locked while they are counted, so two tabs cannot both create one.
+ * Creates a workspace with `userId` as its owner and default brand settings, atomically. The
+ * address is `slug` when given (refused with a field error when it is not free) or one made
+ * from the name. In hosted mode it starts on the Free plan, and a person may own only so many
+ * Free workspaces; the user's row is locked while they are counted, so two tabs cannot both
+ * create one.
  */
 export async function createWorkspace(
   sql: postgres.Sql,
-  input: { name: string; userId: string; plan?: Plan },
+  input: { name: string; userId: string; slug?: string | undefined; plan?: Plan },
   settings: PlanSettings = planSettings(),
 ): Promise<Workspace & { plan: Plan }> {
   const name = cleanWorkspaceName(input.name);
-  const base = slugify(name);
   const plan = input.plan ?? (settings.mode === 'hosted' ? 'free' : 'unlimited');
-  return sql.begin(async (tx) => {
-    const max = limitsFor(plan, settings).ownedWorkspaces;
-    if (max !== null) {
-      await tx`select 1 from auth_users where id = ${input.userId} for update`;
-      const [owned] = await tx<{ n: number }[]>`
-        select count(*)::int as n from app_members m join app_workspaces w on w.id = m.workspace_id
-        where m.user_id = ${input.userId} and m.role = 'owner' and w.plan = ${plan}`;
-      assertRoom({ plan, limits: limitsFor(plan, settings) }, 'ownedWorkspaces', owned?.n ?? 0);
+  try {
+    return await sql.begin(async (tx) => {
+      const max = limitsFor(plan, settings).ownedWorkspaces;
+      if (max !== null) {
+        await tx`select 1 from auth_users where id = ${input.userId} for update`;
+        const [owned] = await tx<{ n: number }[]>`
+          select count(*)::int as n from app_members m join app_workspaces w on w.id = m.workspace_id
+          where m.user_id = ${input.userId} and m.role = 'owner' and w.plan = ${plan}`;
+        assertRoom({ plan, limits: limitsFor(plan, settings) }, 'ownedWorkspaces', owned?.n ?? 0);
+      }
+      const slug = input.slug ?? (await addressFromName(tx, name));
+      await lockAddresses(tx, [slug]);
+      await assertAddressFree(tx, slug, null);
+      await claimAddress(tx, slug);
+      const id = randomId('ws');
+      await tx`insert into app_workspaces (id, slug, name, created_by, plan)
+        values (${id}, ${slug}, ${name}, ${input.userId}, ${plan})`;
+      await tx`insert into app_members (workspace_id, user_id, role)
+        values (${id}, ${input.userId}, 'owner')`;
+      await tx`insert into app_brand_settings (workspace_id) values (${id})`;
+      return { id, slug, name, plan };
+    });
+  } catch (err) {
+    if (isSlugConflict(err)) {
+      throw new AppError('CONFLICT', 'Someone just took this address. Try another one.', 'slug');
     }
-    const id = randomId('ws');
-    let slug = base;
-    for (let attempt = 0; ; attempt++) {
-      const [taken] = await tx`select 1 from app_workspaces where slug = ${slug}`;
-      if (!taken) break;
-      slug = `${base}-${id.slice(-4 - attempt)}`.slice(0, 48);
-    }
-    await tx`insert into app_workspaces (id, slug, name, created_by, plan)
-      values (${id}, ${slug}, ${name}, ${input.userId}, ${plan})`;
-    await tx`insert into app_members (workspace_id, user_id, role)
-      values (${id}, ${input.userId}, 'owner')`;
-    await tx`insert into app_brand_settings (workspace_id) values (${id})`;
-    return { id, slug, name, plan };
-  });
+    throw err;
+  }
+}
+
+/** The address the name suggests, or the first free one numbered after it. */
+async function addressFromName(tx: postgres.TransactionSql, name: string): Promise<string> {
+  const base = suggestAddress(name);
+  if (!(await unavailableAddresses(tx, [base])).has(base)) return base;
+  const [first] = await freeAlternatives(tx, base, null, 1);
+  return first ?? `${base.slice(0, 30).replace(/-+$/, '')}-${randomId('x').slice(-6)}`;
 }
 
 export async function countWorkspaces(sql: Sql): Promise<number> {
