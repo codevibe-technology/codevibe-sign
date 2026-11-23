@@ -17,7 +17,11 @@ Before 1.0, breaking changes are released as `minor`.
 
 Changes that do not affect a published package (docs, CI, tests, the apps) do not need one.
 
+The eight published packages are a `fixed` group in `config.json`: they always share one
+version number and are released together, so a `minor` for one package moves all of them.
+
 ## Release
 
 On every push to `main`, the release workflow opens or updates a "Version packages" pull
-request. Merging it bumps versions, writes the changelogs and publishes to npm with provenance.
+request. Merging it bumps versions, writes the changelogs and publishes to npm through trusted
+publishing (OIDC), with provenance and without a stored token.
