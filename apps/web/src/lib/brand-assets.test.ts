@@ -150,7 +150,7 @@ describe('the lockup', () => {
     expect(wordmark).toContain("surface = 'light'");
     expect(wordmark).not.toContain('{BRAND_NAME}</');
     const placed: Record<string, string> = {
-      'src/components/marketing/site-header.tsx': '<Wordmark surface="theme"',
+      'src/components/marketing/site-header.tsx': '<Wordmark surface="light"',
       'src/app/verify/page.tsx': '<Wordmark surface="theme"',
       'src/components/records/public-shell.tsx': '<Wordmark surface="theme"',
       'src/components/marketing/site-footer.tsx': '<Wordmark surface="dark"',

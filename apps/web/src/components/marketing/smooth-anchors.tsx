@@ -27,6 +27,8 @@ export function SmoothAnchors() {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as Element | null)?.closest?.('a');
       if (!anchor) return;
+      // A link in the folded header menu closes it.
+      anchor.closest('details[open]')?.removeAttribute('open');
       const id = sectionTarget(anchor, window.location);
       const section = id ? document.getElementById(id) : null;
       if (!section) return;

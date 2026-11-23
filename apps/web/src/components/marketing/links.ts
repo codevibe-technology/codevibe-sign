@@ -6,3 +6,7 @@ export const SELF_HOST_DOCS = '/docs/getting-started/docker';
 export const VERIFY_URL = '/verify';
 export const SEAL_GUIDE = '/docs/guides/seal-in-pdf-readers';
 export const EVIDENCE_GUIDE = '/docs/guides/section-63-certificate';
+export const AADHAAR_GUIDE = '/docs/guides/aadhaar-leegality';
+export const API_DOCS = '/docs/http-api/';
+export const WEBHOOKS_GUIDE = '/docs/guides/webhooks';
+export const SECURITY_DOCS = '/docs/security';
