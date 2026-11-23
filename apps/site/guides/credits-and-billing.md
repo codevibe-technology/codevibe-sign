@@ -85,3 +85,26 @@ test mode are numbered separately (`T-...`) and say they are not tax documents.
 
 Paying for the Cloud plan and for extra members works the same way and is described under
 [Plans and pricing](/guides/pricing#cloud).
+
+## Billing admins
+
+The account owner can make someone a **Billing admin** under **Settings, Team**. A billing admin
+sees the plan, usage and invoices, downloads invoice PDFs, buys eSign credits and renews or
+upgrades the plan. They send their own documents like a member, but cannot manage the team, API
+keys, webhooks or workspace settings. Admins who are not billing admins do not see invoices; a
+direct link to an invoice PDF answers them with 403.
+
+## Transferring a workspace
+
+The account owner can move a workspace to someone else's account from **Settings, Workspace,
+Transfer ownership**. The new owner must already be in the workspace or invited to it, and their
+plan must have room for one more workspace (the Free plan holds one). They get an email and a
+notice in the app, and confirm with their password, or a fresh sign-in if they have none.
+
+- Documents, templates, members, API keys and webhooks move with the workspace. Its address
+  does not change.
+- Invoices already issued, eSign credits and the subscription stay with the account that paid
+  for them. Billing admins become members.
+- The previous owner stays on as an admin unless they chose to leave.
+- An offer can be cancelled until it is accepted, and expires after 7 days. Every step is listed
+  under **Ownership history** on the same page.
