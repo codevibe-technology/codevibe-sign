@@ -150,6 +150,14 @@ export const correctRecipientAction = workspaceAction(
     resend: z.boolean().optional(),
   }),
   async (ctx, input) => {
+    // A corrected address receives the signing link, so a member may only correct their own.
+    const mine = await sentBy(db(), ctx.workspace.id, ctx.user.id, [input.envelopeId]);
+    if (!canVoidEnvelope(ctx.role, mine.has(input.envelopeId))) {
+      throw new AppError(
+        'FORBIDDEN',
+        'Only an admin can change the recipients of an envelope someone else sent.',
+      );
+    }
     const api = signApi(userPrincipal(ctx.user.id, ctx.workspace.id, false, actor(ctx)));
     const before = (await api.get(input.envelopeId)).recipients.find(
       (r) => r.id === input.recipientId,

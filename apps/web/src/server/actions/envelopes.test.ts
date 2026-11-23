@@ -275,19 +275,39 @@ describe('shareLinkAction', () => {
 });
 
 describe('correctRecipientAction', () => {
+  const input = (envelopeId: string) => ({
+    workspaceId: WORKSPACE.id,
+    envelopeId,
+    recipientId: 'r1',
+    name: 'Asha',
+    email: 'asha.rao@example.com',
+  });
+
   it('lets senders correct and reports a new invitation', async () => {
-    const input = {
-      workspaceId: WORKSPACE.id,
-      envelopeId: 'env_1',
-      recipientId: 'r1',
-      name: 'Asha',
-      email: 'asha.rao@example.com',
-    };
+    state.mine = new Set(['env_1']);
     state.role = 'viewer';
-    expect(await correctRecipientAction(input)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(await correctRecipientAction(input('env_1'))).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    });
     state.role = 'member';
-    expect(await correctRecipientAction(input)).toEqual({ ok: true, data: { invited: true } });
+    expect(await correctRecipientAction(input('env_1'))).toEqual({
+      ok: true,
+      data: { invited: true },
+    });
     expect(state.calls).toContain('correct:env_1:r1:asha.rao@example.com');
+  });
+
+  it('keeps a member from redirecting the signing link of an envelope someone else sent', async () => {
+    state.mine = new Set();
+    state.role = 'member';
+    expect(await correctRecipientAction(input('env_1'))).toMatchObject({
+      ok: false,
+      code: 'FORBIDDEN',
+    });
+    expect(state.calls.some((call) => call.startsWith('correct:'))).toBe(false);
+    state.role = 'admin';
+    expect(await correctRecipientAction(input('env_1'))).toMatchObject({ ok: true });
   });
 });
 

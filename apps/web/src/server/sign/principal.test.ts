@@ -106,6 +106,18 @@ describe('createAuthenticate', () => {
     expect(await setup('viewer')(voiding('env_mine'))).toMatchObject({ readOnly: true });
   });
 
+  it('lets members correct the recipients only of envelopes they sent', async () => {
+    const correcting = (id: string) =>
+      new Request(`${APP}/api/v1/envelopes/${id}/recipients/r1`, {
+        method: 'PATCH',
+        headers: { cookie: 'session', 'x-workspace': 'ws_a', origin: APP },
+      });
+    const member = setup('member', ['env_mine']);
+    expect(await member(correcting('env_mine'))).toMatchObject({ id: 'user:u1' });
+    expect(await refusal(member(correcting('env_other')))).toBe('FORBIDDEN');
+    expect(await setup('admin')(correcting('env_other'))).toMatchObject({ id: 'user:u1' });
+  });
+
   it('applies the same checks to an address written with percent-escapes', async () => {
     const at = (path: string) =>
       new Request(`${APP}/api/v1/envelopes/${path}`, {

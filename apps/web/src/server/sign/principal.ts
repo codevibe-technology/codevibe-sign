@@ -31,6 +31,11 @@ export const inProcess = (holder.__cvsInProcess ??= new WeakMap<Request, Princip
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
 /** Withdrawing an envelope, or copying it to edit: what a member may do only to their own. */
 const VOID_PATH = /\/v1\/envelopes\/([^/]+)\/(?:void|recall|revise)\/?$/;
+/**
+ * Correcting a recipient can send their signing link to a new address, so it is held to the
+ * same rule: a member only on what they sent.
+ */
+const CORRECT_PATH = /\/v1\/envelopes\/([^/]+)\/recipients\/[^/]+\/?$/;
 const LINK_PATH = /\/v1\/envelopes\/[^/]+\/recipients\/[^/]+\/link\/?$/;
 
 /**
@@ -68,12 +73,19 @@ export function createAuthenticate(deps: PrincipalDeps) {
       throw new HttpError('FORBIDDEN', 'Only an admin can take a signing link to share');
     }
     const voiding = request.method === 'POST' && VOID_PATH.exec(path);
-    if (voiding && can(role, 'envelopes.write')) {
-      const envelopeId = routedParam(voiding[1]!);
+    const correcting = request.method === 'PATCH' && CORRECT_PATH.exec(path);
+    const guarded = voiding || correcting;
+    if (guarded && can(role, 'envelopes.write')) {
+      const envelopeId = routedParam(guarded[1]!);
       if (envelopeId === null) throw new HttpError('VALIDATION', 'The address is not valid');
       const own = (await deps.isSender?.(user.id, workspaceId, envelopeId)) ?? false;
       if (!canVoidEnvelope(role, own)) {
-        throw new HttpError('FORBIDDEN', 'Only an admin can void an envelope someone else sent');
+        throw new HttpError(
+          'FORBIDDEN',
+          voiding
+            ? 'Only an admin can void an envelope someone else sent'
+            : 'Only an admin can change the recipients of an envelope someone else sent',
+        );
       }
     }
     return {
