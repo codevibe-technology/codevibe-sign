@@ -75,7 +75,7 @@ export function ConsentStep({
       <div className="px-6 pt-7 pb-6 sm:px-9 sm:pt-9">
         <p className="eyebrow">Hello {view.recipient.name}</p>
         <h1
-          className="mt-2 text-[24px] leading-tight font-bold sm:text-[28px]"
+          className="mt-2 text-[24px] leading-tight font-bold outline-none sm:text-[28px]"
           tabIndex={-1}
           data-autofocus
         >
@@ -118,8 +118,10 @@ export function ConsentStep({
         </ul>
         {view.envelope.expiresAt ? (
           <p className="mt-3 flex items-center gap-2 text-sm text-muted">
-            <CalendarClock aria-hidden className="h-4 w-4" />
-            Please {verb} by <LocalTime iso={view.envelope.expiresAt} />.
+            <CalendarClock aria-hidden className="h-4 w-4 shrink-0" />
+            <span>
+              Please {verb} by <LocalTime iso={view.envelope.expiresAt} />.
+            </span>
           </p>
         ) : null}
 

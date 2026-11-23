@@ -147,7 +147,7 @@ export function SigningMessage({
         {icon}
       </span>
       <h1
-        className="text-[24px] leading-tight font-bold sm:text-[26px]"
+        className="text-[24px] leading-tight font-bold outline-none sm:text-[26px]"
         tabIndex={-1}
         data-autofocus
       >

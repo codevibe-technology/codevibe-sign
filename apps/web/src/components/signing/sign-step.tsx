@@ -70,7 +70,7 @@ export function SignStep({
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 px-1">
         <div className="min-w-0">
           <h1
-            className="truncate text-[17px] leading-tight font-bold sm:text-[22px]"
+            className="truncate text-[17px] leading-tight font-bold outline-none sm:text-[22px]"
             tabIndex={-1}
             data-autofocus
           >
