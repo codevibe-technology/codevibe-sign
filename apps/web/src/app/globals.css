@@ -12,8 +12,11 @@
   --line: #e3e6eb;
   --line-strong: #c9d0da;
   --ink: #0f172a;
-  --muted: #5f6e84;
+  --muted: #5a6980;
   --primary: #1b6ae0;
+  /* Text in a brand colour sits on tints as well as white, so it is a shade darker than the
+     fill: every text and background pair in this file meets 4.5:1 (see contrast.test.ts). */
+  --primary-text: #1860d0;
   --primary-hover: #1557ba;
   --primary-soft: #e6effc;
   --primary-ink: #ffffff;
@@ -21,8 +24,10 @@
   --accent-soft: #d8f7f2;
   --accent-ink: #0d1b2a;
   --danger: #c9372c;
+  --danger-text: #bd3228;
   --danger-soft: #fbe9e7;
   --success: #12805c;
+  --success-text: #0e7250;
   --success-soft: #def4eb;
   --warning: #9a5b00;
   --warning-soft: #fdf1da;
@@ -45,6 +50,7 @@
   --ink: #e8eef6;
   --muted: #9db0c7;
   --primary: #4c8df0;
+  --primary-text: #6aa2f5;
   --primary-hover: #6aa2f5;
   --primary-soft: #16325a;
   --primary-ink: #06101b;
@@ -52,8 +58,10 @@
   --accent-soft: #0f3d3c;
   --accent-ink: #06101b;
   --danger: #f07167;
+  --danger-text: #f4877e;
   --danger-soft: #3d1a1a;
   --success: #4cc79a;
+  --success-text: #4cc79a;
   --success-soft: #0f3528;
   --warning: #f0b04c;
   --warning-soft: #3a2a0d;
@@ -77,18 +85,22 @@
     --ink: #e8eef6;
     --muted: #9db0c7;
     --primary: #4c8df0;
+    --primary-text: #6aa2f5;
     --primary-hover: #6aa2f5;
     --primary-soft: #16325a;
     --primary-ink: #06101b;
     --accent-soft: #0f3d3c;
     --accent-ink: #06101b;
     --danger: #f07167;
+    --danger-text: #f4877e;
     --danger-soft: #3d1a1a;
     --success: #4cc79a;
+    --success-text: #4cc79a;
     --success-soft: #0f3528;
     --warning: #f0b04c;
     --warning-soft: #3a2a0d;
     --nav: #07111c;
+    --nav-raised: #17304a;
     --nav-muted: #8aa0b8;
     --header: #17304a;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.25);
@@ -122,6 +134,9 @@
   --color-nav-muted: var(--nav-muted);
   --color-header: var(--header);
   --color-header-ink: var(--header-ink);
+  --text-color-primary: var(--primary-text);
+  --text-color-danger: var(--danger-text);
+  --text-color-success: var(--success-text);
   --shadow-card: var(--shadow);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
