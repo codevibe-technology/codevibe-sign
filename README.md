@@ -1,25 +1,59 @@
-# Codevibe Sign
+<p align="center">
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=banner"><img src=".github/assets/banner.png" alt="Codevibe Sign: send it, sign it, seal it, and prove it to anyone. A sealed PDF with a PAdES seal and a hash-chained audit trail. Free cloud, or self-host with no limits." width="100%"></a>
+</p>
 
-Send documents for signature in minutes and get back a sealed PDF anyone can check. Codevibe
-Sign is open-source e-signing: upload a PDF, add who signs, place the fields and send. Signers
-sign in their browser, with no account. The finished PDF carries a PAdES seal, a signing
-certificate and a hash-chained audit trail that can be verified offline. Start on the Free plan
-at sign.codevibe.in, run the same app on your own server with Docker at no cost and with no
-limits, or build signing into your own product with the TypeScript libraries.
+<p align="center">
+  <a href="https://github.com/codevibe-technology/codevibe-sign/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/codevibe-technology/codevibe-sign/ci.yml?branch=main&style=flat-square&label=CI&labelColor=0A1525" alt="CI"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/libraries-Apache--2.0-2DD4BF?style=flat-square&labelColor=0A1525" alt="Libraries: Apache-2.0"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/server%20%26%20app-AGPL--3.0-1B6AE0?style=flat-square&labelColor=0A1525" alt="Server and app: AGPL-3.0"></a>
+  <img src="https://img.shields.io/badge/Node.js-22%2B-1B6AE0?style=flat-square&labelColor=0A1525" alt="Node.js 22+">
+  <img src="https://img.shields.io/badge/TypeScript-strict-1B6AE0?style=flat-square&labelColor=0A1525" alt="TypeScript">
+  <img src="https://img.shields.io/badge/status-pre--release-F5B547?style=flat-square&labelColor=0A1525" alt="Status: pre-release">
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=badge"><img src="https://img.shields.io/badge/cloud-free%20plan-2DD4BF?style=flat-square&labelColor=0A1525" alt="Free cloud plan"></a>
+</p>
 
-**[Website](https://sign.codevibe.in)** · **[Docs](https://sign.codevibe.in/docs)** ·
-**[Self-hosting runbook](deploy/README.md)** · **[npm](https://www.npmjs.com/package/codevibe-sign)**
+<p align="center">
+  <b>Upload a PDF, add who signs, place the fields and send. People sign in their browser, with no account,<br>and you get back one sealed PDF with a certificate page and an audit trail anyone can check, even offline.</b>
+</p>
+
+<p align="center">
+  <a href="#get-started">Get started</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#verify-a-signed-pdf">Verify a PDF</a> ·
+  <a href="#plans">Plans</a> ·
+  <a href="#packages">Packages</a> ·
+  <a href="#using-the-libraries">Libraries</a> ·
+  <a href="#self-hosting">Self-hosting</a> ·
+  <a href="#security">Security</a> ·
+  <a href="#legal-note">Legal</a> ·
+  <a href="#licensing">Licensing</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="https://sign.codevibe.in/docs?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=nav">Docs</a>
+</p>
+
+---
 
 ## Get started
 
-**Cloud.** Create a workspace on the Free plan at [sign.codevibe.in](https://sign.codevibe.in).
-A sample agreement is waiting in it, so you can send yourself a document and sign it in a
-minute. See [Plans](#plans) for what Free includes.
+Three ways in. Pick the one that fits, and switch later: the cloud and self-hosting run the same code.
 
-**Self-host the app with Docker.** The web app, its HTTP API and these docs, with PostgreSQL,
-behind your Traefik. No limits, and your documents never leave your server.
+<table>
+  <tr>
+    <th width="33%" align="left">☁️ Cloud</th>
+    <th width="33%" align="left">🐳 Self-host</th>
+    <th width="33%" align="left">📦 Libraries</th>
+  </tr>
+  <tr>
+    <td valign="top">Create a free workspace at <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=get-started">sign.codevibe.in</a>. A sample agreement is waiting in it, so you can send yourself a document and sign it in a minute. No card needed.</td>
+    <td valign="top">The whole web app, its HTTP API and the docs, with PostgreSQL, behind your Traefik. No limits, and your documents never leave your server. See <a href="#self-hosting">Self-hosting</a> and <a href="deploy/README.md">deploy/README.md</a>.</td>
+    <td valign="top">Build signing into your own Node or React app. <code>npm i codevibe-sign</code> gives you the API client, PDF tools, core rules, React components and a command line, all Apache-2.0. See <a href="#using-the-libraries">Using the libraries</a>.</td>
+  </tr>
+</table>
 
 ```sh
+# Self-host the web app with Docker
 git clone https://github.com/codevibe-technology/codevibe-sign.git
 cd codevibe-sign/deploy
 cp .env.example .env              # host name, Traefik, database, secrets, SMTP; PLAN_MODE=self-hosted
@@ -27,26 +61,75 @@ cp .env.example .env              # host name, Traefik, database, secrets, SMTP;
 docker compose up -d --build
 ```
 
-[deploy/README.md](deploy/README.md) walks through DNS, the seal certificate, the first start,
-backups, a restore drill and upgrades.
-
-**Use the libraries.** Add signing to your own Node or React app:
-
 ```sh
+# Or add the libraries to your app
 npm i codevibe-sign
 ```
 
-`codevibe-sign` is Apache-2.0 from end to end: the API client, the PDF tools, the core rules,
-the React components and a command line. See [Using the libraries](#using-the-libraries) below.
+> **Pre-release.** The packages are under active development and the APIs may change before 1.0.
 
-**Licence in short.** The libraries, `codevibe-sign` included, are Apache-2.0: use them in any
-product, open or closed. The server (`@codevibe_technology/sign-server`) and the web app are
-AGPL-3.0: run and change them freely, and share your changes if you offer a modified version to
-others over a network. `npm i codevibe-sign` never installs AGPL code. The Codevibe names and
-logos are not covered by either licence. Details in [LICENSING.md](LICENSING.md).
+## Features
 
-> Status: pre-release. The packages are under active development and the APIs below may change
-> before 1.0.
+<p align="center">
+  <img src=".github/assets/whats-inside.png" alt="What's inside Codevibe Sign: a sealed PDF anyone can check, an audit trail that cannot be edited, signing order and signer checks, templates and bulk send, API, webhooks and React, and Aadhaar eSign" width="100%">
+</p>
+
+- 📄 **Envelopes** with several documents and recipients: signers, approvers and viewers.
+- 🔀 **Sequential or parallel routing**, reminders and expiry.
+- ✍️ **Fields**: signature, initials, date signed, name, text and checkbox, placed in PDF points. Signatures drawn, typed or uploaded.
+- ⚠️ **A warning in the field placer** when a signature or initials box covers page text, and the signer's name and signing time printed under each signature.
+- 🔐 **Signer checks**: a six-digit email code by default, or SMS code or email link only, with rate limits.
+- 🛡️ **A sealed PDF**: field values flattened onto the pages, a certificate page appended and a PAdES signature applied with your certificate, so any later edit breaks the seal and shows up in `verify()`.
+- ⛓️ **An append-only audit log** chained with SHA-256.
+- 🧾 **A one-page signing certificate** with a QR code to a **public record page**, which you can turn off per envelope or per workspace. Already-signed PDFs are refused, so earlier signatures are never removed.
+- ✅ **Public verification**: the verify page, `POST /v1/verify` and `GET /v1/verify/{sha256}` say whether a file is exactly what was sealed, with no API key.
+- 🗂️ **Templates and bulk send** from a CSV, in the web app and through `/v1/templates` in the API.
+- 🏢 **Workspaces** with their own address (old links redirect), time zone for signed documents, brand, team and sign-in by password or email link.
+- 🔔 **Signed outbound webhooks** with retries, and an **HTTP API** with an OpenAPI description and a Postman collection.
+- 🇮🇳 **Aadhaar eSign** through a licensed provider (Leegality), built into the server and the web app: the signer confirms with an Aadhaar OTP, and the finished file carries their Aadhaar signature and the seal together. The adapter is also a library of its own (`@codevibe_technology/sign-aadhaar`).
+- ⚛️ **React components** for signing and field placement, unstyled and themed with CSS variables.
+
+## How it works
+
+<p align="center">
+  <img src=".github/assets/how-it-works.png" alt="How Codevibe Sign works: send, sign in order, seal, verify" width="100%">
+</p>
+
+1. **Send.** The sender creates an envelope: documents, recipients, fields and routing. Each
+   recipient gets a single-use, expiring signing link.
+2. **Sign in order.** In sequential routing, only the recipients with the lowest unfinished
+   order are notified. Each one opens the link, authenticates if required, fills their fields
+   and signs or declines. Every step is recorded in the audit log.
+3. **Seal.** After the last required action, the server draws the values onto the pages,
+   appends the certificate page (who signed, how and when, the sender, the document
+   fingerprint, the audit chain head and a QR code to the record) and applies the seal.
+4. **Verify.** Anyone with the file can check the seal and the audit chain, without contacting
+   the server that produced it.
+
+## Verify a signed PDF
+
+<p align="center">
+  <img src=".github/assets/verify.png" alt="The public verify page at sign.codevibe.in/verify showing a valid seal, the signers and an intact audit chain, beside the details of the seal certificate and its SHA-256 fingerprint" width="100%">
+</p>
+
+Anyone who receives a PDF signed with Codevibe Sign can check it, with no account:
+
+- **Scan the QR code** on the certificate page, or open the link beside it. The public record shows the seal status, the signers, the fingerprints and the audit trail, never the document itself.
+- **On the web.** Drop it on [sign.codevibe.in/verify](https://sign.codevibe.in/verify?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=verify). It shows whether the seal is intact, who signed and when, and whether the audit trail is complete. The file is checked in memory and dropped; nothing is stored or logged.
+- **Through the API.** `POST /v1/verify` with the PDF, or `GET /v1/verify/{sha256}` with its hash, gives the same answer as JSON, with no API key.
+- **From the command line.** `npx codevibe-sign verify signed.pdf` checks the seal offline; add `--fingerprint` with the fingerprint below to check it was sealed by sign.codevibe.in.
+
+**The seal certificate is public on purpose.** Files completed on sign.codevibe.in are sealed with the certificate below. It holds only the public key, so sharing it lets anyone check a seal without being able to make one. The private key stays on the server and is never in this repository.
+
+|                     |                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| Subject             | `CN=Codevibe Sign, O=Codevibe Technology, C=IN` (self-signed)                      |
+| Valid               | 20 November 2026 to 19 November 2029                                               |
+| Key                 | RSA 3072, SHA-256                                                                  |
+| SHA-256 fingerprint | `6B6E D7EC C18F C1B1 B6F5 514C 58C2 13B4 8840 528D 665D F007 0D63 90AF 73DF 9C80`  |
+| Download            | [sign.codevibe.in/verify/certificate](https://sign.codevibe.in/verify/certificate) |
+
+What a PDF reader shows for the seal is explained in [How the seal works in PDF readers](https://sign.codevibe.in/docs/guides/seal-in-pdf-readers?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=verify-guide). If you self-host, your files are sealed with **your own** certificate, and you publish its fingerprint the same way.
 
 ## Plans
 
@@ -82,38 +165,6 @@ logos are not covered by either licence. Details in [LICENSING.md](LICENSING.md)
 Aadhaar eSign is paid per completed eSign with prepaid credits; the price for each plan is on
 the [pricing section](https://sign.codevibe.in/#pricing). More in the
 [plans and pricing guide](https://sign.codevibe.in/docs/guides/pricing).
-
-## Features
-
-- Envelopes with several documents and recipients: signers, approvers and viewers.
-- Sequential or parallel routing, reminders and expiry.
-- Fields: signature, initials, date signed, name, text and checkbox, placed in PDF points.
-- Signer authentication by email link, email OTP or SMS OTP, with rate limits.
-- Signatures drawn, typed or uploaded.
-- A sealed PDF: field values flattened onto the pages, a certificate page appended and a PAdES
-  signature applied with your certificate, so any later edit breaks the seal and shows up in
-  `verify()`.
-- An append-only audit log chained with SHA-256.
-- Templates and bulk send from a CSV, in the web app.
-- Signed outbound webhooks with retries.
-- Aadhaar eSign through a licensed provider (Leegality), built into the server and the web app:
-  the signer confirms with an Aadhaar OTP, and the finished file carries their Aadhaar signature
-  and the seal together. The adapter is also a library of its own
-  (`@codevibe_technology/sign-aadhaar`).
-- React components for signing and field placement, unstyled and themed with CSS variables.
-
-## How it works
-
-1. **Send.** The sender creates an envelope: documents, recipients, fields and routing. Each
-   recipient gets a single-use, expiring signing link.
-2. **Sign in order.** In sequential routing, only the recipients with the lowest unfinished
-   order are notified. Each one opens the link, authenticates if required, fills their fields
-   and signs or declines. Every step is recorded in the audit log.
-3. **Seal.** After the last required action, the server draws the values onto the pages,
-   appends the certificate page (who signed, how and when, the document fingerprint, the audit
-   chain head and a QR code to the record) and applies the seal.
-4. **Verify.** Anyone with the file can check the seal and the audit chain, without contacting
-   the server that produced it.
 
 ## Packages
 
@@ -308,6 +359,65 @@ Other countries have their own rules (for example eIDAS in the EU and the ESIGN 
 This is not legal advice; take your own before relying on any signature for a particular
 document.
 
+## Licensing
+
+<p align="center">
+  <img src=".github/assets/licensing.png" alt="Two licences, kept apart: the libraries are Apache-2.0 and installing codevibe-sign never installs AGPL code; the server and web app are AGPL-3.0, with a commercial licence on request" width="100%">
+</p>
+
+| You run                                                                                                               | You get                                                                                      | Licence                                     |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `npm i codevibe-sign`                                                                                                 | The API client, PDF tools, core rules, React components and the `codevibe-sign` command line | Apache-2.0 only                             |
+| `npm i @codevibe_technology/sign-core` (or `sign-pdf`, `sign-client`, `sign-react`, `sign-templates`, `sign-aadhaar`) | That library                                                                                 | Apache-2.0 only                             |
+| `npm i @codevibe_technology/sign-server` or `npx @codevibe_technology/sign-server start`                              | The HTTP API, the signing runtime and the `codevibe-sign-server` command                     | AGPL-3.0-only, with Apache-2.0 dependencies |
+| The Docker image, or `deploy/`                                                                                        | The standalone service, or the whole web app                                                 | AGPL-3.0-only                               |
+
+Running the unmodified server or app for your own organisation, or calling its API from your own closed-source product, does not require you to publish anything. If the AGPL does not fit how you want to use the server or app, write to hello@codevibe.in about a commercial licence. [LICENSING.md](LICENSING.md) explains it in plain words, and [TRADEMARKS.md](TRADEMARKS.md) covers the Codevibe names and logos.
+
+## FAQ
+
+<details>
+<summary><b>Is an electronic signature legally valid in India?</b></summary>
+
+For most business documents, yes: a contract formed by electronic means is valid and enforceable under section 10A of the IT Act 2000. Where a law requires a signature in the statutory sense, use Aadhaar eSign or a DSC. Wills, trust deeds, most powers of attorney and most negotiable instruments cannot be signed electronically at all. See the [legal note](#legal-note). This is not legal advice.
+
+</details>
+
+<details>
+<summary><b>Is it really free?</b></summary>
+
+Yes. The Free cloud plan costs nothing and needs no card. Self-hosting is free with no limits on envelopes, members or storage. The cloud runs the same code you can download; nothing is held back for a paid edition.
+
+</details>
+
+<details>
+<summary><b>Is it safe that the seal certificate is public?</b></summary>
+
+Yes, that is how a seal works. The certificate holds only the public key, which lets anyone check a seal. Making a seal needs the private key, which stays on the server, encrypted, and is never committed: `*.p12` and `deploy/secrets/` are in `.gitignore`. Publishing the certificate and its fingerprint is what lets the verify page, PDF readers and your recipients check the files you send.
+
+</details>
+
+<details>
+<summary><b>Do the people who sign need an account?</b></summary>
+
+No. They open the link in their email and sign in the browser on their phone or laptop, with no app to install. They can download their copy as soon as everyone has signed.
+
+</details>
+
+<details>
+<summary><b>Can I use it in a closed-source product?</b></summary>
+
+Yes. The libraries are Apache-2.0, and `npm i codevibe-sign` never installs AGPL code. Running the AGPL server as its own service and calling its API keeps your product under any licence you choose. See [Licensing](#licensing).
+
+</details>
+
+<details>
+<summary><b>Where are documents stored?</b></summary>
+
+On the cloud, in a PostgreSQL database and a file store on servers Codevibe runs, reached only over HTTPS. Self-hosted, on your own server with your own database, mail server and sealing certificate; nothing is sent to us.
+
+</details>
+
 ## Roadmap
 
 - eMudhra as a second eSign provider, behind the same `EsignProvider` interface.
@@ -316,10 +426,22 @@ document.
 
 Ideas and pull requests are welcome; open an issue to discuss larger changes first.
 
+## Changelog
+
+The highlights of every release are in [CHANGELOG.md](CHANGELOG.md) and on the [docs changelog](https://sign.codevibe.in/docs/changelog?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=changelog), and each package's `CHANGELOG.md` has the full notes, written by [Changesets](https://github.com/changesets/changesets) when a version is published. GitHub releases carry the same notes.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commands, the commit convention, the
-contributor licence agreement and how releases work. Everyone taking part agrees to the [Code of Conduct](CODE_OF_CONDUCT.md).
+contributor licence agreement and how releases work. Everyone taking part agrees to the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately to security@codevibe.in; see [SECURITY.md](SECURITY.md).
+
+```sh
+git clone https://github.com/codevibe-technology/codevibe-sign.git
+cd codevibe-sign
+pnpm install
+pnpm build
+pnpm test
+```
 
 ## Licence
 
@@ -327,3 +449,20 @@ The libraries are Apache-2.0, so you can use them in any product; `npm i codevib
 ever installs Apache-2.0 code. The server and the apps are AGPL-3.0: free to use and self-host,
 and if you offer a modified version to others as a hosted service you share your changes. [LICENSING.md](LICENSING.md) explains it in plain words. The
 licences do not cover the Codevibe names and logos; see [TRADEMARKS.md](TRADEMARKS.md).
+
+---
+
+<p align="center">
+  <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-logo">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/codevibe-logo-light.png">
+      <img src=".github/assets/codevibe-logo-dark.png" alt="Codevibe" height="28">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  Built and maintained by <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=built-by"><b>Codevibe</b></a>, a software development agency in Gurugram, India.<br>
+  We build web apps, mobile apps and AI products for startups.<br>
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Codevibe Sign</a> · <a href="https://codevibe.in/tools/codevibe-sign?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Product page</a> · <a href="https://codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=codevibe-sign&utm_content=footer-links">Website</a> · <a href="mailto:hello@codevibe.in">hello@codevibe.in</a>
+</p>

@@ -1,0 +1,89 @@
+# Changelog
+
+The highlights of each Codevibe Sign release, for the whole project. The eight packages share one
+version number and are released together. Each package also keeps its own `CHANGELOG.md`, written
+by [Changesets](https://github.com/changesets/changesets) at release time, with every change in
+full; GitHub releases carry the same notes. You can read this page on the
+[docs changelog](https://sign.codevibe.in/docs/changelog?utm_source=github&utm_medium=changelog&utm_campaign=codevibe-sign) too.
+
+Releases follow [semantic versioning](https://semver.org/). Before 1.0, a breaking change bumps
+the minor version and says so in its first line.
+
+## Unreleased: 0.1.0, the first public release
+
+### What ships
+
+- **`codevibe-sign`** (Apache-2.0): the API client, PDF tools, core rules and React components
+  behind one install with subpath imports, and a command line: `verify`, `inspect`, `keygen`,
+  `hash` and `api-key`. It contains no AGPL code and does not depend on the server.
+- **`@codevibe_technology/sign-server`** (AGPL-3.0-only): the HTTP API and runtime, with its own
+  `codevibe-sign-server` command (`start` and `start --memory`), the Docker image and the
+  `deploy/` set-up for the whole web app.
+- **The libraries** `sign-core`, `sign-pdf`, `sign-client`, `sign-react`, `sign-templates` and
+  `sign-aadhaar` (Apache-2.0). `sign-aadhaar` is a standalone library for now; the server and
+  the web app do not call it yet.
+- **Workspaces** in the server: envelopes, API keys and webhooks belong to a workspace, each
+  with its own mail templates, sender details and time zone for signed documents.
+- **Webhooks** with a delivery log, test deliveries and redelivery.
+
+### In the API
+
+- **Templates:** `GET`, `POST`, `PATCH` and `DELETE /v1/templates`, and
+  `POST /v1/templates/{templateId}/envelopes` to send from a template with a person for each role.
+- **Public verification:** `POST /v1/verify` and `GET /v1/verify/{sha256}` check a sealed PDF with
+  no API key, limited per client address.
+- **Versioning:** every `/v1` answer carries `Codevibe-Api-Version: 1`; deprecations will come
+  with `Deprecation` and `Sunset` headers at least six months apart.
+
+### In the web app
+
+- Workspace addresses you choose at sign-up and can change; old links redirect.
+- A time zone per workspace for the dates on signed documents and in emails.
+- Sign-in by password or by email link, and people are called by their name.
+- A public record page for each completed envelope, reached from the QR code on the certificate
+  or the verify page, and switchable off per envelope or per workspace.
+- A warning when a signature or initials field covers page text.
+- Light theme by default in the app and the docs.
+
+### Stronger evidence
+
+- Seals can carry an RFC 3161 timestamp (PAdES B-T) through `SEAL_TSA_URL`.
+- The seal is a certification signature (DocMDP P=1, no changes allowed) when it is the first
+  signature in the file.
+- Seal certificates issued by a private root or a CA are supported; weak keys (RSA under 2048
+  bits) and SHA-1 or MD5 certificates are refused.
+- `verify(bytes, { trust })` passes only a file with exactly one intact signature that covers
+  every byte and was made with a certificate you trust.
+- Each drawn signature is captioned with the signer's name and signing time.
+- The signing certificate is one compact page: document, envelope, sender, each signer with
+  masked contact, method and time, the fingerprint and a QR code to the record page. IP
+  addresses and the event list are no longer printed in the file.
+
+### Safer by default
+
+- **Breaking, before 1.0:** a recipient with an email address signs with a six-digit email code
+  unless you choose `email_link`, so a forwarded link alone is no longer enough to sign.
+- PDFs that already carry digital signatures are refused instead of having those signatures
+  silently removed.
+- Until a recipient has entered their code, the signing session shows no documents, fields or
+  values, and the email address is masked.
+- Limits on one-time codes per recipient, API keys stored as SHA-256 hashes, webhook targets
+  limited to public HTTPS hosts, uploads parsed in a worker under limits, and every log line
+  redacted.
+- **Breaking, before 1.0:** envelope and document JSON no longer carries the internal `fileKey`.
+
+### Platform
+
+- Node 22 or later. Node 20 has reached end of life; CI runs on Node 22 and 24.
+- CommonJS projects get correct types (`.d.cts` for `require`).
+- Releases are published from GitHub Actions through npm trusted publishing, so each one carries
+  a provenance statement.
+- Contributors sign a contributor licence agreement (individual or corporate), checked on every
+  pull request.
+
+---
+
+<p align="center">
+  Built and maintained by <a href="https://codevibe.in?utm_source=github&utm_medium=changelog&utm_campaign=codevibe-sign&utm_content=built-by"><b>Codevibe</b></a>, a software development agency in Gurugram, India ·
+  <a href="https://sign.codevibe.in?utm_source=github&utm_medium=changelog&utm_campaign=codevibe-sign&utm_content=footer">sign.codevibe.in</a>
+</p>
