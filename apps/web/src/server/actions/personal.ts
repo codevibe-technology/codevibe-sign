@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { THEME_COOKIE } from '@/lib/preferences';
@@ -19,6 +20,7 @@ export const updatePreferencesAction = userAction(
       sameSite: 'lax',
       maxAge: 365 * 24 * 60 * 60,
     });
+    revalidatePath('/w/[slug]', 'layout');
     return saved;
   },
 );

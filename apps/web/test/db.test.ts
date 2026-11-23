@@ -11,6 +11,7 @@ import { betterAuth } from 'better-auth';
 import { getMigrations } from 'better-auth/db/migration';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PNG } from './fixtures';
 import { createApiKey, listApiKeys, resolveApiKey, revokeApiKey } from '@/server/api-keys';
 import { authOptions } from '@/server/auth/config';
 import {
@@ -49,6 +50,8 @@ import {
   findMembership,
   listWorkspacesForUser,
   renameWorkspace,
+  setWorkspaceTimeZone,
+  workspaceTimeZone,
 } from '@/server/workspaces';
 
 const url = process.env.DATABASE_URL;
@@ -485,6 +488,20 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       );
       await rejectsWith(updatePreferences(sql, users.zoe.id, { theme: 'neon' }), 'VALIDATION');
       expect((await getPreferences(sql, users.mia.id)).theme).toBe('system');
+      expect((await updatePreferences(sql, users.zoe.id, { timezone: '' })).timezone).toBeNull();
+    });
+
+    it('keeps a time zone per workspace, unset until one is chosen', async () => {
+      const a = await createWorkspace(sql, { name: 'Zone A', userId: users.asha.id });
+      const b = await createWorkspace(sql, { name: 'Zone B', userId: users.asha.id });
+      expect(await workspaceTimeZone(sql, a.id)).toBeNull();
+      expect(await setWorkspaceTimeZone(sql, a.id, 'Pacific/Auckland')).toBe('Pacific/Auckland');
+      expect(await workspaceTimeZone(sql, a.id)).toBe('Pacific/Auckland');
+      expect(await workspaceTimeZone(sql, b.id)).toBeNull();
+      await rejectsWith(setWorkspaceTimeZone(sql, a.id, 'Mars/Phobos'), 'VALIDATION');
+      await rejectsWith(setWorkspaceTimeZone(sql, a.id, ''), 'VALIDATION');
+      expect(await workspaceTimeZone(sql, a.id)).toBe('Pacific/Auckland');
+      expect(await workspaceTimeZone(sql, 'ws_missing')).toBeNull();
     });
   });
 
@@ -574,6 +591,99 @@ describe.skipIf(!url)('against PostgreSQL', () => {
       expect((await call(keyA, 'POST', `/v1/envelopes/${envelope.id}/send`, {})).status).toBe(200);
       expect(mailer.sent.at(-1)?.text).toContain(`${APP_URL}/api/sign/`);
       expect((await call('cvs_wrong', 'GET', '/v1/envelopes')).status).toBe(401);
+    });
+
+    it('dates each workspace’s documents and emails in its own zone', async () => {
+      const india = await createWorkspace(sql, { name: 'India', userId: users.asha.id });
+      const nz = await createWorkspace(sql, { name: 'New Zealand', userId: users.asha.id });
+      const plain = await createWorkspace(sql, { name: 'Default', userId: users.asha.id });
+      await setWorkspaceTimeZone(sql, india.id, 'Asia/Kolkata');
+      await setWorkspaceTimeZone(sql, nz.id, 'Pacific/Auckland');
+      const drawn: Record<string, (string | undefined)[]> = {};
+      const mailer = consoleMailer({ silent: true });
+      const sign = createSignServer({
+        store: postgresStore(sql),
+        files: memoryFileStore(),
+        mailer,
+        otp: consoleOtpSender({ silent: true }),
+        pdf: {
+          ...pdf,
+          renderFields: async (bytes, _fields, _values, recipients, options) => {
+            drawn[recipients[0]!.name] = [options.timeZone];
+            return bytes;
+          },
+          appendCertificate: async (bytes, input) => {
+            drawn[input.envelope.recipients[0]!.name]!.push(input.timeZone);
+            return bytes;
+          },
+        },
+        sealer: { p12: new Uint8Array([1]), passphrase: '' },
+        apiKeys: [],
+        authenticate: createAuthenticate({
+          appUrl: APP_URL,
+          resolveApiKey: (key) => resolveApiKey(sql, key),
+          sessionUser: async () => null,
+          roleOf: async () => null,
+        }),
+        timeZone: 'America/New_York',
+        workspaceTimeZone: (workspaceId) => workspaceTimeZone(sql, workspaceId),
+        basePath: '/api',
+        publicUrl: APP_URL,
+      });
+      const expiresAt = new Date(Date.UTC(new Date().getUTCFullYear() + 1, 2, 31, 18, 29));
+      const run = async (workspaceId: string, name: string) => {
+        const { key } = await createApiKey(sql, {
+          workspaceId,
+          name: 'zone',
+          createdBy: users.asha.id,
+        });
+        const created = await sign.app.request('/api/v1/envelopes', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            ...body,
+            recipients: [{ key: 'asha', name, email: `${name.toLowerCase()}@example.com` }],
+            expiresAt: expiresAt.toISOString(),
+            send: true,
+          }),
+        });
+        expect(created.status).toBe(201);
+        const envelope = (await created.json()) as { fields: { id: string }[] };
+        const mail = mailer.sent.at(-1)!;
+        const token = /\/api\/sign\/([A-Za-z0-9_-]+)/.exec(mail.text)![1]!;
+        const view = (await (await sign.app.request(`/api/v1/sign/${token}`)).json()) as {
+          timeZone: string;
+        };
+        const signed = await sign.app.request(`/api/v1/sign/${token}/submit`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            consent: true,
+            values: [{ fieldId: envelope.fields[0]!.id, value: PNG }],
+          }),
+        });
+        expect(signed.status).toBe(200);
+        return { expiry: /expires on ([^.]+ \S+)\./.exec(mail.text)?.[1], zone: view.timeZone };
+      };
+
+      const year = expiresAt.getUTCFullYear();
+      expect(await run(india.id, 'Indira')).toEqual({
+        expiry: `31 Mar ${year}, 23:59 GMT+5:30`,
+        zone: 'Asia/Kolkata',
+      });
+      expect(await run(nz.id, 'Niko')).toEqual({
+        expiry: `1 Apr ${year}, 07:29 GMT+13`,
+        zone: 'Pacific/Auckland',
+      });
+      expect(await run(plain.id, 'Dana')).toEqual({
+        expiry: `31 Mar ${year}, 14:29 GMT-4`,
+        zone: 'America/New_York',
+      });
+      expect(drawn).toEqual({
+        Indira: ['Asia/Kolkata', 'Asia/Kolkata'],
+        Niko: ['Pacific/Auckland', 'Pacific/Auckland'],
+        Dana: ['America/New_York', 'America/New_York'],
+      });
     });
 
     it('counts, finds whose turn it is, lists activity and remembers senders', async () => {

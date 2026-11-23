@@ -103,5 +103,8 @@ export function env(): Env {
   return cached;
 }
 
+/** The zone for workspaces that have not chosen one: `SIGN_TIME_ZONE`, or UTC. */
+export const defaultTimeZone = (config: Env) => config.SIGN_TIME_ZONE ?? 'UTC';
+
 export const googleEnabled = (config: Env) =>
   Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET);

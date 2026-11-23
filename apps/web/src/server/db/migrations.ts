@@ -291,4 +291,10 @@ create index app_mail_log_envelope_idx on app_mail_log (envelope_id, created_at 
 create index app_mail_log_created_idx on app_mail_log (created_at);
 `,
   },
+  {
+    name: '0009_workspace_time_zone',
+    sql: `
+alter table app_workspaces add column time_zone text;
+`,
+  },
 ];

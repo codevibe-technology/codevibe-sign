@@ -34,6 +34,8 @@ export interface SignerView {
   otpRequired: boolean;
   authenticated: boolean;
   canAct: boolean;
+  /** IANA zone the signing date is printed in on the document. */
+  timeZone: string;
 }
 
 /** `GET /api/v1/sign/receipt`: where things stand after signing. */
@@ -181,4 +183,20 @@ export function otpProblem(error: unknown): string {
       : 'Too many wrong codes. Send yourself a new one.';
   }
   return error.message;
+}
+
+/**
+ * `05 Nov 2026`: the day `at` falls on in `timeZone`, written the way the sealed document
+ * prints a date of signing.
+ */
+export function signingDay(at: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('day')} ${part('month')} ${part('year')}`;
 }

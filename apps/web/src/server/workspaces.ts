@@ -1,6 +1,7 @@
 import 'server-only';
 import type postgres from 'postgres';
 import { limitsFor, type Plan, type PlanSettings } from '@/lib/plans';
+import { isTimeZone } from '@/lib/preferences';
 import type { Role } from '@/lib/roles';
 import { randomId } from './crypto';
 import { AppError } from './errors';
@@ -114,6 +115,22 @@ export async function findMembership(
   if (!row) return null;
   const { role, ...workspace } = row;
   return { workspace, role };
+}
+
+/** The zone a workspace chose for its documents and emails, or null while it uses the default. */
+export async function workspaceTimeZone(sql: Sql, workspaceId: string): Promise<string | null> {
+  const [row] = await sql<{ time_zone: string | null }[]>`
+    select time_zone from app_workspaces where id = ${workspaceId}`;
+  return row?.time_zone ?? null;
+}
+
+export async function setWorkspaceTimeZone(sql: Sql, workspaceId: string, timeZone: string) {
+  if (!isTimeZone(timeZone)) {
+    throw new AppError('VALIDATION', 'Pick a time zone from the list', 'timeZone');
+  }
+  await sql`update app_workspaces set time_zone = ${timeZone}, updated_at = now()
+    where id = ${workspaceId}`;
+  return timeZone;
 }
 
 export async function renameWorkspace(sql: Sql, workspaceId: string, name: string) {

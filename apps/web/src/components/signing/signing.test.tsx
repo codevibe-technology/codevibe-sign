@@ -82,6 +82,7 @@ const view = (overrides: Partial<SignerView> = {}): SignerView => ({
   otpRequired: false,
   authenticated: false,
   canAct: true,
+  timeZone: 'Asia/Kolkata',
   ...overrides,
 });
 

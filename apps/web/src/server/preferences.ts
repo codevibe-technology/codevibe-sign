@@ -20,15 +20,16 @@ export async function updatePreferences(
   userId: string,
   patch: { theme?: string; timezone?: string },
 ): Promise<Preferences> {
+  // An empty zone means "follow my device": nothing is stored and the browser's zone is used.
   if (patch.theme !== undefined && !isTheme(patch.theme)) {
     throw new AppError('VALIDATION', 'Pick system, light or dark', 'theme');
   }
-  if (patch.timezone !== undefined && !isTimeZone(patch.timezone)) {
+  if (patch.timezone && !isTimeZone(patch.timezone)) {
     throw new AppError('VALIDATION', 'Pick a time zone from the list', 'timezone');
   }
   await sql`
     insert into app_user_preferences (user_id, theme, timezone)
-    values (${userId}, ${patch.theme ?? 'system'}, ${patch.timezone ?? null})
+    values (${userId}, ${patch.theme ?? 'system'}, ${patch.timezone || null})
     on conflict (user_id) do update set
       theme = ${patch.theme === undefined ? sql`app_user_preferences.theme` : sql`excluded.theme`},
       timezone = ${patch.timezone === undefined ? sql`app_user_preferences.timezone` : sql`excluded.timezone`},

@@ -18,7 +18,7 @@ import { mailSenderOnDecline } from '../decline-mail';
 import { publishChange } from '../live/live';
 import { completedCopyAttachmentLimit } from '../mail-transport';
 import { appRuntime } from '../runtime';
-import { findMembership } from '../workspaces';
+import { findMembership, workspaceTimeZone } from '../workspaces';
 import { planSettings } from '../plans';
 import { isSampleEnvelope } from '../sample-envelope';
 import { createWorkspaceMail } from './mail';
@@ -124,6 +124,7 @@ function build(): SignServer {
     signingPageUrl: `${config.APP_URL}/sign`,
     trustProxy: config.TRUST_PROXY,
     ...(config.SIGN_TIME_ZONE ? { timeZone: config.SIGN_TIME_ZONE } : {}),
+    workspaceTimeZone: (workspaceId) => workspaceTimeZone(sql, workspaceId),
     effects: 'background',
     sessionSecret: sessionSecret(config),
   });

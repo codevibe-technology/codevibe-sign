@@ -1,14 +1,15 @@
 'use client';
 
 import { Monitor, Moon, Sun } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { applyTheme } from '@/components/shell/theme';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
 import { Field, NativeSelect } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import { timeZones, type Preferences, type Theme } from '@/lib/preferences';
+import type { Preferences, Theme } from '@/lib/preferences';
 import { updatePreferencesAction } from '@/server/actions/personal';
+import { TimeZoneSelect } from './time-zone-select';
 import { useAction } from './use-action';
 
 const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
@@ -26,13 +27,7 @@ export function PersonalForm({
 }) {
   const [theme, setTheme] = useState<Theme>(preferences.theme);
   const [timezone, setTimezone] = useState(preferences.timezone ?? '');
-  const [zones, setZones] = useState<string[]>(preferences.timezone ? [preferences.timezone] : []);
   const { pending, errors, run } = useAction();
-
-  useEffect(() => {
-    setZones(timeZones());
-    if (!preferences.timezone) setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  }, [preferences.timezone]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -78,21 +73,16 @@ export function PersonalForm({
           </fieldset>
           <Field
             label="Time zone"
-            hint="Dates and times in the app are shown in this zone."
+            hint="Dates and times in the app are shown in this zone, with the zone named. Documents are dated in the workspace time zone."
             error={errors.timezone}
           >
             {(props) => (
-              <NativeSelect
+              <TimeZoneSelect
                 {...props}
                 value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-              >
-                {zones.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone.replaceAll('_', ' ')}
-                  </option>
-                ))}
-              </NativeSelect>
+                onChange={setTimezone}
+                blank="Match my device"
+              />
             )}
           </Field>
           <Field label="Language" hint="More languages are on the way.">

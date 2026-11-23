@@ -8,7 +8,12 @@ import { env } from '../env';
 import { AppError } from '../errors';
 import { createSampleEnvelope, dismissStartHere } from '../sample-envelope';
 import { signRequest } from '../sign/client';
-import { countWorkspaces, createWorkspace, renameWorkspace } from '../workspaces';
+import {
+  countWorkspaces,
+  createWorkspace,
+  renameWorkspace,
+  setWorkspaceTimeZone,
+} from '../workspaces';
 import { userAction, workspaceAction } from './action';
 
 const name = z.string({ error: 'Give the workspace a name' });
@@ -50,5 +55,15 @@ export const renameWorkspaceAction = workspaceAction(
     const renamed = await renameWorkspace(db(), ctx.workspace.id, input.name);
     revalidatePath(`/w/${ctx.workspace.slug}`, 'layout');
     return { name: renamed };
+  },
+);
+
+export const setWorkspaceTimeZoneAction = workspaceAction(
+  'workspace.manage',
+  z.object({ timeZone: z.string({ error: 'Pick a time zone from the list' }).max(64) }),
+  async (ctx, input) => {
+    const timeZone = await setWorkspaceTimeZone(db(), ctx.workspace.id, input.timeZone);
+    revalidatePath(`/w/${ctx.workspace.slug}/settings/workspace`);
+    return { timeZone };
   },
 );
