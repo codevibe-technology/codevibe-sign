@@ -88,6 +88,7 @@ vi.mock('../webhooks', () => ({
   setWebhookEnabled: record('setWebhookEnabled'),
   rollWebhookSecret: record('rollWebhookSecret', 'whsec_new'),
   deleteWebhook: record('deleteWebhook'),
+  assertWebhooksLive: async () => undefined,
 }));
 vi.mock('../sign/webhooks', () => ({ webhookRules: () => ({}) }));
 vi.mock('../sign/server', () => ({

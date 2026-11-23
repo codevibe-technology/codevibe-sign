@@ -7,6 +7,7 @@ import { AppError } from '../errors';
 import { signServer } from '../sign/server';
 import { webhookRules } from '../sign/webhooks';
 import {
+  assertWebhooksLive,
   createWebhook,
   deleteWebhook,
   getDelivery,
@@ -90,6 +91,7 @@ export const testWebhookAction = workspaceAction(
       throw new AppError('NOT_FOUND', 'That endpoint no longer exists in this workspace.');
     if (!webhook.enabled)
       throw new AppError('CONFLICT', 'Turn the endpoint on to send it a test event.');
+    await assertWebhooksLive(db(), ctx.workspace.id);
     const report = await signServer().sendTestWebhook({
       workspaceId: ctx.workspace.id,
       url: webhook.url,
@@ -109,6 +111,7 @@ export const retryDeliveryAction = workspaceAction(
     if (!webhook)
       throw new AppError('NOT_FOUND', 'That endpoint no longer exists in this workspace.');
     if (!webhook.enabled) throw new AppError('CONFLICT', 'Turn the endpoint on to send it again.');
+    await assertWebhooksLive(sql, ctx.workspace.id);
     const delivery = await getDelivery(sql, ctx.workspace.id, webhook.id, input.deliveryId);
     if (!delivery) throw new AppError('NOT_FOUND', 'That delivery is no longer in the log.');
     const report = await signServer().redeliverWebhook({

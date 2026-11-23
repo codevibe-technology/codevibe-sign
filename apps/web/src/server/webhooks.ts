@@ -12,7 +12,7 @@ import {
 } from '@/lib/webhooks';
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
-import { assertRoom, lockedPlan } from './plans';
+import { assertRoom, assertWebhooksIncluded, lockedPlan, workspacePlan } from './plans';
 import { userLabel } from './profile';
 
 type Sql = postgres.Sql;
@@ -98,6 +98,7 @@ export async function createWebhook(
   const secret = newSecret();
   await sql.begin(async (tx) => {
     const plan = await lockedPlan(tx, input.workspaceId);
+    assertWebhooksIncluded(plan);
     const [count] = await tx<{ n: number }[]>`
       select count(*)::int as n from app_webhooks where workspace_id = ${input.workspaceId}`;
     const used = count?.n ?? 0;
@@ -139,9 +140,21 @@ export async function setWebhookEnabled(
   id: string,
   enabled: boolean,
 ) {
-  const rows = await sql`update app_webhooks set enabled = ${enabled}, updated_at = now()
-    where id = ${id} and workspace_id = ${workspaceId} returning id`;
+  const rows = await sql.begin(async (tx) => {
+    // Turning an endpoint off is always allowed; turning one on needs a plan with webhooks.
+    if (enabled) assertWebhooksIncluded(await lockedPlan(tx, workspaceId));
+    return tx`update app_webhooks set enabled = ${enabled}, updated_at = now()
+      where id = ${id} and workspace_id = ${workspaceId} returning id`;
+  });
   if (rows.length === 0) throw notFound();
+}
+
+/**
+ * Refuses to send anything to a workspace's endpoints by hand (a test event, a delivery sent
+ * again) while its plan has no webhooks.
+ */
+export async function assertWebhooksLive(sql: Sql, workspaceId: string) {
+  assertWebhooksIncluded(await workspacePlan(sql, workspaceId));
 }
 
 /** A new secret; the old one stops working at once. */
@@ -203,8 +216,14 @@ export async function getWebhook(
   return row ? toRecord(row) : null;
 }
 
-/** The workspace's live endpoints, as the sign server delivers to them. */
+/**
+ * The workspace's live endpoints, as the sign server delivers to them: none while its plan
+ * has no webhooks, so events are not queued and deliveries already waiting to be retried stop.
+ * A workspace that no longer exists has none either.
+ */
 export async function webhookTargetsFor(sql: Sql, workspaceId: string): Promise<WebhookTarget[]> {
+  const plan = await workspacePlan(sql, workspaceId).catch(() => null);
+  if (!plan || plan.limits.webhooks === 0) return [];
   return sql<WebhookTarget[]>`select url, secret, events from app_webhooks
     where workspace_id = ${workspaceId} and enabled order by created_at`;
 }
