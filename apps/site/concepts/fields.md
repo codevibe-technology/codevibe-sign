@@ -17,14 +17,14 @@ A field is a box on one page of one document, owned by one recipient.
 | `name`        | Text. Filled with the recipient's name when left empty. |
 | `text`        | Text, at most 1000 characters.                          |
 | `checkbox`    | `'true'` or `'false'`.                                  |
-| `aadhaar`     | None. Where an Aadhaar eSign signer signs; see below.   |
+| `aadhaar`     | None. Older envelopes only; see below.                  |
 
 Fields are required by default. Only signers and approvers can own fields.
 
-A signer with `auth: 'aadhaar'` has exactly one `aadhaar` field, required, and no
-`signature` or `initials` fields: they sign the whole file at the eSign provider and draw
-nothing. Nobody else can have an `aadhaar` field. See
-[Aadhaar eSign with Leegality](/guides/aadhaar-leegality#place-the-aadhaar-esign-box).
+A signer with `auth: 'aadhaar'` has no fields: they sign the whole file at the eSign provider,
+which places the signature where its workflow says. The `aadhaar` field is only read on
+envelopes sent while it marked that place. See
+[Aadhaar eSign with Leegality](/guides/aadhaar-leegality#set-the-signature-position).
 
 ## Coordinates
 

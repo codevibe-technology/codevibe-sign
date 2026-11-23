@@ -57,11 +57,17 @@ document.
 
 ## Aadhaar eSign
 
-If the sender asked for Aadhaar eSign, you do not draw a signature: the **Aadhaar eSign** box
-on the page shows where it goes. The last step is **Continue to Aadhaar eSign**. You
-review the document on Leegality's page and confirm with the OTP sent to the mobile number
-linked to your Aadhaar, then come back here. If it fails or runs out of time, press
-**Try again**. Codevibe Sign never sees your Aadhaar number.
+If the sender asked for Aadhaar eSign, there is nothing to fill in or draw: read the document,
+then choose **Continue to Aadhaar eSign**. On Leegality's page you review the document and
+confirm with the OTP sent to the mobile number linked to your Aadhaar; Leegality places your
+signature. Then you come back here. If it fails or runs out of time, press **Try again**.
+Codevibe Sign never sees your Aadhaar number.
+
+<HelpClip name="aadhaar-sign" caption="Continuing to Aadhaar eSign at Leegality, then back to the thank-you page with the two files." />
+
+When everyone has signed, the thank-you page offers **Signed document (Aadhaar eSign)**, the
+file with your Aadhaar signature and the Codevibe Sign seal, and **Certificate and audit
+trail**, a separate PDF with the signing certificate and every event. The email carries both.
 
 ## Afterwards
 

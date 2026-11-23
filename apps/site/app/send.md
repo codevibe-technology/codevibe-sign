@@ -38,7 +38,11 @@ At least one signer or approver is needed.
 - **Email link only:** weaker evidence; anyone with the email could sign.
 - **Aadhaar eSign:** the signer signs with their Aadhaar OTP through Leegality. It costs one
   credit on the cloud and has four rules: one Aadhaar signer, one document, that signer signs
-  last, and the order is **One after another**. See [Aadhaar eSign](/admin/aadhaar-esign).
+  last, and the order is **One after another**. Leegality places the Aadhaar signature where
+  your Leegality workflow says, so you place no box for that signer; a note under their row
+  says so. See [Aadhaar eSign](/admin/aadhaar-esign).
+
+<HelpClip name="aadhaar-send" caption="Choosing Aadhaar eSign as the identity check, with the note on where Leegality places the signature." />
 
 Codes by text message are coming later; they are not offered yet.
 
@@ -77,11 +81,12 @@ written in the PDF itself, see [Fields across pages and tags](/guides/field-tags
 
 <HelpClip name="place-fields" caption="Placing initials on every page, a quick add, and a text field on chosen pages." />
 
-A signer who uses Aadhaar eSign draws nothing, so for them the tray offers **Aadhaar eSign**
-instead of **Signature** and **Initials**. Place one Aadhaar eSign box where their signature
-goes; **Send** stays blocked until it is there. Date signed, name, text and checkbox fields
-can still be given to them. See
-[Place the Aadhaar eSign box](/guides/aadhaar-leegality#place-the-aadhaar-esign-box).
+A signer who uses Aadhaar eSign has no fields. With them picked, the tray offers nothing and
+a note says: "Leegality places the Aadhaar signature where your Leegality workflow says (set
+the signature position in the workflow). You don't place a box." Give any date, text or
+checkbox to a signer before them. The document Leegality signs is then exactly what you
+approved, with the earlier signers' fields filled in. See
+[Set the signature position](/guides/aadhaar-leegality#set-the-signature-position).
 
 **Preview as signer** shows the pages as the recipient you pick sees them, with only their
 fields. **Back to editing** returns to placing fields.
