@@ -3,7 +3,12 @@ import { PDFArray, PDFDict, PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { SignError, type AuditEvent, type Recipient } from '@codevibe_technology/sign-core';
 import { extractText } from './testing/extract';
-import { appendCertificate, certificatePdf, type CertificateData } from './certificate';
+import {
+  appendCertificate,
+  certificatePdf,
+  certificateWithAuditTrailPdf,
+  type CertificateData,
+} from './certificate';
 import { authLabel } from './certificate-text';
 import { lockupWidth } from './lockup';
 import { LOCKUP } from './lockup-paths';
@@ -86,39 +91,6 @@ async function rejection(promise: Promise<unknown>): Promise<SignError> {
 }
 
 describe('appendCertificate', () => {
-  it('certifies the file an Aadhaar eSign signer is about to sign', async () => {
-    const ravi = recipient({
-      id: 'r3',
-      name: 'Ravi Kumar',
-      email: 'ravi@example.com',
-      order: 2,
-      auth: 'aadhaar',
-      status: 'viewed',
-      actedAt: undefined,
-    });
-    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
-      envelope: envelope({
-        status: 'in_progress',
-        completedAt: undefined,
-        recipients: [signer, ravi],
-      }),
-      document: document(),
-      events: events.slice(0, 5),
-      recordUrl: RECORD_URL,
-      esign: { recipientId: 'r3', provider: 'leegality' },
-    });
-    expect(await pageCount(output)).toBe(2);
-    const text = (await certificateText(output, 1)).join(' ');
-    expect(text).toContain('Completed by the Aadhaar eSign of Ravi Kumar on this file');
-    expect(text).toContain('Aadhaar eSign (via Leegality)');
-    expect(text).toContain('With the Aadhaar eSign on this file');
-    expect(text).toContain('The time is in the digital signature');
-    expect(text).toContain('One-time code by email');
-    expect(text).toContain('2026-11-18 09:00:05 UTC');
-    expect(text).toContain('signed with Aadhaar eSign and then sealed');
-    expect(text).not.toContain('chain head');
-  });
-
   it('prints the facts of the signing on one page', async () => {
     const pdf = await makePdf([{ size: A4 }]);
     const output = await appendCertificate(pdf, {
@@ -465,5 +437,76 @@ describe('certificatePdf', () => {
     const second = shownText(await pageContent(output, 1)).join(' ');
     expect(second).toContain('Annexure.pdf');
     expect(second).toContain('b'.repeat(64));
+  });
+});
+
+describe('certificateWithAuditTrailPdf', () => {
+  const ravi = recipient({
+    id: 'r3',
+    name: 'Ravi Kumar',
+    email: 'ravi@example.com',
+    order: 2,
+    auth: 'aadhaar',
+    status: 'signed',
+    esign: { provider: 'leegality', status: 'signed', signerName: 'RAVI S KUMAR' },
+  });
+  const data = (): CertificateData => ({
+    envelope: envelope({ recipients: [signer, ravi] }),
+    document: document(),
+    events,
+    recordUrl: RECORD_URL,
+    esign: {
+      recipientId: 'r3',
+      provider: 'leegality',
+      signerName: 'RAVI S KUMAR',
+      issuer: 'Protean eGov Technologies Limited sub-CA for Aadhaar eSign 2024',
+      signedAt: '2026-11-18T09:12:40.000Z',
+    },
+  });
+
+  it('prints a truthful certificate for a completed Aadhaar eSign, then the audit trail', async () => {
+    const output = await certificateWithAuditTrailPdf(data());
+    const pages = await pageCount(output);
+    expect(pages).toBeGreaterThanOrEqual(2);
+    const certificate = (await certificateText(output, 0)).join(' ');
+    expect(certificate).toContain('Signing certificate');
+    expect(certificate).toContain('Completed');
+    expect(certificate).not.toContain('on this file');
+    expect(certificate).toContain('Aadhaar eSign (via Leegality)');
+    expect(certificate).toContain('2026-11-18 09:12:40 UTC');
+    expect(certificate).toContain('eSign certificate: RAVI S KUMAR');
+    expect(certificate).toContain('Issued by Protean eGov Technologies Limited');
+    expect(certificate).toContain('chain head');
+    expect(certificate).toContain('nothing was added to its pages');
+    const rest = (await certificateText(output, 1)).join(' ');
+    expect(rest).toContain('Audit trail');
+    const doc = await PDFDocument.load(output);
+    expect(doc.getTitle()).toBe(
+      'Signing certificate and audit trail: Offer letter for Shubh Kumar',
+    );
+  });
+
+  it('prints the network addresses of the events only when asked', async () => {
+    const withIp = (
+      await certificateText(
+        await certificateWithAuditTrailPdf(data(), { networkAddresses: true }),
+        1,
+      )
+    ).join(' ');
+    const without = (await certificateText(await certificateWithAuditTrailPdf(data()), 1)).join(
+      ' ',
+    );
+    expect(withIp).toContain('IP 203.0.113.7');
+    expect(without).not.toContain('203.0.113.7');
+  });
+
+  it('falls back to the time the signer acted when the signature has no time', async () => {
+    const input = data();
+    delete input.esign!.signedAt;
+    const certificate = (await certificateText(await certificateWithAuditTrailPdf(input), 0)).join(
+      ' ',
+    );
+    expect(certificate).toContain('eSign certificate: RAVI S KUMAR');
+    expect(certificate).not.toContain('Not yet');
   });
 });

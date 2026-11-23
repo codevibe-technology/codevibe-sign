@@ -5,7 +5,7 @@ export type { ParseLimits } from './limits';
 export { renderFields } from './render';
 export { sanitizePdf } from './sanitize';
 export type { RenderOptions } from './render';
-export { appendCertificate, certificatePdf } from './certificate';
+export { appendCertificate, certificatePdf, certificateWithAuditTrailPdf } from './certificate';
 export type {
   CertificateData,
   CertificateEsign,

@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import type { AuditEvent, Envelope, IsoDateTime, Recipient } from '@codevibe_technology/sign-core';
 import { ROLE_LABELS, STATUS_LABELS, actionLabel, actorOf, authLabel } from './certificate-text';
-import { embedFonts } from './fonts';
+import { embedFonts, type FontSet } from './fonts';
 import { drawLockup, lockupWidth } from './lockup';
 import { maskEmail, maskPhone } from './mask';
 import { A4, CONTENT_WIDTH, MARGIN, PageFlow, type Part } from './page-flow';
@@ -70,12 +70,25 @@ export async function auditTrailPdf(
   data: AuditTrailData,
   options: AuditTrailOptions = {},
 ): Promise<Uint8Array> {
-  const { envelope, events, timeZone } = data;
-  if (timeZone) {
-    assertTimeZone(timeZone);
+  if (data.timeZone) {
+    assertTimeZone(data.timeZone);
   }
   const doc = await PDFDocument.create();
   const fonts = await embedFonts(doc, options.font);
+  drawAuditTrail(doc, fonts, data, options);
+  doc.setTitle(`Audit trail: ${data.envelope.title}`);
+  await fonts.finish();
+  return doc.save();
+}
+
+/** Draws the audit trail on new pages at the end of `doc`. */
+export function drawAuditTrail(
+  doc: PDFDocument,
+  fonts: FontSet,
+  data: AuditTrailData,
+  options: Pick<AuditTrailOptions, 'networkAddresses'> = {},
+): void {
+  const { envelope, events, timeZone } = data;
   const names = new Map(envelope.recipients.map((recipient) => [recipient.id, recipient.name]));
 
   const flow = new PageFlow(doc, fonts, 'Audit trail');
@@ -209,7 +222,4 @@ export async function auditTrailPdf(
   );
 
   flow.footers(`Envelope ${envelope.id}`, formatUtc(new Date(data.generatedAt ?? Date.now())));
-  doc.setTitle(`Audit trail: ${envelope.title}`);
-  await fonts.finish();
-  return doc.save();
 }

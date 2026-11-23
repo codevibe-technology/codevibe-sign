@@ -161,8 +161,8 @@ step is available on its own as `sanitizePdf(bytes)`.
   that still does not fit is cut with an ellipsis. `name` falls back to the recipient's
   name and `date_signed` to the recipient's `actedAt`. Dates print as `19 Nov 2026`.
 - `checkbox`: `'true'` or `'false'`; a box is drawn, with a tick when checked.
-- `aadhaar`: no value; a framed box with "Aadhaar eSign", the signer's name and the provider
-  (`esignProvider`) is drawn on the file sent for the Aadhaar eSign.
+- `aadhaar`: no value and nothing is drawn. The field type is kept for envelopes sent while
+  it marked where an Aadhaar eSign signer signs; the eSign provider places that signature.
 
 Boxes that run off the page are trimmed to it.
 
@@ -208,11 +208,23 @@ continues on further pages with its header repeated.
 
 `options`: `font` (as above) and `maxBytes`.
 
+`esign: { recipientId, provider, sandbox?, signerName?, issuer?, signedAt? }` describes the
+Aadhaar eSign of a completed envelope, as read from the signed file: that signer's row names
+the method (`Aadhaar eSign (via Leegality)`), the time of the signature (`signedAt`, from its
+timestamp or signing time) and the subject and issuer of their eSign certificate. Use it with
+`certificateWithAuditTrailPdf`, since nothing can be added to the pages of the signed file.
+
 ### `certificatePdf(data, options?) → Promise<Uint8Array>`
 
 The same certificate as a PDF of its own, without the document: for someone who should see
 who signed and when, but not what was signed. `data` is one `CertificateData` or an array, to
 put the certificates of several documents in one file. `options`: `font`.
+
+### `certificateWithAuditTrailPdf(data, options?) → Promise<Uint8Array>`
+
+The certificate (`CertificateData`) followed by the audit trail of the same envelope, in one
+PDF: what the parties of a document signed with Aadhaar eSign get next to the signed file.
+`options`: `font`, and `networkAddresses` to print the address of each event.
 
 ### `auditTrailPdf(data, options?) → Promise<Uint8Array>`
 
@@ -302,7 +314,7 @@ and is shown as covering the file up to the point where it was made; the operato
 covers the whole file, earlier signatures included. Nothing else can be added this way:
 drawing on a page or appending a certificate page after someone else's signature would make
 readers report that signature as broken. Draw the fields before the file goes to the
-provider, and keep the certificate as a file of its own (`certificatePdf`).
+provider, and keep the certificate as a file of its own (`certificateWithAuditTrailPdf`).
 
 ```ts
 const signedByProvider = await provider.fetchSignedDocument(ref);

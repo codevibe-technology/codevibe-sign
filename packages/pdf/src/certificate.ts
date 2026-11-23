@@ -7,6 +7,7 @@ import {
   type Recipient,
 } from '@codevibe_technology/sign-core';
 import { ROLE_LABELS, STATUS_LABELS, authLabel, shortHash } from './certificate-text';
+import { drawAuditTrail } from './audit-trail';
 import { embedFonts, type FontSet } from './fonts';
 import { loadPdf } from './inspect';
 import { maskEmail, maskPhone } from './mask';
@@ -46,20 +47,25 @@ export interface CertificateData {
    */
   note?: string;
   /**
-   * Draws the certificate for the file an Aadhaar eSign signer is about to sign, so the
-   * provider's signature covers it too: that signer's row says they sign with Aadhaar eSign,
-   * and the time and their certificate are left to the digital signature and the audit trail.
+   * The Aadhaar eSign of a completed envelope, as read from the signed file: that signer's
+   * row shows the name and issuer of their eSign certificate and the time of the signature.
    */
   esign?: CertificateEsign;
 }
 
-/** The Aadhaar eSign still to come on the file the certificate is part of. */
+/** An Aadhaar eSign on the signed document, as its digital signature tells it. */
 export interface CertificateEsign {
   recipientId: string;
   /** The eSign provider, for example "leegality". */
   provider: string;
   /** The provider's test environment: the certificate says the signature has no legal effect. */
   sandbox?: boolean;
+  /** Subject name of the signer's eSign certificate, for example "Prakriti S Iyer". */
+  signerName?: string;
+  /** Who issued that certificate, for example an eSign provider licensed by the CCA. */
+  issuer?: string;
+  /** When the eSign was made: the signature's timestamp, else its signing time. */
+  signedAt?: IsoDateTime;
 }
 
 export interface CertificateOptions {
@@ -86,11 +92,10 @@ const PROVIDED_BY = 'Signing certificate provided by:';
 const SEALED_FILE_LINE =
   'This file is sealed with a digital signature that covers every page, including this one. ' +
   'Any change made after sealing breaks the seal.';
-const ESIGN_FILE_LINE =
-  'This file is signed with Aadhaar eSign and then sealed with a digital signature; both ' +
-  'cover every page, including this one, and any change made afterwards breaks them. The ' +
-  'time of the Aadhaar eSign and the signer certificate are in the digital signature and ' +
-  'in the audit trail.';
+const ESIGN_LINE =
+  'This certificate goes with a document signed with Aadhaar eSign. The signed document ' +
+  'carries the Aadhaar eSign and then a seal, two digital signatures a PDF reader can check; ' +
+  'nothing was added to its pages. This certificate and the audit trail are sealed on their own.';
 const STANDALONE_LINE =
   'This certificate summarises a completed signing. The signed document is sealed with a ' +
   'digital signature, and any change made to it after sealing breaks the seal.';
@@ -194,19 +199,8 @@ function drawCertificate(
   flow.field('Envelope ID', [{ text: envelope.id, style: flow.style('mono') }], summaryWidth);
   const esign = data.esign;
   const esigner = esign && envelope.recipients.find((r) => r.id === esign.recipientId);
-  flow.field(
-    'Status',
-    [
-      {
-        text: esigner
-          ? `Completed by the Aadhaar eSign of ${esigner.name} on this file`
-          : STATUS_LABELS[envelope.status],
-        style: body,
-      },
-    ],
-    summaryWidth,
-  );
-  if (envelope.completedAt && !esigner) {
+  flow.field('Status', [{ text: STATUS_LABELS[envelope.status], style: body }], summaryWidth);
+  if (envelope.completedAt) {
     flow.field('Completed', moment(envelope.completedAt, true), summaryWidth);
   } else if (envelope.sentAt) {
     flow.field('Sent', moment(envelope.sentAt, true), summaryWidth);
@@ -278,11 +272,15 @@ function drawCertificate(
       const declined =
         seen.declinedAt ?? (recipient.status === 'declined' ? recipient.actedAt : undefined);
       let when: Part[];
-      if (esigner && recipient.id === esigner.id) {
+      if (esign && esigner && recipient.id === esigner.id && !declined) {
         when = [
-          { text: 'With the Aadhaar eSign on this file', style: body },
-          { text: 'The time is in the digital signature', style: small },
+          ...(esign.signedAt ? moment(esign.signedAt) : done ? moment(done) : []),
+          ...(esign.signerName
+            ? [{ text: `eSign certificate: ${esign.signerName}`, style: small }]
+            : []),
+          ...(esign.issuer ? [{ text: `Issued by ${esign.issuer}`, style: small }] : []),
         ];
+        if (when.length === 0) when = [{ text: 'Not yet', style: body }];
       } else if (declined) {
         when = [{ text: 'Declined', style: body }, ...moment(declined)];
         if (recipient.declineReason) {
@@ -335,7 +333,7 @@ function drawCertificate(
   flow.gap(1);
   flow.paragraph(document.sha256, flow.style('monoSmall'));
   flow.paragraph('SHA-256 of the document as it was sent for signing.', small);
-  if (auditHead && !esigner) {
+  if (auditHead) {
     flow.gap(3);
     flow.paragraph(
       `Audit trail when sealed: ${events.length} ${events.length === 1 ? 'event' : 'events'}, chain head`,
@@ -373,7 +371,7 @@ export async function appendCertificate(
 ): Promise<Uint8Array> {
   const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
   const fonts = await embedFonts(doc, options.font);
-  drawCertificate(doc, fonts, data, data.esign ? ESIGN_FILE_LINE : SEALED_FILE_LINE);
+  drawCertificate(doc, fonts, data, SEALED_FILE_LINE);
   await fonts.finish();
   return doc.save();
 }
@@ -391,10 +389,42 @@ export async function certificatePdf(
   const doc = await PDFDocument.create();
   const fonts = await embedFonts(doc, options.font);
   for (const item of list) {
-    drawCertificate(doc, fonts, item, STANDALONE_LINE);
+    drawCertificate(doc, fonts, item, item.esign ? ESIGN_LINE : STANDALONE_LINE);
   }
   const title = list[0]?.envelope.title;
   doc.setTitle(title ? `Signing certificate: ${title}` : 'Signing certificate');
+  await fonts.finish();
+  return doc.save();
+}
+
+/**
+ * The certificate followed by the envelope's audit trail, in one PDF: what the parties of a
+ * document signed with Aadhaar eSign get next to it, since nothing can be added to the pages
+ * of the signed file. Network addresses are printed only with `networkAddresses`.
+ */
+export async function certificateWithAuditTrailPdf(
+  data: CertificateData,
+  options: Pick<CertificateOptions, 'font'> & { networkAddresses?: boolean } = {},
+): Promise<Uint8Array> {
+  if (data.timeZone) {
+    assertTimeZone(data.timeZone);
+  }
+  const doc = await PDFDocument.create();
+  const fonts = await embedFonts(doc, options.font);
+  drawCertificate(doc, fonts, data, data.esign ? ESIGN_LINE : STANDALONE_LINE);
+  drawAuditTrail(
+    doc,
+    fonts,
+    {
+      envelope: data.envelope,
+      events: data.events,
+      ...(data.timeZone ? { timeZone: data.timeZone } : {}),
+      ...(data.generatedAt ? { generatedAt: data.generatedAt } : {}),
+      ...(data.recordUrl ? { recordUrl: data.recordUrl } : {}),
+    },
+    options.networkAddresses ? { networkAddresses: true } : {},
+  );
+  doc.setTitle(`Signing certificate and audit trail: ${data.envelope.title}`);
   await fonts.finish();
   return doc.save();
 }

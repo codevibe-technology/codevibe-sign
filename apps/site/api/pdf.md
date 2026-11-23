@@ -131,9 +131,8 @@ step is available on its own as `sanitizePdf(bytes)`.
   that still does not fit is cut with an ellipsis. `name` falls back to the recipient's
   name and `date_signed` to the recipient's `actedAt`. Dates print as `19 Nov 2026`.
 - `checkbox`: `'true'` or `'false'`; a box is drawn, with a tick when checked.
-- `aadhaar`: no value. A framed box with "Aadhaar eSign", the recipient's name and "Signed
-  with Aadhaar OTP via `esignProvider`" is drawn on the file sent to the eSign provider; the
-  digital signature itself is the provider's.
+- `aadhaar`: no value and nothing is drawn. The field type is kept for envelopes sent while
+  it marked where an Aadhaar eSign signer signs; the eSign provider places that signature.
 
 Boxes that run off the page are trimmed to it.
 
@@ -144,7 +143,6 @@ Boxes that run off the page are trimmed to it.
 | `timeZone`      | `UTC`   | IANA zone used to turn a `date_signed` timestamp into a date. |
 | `formatDate`    | none    | `(isoValue) => string` for `date_signed` text.                |
 | `maxImageBytes` | 1 MB    | Largest signature image.                                      |
-| `esignProvider` | none    | Provider an `aadhaar` box names, such as `Leegality`.         |
 | `maxBytes`      | 25 MB   | Largest input PDF.                                            |
 
 Errors: `REQUIRED_FIELDS_MISSING` (`details.fieldIds`), `INVALID_FIELD_VALUE` (bad image,
@@ -180,18 +178,23 @@ continues on further pages with its header repeated.
 
 `options`: `font` (as above) and `maxBytes`.
 
-`esign: { recipientId, provider, sandbox? }` draws the certificate for the file an Aadhaar
-eSign signer is about to sign, so the provider's signature covers it: the status reads
-"Completed by the Aadhaar eSign of ... on this file", that signer's row names the method
-(`Aadhaar eSign (via Leegality)`) and says the time is in the digital signature, the chain
-head is left out, and the closing line says the file is signed with Aadhaar eSign and then
-sealed.
+`esign: { recipientId, provider, sandbox?, signerName?, issuer?, signedAt? }` describes the
+Aadhaar eSign of a completed envelope, as read from the signed file: that signer's row names
+the method (`Aadhaar eSign (via Leegality)`), the time of the signature (`signedAt`, from its
+timestamp or signing time) and the subject and issuer of their eSign certificate. Use it with
+`certificateWithAuditTrailPdf`, since nothing can be added to the pages of the signed file.
 
 ### `certificatePdf(data, options?) → Promise<Uint8Array>`
 
 The same certificate as a PDF of its own, without the document: for someone who should see
 who signed and when, but not what was signed. `data` is one `CertificateData` or an array, to
 put the certificates of several documents in one file. `options`: `font`.
+
+### `certificateWithAuditTrailPdf(data, options?) → Promise<Uint8Array>`
+
+The certificate (`CertificateData`) followed by the audit trail of the same envelope, in one
+PDF: what the parties of a document signed with Aadhaar eSign get next to the signed file.
+`options`: `font`, and `networkAddresses` to print the address of each event.
 
 ### `auditTrailPdf(data, options?) → Promise<Uint8Array>`
 
