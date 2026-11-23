@@ -18,9 +18,19 @@ describe('contentSecurityPolicy', () => {
     expect(policy.get('frame-ancestors')).toEqual(["'none'"]);
     expect(policy.get('form-action')).toEqual(["'self'"]);
     expect(policy.get('connect-src')).toEqual(["'self'"]);
-    for (const source of policy.get('script-src')!) {
-      expect(source).not.toMatch(/^https?:|^\*/);
-    }
+    const foreign = policy.get('script-src')!.filter((source) => /^https?:|^\*/.test(source));
+    expect(foreign).toEqual(['https://checkout.razorpay.com']);
+  });
+
+  it('lets Razorpay Checkout open its payment frame and nothing else', () => {
+    const policy = directives(contentSecurityPolicy({ development: false }));
+    expect(policy.get('frame-src')).toEqual([
+      "'self'",
+      'https://api.razorpay.com',
+      'https://checkout.razorpay.com',
+    ]);
+    expect(policy.get('connect-src')).toEqual(["'self'"]);
+    expect(policy.get('img-src')!.some((source) => source.includes('razorpay'))).toBe(false);
   });
 
   it('takes fonts and styles from the app itself, with no font service', () => {

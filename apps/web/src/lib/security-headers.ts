@@ -3,12 +3,16 @@ export interface HeaderRule {
   headers: { key: string; value: string }[];
 }
 
+const RAZORPAY_CHECKOUT = 'https://checkout.razorpay.com';
+const RAZORPAY_API = 'https://api.razorpay.com';
+
 /**
  * The Content-Security-Policy for every page. Scripts, styles, fonts, images and connections
  * come from the app's own origin only. Next.js starts pages with inline scripts and the UI sets
  * inline styles, so both stay allowed inline; what the policy stops is code or data being
  * loaded from, or sent to, anywhere else, and the app being framed. The docs under `/docs`
- * serve their own fonts too.
+ * serve their own fonts too. Razorpay Checkout is the one outside script: it is loaded when
+ * someone pays and runs its payment form in a frame on Razorpay's own origin.
  */
 export function contentSecurityPolicy({ development }: { development: boolean }): string {
   const directives: [string, string[]][] = [
@@ -20,6 +24,7 @@ export function contentSecurityPolicy({ development }: { development: boolean })
         "'unsafe-inline'",
         "'wasm-unsafe-eval'",
         ...(development ? ["'unsafe-eval'"] : []),
+        RAZORPAY_CHECKOUT,
       ],
     ],
     ['style-src', ["'self'", "'unsafe-inline'"]],
@@ -27,7 +32,7 @@ export function contentSecurityPolicy({ development }: { development: boolean })
     ['font-src', ["'self'", 'data:']],
     ['connect-src', ["'self'"]],
     ['worker-src', ["'self'", 'blob:']],
-    ['frame-src', ["'self'"]],
+    ['frame-src', ["'self'", RAZORPAY_API, RAZORPAY_CHECKOUT]],
     ['object-src', ["'none'"]],
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'"]],
