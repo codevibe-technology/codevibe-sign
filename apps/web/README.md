@@ -106,21 +106,21 @@ Traefik, from [Dockerfile](Dockerfile).
 
 ## Scripts
 
-| Script        | What it does                                                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `dev`         | Next.js in development mode.                                                                                               |
-| `build`       | Production build.                                                                                                          |
-| `start`       | Serves the production build.                                                                                               |
-| `db:migrate`  | Migrates `DATABASE_URL`: the sign server's tables, then the app's.                                                         |
-| `plan:set`    | Moves a workspace to another plan and records the change.                                                                  |
-| `build:docs`  | Builds the docs site and copies it into `docs-dist` for `/docs`.                                                           |
-| `build:ops`   | Bundles `migrate` and `plan:set` into `ops/` for the Docker image.                                                         |
-| `sample:pdf`  | Regenerates the first-run sample agreement PDF.                                                                            |
-| `dev:seal`    | Writes a self-signed seal certificate to `data/dev-seal.p12`.                                                              |
-| `test`        | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.                                              |
-| `smoke`       | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API.                                     |
-| `e2e:signing` | Drives a running app in a browser: the Fields step and the signing page at 1440 and 390 px. Needs `BASE` and `WEB_LOG`.    |
-| `brand:icons` | Draws the favicon, touch icon, 192 and 512 icons and the docs' copies from `apps/site/public/mark.svg`, the one logo file. |
+| Script        | What it does                                                                                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev`         | Next.js in development mode.                                                                                                                                                                                                    |
+| `build`       | Production build.                                                                                                                                                                                                               |
+| `start`       | Serves the production build.                                                                                                                                                                                                    |
+| `db:migrate`  | Migrates `DATABASE_URL`: the sign server's tables, then the app's.                                                                                                                                                              |
+| `plan:set`    | Moves a workspace to another plan and records the change.                                                                                                                                                                       |
+| `build:docs`  | Builds the docs site and copies it into `docs-dist` for `/docs`.                                                                                                                                                                |
+| `build:ops`   | Bundles `migrate` and `plan:set` into `ops/` for the Docker image.                                                                                                                                                              |
+| `sample:pdf`  | Regenerates the first-run sample agreement PDF.                                                                                                                                                                                 |
+| `dev:seal`    | Writes a self-signed seal certificate to `data/dev-seal.p12`.                                                                                                                                                                   |
+| `test`        | Unit and component tests. With `DATABASE_URL` set, also the PostgreSQL suite.                                                                                                                                                   |
+| `smoke`       | Starts the built app against `DATABASE_URL` and walks sign-in, the guards and the API.                                                                                                                                          |
+| `e2e:signing` | Drives a running app in a browser: the Fields step and the signing page at 1440 and 390 px. Needs `BASE` and `WEB_LOG`.                                                                                                         |
+| `brand:icons` | Draws the favicon, touch icon, 192 and 512 icons and the docs' copies from `apps/site/public/mark.svg`, copies the lockups in `apps/site/public/brand` to the app and writes the email logo and the certificate's lockup paths. |
 
 ## Configuration
 

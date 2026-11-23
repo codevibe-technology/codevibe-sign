@@ -1,10 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
-import { BRAND_COLORS, MARK_SVG } from '@/lib/brand-assets';
+import { BRAND_COLORS, BRAND_NAME, LOCKUP } from '@/lib/brand-assets';
 import { HOME_TITLE } from '@/lib/home-seo';
-
-const MARK = `data:image/svg+xml;base64,${Buffer.from(MARK_SVG).toString('base64')}`;
 
 export const shareAlt = HOME_TITLE;
 export const shareSize = { width: 1200, height: 630 };
@@ -16,6 +14,8 @@ export const shareSize = { width: 1200, height: 630 };
 export async function shareImage() {
   const shot = await readFile(join(process.cwd(), 'src/app/share-shot.jpg'));
   const shotUrl = `data:image/jpeg;base64,${shot.toString('base64')}`;
+  const lockup = await readFile(join(process.cwd(), 'public', LOCKUP.white));
+  const lockupUrl = `data:image/svg+xml;base64,${lockup.toString('base64')}`;
   return new ImageResponse(
     (
       <div
@@ -49,10 +49,12 @@ export async function shareImage() {
             width: 620,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-            <img src={MARK} width={56} height={56} />
-            <div style={{ fontSize: 34, fontWeight: 700 }}>Codevibe Sign</div>
-          </div>
+          <img
+            src={lockupUrl}
+            alt={BRAND_NAME}
+            width={Math.round((LOCKUP.width * 52) / LOCKUP.height)}
+            height={52}
+          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
             <div style={{ fontSize: 62, fontWeight: 700, lineHeight: 1.05 }}>
               Send documents for signature in minutes

@@ -1,5 +1,6 @@
-// Draws every icon of the web app and the docs from the one logo file, apps/site/public/mark.svg:
-// `pnpm --filter web brand:icons`. Run it after changing the logo and commit what it writes.
+// Draws every icon of the web app and the docs from the one mark file, apps/site/public/mark.svg,
+// and copies the lockups in apps/site/public/brand to the app, the email PNG and the PDF
+// certificate: `pnpm --filter web brand:icons`. Run it after changing either and commit the output.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,12 +96,6 @@ write(path('../../site/public/apple-touch-icon.png'), apple);
 write(path('../../site/public/icon-192.png'), icon192);
 write(path('../../site/public/icon-512.png'), icon512);
 write(path('../../site/public/site.webmanifest'), manifest('/docs/'));
-
-const module = path('../src/lib/brand-assets.ts');
-const text = readFileSync(module, 'utf8');
-const mark = source.toString('utf8').trim();
-if (mark.includes("'")) throw new Error('mark.svg must not contain single quotes');
-write(module, text.replace(/(export const MARK_SVG =\n {2}')[^']*(';)/, `$1${mark}$2`));
 
 // The lockup: mark and outlined "codevibe sign", drawn on codevibe.in's logo grid. The four
 // colourways live next to the mark in apps/site/public/brand; the app serves the same files.
