@@ -111,10 +111,10 @@ export function AadhaarSection({ pricing }: { pricing: PricingView }) {
     <section
       id="aadhaar"
       aria-labelledby="aadhaar-title"
-      className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-24 lg:px-8"
+      className="scroll-mt-20 px-4 py-12 sm:px-6 sm:py-14 lg:px-8"
     >
       <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[linear-gradient(125deg,#0B47A8_0%,#1B6AE0_55%,#0F7C8E_100%)] text-white">
-        <div className="grid gap-14 px-6 py-14 sm:px-10 sm:py-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16 lg:px-16">
+        <div className="grid gap-10 px-6 py-10 sm:px-10 sm:py-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-12 lg:px-14">
           <div {...reveal()}>
             <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-sm font-semibold ring-1 ring-white/25">
               <Fingerprint aria-hidden className="h-4 w-4" />
@@ -122,7 +122,7 @@ export function AadhaarSection({ pricing }: { pricing: PricingView }) {
             </p>
             <h2
               id="aadhaar-title"
-              className="mt-5 text-[clamp(2rem,1.4rem+2vw,3rem)] leading-[1.08] font-bold"
+              className="mt-4 text-[clamp(1.75rem,1.3rem+1.6vw,2.5rem)] leading-[1.08] font-bold"
             >
               Legally valid Aadhaar e-signatures, built in
             </h2>
@@ -131,9 +131,9 @@ export function AadhaarSection({ pricing }: { pricing: PricingView }) {
               Aadhaar eSign. The signer confirms with a one-time code, no paper and no dongle, and
               you get back one PDF that carries it all.
             </p>
-            <ol className="mt-8 grid gap-4 sm:grid-cols-3">
+            <ol className="mt-6 grid gap-3 sm:grid-cols-3">
               {STEPS.map((step, i) => (
-                <li key={step.title} className="rounded-xl bg-white/10 p-4 ring-1 ring-white/20">
+                <li key={step.title} className="rounded-xl bg-white/10 p-3.5 ring-1 ring-white/20">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white font-display text-sm font-bold text-[#0B47A8]">
                     {i + 1}
                   </span>
@@ -142,7 +142,7 @@ export function AadhaarSection({ pricing }: { pricing: PricingView }) {
                 </li>
               ))}
             </ol>
-            <div className="mt-8 grid gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="mt-6 grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <div>
                 <p className="text-sm font-semibold text-white/90">Price of one eSign</p>
                 <dl className="mt-2 grid grid-cols-2 gap-3">
@@ -161,7 +161,7 @@ export function AadhaarSection({ pricing }: { pricing: PricingView }) {
             </div>
             <a
               href={AADHAAR_GUIDE}
-              className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#0B47A8] hover:bg-white/90"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#0B47A8] hover:bg-white/90"
             >
               How Aadhaar eSign works
               <ArrowRight aria-hidden className="h-4 w-4" />

@@ -655,7 +655,7 @@ export function Landing({
         <section
           id="features"
           aria-labelledby="features-title"
-          className="scroll-mt-20 bg-[#F6F8FC] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+          className="scroll-mt-20 bg-[#F6F8FC] px-4 py-16 sm:px-6 sm:py-20 lg:px-8"
         >
           <SectionHead
             id="features-title"
@@ -846,7 +846,7 @@ docker compose up -d`}</code>
         <section
           id="faq"
           aria-labelledby="faq-title"
-          className="scroll-mt-20 bg-[#F6F8FC] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+          className="scroll-mt-20 bg-[#F6F8FC] px-4 py-16 sm:px-6 sm:py-20 lg:px-8"
         >
           <SectionHead
             id="faq-title"
