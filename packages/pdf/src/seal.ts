@@ -52,7 +52,7 @@ export interface SealOptions {
   certify?: boolean;
 }
 
-const DEFAULT_REASON = 'Sealed to show the document has not changed since signing';
+export const DEFAULT_REASON = 'Sealed to show the document has not changed since signing';
 const MIN_SIGNATURE_BYTES = 8192;
 /** Room for a timestamp token: the authority's signed TSTInfo plus its certificate chain. */
 const TIMESTAMP_BYTES = 16384;
@@ -68,12 +68,12 @@ class CadesSigner extends Signer {
 }
 
 /** Room for the CMS structure: the certificate chain plus signature, attributes and slack. */
-function placeholderSize(chainDer: string[], timestamped: boolean): number {
+export function placeholderSize(chainDer: string[], timestamped: boolean): number {
   const chainBytes = chainDer.reduce((total, der) => total + der.length, 0);
   return Math.max(MIN_SIGNATURE_BYTES, chainBytes + 4096) + (timestamped ? TIMESTAMP_BYTES : 0);
 }
 
-function parseCertificate(binary: string): forge.pki.Certificate {
+export function parseCertificate(binary: string): forge.pki.Certificate {
   try {
     return forge.pki.certificateFromAsn1(forge.asn1.fromDer(binary));
   } catch {
@@ -83,7 +83,7 @@ function parseCertificate(binary: string): forge.pki.Certificate {
   }
 }
 
-function provider(options: SealOptions): SealProvider {
+export function sealProvider(options: SealOptions): SealProvider {
   if (options.signer) return options.signer;
   if (!options.p12) {
     throw new SignError('SEAL_FAILED', 'seal() needs a p12 file or a signer.', {
@@ -94,7 +94,7 @@ function provider(options: SealOptions): SealProvider {
 }
 
 /** Asks for a timestamp over the signature value, failing closed unless it is optional. */
-function timestamper(options: SealOptions) {
+export function timestamper(options: SealOptions) {
   const url = options.tsaUrl?.trim();
   if (!url) return undefined;
   const required = options.tsaRequired ?? true;
@@ -123,11 +123,11 @@ function timestamper(options: SealOptions) {
  * signature, certifies it with DocMDP (no changes allowed); any later change makes the seal
  * invalid. Refuses RSA keys under 2048 bits, certificates signed with anything weaker than
  * SHA-256, certificates not valid at the signing time or not meant for document signing, and
- * files that already carry signatures (`PDF_ALREADY_SIGNED`).
+ * files that already carry signatures (`PDF_ALREADY_SIGNED`; use `countersign()` for those).
  */
 export async function seal(pdfBytes: Uint8Array, options: SealOptions): Promise<Uint8Array> {
   const signingTime = options.signingTime ?? new Date();
-  const signer = provider(options);
+  const signer = sealProvider(options);
   const chainDer = (await signer.certificateChain()).map((der) =>
     Buffer.from(der).toString('binary'),
   );
@@ -136,8 +136,8 @@ export async function seal(pdfBytes: Uint8Array, options: SealOptions): Promise<
 
   const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
   // Sealing writes the whole file again, which would destroy existing signatures (an Aadhaar
-  // eSign from an ESP, for example). Sealing after them needs an incremental update appended
-  // after the signed bytes; until that exists, such a file is refused here.
+  // eSign from an ESP, for example). `countersign()` seals such a file with an incremental
+  // update instead, so it is refused here.
   const existing = signatureFieldsOf(doc).length;
   if (existing > 0) {
     throw new SignError(
