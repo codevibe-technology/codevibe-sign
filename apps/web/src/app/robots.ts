@@ -21,7 +21,6 @@ export default function robots(): MetadataRoute.Robots {
         '/onboarding',
         '/brand/',
         '/r/',
-        '/preview/',
       ],
     },
     sitemap: [`${appUrl}/sitemap.xml`, `${appUrl}/docs/sitemap.xml`],
