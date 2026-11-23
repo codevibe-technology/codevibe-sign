@@ -19,7 +19,7 @@ jobs:
       id-token: write # npm trusted publishing (OIDC) and provenance
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       # No dependency cache here: a release never restores files an earlier run saved.
       - uses: actions/setup-node@v7
         with:
@@ -30,7 +30,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm check:types
-      - uses: changesets/action@v1
+      - uses: changesets/action@v2
         with:
           version: pnpm version-packages
           publish: pnpm release
