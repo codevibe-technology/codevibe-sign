@@ -114,6 +114,16 @@ describe('auditTrailPdf', () => {
     );
     expect(text).toContain('IP 203.0.113.7');
     expect(text).toContain('IP 203.0.113.9');
+    const unknown = await allText(
+      await auditTrailPdf(
+        {
+          envelope: envelope(),
+          events: [event(1, 'recipient.viewed', { context: { ip: 'unknown' } })],
+        },
+        { networkAddresses: true },
+      ),
+    );
+    expect(unknown.join(' ')).not.toContain('IP unknown');
     expect(text.join('\n')).not.toContain('Mozilla');
   });
 

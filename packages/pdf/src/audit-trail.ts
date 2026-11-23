@@ -190,7 +190,9 @@ export async function auditTrailPdf(
     ],
     events.map((event) => {
       const method = methodOf(event, envelope);
-      const ip = options.networkAddresses ? event.context?.ip : undefined;
+      // A server that cannot see the client's address records "unknown"; nothing to print.
+      const recorded = event.context?.ip;
+      const ip = options.networkAddresses && recorded !== 'unknown' ? recorded : undefined;
       return [
         [{ text: String(event.seq), style: body }],
         when(event.at),
