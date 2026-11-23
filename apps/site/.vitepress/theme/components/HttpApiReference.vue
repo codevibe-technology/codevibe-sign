@@ -36,6 +36,16 @@ const customCss = `
 .scalar-app .sidebar-search-placeholder {
   color: var(--vp-c-text-2);
 }
+/* The contact and licence links show only an icon; keep their names for screen readers. */
+.scalar-app .icons-only a > span {
+  display: inline;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .dark .scalar-app {
   --scalar-color-green: var(--cv-teal);
   --scalar-color-blue: #6ea3f5;
