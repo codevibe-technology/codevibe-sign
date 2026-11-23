@@ -18,7 +18,7 @@ export default async function PrivacyPage() {
     <LegalPage
       viewer={await siteViewer()}
       title="Privacy"
-      updated="20 November 2026"
+      updated="23 November 2026"
       intro={
         <p>
           Codevibe Technology runs the Codevibe Sign cloud at sign.codevibe.in. This page says what
@@ -52,6 +52,16 @@ export default async function PrivacyPage() {
           <li>
             <strong>Usage counts</strong> for your plan, and a 30-day log of webhook deliveries.
           </li>
+          <li>
+            <strong>Billing:</strong> if you pay for something, the billing name, address, GSTIN and
+            email you give us, your orders, invoices and Aadhaar eSign credits, and the payment
+            reference from Razorpay. We never receive or store card, UPI or bank details.
+          </li>
+          <li>
+            <strong>Aadhaar eSign:</strong> the signer&apos;s name and the details of the signing
+            certificate as the eSign provider returns them. We never receive or store an Aadhaar
+            number. If you connect your own Leegality account, its credentials are stored encrypted.
+          </li>
         </ul>
       </LegalSection>
       <LegalSection title="Why we store it">
@@ -67,6 +77,15 @@ export default async function PrivacyPage() {
           <li>Members of your workspace see what their role allows.</li>
           <li>
             Our hosting and email delivery providers process data only to run the service for us.
+          </li>
+          <li>
+            Razorpay takes payments for us. It receives the amount, your billing name and email, and
+            whatever you enter on its payment page.
+          </li>
+          <li>
+            Leegality runs Aadhaar eSign. When a signer is asked to sign that way, Leegality
+            receives the document and the signer&apos;s name and email address or mobile number, and
+            the signer gives their Aadhaar details to Leegality directly.
           </li>
         </ul>
         <p>
@@ -85,7 +104,7 @@ export default async function PrivacyPage() {
           We keep workspace data, documents and their audit trails while the workspace exists,
           because a signed document is only useful with its record. Webhook delivery logs are kept
           for 30 days. Ask us to delete a workspace or your account and we will remove it, except
-          where the law requires us to keep something.
+          where the law requires us to keep something, such as invoices and payment records.
         </p>
       </LegalSection>
       <LegalSection title="Your choices">

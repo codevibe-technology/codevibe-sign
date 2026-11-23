@@ -19,7 +19,7 @@ export default async function TermsPage() {
     <LegalPage
       viewer={await siteViewer()}
       title="Terms"
-      updated="20 November 2026"
+      updated="23 November 2026"
       intro={
         <p>
           These terms cover the Codevibe Sign cloud at sign.codevibe.in, run by Codevibe Technology.
@@ -63,6 +63,27 @@ export default async function TermsPage() {
           electronic signature suits a particular document is your decision; some documents need
           Aadhaar eSign, a wet signature or registration under Indian law.
         </p>
+      </LegalSection>
+      <LegalSection title="Paid plans and credits">
+        <p>
+          Prices are shown before you pay and do not include GST, which is added at the rate in
+          force. Every payment gets a GST tax invoice. Payments are taken by Razorpay.
+        </p>
+        <ul>
+          <li>
+            The Cloud plan is paid for a term in advance. It is not renewed or charged
+            automatically. You can cancel at any time; the plan stays on until the end of the term
+            paid for, and that term is not refunded.
+          </li>
+          <li>
+            Aadhaar eSign credits are used one for each completed eSign. An eSign that is declined,
+            fails or is not finished in time uses no credit.
+          </li>
+          <li>
+            Aadhaar eSign is carried out by a licensed eSign provider. Its availability depends on
+            that provider and on the Aadhaar system.
+          </li>
+        </ul>
       </LegalSection>
       <LegalSection title="Availability and liability">
         <p>
