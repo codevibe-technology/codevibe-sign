@@ -8,10 +8,14 @@
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
-    "preview": "vitepress preview"
+    "preview": "vitepress preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
-    "@scalar/api-reference": "1.76.4",
+    "@types/node": "22.19.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "vitepress": "1.6.4"
   }
 }

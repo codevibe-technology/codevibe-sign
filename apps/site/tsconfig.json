@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "declaration": false,
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  "include": [
+    ".vitepress/theme/search.test.ts",
+    ".vitepress/api",
+    ".vitepress/markdown.ts",
+    ".vitepress/site.ts",
+    ".vitepress/theme/search.ts",
+    ".vitepress/theme/enhance.ts",
+    "vitest.config.ts"
+  ]
+}

@@ -2,6 +2,9 @@
 // the sitemap and robots.txt all read it.
 export const SITE_URL = 'https://sign.codevibe.in';
 
+/** The docs are served by the web app under this path. */
+export const DOCS_BASE = '/docs/';
+
 export const SITE_NAME = 'Codevibe Sign';
 export const SITE_DESCRIPTION =
   'Open-source e-signatures you run yourself: send documents, sign in order, seal the PDF and verify it offline.';

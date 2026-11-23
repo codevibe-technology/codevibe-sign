@@ -12,3 +12,6 @@ apps/web/docs-dist/
 apps/web/ops/
 # Fillable templates keep their blank lines (____) as typed.
 apps/site/public/*.md
+# Generated from the OpenAPI document by `pnpm docs:api`.
+apps/site/http-api/reference/
+apps/site/http-api/errors.md

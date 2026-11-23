@@ -20,7 +20,8 @@
     "e2e": "node scripts/e2e.mjs",
     "check:snippets": "node scripts/check-snippets.mjs",
     "check:types": "node scripts/check-types.mjs",
-    "openapi": "node scripts/openapi.mjs"
+    "openapi": "node scripts/openapi.mjs",
+    "docs:api": "node --disable-warning=ExperimentalWarning scripts/api-docs.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
