@@ -1,81 +1,31 @@
-import {
-  ArrowRight,
-  BadgeCheck,
-  Check,
-  Clock3,
-  FileCode2,
-  KeyRound,
-  Link2,
-  ListOrdered,
-  Mail,
-  Palette,
-  ShieldCheck,
-  UserRoundPen,
-  UsersRound,
-  Webhook,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowRight, Check, Mail, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { formatBytes, type PlanLimits } from '@/lib/plans';
 import { APP_HOME } from '@/lib/safe-next';
-import { Clip, type ClipSpec } from './clip';
+import { Clip } from './clip';
 import { CLIPS } from './clips';
-import { CONTACT_EMAIL, DOCS_URL, GITHUB_URL, SELF_HOST_DOCS, VERIFY_URL } from './links';
+import { ExternalLink } from './external-link';
+import {
+  CONTACT_EMAIL,
+  DOCS_URL,
+  EVIDENCE_GUIDE,
+  GITHUB_URL,
+  SELF_HOST_DOCS,
+  VERIFY_URL,
+} from './links';
+import { SAMPLE_TRAIL, shortHash } from './sample-trail';
+import { ScrollStory, type StoryStep } from './scroll-story';
 import { SiteFooter } from './site-footer';
 import { SiteHeader, type SiteViewer } from './site-header';
+import { SmoothAnchors } from './smooth-anchors';
 
-/** Only what the product does today: every line here can be checked in the code. */
-const TRUST: { icon: LucideIcon; title: string; text: string }[] = [
-  {
-    icon: ShieldCheck,
-    title: 'PAdES seal',
-    text: 'On every completed PDF. Any later change breaks it.',
-  },
-  {
-    icon: Link2,
-    title: 'Hash-chained audit trail',
-    text: 'Each step carries a SHA-256 hash of the one before.',
-  },
-  {
-    icon: KeyRound,
-    title: 'One-time email codes',
-    text: 'The document opens only after the signer types the code.',
-  },
-  {
-    icon: BadgeCheck,
-    title: 'Public verify page',
-    text: 'Anyone can check a signed PDF, no account needed.',
-  },
-  {
-    icon: Webhook,
-    title: 'Signed webhooks',
-    text: 'HMAC-SHA256 on every delivery, with a delivery log.',
-  },
-  {
-    icon: FileCode2,
-    title: 'Open source',
-    text: 'Libraries under Apache-2.0, the app under AGPL-3.0.',
-  },
-];
-
-interface Feature {
-  id: string;
-  eyebrow: string;
-  title: string;
-  text: string;
-  points: string[];
-  clip: ClipSpec;
-  /** The phone recording sits in a phone frame; the rest in a browser window. */
-  phone?: boolean;
-}
-
-const FEATURES: Feature[] = [
+const STEPS: StoryStep[] = [
   {
     id: 'send',
-    eyebrow: 'Send',
+    name: 'Send',
     title: 'Send a document in a minute',
     text: 'Upload a PDF, add who signs, drag signature and date boxes onto the page, and send. The draft saves as you go.',
     points: [
@@ -87,7 +37,7 @@ const FEATURES: Feature[] = [
   },
   {
     id: 'sign',
-    eyebrow: 'Sign',
+    name: 'Sign',
     title: 'Signing that works on any phone',
     text: 'The signer opens the link from their email, types the one-time code we send them and signs with a finger. No account and no app.',
     points: [
@@ -100,7 +50,7 @@ const FEATURES: Feature[] = [
   },
   {
     id: 'seal',
-    eyebrow: 'Seal',
+    name: 'Seal',
     title: 'A sealed PDF with its certificate',
     text: 'When the last person signs, the PDF gets a PAdES seal and a certificate page: who signed, when, from which IP address and device, and a SHA-256 fingerprint of every file.',
     points: [
@@ -112,7 +62,7 @@ const FEATURES: Feature[] = [
   },
   {
     id: 'audit',
-    eyebrow: 'Track',
+    name: 'Track',
     title: 'An audit trail nobody can quietly edit',
     text: 'Every step, from draft to sealed, is recorded with a hash of the step before it. The envelope page checks the chain and shows the whole history live.',
     points: [
@@ -124,7 +74,7 @@ const FEATURES: Feature[] = [
   },
   {
     id: 'verify',
-    eyebrow: 'Verify',
+    name: 'Verify',
     title: 'Anyone can check a signed PDF',
     text: 'Drop a signed PDF on the public verify page. It shows whether the seal is intact, who signed and when, and whether the audit trail is complete.',
     points: [
@@ -136,7 +86,7 @@ const FEATURES: Feature[] = [
   },
   {
     id: 'templates',
-    eyebrow: 'Scale',
+    name: 'Scale',
     title: 'Templates and bulk send',
     text: 'Keep the documents you send often with roles and fields in place. Then send one to a whole list from a CSV file: every row is checked before anything goes out.',
     points: [
@@ -148,34 +98,28 @@ const FEATURES: Feature[] = [
   },
 ];
 
-const MORE: { icon: LucideIcon; title: string; text: string }[] = [
+const MORE: { title: string; text: string }[] = [
   {
-    icon: ListOrdered,
     title: 'Signing order',
     text: 'One after another or all at once, with reminders that go out on their own.',
   },
   {
-    icon: UserRoundPen,
     title: 'Fix after sending',
     text: 'Correct a mistyped email, resend a link, or recall the envelope to edit it.',
   },
   {
-    icon: Palette,
     title: 'Your brand and words',
     text: 'Logo, colour and font on the signing page, and your own text in every email.',
   },
   {
-    icon: Clock3,
     title: 'Time zones',
     text: 'Each workspace picks its zone; every date on screen and on paper names it.',
   },
   {
-    icon: UsersRound,
     title: 'Team workspaces',
     text: 'Invite people by email and give each the role they need.',
   },
   {
-    icon: Mail,
     title: 'Email log',
     text: 'See every message sent from the workspace, and to whom.',
   },
@@ -299,132 +243,170 @@ function planLines(limits: PlanLimits): string[] {
   ];
 }
 
-/** The Codevibe section label: a mono eyebrow with a short teal rule. */
-function Eyebrow({ children, onDark = false }: { children: ReactNode; onDark?: boolean }) {
-  return (
-    <p
-      className={cn(
-        'flex items-center gap-2.5 font-mono text-xs font-medium tracking-[0.12em] uppercase',
-        onDark ? 'text-white/75' : 'text-muted',
-      )}
-    >
-      <span aria-hidden className="h-px w-6 bg-accent" />
-      {children}
-    </p>
-  );
-}
-
-function Section({
-  id,
-  eyebrow,
-  title,
-  intro,
-  children,
-  className,
-}: {
-  id: string;
-  eyebrow: string;
-  title: string;
-  intro?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      id={id}
-      aria-labelledby={`${id}-title`}
-      className={cn('scroll-mt-16 px-4 py-16 sm:px-6 sm:py-24', className)}
-    >
-      <div className="mx-auto max-w-6xl">
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <h2 id={`${id}-title`} className="mt-3 max-w-2xl text-3xl font-bold sm:text-4xl">
-          {title}
-        </h2>
-        {intro ? <p className="mt-3 max-w-2xl text-lg text-muted">{intro}</p> : null}
-        <div className="mt-10 sm:mt-12">{children}</div>
-      </div>
-    </section>
-  );
-}
-
-/** A browser window around a desktop clip, so it reads as the product and not as a picture. */
-function BrowserFrame({
-  clip,
-  describedBy,
-  eager,
-  className,
-}: {
-  clip: ClipSpec;
-  describedBy?: string;
-  eager?: boolean;
-  className?: string;
-}) {
+/** A sheet of paper: the frame for the app's own screens on this page. */
+function Sheet({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-line bg-surface shadow-[0_24px_60px_-20px_rgb(13_27_42/0.35)]',
+        'overflow-hidden rounded-[3px] bg-surface shadow-[0_1px_0_rgb(13_27_42/0.04),0_24px_48px_-24px_rgb(13_27_42/0.45)] ring-1 ring-line',
         className,
       )}
     >
-      <div
-        aria-hidden
-        className="flex h-8 items-center gap-1.5 border-b border-line bg-surface-2 px-3"
-      >
-        <span className="h-2.5 w-2.5 rounded-full bg-[#F26B5B]" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[#F5BE4F]" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[#4CC38A]" />
-      </div>
-      <Clip clip={clip} describedBy={describedBy} eager={eager} />
+      {children}
     </div>
   );
 }
 
-function PhoneFrame({ clip, describedBy }: { clip: ClipSpec; describedBy?: string }) {
+/**
+ * A signature in the app's blue ink, written once across the edge of the sealed copy, the way
+ * people sign across an envelope's flap so that opening it shows.
+ */
+function InkSignature({ className }: { className?: string }) {
   return (
-    <div className="mx-auto w-full max-w-[280px] rounded-[2.4rem] bg-[#0D1B2A] p-2.5 shadow-[0_24px_60px_-20px_rgb(13_27_42/0.5)]">
-      <div className="overflow-hidden rounded-[1.9rem]">
-        <Clip clip={clip} describedBy={describedBy} />
-      </div>
-    </div>
-  );
-}
-
-function FeatureRow({ feature, index }: { feature: Feature; index: number }) {
-  const flip = index % 2 === 1;
-  return (
-    <li
-      id={feature.id}
-      className="grid scroll-mt-20 grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-14"
+    <svg
+      aria-hidden
+      viewBox="0 0 240 90"
+      fill="none"
+      className={cn('text-primary', className)}
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <div className={cn('lg:col-span-5', flip && 'lg:order-2')}>
-        <p className="font-mono text-xs font-medium tracking-[0.12em] text-primary uppercase">
-          {String(index + 1).padStart(2, '0')} · {feature.eyebrow}
-        </p>
-        <h3 id={`${feature.id}-title`} className="mt-3 text-2xl font-bold sm:text-3xl">
-          {feature.title}
-        </h3>
-        <p id={`${feature.id}-text`} className="mt-3 text-lg text-muted">
-          {feature.text}
-        </p>
-        <ul className="mt-5 space-y-2.5">
-          {feature.points.map((point) => (
-            <li key={point} className="flex gap-2.5">
-              <Check aria-hidden className="mt-1 h-4 w-4 shrink-0 text-success" />
-              {point}
+      <path
+        pathLength={1}
+        className="ink-stroke"
+        stroke="currentColor"
+        strokeWidth={2.4}
+        d="M14 64 C18 42 22 22 31 17 C41 12 47 26 37 35 C31 41 22 43 28 46 C36 50 44 62 53 67 M59 58 C63 50 67 44 71 50 C73 54 72 62 75 60 C79 52 83 46 87 52 C89 56 88 62 92 60 C97 54 101 44 105 50 C107 54 105 60 111 58 C119 55 121 46 117 46 C111 46 111 58 121 60 C129 62 135 50 139 34 C141 26 141 22 139 30 C135 46 135 60 141 60 C147 60 151 48 157 48 C163 48 159 60 167 58 C175 56 177 48 181 50 C187 52 183 60 191 60 C197 60 201 54 206 51"
+      />
+      <path
+        pathLength={1}
+        className="ink-stroke ink-stroke-late"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        d="M22 77 C78 72 146 67 228 57"
+      />
+    </svg>
+  );
+}
+
+/** The slip a sealed copy carries: what the certificate page says, in brief. */
+function SealSlip() {
+  const last = SAMPLE_TRAIL.at(-1)!;
+  return (
+    <div
+      aria-hidden
+      className="relative bg-[#0D1B2A] px-4 py-3.5 font-mono text-[11px] leading-5 text-white/75 shadow-[0_16px_32px_-16px_rgb(13_27_42/0.6)] sm:px-5"
+    >
+      <p className="flex items-center justify-between gap-4 font-sans text-[13px] font-semibold text-white">
+        <span className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-accent" />
+          Seal intact
+        </span>
+        <span className="font-mono text-[11px] font-medium text-accent">PAdES</span>
+      </p>
+      <p className="mt-1.5">
+        SHA-256 <span className="text-white">{shortHash(last.hash)}</span>
+      </p>
+      <p>Signed 23 Nov 2026, {last.at.slice(0, 5)} IST</p>
+    </div>
+  );
+}
+
+function AuditSheet() {
+  return (
+    <figure className="min-w-0">
+      <Sheet>
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
+          <p className="truncate text-sm font-semibold">Design services agreement</p>
+          <p className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-success">
+            <Check aria-hidden className="h-3.5 w-3.5" />
+            Chain intact
+          </p>
+        </div>
+        <ol className="px-5 py-2">
+          {SAMPLE_TRAIL.map((entry, i) => (
+            <li
+              key={entry.action}
+              className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-x-4"
+            >
+              <time className="pt-[1.1rem] font-mono text-[11px] text-muted tabular-nums sm:text-xs">
+                {entry.at}
+              </time>
+              <div className="relative min-w-0 py-3.5 pl-5">
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute top-0 bottom-0 left-0 w-px bg-line-strong',
+                    i === 0 && 'top-[1.35rem]',
+                    i === SAMPLE_TRAIL.length - 1 && 'bottom-auto h-[1.35rem]',
+                  )}
+                />
+                <span
+                  aria-hidden
+                  className="absolute top-[1.1rem] -left-[3px] h-[7px] w-[7px] rotate-45 bg-ink"
+                />
+                <p className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-semibold">{entry.title}</span>
+                  <code className="font-mono text-[11px] text-muted">{entry.action}</code>
+                </p>
+                <p className="mt-0.5 text-sm text-muted">{entry.detail}</p>
+                <p className="mt-1.5 truncate font-mono text-[11px] leading-4 text-muted">
+                  <span className="text-ink">{shortHash(entry.hash)}</span>
+                  {entry.prev ? (
+                    <> &nbsp;covers {shortHash(entry.prev)}</>
+                  ) : (
+                    <> &nbsp;first entry</>
+                  )}
+                </p>
+              </div>
             </li>
           ))}
-        </ul>
-      </div>
-      <div className={cn('min-w-0 lg:col-span-7', flip && 'lg:order-1')}>
-        {feature.phone ? (
-          <div className="rounded-2xl bg-gradient-to-br from-primary-soft via-surface to-accent-soft px-6 py-8 sm:py-10">
-            <PhoneFrame clip={feature.clip} describedBy={`${feature.id}-text`} />
-          </div>
-        ) : (
-          <BrowserFrame clip={feature.clip} describedBy={`${feature.id}-text`} />
-        )}
-      </div>
-    </li>
+        </ol>
+        <div className="border-t border-dashed border-line-strong bg-surface-2/60 px-5 py-3.5 text-sm">
+          <span className="font-semibold">And at any time later,</span>{' '}
+          <span className="text-muted">
+            anyone can drop the PDF on the verify page and see the seal intact and the trail
+            complete.
+          </span>
+        </div>
+      </Sheet>
+      <figcaption className="mt-3 text-sm text-muted">
+        An example trail with made-up people. The hashes are real SHA-256 hashes of it.
+      </figcaption>
+    </figure>
+  );
+}
+
+function PlanColumn({
+  name,
+  price,
+  note,
+  lines,
+  action,
+  first,
+}: {
+  name: string;
+  price: string;
+  note: string;
+  lines: string[];
+  action: ReactNode;
+  first?: boolean;
+}) {
+  return (
+    <div className={cn('flex flex-col p-6 sm:p-8', first && 'bg-surface')}>
+      <h3 className="text-lg font-semibold">{name}</h3>
+      <p className="mt-3 font-display text-4xl font-bold tracking-tight">{price}</p>
+      <p className="mt-2 text-muted">{note}</p>
+      <ul className="mt-6 flex-1 space-y-2.5 border-t border-line pt-5 text-sm">
+        {lines.map((line) => (
+          <li key={line} className="flex gap-2">
+            <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+            {line}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-8">{action}</div>
+    </div>
   );
 }
 
@@ -442,36 +424,27 @@ export function Landing({
     ? { href: APP_HOME, label: 'Go to dashboard' }
     : { href: '/sign-in', label: 'Start free' };
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
+    <div className="marketing flex min-h-dvh flex-col bg-canvas">
+      <SmoothAnchors />
       <SiteHeader viewer={viewer} />
       <main id="main" className="flex-1">
         <section
           aria-labelledby="hero-title"
-          className="relative overflow-hidden bg-header px-4 pt-14 pb-16 text-header-ink sm:px-6 sm:pt-20 sm:pb-24"
+          className="overflow-hidden px-4 pt-12 pb-20 sm:px-6 sm:pt-20 sm:pb-28"
         >
-          <div
-            aria-hidden
-            className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:48px_48px]"
-          />
-          <div
-            aria-hidden
-            className="absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-accent/20 blur-3xl"
-          />
-          <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-[1fr_1.15fr] lg:gap-14">
-            <div>
-              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm font-medium text-white/85">
-                <span className="h-2 w-2 rounded-full bg-accent" />
-                Open-source e-signatures
-              </p>
-              <h1
-                id="hero-title"
-                className="mt-5 text-4xl leading-[1.06] font-bold text-white sm:text-5xl lg:text-[3.5rem]"
-              >
-                Send documents for signature in minutes
-              </h1>
-              <p className="mt-5 max-w-xl text-lg text-white/80">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)]">
+            <h1
+              id="hero-title"
+              className="text-[clamp(2.9rem,8.6vw,6rem)] leading-[0.94] font-bold tracking-[-0.035em] lg:col-span-2"
+            >
+              Get it signed. <br />
+              <span className="text-primary">Keep the proof.</span>
+            </h1>
+            <div className="lg:pt-2">
+              <p className=" max-w-[34rem] text-lg text-muted">
                 Upload a PDF, place the fields and send. People sign on any phone or laptop, and you
-                get back a sealed PDF with a certificate anyone can check.
+                get back a sealed PDF with a certificate page that anyone can check, no account
+                needed.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button asChild className="h-12 px-6 text-base">
@@ -479,24 +452,20 @@ export function Landing({
                     {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="h-12 border border-white/25 px-6 text-base text-white hover:bg-white/10"
-                >
-                  <a href={GITHUB_URL} target="_blank" rel="noopener">
+                <Button asChild variant="secondary" className="h-12 px-6 text-base">
+                  <ExternalLink href={GITHUB_URL} bare>
                     Self-host it
-                  </a>
+                  </ExternalLink>
                 </Button>
               </div>
-              <p className="mt-4 text-sm text-white/70">
+              <p className="mt-5 text-sm text-muted">
                 Start on the Free plan, no card needed. Or self-host it, free and unlimited.
               </p>
-              <p className="mt-2 text-sm text-white/70">
+              <p className="mt-1 text-sm text-muted">
                 Received a signed PDF?{' '}
                 <Link
                   href={VERIFY_URL}
-                  className="font-semibold text-white underline underline-offset-2 hover:no-underline"
+                  className="font-semibold text-primary underline underline-offset-2 hover:no-underline"
                 >
                   Check it here
                 </Link>
@@ -504,98 +473,130 @@ export function Landing({
               </p>
             </div>
             <figure className="min-w-0">
-              <BrowserFrame
-                clip={CLIPS.hero}
-                describedBy="hero-clip-text"
-                eager
-                className="border-white/10"
-              />
-              <figcaption id="hero-clip-text" className="mt-3 text-sm text-white/70">
-                The real app: fields placed on a PDF, the sealed copy, and the public seal check.
+              <div className="relative pr-2 pb-2 sm:pr-3">
+                <div
+                  aria-hidden
+                  className="absolute inset-0 top-3 left-3 rotate-[1.4deg] rounded-[3px] bg-surface ring-1 ring-line"
+                />
+                <div
+                  aria-hidden
+                  className="absolute inset-0 top-1.5 left-1.5 rotate-[0.6deg] rounded-[3px] bg-surface ring-1 ring-line"
+                />
+                <Sheet className="relative">
+                  <Clip clip={CLIPS.hero} describedBy="hero-clip-text" eager />
+                </Sheet>
+              </div>
+              <div className="relative -mt-8 flex items-end pl-4 sm:-mt-10 sm:pl-8">
+                <InkSignature className="pointer-events-none absolute -top-9 left-[38%] z-20 w-[36%] max-w-[15rem] sm:left-[53%] sm:w-[37%] sm:-top-12" />
+                <div className="relative z-10 w-[min(19rem,72%)]">
+                  <SealSlip />
+                </div>
+              </div>
+              <figcaption id="hero-clip-text" className="mt-4 text-sm text-muted">
+                The real app, with made-up people: fields placed on a PDF, the sealed copy, and the
+                public seal check.
               </figcaption>
             </figure>
           </div>
         </section>
 
         <section
-          aria-labelledby="trust-title"
-          className="border-b border-line bg-surface px-4 sm:px-6"
+          id="proof"
+          aria-labelledby="proof-title"
+          className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
         >
-          <div className="mx-auto max-w-6xl py-10">
-            <h2 id="trust-title" className="sr-only">
-              Built to be checked
-            </h2>
-            <ul className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-              {TRUST.map((item) => (
-                <li key={item.title} className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#0D1B2A] text-accent">
-                    <item.icon aria-hidden className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h3 className="font-semibold">{item.title}</h3>
-                    <p className="text-sm text-muted">{item.text}</p>
-                  </div>
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+            <div className="lg:pt-4">
+              <h2 id="proof-title" className="text-3xl font-bold sm:text-4xl">
+                Every step goes on the record
+              </h2>
+              <p className="mt-4 text-lg text-muted">
+                Each entry in an envelope&rsquo;s audit trail carries a SHA-256 hash of the entry
+                before it. Change or remove one and the chain stops adding up.
+              </p>
+              <p className="mt-4 text-muted">
+                The signer only sees the document after typing a one-time code from their email.
+                When the last person signs, the PDF is sealed and gets a certificate page: who
+                signed, when, and from which IP address and device.
+              </p>
+              <ul className="mt-8 space-y-3 border-t border-line pt-6 text-sm font-semibold">
+                <li>
+                  <Link
+                    href={VERIFY_URL}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    Check a signed PDF on the verify page
+                  </Link>
                 </li>
-              ))}
-            </ul>
+                <li>
+                  <a
+                    href={EVIDENCE_GUIDE}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    Read how the certificate serves as evidence
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <AuditSheet />
           </div>
         </section>
 
-        <Section
+        <ScrollStory
           id="features"
-          eyebrow="How it works"
           title="From PDF to sealed copy, on any device"
-          intro="Each clip below is the real app, recorded with made-up people and companies."
-        >
-          <ol className="space-y-20 sm:space-y-28">
-            {FEATURES.map((feature, i) => (
-              <FeatureRow key={feature.id} feature={feature} index={i} />
-            ))}
-          </ol>
-          <div className="mt-24 rounded-2xl border border-line bg-surface p-6 sm:p-8">
-            <h3 className="text-xl font-bold">Also in the box</h3>
-            <ul className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          intro="Each clip is the real app, recorded with made-up people and companies."
+          steps={STEPS}
+        />
+
+        <section aria-labelledby="more-title" className="px-4 py-20 sm:px-6 sm:py-24">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+            <div>
+              <h2 id="more-title" className="text-3xl font-bold sm:text-4xl">
+                Also in the box
+              </h2>
+              <p className="mt-3 text-lg text-muted">
+                The parts you notice on the second day, when real people start signing.
+              </p>
+            </div>
+            <dl className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
               {MORE.map((item) => (
-                <li key={item.title} className="flex gap-3.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                    <item.icon aria-hidden className="h-[18px] w-[18px]" />
-                  </span>
-                  <div>
-                    <h4 className="font-semibold">{item.title}</h4>
-                    <p className="text-sm text-muted">{item.text}</p>
-                  </div>
-                </li>
+                <div key={item.title} className="border-t border-line py-5">
+                  <dt className="font-semibold">{item.title}</dt>
+                  <dd className="mt-1 text-muted">{item.text}</dd>
+                </div>
               ))}
-            </ul>
+            </dl>
           </div>
-        </Section>
+        </section>
 
         <section
           id="developers"
           aria-labelledby="developers-title"
-          className="scroll-mt-16 bg-header px-4 py-16 text-header-ink sm:px-6 sm:py-24"
+          className="scroll-mt-16 bg-[#0D1B2A] px-4 py-20 text-white sm:px-6 sm:py-28"
         >
           <div className="mx-auto max-w-6xl">
-            <Eyebrow onDark>Developers</Eyebrow>
-            <h2
-              id="developers-title"
-              className="mt-3 max-w-2xl text-3xl font-bold text-white sm:text-4xl"
-            >
+            <h2 id="developers-title" className="max-w-2xl text-3xl font-bold sm:text-4xl">
               An API for everything in the app
             </h2>
-            <p className="mt-3 max-w-2xl text-lg text-white/80">
+            <p className="mt-4 max-w-2xl text-lg text-white/80">
               Make an API key for each system, send envelopes from your backend, and get a signed
               webhook when something happens.
             </p>
-            <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10">
+            <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-2">
               <div className="min-w-0">
-                <pre
-                  tabIndex={0}
-                  aria-label="Sending an envelope with the TypeScript client"
-                  className="overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-5 font-mono text-[13px] leading-6 text-white/90"
-                >
-                  <code>{API_SNIPPET}</code>
-                </pre>
+                <div className="overflow-hidden rounded-[3px] ring-1 ring-white/12">
+                  <p className="border-b border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-xs text-white/70">
+                    send-agreement.ts
+                  </p>
+                  <pre
+                    tabIndex={0}
+                    aria-label="Sending an envelope with the TypeScript client"
+                    className="overflow-x-auto bg-black/25 p-5 font-mono text-[13px] leading-6 text-white/90"
+                  >
+                    <code>{API_SNIPPET}</code>
+                  </pre>
+                </div>
                 <ul className="mt-6 grid gap-3 text-white/85 sm:grid-cols-2">
                   {[
                     'OpenAPI 3.1 and a Postman collection',
@@ -625,11 +626,9 @@ export function Landing({
                 </div>
               </div>
               <figure className="min-w-0">
-                <BrowserFrame
-                  clip={CLIPS.api}
-                  describedBy="api-clip-text"
-                  className="border-white/10"
-                />
+                <Sheet className="ring-white/10">
+                  <Clip clip={CLIPS.api} describedBy="api-clip-text" />
+                </Sheet>
                 <figcaption id="api-clip-text" className="mt-3 text-sm text-white/70">
                   Creating an API key for a billing system, then a webhook endpoint for the events
                   it needs.
@@ -639,214 +638,214 @@ export function Landing({
           </div>
         </section>
 
-        <Section
+        <section
           id="open-source"
-          eyebrow="Open source"
-          title="Read the code. Run it yourself."
-          intro="The cloud runs the same code you can download. Nothing is held back for a paid edition."
+          aria-labelledby="open-source-title"
+          className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
         >
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.1fr]">
-            <ul className="space-y-4">
-              <li className="rounded-xl border border-line bg-surface p-5">
-                <h3 className="font-semibold">Libraries under Apache-2.0</h3>
-                <p className="mt-1 text-muted">
-                  The signing rules, PDF sealing, the React signing view and the API client. Use
-                  them in any product, open or closed.
-                </p>
-              </li>
-              <li className="rounded-xl border border-line bg-surface p-5">
-                <h3 className="font-semibold">Server and app under AGPL-3.0</h3>
-                <p className="mt-1 text-muted">
-                  Run them, change them and keep them. If you offer a changed version to others over
-                  a network, share your changes.
-                </p>
-              </li>
-            </ul>
-            <div className="min-w-0 rounded-xl bg-header p-5 text-header-ink sm:p-6">
-              <h3 className="font-semibold text-white">Self-host with Docker</h3>
-              <p className="mt-1 text-sm text-white/75">
-                One container for the app, one for PostgreSQL. Your documents never leave your
-                server, and there are no limits.
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+            <div>
+              <h2 id="open-source-title" className="text-3xl font-bold sm:text-4xl">
+                Read the code. Run it yourself.
+              </h2>
+              <p className="mt-4 text-lg text-muted">
+                The cloud runs the same code you can download. Nothing is held back for a paid
+                edition.
               </p>
-              <pre
-                tabIndex={0}
-                aria-label="Commands to self-host with Docker"
-                className="mt-4 overflow-x-auto rounded-lg bg-black/30 p-4 font-mono text-sm leading-6 text-white/90"
-              >
-                <code>{`git clone ${GITHUB_URL}.git
+              <div className="mt-8 grid grid-cols-1 gap-6 border-t border-line pt-6 sm:grid-cols-2">
+                <div>
+                  <h3 className="font-semibold">Libraries under Apache-2.0</h3>
+                  <p className="mt-1 text-sm text-muted">
+                    The signing rules, PDF sealing, the React signing view and the API client. Use
+                    them in any product, open or closed.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Server and app under AGPL-3.0</h3>
+                  <p className="mt-1 text-sm text-muted">
+                    Run them, change them and keep them. If you offer a changed version to others
+                    over a network, share your changes.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="min-w-0 self-end">
+              <div className="overflow-hidden rounded-[3px] bg-[#0D1B2A] text-white">
+                <div className="border-b border-white/10 px-5 py-3">
+                  <h3 className="font-semibold">Self-host with Docker</h3>
+                  <p className="mt-0.5 text-sm text-white/75">
+                    One container for the app, one for PostgreSQL. Your documents never leave your
+                    server, and there are no limits.
+                  </p>
+                </div>
+                <pre
+                  tabIndex={0}
+                  aria-label="Commands to self-host with Docker"
+                  className="overflow-x-auto p-5 font-mono text-[13px] leading-6 text-white/90"
+                >
+                  <code>{`git clone ${GITHUB_URL}.git
 cd codevibe-sign/deploy
 cp .env.example .env    # set your domain and secrets
 docker compose up -d`}</code>
-              </pre>
-              <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
-                <a className="text-accent hover:underline" href={SELF_HOST_DOCS}>
+                </pre>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+                <a
+                  className="text-primary underline-offset-2 hover:underline"
+                  href={SELF_HOST_DOCS}
+                >
                   Read the self-hosting guide
                 </a>
-                <a
-                  className="text-accent hover:underline"
+                <ExternalLink
+                  className="text-primary underline-offset-2 hover:underline"
                   href={GITHUB_URL}
-                  target="_blank"
-                  rel="noopener"
                 >
                   View on GitHub
-                </a>
+                </ExternalLink>
               </div>
             </div>
           </div>
-        </Section>
+        </section>
 
-        <Section
+        <section
           id="pricing"
-          eyebrow="Pricing"
-          title="Start free. Self-host for nothing."
-          className="bg-surface"
+          aria-labelledby="pricing-title"
+          className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
         >
-          <div className="grid gap-5 lg:grid-cols-3">
-            <PlanCard
-              name="Free"
-              price="₹0"
-              note="A cloud workspace for trying it out and small teams."
-              lines={planLines(free)}
-              action={
-                <Button asChild className="w-full">
-                  <Link href={start.href}>{start.label}</Link>
-                </Button>
-              }
-              highlight
-            />
-            <PlanCard
-              name="Cloud"
-              price="Coming soon"
-              note="For teams that send every day. Write to us from a Free workspace to be upgraded."
-              lines={planLines(cloud)}
-              action={
-                <Button asChild variant="secondary" className="w-full">
-                  <a
-                    href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Codevibe Sign Cloud plan')}`}
-                  >
-                    <Mail aria-hidden className="h-4 w-4" />
-                    Upgrade by email
-                  </a>
-                </Button>
-              }
-            />
-            <PlanCard
-              name="Self-hosted"
-              price="Free"
-              note="On your own server, under the open-source licences."
-              lines={[
-                'No limits on envelopes, members or storage',
-                'Every feature, including the API and webhooks',
-                'Your documents stay on your server',
-                'Your own domain and brand',
-                'Help from the community on GitHub',
-              ]}
-              action={
-                <Button asChild variant="secondary" className="w-full">
-                  <a href={GITHUB_URL} target="_blank" rel="noopener">
-                    Self-host it
-                  </a>
-                </Button>
-              }
-            />
-          </div>
-        </Section>
-
-        <Section id="faq" eyebrow="Questions" title="Good to know">
-          <div className="max-w-3xl divide-y divide-line rounded-xl border border-line bg-surface">
-            {FAQ.map((item) => (
-              <details
-                key={item.q}
-                className="group px-5 py-4 [&_a]:font-semibold [&_a]:text-primary"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
-                  {item.q}
-                  <span
-                    aria-hidden
-                    className="text-xl leading-none text-muted transition-transform group-open:rotate-45"
-                  >
-                    +
-                  </span>
-                </summary>
-                <div className="mt-3 text-muted">{item.a}</div>
-              </details>
-            ))}
-          </div>
-        </Section>
-
-        <section aria-labelledby="start-title" className="px-4 pb-20 sm:px-6 sm:pb-28">
-          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-header px-6 py-12 text-center sm:px-12 sm:py-16">
-            <div
-              aria-hidden
-              className="absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-primary/30 blur-3xl"
-            />
-            <div
-              aria-hidden
-              className="absolute -top-32 -right-24 h-72 w-72 rounded-full bg-accent/25 blur-3xl"
-            />
-            <h2 id="start-title" className="relative text-3xl font-bold text-white sm:text-4xl">
-              Send your first document today
+          <div className="mx-auto max-w-6xl">
+            <h2 id="pricing-title" className="max-w-2xl text-3xl font-bold sm:text-4xl">
+              Start free. <span className="whitespace-nowrap">Self-host</span> for nothing.
             </h2>
-            <p className="relative mx-auto mt-3 max-w-xl text-lg text-white/80">
-              A Free plan workspace takes a minute to set up. Or run the same app on your own
-              server, free and unlimited.
+            <p className="mt-4 max-w-2xl text-lg text-muted">
+              Every plan seals the same way and keeps the same audit trail. The limits are the only
+              difference.
             </p>
-            <div className="relative mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <Button asChild className="h-12 px-6 text-base">
-                <Link href={start.href}>
-                  {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="ghost"
-                className="h-12 border border-white/25 px-6 text-base text-white hover:bg-white/10"
-              >
-                <a href={DOCS_URL}>Read the docs</a>
-              </Button>
+            <div className="mt-12 grid grid-cols-1 divide-y divide-line rounded-[3px] bg-canvas ring-1 ring-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+              <PlanColumn
+                name="Free"
+                price="₹0"
+                note="A cloud workspace for trying it out and small teams."
+                lines={planLines(free)}
+                action={
+                  <Button asChild className="h-11 w-full">
+                    <Link href={start.href}>{start.label}</Link>
+                  </Button>
+                }
+                first
+              />
+              <PlanColumn
+                name="Cloud"
+                price="Coming soon"
+                note="For teams that send every day. Write to us from a Free workspace to be upgraded."
+                lines={planLines(cloud)}
+                action={
+                  <Button asChild variant="secondary" className="h-11 w-full">
+                    <a
+                      href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Codevibe Sign Cloud plan')}`}
+                    >
+                      <Mail aria-hidden className="h-4 w-4" />
+                      Upgrade by email
+                    </a>
+                  </Button>
+                }
+              />
+              <PlanColumn
+                name="Self-hosted"
+                price="Free"
+                note="On your own server, under the open-source licences."
+                lines={[
+                  'No limits on envelopes, members or storage',
+                  'Every feature, including the API and webhooks',
+                  'Your documents stay on your server',
+                  'Your own domain and brand',
+                  'Help from the community on GitHub',
+                ]}
+                action={
+                  <Button asChild variant="secondary" className="h-11 w-full">
+                    <ExternalLink href={GITHUB_URL} bare>
+                      Self-host it
+                    </ExternalLink>
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="faq"
+          aria-labelledby="faq-title"
+          className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
+        >
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+            <div>
+              <h2 id="faq-title" className="text-3xl font-bold sm:text-4xl">
+                Good to know
+              </h2>
+              <p className="mt-4 text-muted">
+                Something else on your mind? Write to{' '}
+                <a
+                  className="font-semibold text-primary hover:underline"
+                  href={`mailto:${CONTACT_EMAIL}`}
+                >
+                  {CONTACT_EMAIL}
+                </a>
+                .
+              </p>
+            </div>
+            <div className="divide-y divide-line border-y border-line">
+              {FAQ.map((item) => (
+                <details key={item.q} className="group py-5 [&_a]:font-semibold [&_a]:text-primary">
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-6 text-lg font-semibold [&::-webkit-details-marker]:hidden">
+                    {item.q}
+                    <span
+                      aria-hidden
+                      className="mt-1 grid h-5 w-5 shrink-0 place-items-center text-muted transition-transform duration-200 group-open:rotate-45"
+                    >
+                      <span className="absolute h-px w-3 bg-current" />
+                      <span className="absolute h-3 w-px bg-current" />
+                    </span>
+                  </summary>
+                  <div className="mt-3 max-w-[65ch] text-muted">{item.a}</div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="start-title" className="px-4 pb-24 sm:px-6 sm:pb-32">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-10 border-t-2 border-ink pt-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+            <div>
+              <h2 id="start-title" className="text-4xl font-bold sm:text-5xl">
+                Send your first document today
+              </h2>
+              <p className="mt-4 max-w-xl text-lg text-muted">
+                A Free plan workspace takes a minute to set up. Or run the same app on your own
+                server, free and unlimited.
+              </p>
+            </div>
+            <div>
+              <div className="relative rounded-[3px] border border-dashed border-primary bg-primary-soft/60 p-3">
+                <span className="absolute -top-2.5 left-3 bg-canvas px-1.5 font-mono text-[11px] font-medium text-primary">
+                  Signature *
+                </span>
+                <Button asChild className="h-12 w-full text-base">
+                  <Link href={start.href}>
+                    {start.label} <ArrowRight aria-hidden className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted">The field is yours to fill.</span>
+                <a href={DOCS_URL} className="font-semibold text-primary hover:underline">
+                  Read the docs
+                </a>
+              </div>
             </div>
           </div>
         </section>
       </main>
       <SiteFooter />
-    </div>
-  );
-}
-
-function PlanCard({
-  name,
-  price,
-  note,
-  lines,
-  action,
-  highlight,
-}: {
-  name: string;
-  price: string;
-  note: string;
-  lines: string[];
-  action: ReactNode;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col rounded-2xl border bg-canvas p-6',
-        highlight ? 'border-primary shadow-card ring-1 ring-primary' : 'border-line',
-      )}
-    >
-      <h3 className="text-lg font-semibold">{name}</h3>
-      <p className="mt-2 font-display text-3xl font-bold">{price}</p>
-      <p className="mt-1 text-muted">{note}</p>
-      <ul className="mt-5 flex-1 space-y-2.5 text-sm">
-        {lines.map((line) => (
-          <li key={line} className="flex gap-2">
-            <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-            {line}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-6">{action}</div>
     </div>
   );
 }

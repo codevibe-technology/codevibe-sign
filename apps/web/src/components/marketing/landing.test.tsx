@@ -14,14 +14,14 @@ describe('Landing', () => {
   it('leads with the promise and the two ways in', () => {
     render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Send documents for signature in minutes' }),
+      screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
     ).toBeInTheDocument();
     const hero = screen.getByRole('heading', { level: 1 }).closest('section')!;
     expect(within(hero).getByRole('link', { name: /Start free/ })).toHaveAttribute(
       'href',
       '/sign-in',
     );
-    expect(within(hero).getByRole('link', { name: 'Self-host it' })).toHaveAttribute(
+    expect(within(hero).getByRole('link', { name: /^Self-host it/ })).toHaveAttribute(
       'href',
       'https://github.com/codevibe-technology/codevibe-sign',
     );
@@ -57,7 +57,7 @@ describe('Landing', () => {
     expect(toDashboard).toHaveLength(3);
     for (const link of toDashboard) expect(link).toHaveAttribute('href', '/dashboard');
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Send documents for signature in minutes' }),
+      screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
     ).toBeInTheDocument();
   });
 
@@ -100,8 +100,28 @@ describe('Landing', () => {
     expect(screen.queryByRole('link', { name: /Go to dashboard/ })).toBeNull();
   });
 
-  it('shows each step with its clip and a description of it', () => {
+  it('tells the six steps with a still and a description of each', () => {
     const { container } = render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    const story = document.getElementById('features')!;
+    expect(
+      within(story).getByRole('heading', {
+        level: 2,
+        name: 'From PDF to sealed copy, on any device',
+      }),
+    ).toBeInTheDocument();
+    const steps = within(story).getByRole('list', { name: 'Steps' });
+    expect(
+      within(steps)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual([
+      'Step 1: Send',
+      'Step 2: Sign',
+      'Step 3: Seal',
+      'Step 4: Track',
+      'Step 5: Verify',
+      'Step 6: Scale',
+    ]);
     for (const [id, clip] of [
       ['send', 'send'],
       ['sign', 'sign-phone'],
@@ -110,24 +130,34 @@ describe('Landing', () => {
       ['verify', 'verify'],
       ['templates', 'bulk'],
     ] as const) {
-      const row = document.getElementById(id)!;
-      expect(within(row).getByRole('heading', { level: 3 })).toBeInTheDocument();
-      expect(row.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.webm`);
-      expect(row.querySelector('img')).toHaveAttribute('src', `/home/${clip}.webp`);
-      const text = document.getElementById(`${id}-text`)!;
-      expect(text.textContent!.length).toBeGreaterThan(40);
-      expect(within(row).getByRole('button', { name: /^Play the clip: / })).toHaveAttribute(
-        'aria-describedby',
-        `${id}-text`,
-      );
+      const step = document.getElementById(id)!;
+      expect(within(step).getByRole('heading', { level: 3 })).toBeInTheDocument();
+      // the still that stands in for the clip when motion is reduced
+      expect(step.querySelector('img')).toHaveAttribute('src', `/home/${clip}.webp`);
+      expect(step.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.webm`);
+      expect(document.getElementById(`${id}-text`)!.textContent!.length).toBeGreaterThan(40);
     }
-    const videos = container.querySelectorAll('video');
-    expect(videos).toHaveLength(8);
-    for (const video of videos) {
-      expect(video).toHaveAttribute('preload', 'none');
+    // only the first step's clip is on the pinned stage before anyone scrolls
+    const stage = within(story).getByRole('button', { name: /^Pause the clip: / });
+    expect(stage.getAttribute('aria-describedby')).toBe('send-text');
+    for (const video of container.querySelectorAll('video')) {
       expect(video).not.toHaveAttribute('autoplay');
+      expect(['none', 'metadata']).toContain(video.getAttribute('preload'));
     }
-    expect(screen.getAllByRole('button', { name: /^Play the clip: / })).toHaveLength(8);
+  });
+
+  it('shows the audit trail as a real hash chain', () => {
+    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    const proof = document.getElementById('proof')!;
+    const entries = [...proof.querySelectorAll('figure ol > li')];
+    expect(entries.map((li) => li.querySelector('code')?.textContent)).toEqual([
+      'envelope.sent',
+      'recipient.viewed',
+      'recipient.authenticated',
+      'recipient.signed',
+      'envelope.completed',
+    ]);
+    expect(within(proof).getByText(/made-up people/)).toBeInTheDocument();
   });
 
   it('shows the API with a working client call', () => {
@@ -169,6 +199,24 @@ describe('Landing', () => {
     expect(within(faq).getByText(/standalone\s+library/)).toBeTruthy();
     expect(within(faq).getByText('Where is my data kept?')).toBeTruthy();
     expect(within(faq).getByText(/Nothing already sent is affected/)).toBeTruthy();
+  });
+
+  it('opens links to other sites in a new tab and says so', () => {
+    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('a[href^="http"]')];
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveAccessibleName(/\(opens in a new tab\)$/);
+    }
+    const footer = screen.getByRole('navigation', { name: 'Footer' });
+    expect(
+      within(footer).getByRole('link', { name: 'Codevibe (opens in a new tab)' }),
+    ).toHaveAttribute('href', 'https://codevibe.in');
+    for (const name of ['Docs', 'Verify a PDF', 'Terms', 'Privacy']) {
+      expect(within(footer).getByRole('link', { name })).not.toHaveAttribute('target');
+    }
   });
 
   it('links the footer to docs, the verify page, GitHub, terms, privacy and Codevibe', () => {
