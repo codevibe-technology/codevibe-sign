@@ -464,12 +464,31 @@ docker compose cp ./signature.png web:/data/branding/signature.png
 ./restart.sh
 ```
 
+### A workspace's own Leegality account
+
+On the Cloud plan, and on any self-hosted install, an admin can enter the workspace's own
+Leegality account under **Settings, Aadhaar eSign** instead of using yours. They set the same
+two URLs in their own Leegality workflow (the page shows them), and Leegality bills them
+directly. Nothing in `.env` is needed for this except `SECRETS_KEY`, which encrypts what they
+enter. Their credentials cannot be read back from the app, by them or by you.
+
+### Open questions to settle before going live
+
+- **Credits expiry.** Credits do not expire today, and the docs say so as the current policy.
+  If they should expire, decide the period before the first live sale.
+- **SAC code.** `INVOICE_SAC` defaults to `998319` (other information technology services).
+  `997331` (licensing services for the right to use computer software) is the other candidate
+  commonly used for software sold as a service. Both are taxed at 18%; ask your chartered
+  accountant which to print, and set it before the first live invoice.
+
 ### Self-hosted installs
 
 - The seller on every invoice is whoever the `INVOICE_SELLER_*` variables name. Nothing is
   built in, so an install never issues invoices in another company's name.
-- Without Razorpay keys nothing is sold. Aadhaar eSign then works only for workspaces that
-  enter their own Leegality account under Settings, Aadhaar eSign, billed by Leegality.
+- Without Razorpay keys nothing is sold. Aadhaar eSign then works for workspaces that enter
+  their own Leegality account under Settings, Aadhaar eSign, billed by Leegality.
+- With `PLAN_MODE=self-hosted` and your own `LEEGALITY_*` values in `.env`, every workspace
+  signs through your account and no credits are involved.
 - With `PLAN_MODE=self-hosted` there are no plan limits and no billing screens.
 
 ## Troubleshooting
