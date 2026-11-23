@@ -8,19 +8,55 @@ export interface SignatureFont {
   family: string;
 }
 
-/** Handwriting faces common on desktop and mobile systems, each ending in a generic fallback. */
+/**
+ * Faces for names in Indian scripts and Arabic, tried after the handwriting face for any letter
+ * it lacks: Kalam (a handwritten Devanagari face, used when the page loads it), then the system
+ * fonts of Windows (Nirmala UI), macOS and iOS (Kohinoor, Sangam MN), and Android (Noto).
+ */
+export const SCRIPT_FALLBACK_FONTS = [
+  'Kalam',
+  'Nirmala UI',
+  'Kohinoor Devanagari',
+  'Kohinoor Bangla',
+  'Kohinoor Gujarati',
+  'Kohinoor Telugu',
+  'Tamil Sangam MN',
+  'Kannada Sangam MN',
+  'Malayalam Sangam MN',
+  'Gurmukhi MN',
+  'Oriya Sangam MN',
+  'Noto Sans Devanagari',
+  'Noto Sans Tamil',
+  'Noto Sans Telugu',
+  'Noto Sans Kannada',
+  'Noto Sans Malayalam',
+  'Noto Sans Bengali',
+  'Noto Sans Gujarati',
+  'Noto Sans Gurmukhi',
+  'Noto Sans Oriya',
+  'Noto Naskh Arabic',
+  'Geeza Pro',
+  'Segoe UI',
+]
+  .map((name) => `"${name}"`)
+  .join(', ');
+
+/**
+ * Handwriting faces common on desktop and mobile systems, each ending in a generic fallback.
+ * Names in other scripts fall through to `SCRIPT_FALLBACK_FONTS` letter by letter.
+ */
 export const defaultSignatureFonts: SignatureFont[] = [
   {
     label: 'Flowing',
-    family: '"Snell Roundhand", "Segoe Script", "Brush Script MT", "URW Chancery L", cursive',
+    family: `"Snell Roundhand", "Segoe Script", "Brush Script MT", "URW Chancery L", ${SCRIPT_FALLBACK_FONTS}, cursive`,
   },
   {
     label: 'Casual',
-    family: '"Bradley Hand", "Segoe Print", "Comic Neue", "Chalkboard SE", cursive',
+    family: `"Bradley Hand", "Segoe Print", "Comic Neue", "Chalkboard SE", ${SCRIPT_FALLBACK_FONTS}, cursive`,
   },
   {
     label: 'Formal',
-    family: '"Apple Chancery", "Lucida Handwriting", "URW Chancery L", "Palatino Linotype", serif',
+    family: `"Apple Chancery", "Lucida Handwriting", "URW Chancery L", "Palatino Linotype", ${SCRIPT_FALLBACK_FONTS}, serif`,
   },
 ];
 
