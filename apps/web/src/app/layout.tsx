@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
+import { metadataBase } from '@/lib/metadata-base';
 import { THEME_COOKIE, isTheme } from '@/lib/preferences';
 import './globals.css';
 
@@ -18,11 +19,16 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: { default: 'Codevibe Sign', template: '%s · Codevibe Sign' },
-  description: 'Send documents for signature, track them and keep a verifiable record.',
-  robots: { index: false, follow: false },
-};
+// Share images and canonical links resolve against the public URL, not the host Next.js
+// guesses (localhost behind the proxy).
+export function generateMetadata(): Metadata {
+  return {
+    metadataBase: metadataBase(process.env.APP_URL),
+    title: { default: 'Codevibe Sign', template: '%s · Codevibe Sign' },
+    description: 'Send documents for signature, track them and keep a verifiable record.',
+    robots: { index: false, follow: false },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: [
