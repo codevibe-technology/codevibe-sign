@@ -15,8 +15,11 @@ const DOCS_URL = `${SITE_URL}${BASE}`;
 
 function pageUrl(relativePath: string): string {
   const path = relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html');
-  return new URL(path, DOCS_URL).href;
+  return withoutTrailingSlash(new URL(path, DOCS_URL).href);
 }
+
+/** The app redirects `/docs/` to `/docs`, so links and the sitemap use the address it lands on. */
+const withoutTrailingSlash = (url: string) => (url.endsWith('/') ? url.slice(0, -1) : url);
 
 /** Files from the repository served at the site root: the API description and its collection. */
 const downloads: Record<string, string> = {
@@ -62,7 +65,14 @@ export default defineConfig({
   lastUpdated: false,
   appearance: true,
 
-  sitemap: { hostname: DOCS_URL },
+  sitemap: {
+    hostname: DOCS_URL,
+    transformItems: (items) =>
+      items.map((item) => ({
+        ...item,
+        url: withoutTrailingSlash(new URL(item.url, DOCS_URL).href),
+      })),
+  },
 
   head: [
     ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
@@ -80,6 +90,7 @@ export default defineConfig({
   ],
 
   transformHead({ pageData, title, description }) {
+    if (pageData.isNotFound) return [['meta', { name: 'robots', content: 'noindex' }]];
     const url = pageUrl(pageData.relativePath);
     const head: HeadConfig[] = [
       ['link', { rel: 'canonical', href: url }],
