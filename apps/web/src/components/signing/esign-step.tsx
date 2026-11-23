@@ -68,8 +68,7 @@ export function EsignWaitStep({
       stopped = true;
       clearTimeout(timer);
     };
-    // The callbacks are stable for the life of the step.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The callbacks are read when a check answers; only a new round or pace starts over.
   }, [round, poll.every, poll.giveUpAfter]);
 
   if (status && (status.status === 'expired' || status.status === 'failed')) {
