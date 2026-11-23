@@ -8,7 +8,11 @@ vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock('@/server/actions/personal', () => ({ updatePreferencesAction: vi.fn() }));
+vi.mock('@/server/actions/personal', () => ({
+  updatePreferencesAction: vi.fn(),
+  updateNameAction: vi.fn(),
+}));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/auth-client', () => ({ authClient: { signOut: vi.fn() } }));
 
 const { Sidebar } = await import('./sidebar');
@@ -97,5 +101,28 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open navigation' }));
     const drawer = await screen.findByRole('dialog', { name: 'Navigation' });
     expect(within(drawer).getByRole('link', { name: 'Templates' })).toBeTruthy();
+  });
+
+  it('asks a member with no name to add one, and nobody else', async () => {
+    window.sessionStorage.clear();
+    const shell = (name: string) => (
+      <AppShell
+        user={{ name, email: 'ravi@example.com' }}
+        sidebar={{ current: acme, workspaces: [acme], canCreate: true }}
+      >
+        <p>Body</p>
+      </AppShell>
+    );
+    const { unmount } = render(shell(' '));
+    const prompt = await screen.findByRole('region', { name: 'Add your name' });
+    expect(within(screen.getByRole('main')).getByText('Body')).toBeTruthy();
+    expect(prompt.compareDocumentPosition(screen.getByText('Body'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveTextContent('R');
+    unmount();
+
+    render(shell('Ravi Kumar'));
+    expect(screen.queryByRole('region', { name: 'Add your name' })).toBeNull();
   });
 });

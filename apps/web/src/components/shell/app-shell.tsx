@@ -3,7 +3,9 @@
 import { Menu } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { useState, type ReactNode } from 'react';
+import { hasName } from '@/lib/person-name';
 import { Wordmark } from './brand-mark';
+import { NamePrompt } from './name-prompt';
 import { Sidebar, type SidebarProps } from './sidebar';
 
 export function AppShell({
@@ -51,6 +53,7 @@ export function AppShell({
           id="main"
           className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-8 md:py-7 lg:px-10"
         >
+          {hasName(user) ? null : <NamePrompt />}
           {children}
         </main>
       </div>

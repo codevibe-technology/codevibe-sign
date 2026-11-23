@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DropdownMenu } from 'radix-ui';
 import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
+import { hasName, initialOf } from '@/lib/person-name';
 import type { Theme } from '@/lib/preferences';
 import { updatePreferencesAction } from '@/server/actions/personal';
 import { applyTheme } from './theme';
@@ -49,7 +50,7 @@ export function UserMenu({
         className="flex h-10 w-10 items-center justify-center rounded-full bg-accent font-display text-sm font-bold text-accent-ink ring-2 ring-white/10 hover:ring-accent/50"
         aria-label="Account menu"
       >
-        {(user.name || user.email).slice(0, 1).toUpperCase()}
+        {initialOf(user)}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
@@ -59,7 +60,9 @@ export function UserMenu({
           className="z-50 w-64 rounded-lg border border-line bg-surface p-1.5 text-ink shadow-card"
         >
           <div className="px-2 py-2">
-            <p className="truncate text-sm font-semibold">{user.name || 'Your account'}</p>
+            <p className="truncate text-sm font-semibold">
+              {hasName(user) ? user.name.trim() : 'Your account'}
+            </p>
             <p className="truncate text-xs text-muted">{user.email}</p>
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
