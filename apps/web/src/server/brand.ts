@@ -47,6 +47,23 @@ interface Row {
 }
 
 /** A workspace's brand with Codevibe defaults filled in for anything not set. */
+/** Where a workspace's logo is served; the version changes with every upload, so it caches. */
+const logoUrlOf = (workspaceId: string, updatedAt: Date) =>
+  `/brand/${workspaceId}/logo?v=${updatedAt.getTime()}`;
+
+/** The logo address of each of these workspaces that has a logo. */
+export async function workspaceLogoUrls(
+  sql: postgres.Sql,
+  workspaceIds: string[],
+): Promise<Map<string, string>> {
+  if (workspaceIds.length === 0) return new Map();
+  const rows = await sql<{ workspace_id: string; logo_updated_at: Date }[]>`
+    select workspace_id, logo_updated_at from app_brand_settings
+    where workspace_id in ${sql(workspaceIds)}
+      and logo_content_type is not null and logo_updated_at is not null`;
+  return new Map(rows.map((r) => [r.workspace_id, logoUrlOf(r.workspace_id, r.logo_updated_at)]));
+}
+
 export async function getBrand(sql: postgres.Sql, workspaceId: string): Promise<Brand> {
   const [row] = await sql<
     Row[]
@@ -56,7 +73,7 @@ export async function getBrand(sql: postgres.Sql, workspaceId: string): Promise<
     workspaceId,
     logoUrl:
       row?.logo_content_type && row.logo_updated_at
-        ? `/brand/${workspaceId}/logo?v=${row.logo_updated_at.getTime()}`
+        ? logoUrlOf(workspaceId, row.logo_updated_at)
         : null,
     brandColor: row?.brand_color ?? DEFAULT_BRAND_COLOR,
     font: row?.font ?? 'inter',

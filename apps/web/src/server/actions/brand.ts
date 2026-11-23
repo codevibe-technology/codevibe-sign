@@ -16,7 +16,8 @@ import { env } from '../env';
 import { appRuntime } from '../runtime';
 import { workspaceAction } from './action';
 
-const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}/settings/brand`);
+// The whole workspace layout: the sidebar shows the logo too.
+const refresh = (slug: string) => revalidatePath(`/dashboard/${slug}`, 'layout');
 
 export const updateBrandAction = workspaceAction(
   'brand.manage',
