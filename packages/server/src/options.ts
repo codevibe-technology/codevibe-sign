@@ -10,6 +10,7 @@ import type {
 } from '@codevibe_technology/sign-core';
 import type { CertificateDetails, PdfEngine, SealTrust } from './engine';
 import type { Logger } from './errors';
+import type { EsignOptions } from './esign/types';
 import type { RateLimiter } from './http/rate-limit';
 import type { ServerStore, TemplateStore } from './store/types';
 import type { Principal } from './tenancy';
@@ -230,6 +231,11 @@ export interface SignServerOptions {
    * by a signer. Return null to use `timeZone`.
    */
   workspaceTimeZone?: (workspaceId: string) => Promise<string | null>;
+  /**
+   * Aadhaar eSign for recipients with `auth: 'aadhaar'`. Without it, an envelope with such a
+   * recipient cannot be sent.
+   */
+  esign?: EsignOptions;
   /** Signs signer session tokens. Set it when more than one process serves requests. */
   sessionSecret?: string;
   /** Signing links stay valid this many days unless the envelope expires sooner. Default 30. */

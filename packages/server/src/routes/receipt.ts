@@ -6,7 +6,7 @@ import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import { RECEIPT_COOKIE, RECEIPT_HEADER, verifyReceipt } from '../http/session';
 import type { Runtime } from '../runtime/context';
-import { sealedFileKey } from '../runtime/seal';
+import { certificateFileKey, sealedFileKey, separateCertificates } from '../runtime/seal';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import { receiptView } from '../views';
 
@@ -36,22 +36,21 @@ export function receiptRoutes(rt: Runtime) {
 
   async function sealedIds(envelopeId: string) {
     const events = await rt.store.listEvents(envelopeId);
-    return new Set(
-      events
-        .filter((e) => e.action === 'document.sealed')
-        .map((e) => String(e.data?.documentId ?? '')),
-    );
+    return {
+      sealed: new Set(
+        events
+          .filter((e) => e.action === 'document.sealed')
+          .map((e) => String(e.data?.documentId ?? '')),
+      ),
+      certificates: separateCertificates(events),
+    };
   }
 
   app.get('/', async (c) => {
     const { envelope, recipient, workspaceId } = await resolve(c);
+    const { sealed, certificates } = await sealedIds(envelope.id);
     return c.json(
-      receiptView(
-        envelope,
-        recipient,
-        workspaceId ?? DEFAULT_WORKSPACE,
-        await sealedIds(envelope.id),
-      ),
+      receiptView(envelope, recipient, workspaceId ?? DEFAULT_WORKSPACE, sealed, certificates),
     );
   });
 
@@ -59,12 +58,12 @@ export function receiptRoutes(rt: Runtime) {
     const { envelope } = await resolve(c);
     const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
     if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
+    const certificate = c.req.query('file') === 'certificate';
+    const key = certificate ? certificateFileKey : sealedFileKey;
     const sealed =
-      envelope.status === 'completed'
-        ? await rt.files.get(sealedFileKey(envelope.id, document.id))
-        : null;
+      envelope.status === 'completed' ? await rt.files.get(key(envelope.id, document.id)) : null;
     if (!sealed) throw new SignError('INVALID_STATE', 'The signed copy is not ready yet');
-    return pdfResponse(c, sealed, document.name, 'sealed');
+    return pdfResponse(c, sealed, document.name, certificate ? 'certificate' : 'sealed');
   });
 
   return app;

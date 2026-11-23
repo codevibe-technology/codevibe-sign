@@ -11,6 +11,7 @@ import {
 } from '@codevibe_technology/sign-core';
 import { Hono, type Context } from 'hono';
 import { sha256Hex } from '../crypto';
+import { earlier, recordedAsIs } from '../verification';
 import { applyParties } from '../draft';
 import { VersionConflictError, validation } from '../errors';
 import { pdfResponse, readJson } from '../http/body';
@@ -20,7 +21,8 @@ import { parseFields, parseJsonObject, parseRecipients, parseSettings } from '..
 import type { Runtime } from '../runtime/context';
 import type { EnvelopeListQuery } from '../store/types';
 import { mutate } from '../runtime/mutate';
-import { sealedFileKey } from '../runtime/seal';
+import { certificateFileKey, sealedFileKey } from '../runtime/seal';
+import { assertEsignReady } from '../esign/flow';
 import { revisionRoutes } from './revisions';
 import { createEnvelopeFromParts } from './create';
 import { checkPdf, loadScoped, readUploadBody, senderAuth, type SenderEnv } from './shared';
@@ -122,7 +124,11 @@ export function senderRoutes(rt: Runtime) {
     const { envelope } = await mutate(
       rt,
       c.req.param('id'),
-      (current) => send(current, deps),
+      async (current) => {
+        const sent = send(current, deps);
+        await assertEsignReady(rt, scopeOf(c).workspaceId, current);
+        return sent;
+      },
       scopeOf(c),
     );
     return c.json(apiEnvelope(envelope));
@@ -168,8 +174,23 @@ export function senderRoutes(rt: Runtime) {
     const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
     if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
     const version = c.req.query('version');
-    if (version !== undefined && version !== 'original' && version !== 'sealed') {
-      throw validation('version must be original or sealed', { field: 'version' });
+    if (
+      version !== undefined &&
+      version !== 'original' &&
+      version !== 'sealed' &&
+      version !== 'certificate'
+    ) {
+      throw validation('version must be original, sealed or certificate', { field: 'version' });
+    }
+    if (version === 'certificate') {
+      const certificate = await rt.files.get(certificateFileKey(envelope.id, document.id));
+      if (!certificate) {
+        throw new SignError(
+          'INVALID_STATE',
+          'This document has no separate certificate; it is the last page of the sealed file',
+        );
+      }
+      return pdfResponse(c, certificate, document.name, 'certificate');
     }
     const sealed =
       version === 'original' ? null : await rt.files.get(sealedFileKey(envelope.id, document.id));
@@ -190,15 +211,22 @@ export function senderRoutes(rt: Runtime) {
     if (!rt.sealTrust || !rt.pdf.verify) {
       throw new SignError('INVALID_STATE', 'This server cannot verify sealed files');
     }
-    const check = await rt.pdf.verify(sealed, { trust: rt.sealTrust });
+    const sha256 = sha256Hex(sealed);
+    const check = await rt.pdf.verify(sealed, {
+      trust: rt.sealTrust,
+      allowEarlierSignatures: true,
+    });
+    const asIs = check.valid ? null : await recordedAsIs(rt, sealed, sha256, check);
     return c.json({
       documentId: document.id,
-      valid: check.valid,
-      reason: check.reason ?? null,
+      valid: check.valid || asIs !== null,
+      reason: asIs ? null : (check.reason ?? null),
       signer: check.signer ?? null,
       signedAt: check.signedAt ?? null,
       certificateSha256: check.certificateSha256 ?? null,
-      sha256: sha256Hex(sealed),
+      sha256,
+      seal: asIs?.seal ?? 'operator',
+      earlierSignatures: asIs?.earlierSignatures ?? (check.earlierSignatures ?? []).map(earlier),
     });
   });
 

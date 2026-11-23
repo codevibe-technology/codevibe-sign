@@ -9,6 +9,7 @@ import {
   type TransitionResult,
 } from '@codevibe_technology/sign-core';
 import { VersionConflictError } from '../errors';
+import { closeSessions } from '../esign/settle';
 import type { Job } from '../store/types';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { Runtime } from './context';
@@ -105,6 +106,7 @@ async function afterCommit(
   const now = rt.clock.now();
   if (isFinal(after) && !isFinal(before)) {
     await rt.store.revokeTokens(after.id, undefined, now);
+    await closeSessions(rt, after);
   } else {
     const revoke = new Set(
       events.flatMap((e) => (REISSUE.has(e.action) && e.recipientId ? [e.recipientId] : [])),

@@ -9,6 +9,7 @@ import { senderRoutes } from './routes/sender';
 import { linkRoutes } from './routes/link';
 import { openApiRoutes } from './routes/openapi';
 import { copyRoutes } from './routes/copy';
+import { ESIGN_WEBHOOK_MAX_BYTES, esignWebhookRoutes } from './routes/esign';
 import { receiptRoutes } from './routes/receipt';
 import { signerRoutes } from './routes/signer';
 import { templateRoutes } from './routes/templates';
@@ -103,6 +104,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
     bodyLimit({ maxSize: rt.limits.maxPdfBytes + VERIFY_FORM_OVERHEAD, onError: tooLarge }),
   );
   app.use('/v1/sign/*', bodyLimit({ maxSize: SIGNER_BODY_LIMIT, onError: tooLarge }));
+  app.use('/v1/esign/*', bodyLimit({ maxSize: ESIGN_WEBHOOK_MAX_BYTES, onError: tooLarge }));
 
   app.get('/health', (c) => c.json({ ok: true }));
   app.route('/v1/openapi.json', openApiRoutes());
@@ -113,6 +115,7 @@ export function createSignServer(options: SignServerOptions): SignServer {
   app.route('/v1/sign/receipt', receiptRoutes(rt));
   app.route('/v1/sign/copy', copyRoutes(rt));
   app.route('/v1/sign', signerRoutes(rt));
+  app.route('/v1/esign/webhooks', esignWebhookRoutes(rt));
   app.route('/sign', linkRoutes(rt));
 
   const deliverNow = async (payload: WebhookPayload) => {

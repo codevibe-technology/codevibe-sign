@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto';
 import { nodeHasher } from '../crypto';
 import type { PdfEngine, SealTrust } from '../engine';
 import { consoleLogger, type Logger } from '../errors';
+import type { EsignOptions } from '../esign/types';
 import { normalizeApiKeys, type StoredApiKey } from '../http/auth';
 import { redactingLogger } from '../http/redact';
 import { memoryRateLimiter, type RateLimiter } from '../http/rate-limit';
@@ -62,6 +63,7 @@ export interface Runtime {
   webhookTargets?: (workspaceId: string) => Promise<WebhookTarget[]>;
   onWebhookDelivery?: (report: WebhookDeliveryReport) => void | Promise<void>;
   onEnvelopeChange?: (change: EnvelopeChange) => void | Promise<void>;
+  esign?: EsignOptions;
   /** Base URL of the server, without a trailing slash. */
   publicUrl: string;
   /** Prefix of every route and cookie path, without a trailing slash; empty by default. */
@@ -185,6 +187,7 @@ export function createRuntime(options: SignServerOptions, pdf: PdfEngine): Runti
     ...(options.webhookTargets ? { webhookTargets: options.webhookTargets } : {}),
     ...(options.onWebhookDelivery ? { onWebhookDelivery: options.onWebhookDelivery } : {}),
     ...(options.onEnvelopeChange ? { onEnvelopeChange: options.onEnvelopeChange } : {}),
+    ...(options.esign ? { esign: options.esign } : {}),
     publicUrl,
     basePath,
     sealer: {

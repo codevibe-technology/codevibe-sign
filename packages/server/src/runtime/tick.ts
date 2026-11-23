@@ -1,4 +1,5 @@
 import { tick as coreTick } from '@codevibe_technology/sign-core';
+import { tickEsign } from '../esign/flow';
 import type { Runtime } from './context';
 import { JOB_LEASE_MS, runJobs } from './jobs';
 import { mutate } from './mutate';
@@ -46,6 +47,8 @@ export async function tick(rt: Runtime, options: TickOptions = {}): Promise<Tick
       });
     }
   }
+
+  await tickEsign(rt);
 
   const jobs = await rt.store.claimJobs(
     now,

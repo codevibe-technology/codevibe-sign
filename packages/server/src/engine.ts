@@ -38,9 +38,22 @@ export interface SealTrust {
   roots?: (string | Uint8Array)[];
 }
 
+/** One digital signature of a file, as `verifySignatures` in the PDF package reports it. */
+export interface SignatureSummary {
+  /** The signature matches the bytes it covers. Trust in its certificate is not checked. */
+  valid: boolean;
+  coversWholeDocument: boolean;
+  signer?: { commonName?: string; organization?: string };
+  issuer?: { commonName?: string; organization?: string };
+  signedAt?: string;
+  certificateSha256?: string;
+}
+
 export interface SealCheck {
   valid: boolean;
   reason?: string;
+  /** Signatures made before the seal, such as an Aadhaar eSign, earliest first. */
+  earlierSignatures?: SignatureSummary[];
   signer?: { commonName?: string; organization?: string };
   signedAt?: string;
   certificateSha256?: string;
@@ -93,8 +106,24 @@ export interface PdfEngine {
   sealCertificate?(options: { p12: Uint8Array; passphrase: string; allowWeakKey?: boolean }): {
     sha256: string;
   };
-  /** Checks a sealed file: one intact signature over every byte, from a trusted certificate. */
-  verify?(pdf: Uint8Array, options: { trust: SealTrust }): Promise<SealCheck>;
+  /**
+   * Checks a sealed file: one intact signature over every byte, from a trusted certificate.
+   * With `allowEarlierSignatures` the seal may be the last of several, each of them intact.
+   */
+  verify?(
+    pdf: Uint8Array,
+    options: { trust: SealTrust; allowEarlierSignatures?: boolean },
+  ): Promise<SealCheck>;
+  /**
+   * Seals a file that already carries digital signatures without changing a byte of it.
+   * Throws `PDF_ALREADY_SIGNED` with `details.reason: 'locked'` when the file allows no
+   * further signature. Needed, with the next two, for Aadhaar eSign.
+   */
+  countersign?(pdf: Uint8Array, options: SealOptions): Promise<Uint8Array>;
+  /** Every digital signature of a file, earliest first. */
+  verifySignatures?(pdf: Uint8Array): Promise<SignatureSummary[]>;
+  /** The signing certificate as a file of its own. */
+  certificatePdf?(input: CertificateInput): Promise<Uint8Array>;
 }
 
 export const defaultPdfEngine: PdfEngine = {
@@ -105,4 +134,7 @@ export const defaultPdfEngine: PdfEngine = {
   seal: (pdf, options) => signPdf.seal(pdf, options),
   sealCertificate: (options) => signPdf.sealCertificate(options),
   verify: (pdf, options) => signPdf.verify(pdf, options),
+  countersign: (pdf, options) => signPdf.countersign(pdf, options),
+  verifySignatures: (pdf) => signPdf.verifySignatures(pdf),
+  certificatePdf: (input) => signPdf.certificatePdf(input),
 };

@@ -62,6 +62,7 @@
     "postpack": "node ../../scripts/readme-utm.mjs restore"
   },
   "dependencies": {
+    "@codevibe_technology/sign-aadhaar": "workspace:*",
     "@codevibe_technology/sign-core": "workspace:*",
     "@codevibe_technology/sign-pdf": "workspace:*",
     "@hono/node-server": "2.1.6",

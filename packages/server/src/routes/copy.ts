@@ -5,7 +5,7 @@ import { clientIp } from '../http/client';
 import { enforce } from '../http/rate-limit';
 import { verifyCopyClaim } from '../http/session';
 import type { Runtime } from '../runtime/context';
-import { sealedFileKey } from '../runtime/seal';
+import { certificateFileKey, sealedFileKey } from '../runtime/seal';
 
 const linkInvalid = () =>
   new SignError(
@@ -34,9 +34,11 @@ export function copyRoutes(rt: Runtime) {
     if (envelope.status !== 'completed') throw linkInvalid();
     const document = envelope.documents.find((d) => d.id === c.req.param('docId'));
     if (!document) throw new SignError('ENVELOPE_NOT_FOUND', 'Document not found');
-    const sealed = await rt.files.get(sealedFileKey(envelope.id, document.id));
+    const certificate = c.req.query('file') === 'certificate';
+    const key = certificate ? certificateFileKey : sealedFileKey;
+    const sealed = await rt.files.get(key(envelope.id, document.id));
     if (!sealed) throw new SignError('INVALID_STATE', 'The signed copy is not ready yet');
-    return pdfResponse(c, sealed, document.name, 'sealed');
+    return pdfResponse(c, sealed, document.name, certificate ? 'certificate' : 'sealed');
   });
 
   return app;

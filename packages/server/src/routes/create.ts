@@ -10,6 +10,7 @@ import { sha256Hex } from '../crypto';
 import { applyParties } from '../draft';
 import type { PdfInfo } from '../engine';
 import type { EnvelopeSettings, FieldSpec, RecipientSpec, UploadedDocument } from '../input';
+import { assertEsignReady } from '../esign/flow';
 import type { Runtime } from '../runtime/context';
 import { create } from '../runtime/mutate';
 import { originalFileKey } from './shared';
@@ -73,6 +74,7 @@ export async function createEnvelopeFromParts(
   let result: TransitionResult = { ...created, envelope };
   if (parts.send) {
     const sent = send(envelope, deps);
+    await assertEsignReady(rt, workspaceId, envelope);
     result = {
       envelope: sent.envelope,
       events: [...created.events, ...sent.events],

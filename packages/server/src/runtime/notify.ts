@@ -11,7 +11,7 @@ import { issueCopyClaim } from '../http/session';
 import { DEFAULT_WORKSPACE } from '../tenancy';
 import type { CopyDownload, MailTemplates } from '../templates';
 import type { Runtime } from './context';
-import { sealedFileKey } from './seal';
+import { certificateFileKey, sealedFileKey, separateCertificates } from './seal';
 import { timeZoneFor } from './time-zone';
 
 export interface NotifyPayload {
@@ -75,7 +75,8 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
   };
 
   if (payload.reason === 'completed_copy') {
-    const attachments = await sealedAttachments(rt, envelope);
+    const certificates = separateCertificates(await rt.store.listEvents(envelope.id));
+    const attachments = await sealedAttachments(rt, envelope, certificates);
     if (attachments) {
       try {
         const mail = templates.completed({ envelope, recipient, attached: true, downloads: [] });
@@ -89,7 +90,7 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
         });
       }
     }
-    const downloads = copyDownloads(rt, envelope, recipient);
+    const downloads = copyDownloads(rt, envelope, recipient, certificates);
     await rt.mailer.send({
       ...base,
       ...templates.completed({ envelope, recipient, attached: false, downloads }),
@@ -112,37 +113,69 @@ export async function runNotify(rt: Runtime, payload: NotifyPayload): Promise<vo
 }
 
 /** One personal download link per document, for a completed copy sent without attachments. */
-function copyDownloads(rt: Runtime, envelope: Envelope, recipient: Recipient): CopyDownload[] {
+function copyDownloads(
+  rt: Runtime,
+  envelope: Envelope,
+  recipient: Recipient,
+  certificates: ReadonlySet<string>,
+): CopyDownload[] {
   const claim = issueCopyClaim(rt.sessionSecret, envelope.id, recipient.id, rt.clock.now());
-  return envelope.documents.map((document) => ({
-    name: document.name,
-    url: `${rt.publicUrl}${rt.basePath}/v1/sign/copy/${encodeURIComponent(document.id)}?c=${claim}`,
-  }));
+  return envelope.documents.flatMap((document) => {
+    const url = `${rt.publicUrl}${rt.basePath}/v1/sign/copy/${encodeURIComponent(document.id)}?c=${claim}`;
+    return [
+      { name: document.name, url },
+      ...(certificates.has(document.id)
+        ? [{ name: certificateName(document.name), url: `${url}&file=certificate` }]
+        : []),
+    ];
+  });
 }
+
+const certificateName = (documentName: string) =>
+  `${documentName.replace(/\.pdf$/i, '')} (signing certificate).pdf`;
 
 /**
  * The sealed files to attach, or null to send links instead: when one is missing or cannot be
  * read, or together they are over `maxAttachmentBytes`.
  */
-async function sealedAttachments(rt: Runtime, envelope: Envelope) {
+async function sealedAttachments(
+  rt: Runtime,
+  envelope: Envelope,
+  certificates: ReadonlySet<string>,
+) {
   const attachments = [];
   let total = 0;
-  for (const document of envelope.documents) {
-    const content = await rt.files
-      .get(sealedFileKey(envelope.id, document.id))
-      .catch((err: unknown) => {
-        rt.logger.warn('sealed file could not be read for the completed copy', {
-          envelope: envelope.id,
-          document: document.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        return null;
+  const read = (key: string, documentId: string) =>
+    rt.files.get(key).catch((err: unknown) => {
+      rt.logger.warn('sealed file could not be read for the completed copy', {
+        envelope: envelope.id,
+        document: documentId,
+        error: err instanceof Error ? err.message : String(err),
       });
-    if (!content) return null;
-    total += content.byteLength;
-    if (total > rt.limits.maxAttachmentBytes) return null;
-    const filename = /\.pdf$/i.test(document.name) ? document.name : `${document.name}.pdf`;
-    attachments.push({ filename, content, contentType: 'application/pdf' });
+      return null;
+    });
+  for (const document of envelope.documents) {
+    const files = [
+      {
+        key: sealedFileKey(envelope.id, document.id),
+        filename: /\.pdf$/i.test(document.name) ? document.name : `${document.name}.pdf`,
+      },
+      ...(certificates.has(document.id)
+        ? [
+            {
+              key: certificateFileKey(envelope.id, document.id),
+              filename: certificateName(document.name),
+            },
+          ]
+        : []),
+    ];
+    for (const file of files) {
+      const content = await read(file.key, document.id);
+      if (!content) return null;
+      total += content.byteLength;
+      if (total > rt.limits.maxAttachmentBytes) return null;
+      attachments.push({ filename: file.filename, content, contentType: 'application/pdf' });
+    }
   }
   return attachments;
 }

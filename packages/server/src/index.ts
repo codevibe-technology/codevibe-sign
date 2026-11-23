@@ -26,7 +26,21 @@ export {
   type CertificateInput,
   type SealTrust,
   type SealCheck,
+  type SignatureSummary,
 } from './engine';
+export type {
+  EsignOptions,
+  EsignHookInput,
+  EsignOutcome,
+  EsignSession,
+  EsignSessionPatch,
+  EsignSessionStatus,
+  EsignSessionStore,
+  EsignSignature,
+  EsignUnavailable,
+} from './esign/types';
+export { esignedFileKey } from './esign/flow';
+export { certificateFileKey, sealedFileKey } from './runtime/seal';
 export type { TickResult, TickOptions } from './runtime/tick';
 export { signWebhook, verifyWebhook, SIGNATURE_HEADER, TEST_EVENT } from './runtime/webhooks';
 export {
@@ -56,6 +70,7 @@ export {
   type TemplateSummary,
 } from './template';
 export type {
+  EarlierSignature,
   PublicVerification,
   SealChecks,
   VerificationFailure,

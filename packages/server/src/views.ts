@@ -38,6 +38,7 @@ export function signerView(
   workspaceId: string,
   auth: { required: boolean; authenticated: boolean },
   timeZone = 'UTC',
+  esign?: { available: boolean },
 ) {
   const locked = auth.required && !auth.authenticated;
   const fields = locked ? [] : envelope.fields.filter((f) => f.recipientId === recipient.id);
@@ -70,6 +71,16 @@ export function signerView(
     authenticated: auth.authenticated,
     canAct: currentRecipients(envelope).some((r) => r.id === recipient.id),
     timeZone,
+    // Only for a recipient who signs with Aadhaar eSign.
+    ...(esign
+      ? {
+          esign: {
+            available: esign.available,
+            provider: recipient.esign?.provider ?? null,
+            status: recipient.esign?.status ?? null,
+          },
+        }
+      : {}),
   };
 }
 
@@ -82,6 +93,8 @@ export function receiptView(
   recipient: Recipient,
   workspaceId: string,
   sealed: ReadonlySet<string>,
+  /** Documents whose signing certificate is a file of its own. */
+  certificates: ReadonlySet<string> = new Set(),
 ) {
   return {
     workspaceId,
@@ -102,6 +115,7 @@ export function receiptView(
       id: d.id,
       name: d.name,
       sealed: sealed.has(d.id),
+      certificate: certificates.has(d.id),
     })),
   };
 }

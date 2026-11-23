@@ -343,6 +343,8 @@ describe('GET /v1/verify/:sha256', () => {
         signer: null,
         signedAt: null,
         certificateSha256: null,
+        seal: 'operator',
+        earlierSignatures: [],
         envelope: null,
       });
     }

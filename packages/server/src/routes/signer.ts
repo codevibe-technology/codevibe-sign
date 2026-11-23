@@ -20,6 +20,7 @@ import { maskEmail, maskPhone } from '@codevibe_technology/sign-pdf';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { HttpError, validation } from '../errors';
+import { checkPending, esignUnavailable, startEsign } from '../esign/flow';
 import { pdfResponse, readJson } from '../http/body';
 import { clientIp, userAgent } from '../http/client';
 import { idempotency } from '../http/idempotency';
@@ -227,6 +228,10 @@ export function signerRoutes(rt: Runtime) {
 
   app.get('/:token', async (c) => {
     const signer = await resolve(c);
+    const esign =
+      signer.recipient.auth === 'aadhaar'
+        ? { available: (await esignUnavailable(rt, signer.workspaceId)) === null }
+        : undefined;
     return c.json(
       signerView(
         signer.envelope,
@@ -234,7 +239,71 @@ export function signerRoutes(rt: Runtime) {
         signer.workspaceId,
         { required: signer.otpRequired, authenticated: signer.authenticated },
         await timeZoneFor(rt, signer.workspaceId),
+        esign,
       ),
+    );
+  });
+
+  const giveReceipt = (c: Context, envelopeId: string, recipientId: string) => {
+    const receipt = issueReceipt(rt.sessionSecret, envelopeId, recipientId, rt.clock.now());
+    setCookie(c, RECEIPT_COOKIE, receipt.value, {
+      httpOnly: true,
+      secure: rt.secureCookies,
+      sameSite: 'Strict',
+      path: signerCookiePath(rt),
+      maxAge: RECEIPT_TTL_MS / 1000,
+    });
+    c.header(RECEIPT_HEADER, receipt.value);
+  };
+
+  /**
+   * Where the signer's Aadhaar eSign stands. Unlike the other routes it still answers after
+   * the recipient has signed, because the signature is recorded while they are away at the
+   * provider: the page they come back to learns it here and gets its receipt.
+   */
+  app.get('/:token/esign', async (c) => {
+    const now = rt.clock.now();
+    const tokenHash = hashToken(tokenOf(c));
+    await enforce(rt.limiter, `token:${tokenHash}`, rt.limits.signerRequestsPerMinute, 60_000, now);
+    const token = await rt.store.findToken(tokenHash);
+    if (!token || token.expiresAt.getTime() <= now.getTime()) throw tokenInvalid();
+    const session = (await rt.store.esign?.latest(token.envelopeId, token.recipientId)) ?? null;
+    if (!session) {
+      if (token.revokedAt) throw tokenInvalid();
+      return c.json({ status: 'none', signUrl: null, expiresAt: null });
+    }
+    let status = session.status === 'starting' ? 'pending' : session.status;
+    if (session.status === 'pending' && (await checkPending(rt, session)) === 'signed') {
+      status = 'signed';
+    }
+    if (token.revokedAt && status !== 'signed') throw tokenInvalid();
+    if (status === 'signed' && now.getTime() - session.updatedAt.getTime() < RECEIPT_TTL_MS) {
+      giveReceipt(c, session.envelopeId, session.recipientId);
+    }
+    const live = status === 'pending' && session.expiresAt.getTime() > now.getTime();
+    return c.json({
+      status,
+      signUrl: live ? session.signUrl : null,
+      expiresAt: live ? session.expiresAt.toISOString() : null,
+    });
+  });
+
+  app.post('/:token/esign', async (c) => {
+    const { envelope, recipient, workspaceId } = await resolveForAction(c);
+    const body = parseJsonObject(await readJson(c));
+    if (body.consent !== true) {
+      throw validation('consent must be true: the signer agrees to sign electronically', {
+        field: 'consent',
+      });
+    }
+    return c.json(
+      await startEsign(rt, {
+        envelope,
+        recipient,
+        workspaceId,
+        values: parseValues(body.values),
+        context: context(c),
+      }),
     );
   });
 
@@ -341,15 +410,7 @@ export function signerRoutes(rt: Runtime) {
     const result = await mutate(rt, envelope.id, (current) =>
       submit(current, { recipientId: recipient.id, values, context: context(c) }, deps),
     );
-    const receipt = issueReceipt(rt.sessionSecret, envelope.id, recipient.id, rt.clock.now());
-    setCookie(c, RECEIPT_COOKIE, receipt.value, {
-      httpOnly: true,
-      secure: rt.secureCookies,
-      sameSite: 'Strict',
-      path: signerCookiePath(rt),
-      maxAge: RECEIPT_TTL_MS / 1000,
-    });
-    c.header(RECEIPT_HEADER, receipt.value);
+    giveReceipt(c, envelope.id, recipient.id);
     return c.json(statusOf(result.envelope, recipient));
   });
 

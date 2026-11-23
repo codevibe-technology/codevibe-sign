@@ -9,7 +9,7 @@ import {
 } from '@codevibe_technology/sign-core';
 import { maskEmail, maskPhone } from '@codevibe_technology/sign-pdf';
 import { sha256Hex } from './crypto';
-import type { SealCheck } from './engine';
+import type { SealCheck, SignatureSummary } from './engine';
 import type { Runtime } from './runtime/context';
 import { sealedFileKey } from './runtime/seal';
 
@@ -18,6 +18,7 @@ export type VerificationFailure =
   | 'not_sealed'
   | 'multiple_signatures'
   | 'signature_invalid'
+  | 'earlier_signature_invalid'
   | 'not_whole_document'
   | 'untrusted_signer'
   | 'unreadable'
@@ -27,7 +28,7 @@ export type VerificationFailure =
 export interface SealChecks {
   /** The file carries a seal. */
   sealed: boolean | null;
-  /** It carries exactly one signature. */
+  /** It carries the seal alone, or the seal over signatures made before it. */
   singleSignature: boolean | null;
   /** The signature is intact: no byte it covers changed. */
   intact: boolean | null;
@@ -61,6 +62,16 @@ export interface VerifiedEnvelope {
   chain: { valid: boolean; head: string | null; events: number };
 }
 
+/** A signature made before the seal, for example an Aadhaar eSign by an eSign provider. */
+export interface EarlierSignature {
+  /** The signature matches the bytes it covers. */
+  valid: boolean;
+  signerCommonName: string | null;
+  /** The authority that issued the signer's certificate. */
+  issuerCommonName: string | null;
+  signedAt: string | null;
+}
+
 export interface PublicVerification {
   /** The file is exactly what this server sealed, unchanged since. */
   valid: boolean;
@@ -73,6 +84,14 @@ export interface PublicVerification {
   signedAt: string | null;
   /** SHA-256 of the certificate the seal was made with. */
   certificateSha256: string | null;
+  /**
+   * `operator`: the file ends with this server's seal. `provider_only`: an eSign provider
+   * locked the file against further signatures, so it is kept as the provider signed it and
+   * is recognised by its SHA-256 in the audit trail.
+   */
+  seal: 'operator' | 'provider_only';
+  /** Signatures made before the seal, earliest first. Empty for most files. */
+  earlierSignatures: EarlierSignature[];
   /** Present only for a valid file whose envelope this server still holds. */
   envelope: VerifiedEnvelope | null;
 }
@@ -89,6 +108,7 @@ const FAILED_CHECK: Partial<Record<VerificationFailure, keyof SealChecks>> = {
   not_sealed: 'sealed',
   multiple_signatures: 'singleSignature',
   signature_invalid: 'intact',
+  earlier_signature_invalid: 'intact',
   not_whole_document: 'coversWholeDocument',
   untrusted_signer: 'trustedCertificate',
 };
@@ -117,8 +137,53 @@ function result(sha256: string, reason: VerificationFailure | null, check?: Seal
       : null,
     signedAt: check?.signedAt ?? null,
     certificateSha256: check?.certificateSha256 ?? null,
+    seal: 'operator',
+    earlierSignatures: (check?.earlierSignatures ?? []).map(earlier),
     envelope: null,
   } satisfies PublicVerification;
+}
+
+export const earlier = (signature: SignatureSummary): EarlierSignature => ({
+  valid: signature.valid,
+  signerCommonName: signature.signer?.commonName ?? null,
+  issuerCommonName: signature.issuer?.commonName ?? null,
+  signedAt: signature.signedAt ?? null,
+});
+
+/** What the audit trail says about how the file with this hash was sealed. */
+async function sealRecord(rt: Runtime, sha256: string) {
+  const ref = await rt.store.findSealed?.(sha256);
+  if (!ref) return null;
+  const events = await rt.store.listEvents(ref.envelopeId);
+  return (
+    events.find((e) => e.action === 'document.sealed' && e.data?.sha256 === sha256)?.data ?? null
+  );
+}
+
+/**
+ * A file this server recorded as sealed, byte for byte, that `verify` cannot vouch for on its
+ * own: one the provider locked, or one whose provider signature is in a form it cannot read.
+ */
+export async function recordedAsIs(
+  rt: Runtime,
+  bytes: Uint8Array,
+  sha256: string,
+  check: SealCheck,
+): Promise<PublicVerification | null> {
+  const record = await sealRecord(rt, sha256);
+  if (record?.seal === 'provider_only') {
+    const signatures = (await rt.pdf.verifySignatures?.(bytes).catch(() => [])) ?? [];
+    return {
+      ...result(sha256, null),
+      seal: 'provider_only',
+      earlierSignatures: signatures.map(earlier),
+      envelope: await envelopeOf(rt, sha256),
+    };
+  }
+  if (check.reason === 'earlier_signature_invalid' && record?.earlierSignatures === 'unverified') {
+    return { ...result(sha256, null, check), envelope: await envelopeOf(rt, sha256) };
+  }
+  return null;
 }
 
 const REASONS = new Set<string>(Object.keys(FAILED_CHECK));
@@ -187,7 +252,7 @@ export async function verifySealedPdf(rt: Runtime, bytes: Uint8Array): Promise<P
   let check: SealCheck;
   rt.verifying.count++;
   try {
-    check = await rt.pdf.verify(bytes, { trust: rt.sealTrust });
+    check = await rt.pdf.verify(bytes, { trust: rt.sealTrust, allowEarlierSignatures: true });
   } catch {
     // A file the parser refuses or cannot read is not a sealed document; it is not our error.
     return result(sha256, 'unreadable');
@@ -195,6 +260,8 @@ export async function verifySealedPdf(rt: Runtime, bytes: Uint8Array): Promise<P
     rt.verifying.count--;
   }
   if (!check.valid) {
+    const recorded = await recordedAsIs(rt, bytes, sha256, check);
+    if (recorded) return recorded;
     const reason = REASONS.has(check.reason ?? '') ? (check.reason as VerificationFailure) : null;
     return result(sha256, reason ?? 'signature_invalid', check);
   }
