@@ -17,6 +17,7 @@ import {
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
 import { assertRoom, assertWithin, lockedPlan, reserveUsage, workspacePlan } from './plans';
+import { userLabel } from './profile';
 
 type Sql = postgres.Sql;
 
@@ -211,7 +212,7 @@ async function claimStaged(
 
 const SELECT = (sql: Sql) => sql`
   select t.id, t.workspace_id as "workspaceId", t.name, t.description, t.definition,
-    t.created_by as "createdBy", u.name as "createdByName", t.created_at as "createdAt",
+    t.created_by as "createdBy", ${userLabel(sql)} as "createdByName", t.created_at as "createdAt",
     t.updated_at as "updatedAt", t.archived_at as "archivedAt"
   from app_templates t left join auth_users u on u.id = t.created_by`;
 

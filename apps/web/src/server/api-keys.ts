@@ -2,6 +2,7 @@ import 'server-only';
 import type postgres from 'postgres';
 import { randomId, randomSecret, sha256Hex } from './crypto';
 import { AppError } from './errors';
+import { userLabel } from './profile';
 
 export const API_KEY_PREFIX = 'cvs_';
 const KEY_SHAPE = /^cvs_[A-Za-z0-9_-]{43}$/;
@@ -41,7 +42,7 @@ export async function createApiKey(
 
 export async function listApiKeys(sql: postgres.Sql, workspaceId: string): Promise<ApiKeyRecord[]> {
   return sql<ApiKeyRecord[]>`
-    select k.id, k.name, k.prefix, k.created_at as "createdAt", u.name as "createdByName",
+    select k.id, k.name, k.prefix, k.created_at as "createdAt", ${userLabel(sql)} as "createdByName",
       k.last_used_at as "lastUsedAt"
     from app_api_keys k left join auth_users u on u.id = k.created_by
     where k.workspace_id = ${workspaceId} and k.revoked_at is null

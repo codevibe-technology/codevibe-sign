@@ -6,6 +6,7 @@ import {
   type EnvelopeStatus,
 } from '@codevibe_technology/sign-core';
 import type postgres from 'postgres';
+import { userLabel } from './profile';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
@@ -116,6 +117,7 @@ export async function recordSender(
 
 export interface Sender {
   userId: string | null;
+  /** Their name, or their email address when they have saved none; null once they are gone. */
   name: string | null;
 }
 
@@ -126,7 +128,7 @@ export async function senderOf(
   envelopeId: string,
 ): Promise<Sender | null> {
   const rows = await sql<{ user_id: string | null; name: string | null }[]>`
-    select s.user_id, u.name from app_envelope_senders s
+    select s.user_id, ${userLabel(sql)} as name from app_envelope_senders s
     left join auth_users u on u.id = s.user_id
     where s.envelope_id = ${envelopeId} and s.workspace_id = ${workspaceId}`;
   const row = rows[0];

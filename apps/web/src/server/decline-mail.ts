@@ -33,7 +33,7 @@ export async function mailSenderOnDecline(
   const decliner = envelope?.recipients.find((r) => r.status === 'declined');
   if (!envelope || !decliner) return;
   const mail = declineNotice({
-    senderName: sender.name,
+    senderName: sender.name.trim(),
     title: envelope.title,
     declinedBy: decliner.name,
     role: decliner.role,

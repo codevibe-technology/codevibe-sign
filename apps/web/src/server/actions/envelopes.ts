@@ -10,6 +10,7 @@ import { inspectUpload, verifyUpload } from '../pdf';
 import { assertWithin, workspacePlan } from '../plans';
 import { signApi, userPrincipal } from '../sign/api';
 import { workspaceAction, type ActionContext } from './action';
+import { displayName } from '@/lib/person-name';
 
 const id = z.string().min(1).max(100);
 const pdfFile = z.instanceof(File, { error: 'Choose a PDF file' });
@@ -109,8 +110,7 @@ export const verifyDocumentAction = workspaceAction(
   },
 );
 
-const actor = (ctx: { user: { name: string; email: string } }) =>
-  ctx.user.name.trim() || ctx.user.email;
+const actor = (ctx: { user: { name: string; email: string } }) => displayName(ctx.user);
 
 /**
  * A fresh signing link for the recipient whose turn it is, for the admin to pass on by hand.

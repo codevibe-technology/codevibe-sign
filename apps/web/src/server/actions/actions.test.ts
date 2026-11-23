@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   workspaceCount: 0,
   calls: [] as string[],
   signingArgs: [] as unknown[],
+  inviterName: '',
 }));
 
 const WORKSPACE = { id: 'ws_1', slug: 'acme', name: 'Acme' };
@@ -62,7 +63,12 @@ vi.mock('../invitations', () => ({
   revokeInvitation: record('revokeInvitation'),
   acceptInvitation: record('acceptInvitation', { workspaceSlug: 'acme' }),
 }));
-vi.mock('../mail', () => ({ sendInvitation: record('sendInvitation') }));
+vi.mock('../mail', () => ({
+  sendInvitation: async (_mailer: unknown, input: { inviterName: string }) => {
+    state.calls.push('sendInvitation');
+    state.inviterName = input.inviterName;
+  },
+}));
 vi.mock('../api-keys', () => ({
   createApiKey: record('createApiKey', { id: 'key_1', key: 'cvs_x', prefix: 'cvs_x' }),
   revokeApiKey: record('revokeApiKey'),
@@ -333,5 +339,15 @@ describe('user actions', () => {
     expect(state.calls).toEqual([]);
     expect((await acceptInvitationAction({ token: 'abc', name: 'Ravi Kumar' })).ok).toBe(true);
     expect(state.calls).toEqual(['acceptInvitation', 'setOwnName:u9:Ravi Kumar']);
+  });
+
+  it('sign an invitation with the inviter’s name, or their email address without one', async () => {
+    const invite = () => inviteMemberAction(withWorkspace({ email: 'a@b.co', role: 'member' }));
+    state.user = { id: 'u1', name: ' Asha Rao ', email: 'asha@example.com', image: null };
+    expect((await invite()).ok).toBe(true);
+    expect(state.inviterName).toBe('Asha Rao');
+    state.user = { id: 'u1', name: '', email: 'asha@example.com', image: null };
+    expect((await invite()).ok).toBe(true);
+    expect(state.inviterName).toBe('asha@example.com');
   });
 });

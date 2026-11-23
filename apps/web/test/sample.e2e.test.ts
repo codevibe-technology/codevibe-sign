@@ -88,10 +88,13 @@ describe('the first-run sample envelope', () => {
     expect(mail.map((m) => m.to)).toContain('asha@acme.test');
   });
 
-  it('names the signer after their email when they have no name yet', async () => {
+  it('names the signer by their name, and by their email address only without one', async () => {
     const { sampleEnvelopeBody } = await import('@/server/sample-envelope');
     expect(sampleEnvelopeBody({ name: ' ', email: 'ravi@acme.test' }).recipients[0]!.name).toBe(
-      'ravi',
+      'ravi@acme.test',
     );
+    expect(
+      sampleEnvelopeBody({ name: ' Ravi Kumar ', email: 'ravi@acme.test' }).recipients[0]!.name,
+    ).toBe('Ravi Kumar');
   });
 });

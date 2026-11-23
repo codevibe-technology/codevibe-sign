@@ -1,4 +1,5 @@
 import { HttpError, type Principal } from '@codevibe_technology/sign-server';
+import { displayName } from '@/lib/person-name';
 import { can, canVoidEnvelope, type Role } from '@/lib/roles';
 
 export const WORKSPACE_HEADER = 'x-workspace';
@@ -8,7 +9,9 @@ export interface PrincipalDeps {
   /** The live key's id and workspace, or null. */
   resolveApiKey: (key: string) => Promise<{ id: string; workspaceId: string } | null>;
   /** The signed-in user behind the request's session cookie, or null. */
-  sessionUser: (headers: Headers) => Promise<{ id: string; name?: string | null } | null>;
+  sessionUser: (
+    headers: Headers,
+  ) => Promise<{ id: string; name?: string | null; email: string } | null>;
   /** The user's role in the workspace, or null when they are not a member. */
   roleOf: (userId: string, workspaceId: string) => Promise<Role | null>;
   /** Whether the member sent this envelope from the app; see `canVoidEnvelope`. */
@@ -33,7 +36,8 @@ const LINK_PATH = /\/v1\/envelopes\/[^/]+\/recipients\/[^/]+\/link\/?$/;
  * Resolves who is calling `/api/v1`: an in-process call, a workspace API key, or a signed-in
  * member using the app. A session call must name its workspace in `X-Workspace` (a header no
  * other site can send without a CORS preflight) and, when it writes, come from the app's own
- * origin. Viewers get a read-only principal, and members may only void what they sent.
+ * origin. Viewers get a read-only principal, and members may only void what they sent. The
+ * audit trail names a member by their name, or by their email address when they have none.
  */
 export function createAuthenticate(deps: PrincipalDeps) {
   const appOrigin = new URL(deps.appUrl).origin;
@@ -73,7 +77,7 @@ export function createAuthenticate(deps: PrincipalDeps) {
       id: `user:${user.id}`,
       workspaceId,
       readOnly: !can(role, 'envelopes.write'),
-      ...(user.name ? { actorName: user.name } : {}),
+      actorName: displayName(user),
     };
   };
 }

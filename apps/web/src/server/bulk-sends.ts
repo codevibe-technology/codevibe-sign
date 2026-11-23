@@ -4,6 +4,7 @@ import type { BulkRowPlan, BulkRowStatus, BulkStatus } from '@/lib/bulk-send';
 import type { People } from '@/lib/templates';
 import { randomId } from './crypto';
 import { AppError } from './errors';
+import { userLabel } from './profile';
 
 type Sql = postgres.Sql;
 
@@ -72,7 +73,7 @@ export async function createBulkSend(
 
 const SELECT = (sql: Sql) => sql`
   select b.id, b.workspace_id as "workspaceId", b.template_id as "templateId",
-    b.template_name as "templateName", b.created_by as "createdBy", u.name as "createdByName",
+    b.template_name as "templateName", b.created_by as "createdBy", ${userLabel(sql)} as "createdByName",
     b.status, b.total, b.created_at as "createdAt", b.finished_at as "finishedAt",
     (select count(*)::int from app_bulk_send_rows r where r.bulk_id = b.id and r.status = 'sent') as sent,
     (select count(*)::int from app_bulk_send_rows r where r.bulk_id = b.id and r.status = 'failed') as failed

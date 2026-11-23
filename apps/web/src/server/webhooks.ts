@@ -13,6 +13,7 @@ import {
 import { randomId, randomSecret } from './crypto';
 import { AppError } from './errors';
 import { assertRoom, lockedPlan } from './plans';
+import { userLabel } from './profile';
 
 type Sql = postgres.Sql;
 
@@ -167,7 +168,7 @@ const notFound = () =>
 
 const SELECT = (sql: Sql) => sql`
   select w.id, w.url, w.description, w.events, w.enabled, w.created_at as "createdAt",
-    w.updated_at as "updatedAt", u.name as "createdByName",
+    w.updated_at as "updatedAt", ${userLabel(sql)} as "createdByName",
     (select json_build_object('status', d.status, 'at', d.last_attempt_at)
        from app_webhook_deliveries d where d.webhook_id = w.id
        order by d.last_attempt_at desc limit 1) as "lastDelivery"

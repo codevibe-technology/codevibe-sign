@@ -6,6 +6,9 @@ import { migrateAll } from '@/server/migrate';
 import { setOwnName } from '@/server/profile';
 import { createInvitation, findInvitation, listOpenInvitations } from '@/server/invitations';
 import { createWorkspace } from '@/server/workspaces';
+import { createApiKey, listApiKeys } from '@/server/api-keys';
+import { recordSender, senderOf } from '@/server/envelopes';
+import { listMembers } from '@/server/members';
 
 const url = process.env.DATABASE_URL;
 
@@ -124,6 +127,31 @@ describe.skipIf(!url)('names, against PostgreSQL', () => {
         invitedBy: { userId: owner.id, role: 'owner' },
       });
       expect((await findInvitation(sql, token))?.invitedByName).toBe(owner.email);
+    });
+  });
+
+  describe('what a person is called', () => {
+    it('is their name, and their email address only until they save one', async () => {
+      const owner = await person('Asha Rao');
+      const unnamed = await person('  ');
+      const ws = await createWorkspace(sql, { name: 'Labels', userId: owner.id });
+      await sql`insert into app_members (workspace_id, user_id, role)
+        values (${ws.id}, ${unnamed.id}, 'admin')`;
+      await recordSender(sql, { workspaceId: ws.id, envelopeId: 'env_named', userId: owner.id });
+      await recordSender(sql, { workspaceId: ws.id, envelopeId: 'env_plain', userId: unnamed.id });
+      await createApiKey(sql, { workspaceId: ws.id, name: 'HR system', createdBy: unnamed.id });
+
+      expect((await senderOf(sql, ws.id, 'env_named'))?.name).toBe('Asha Rao');
+      expect((await senderOf(sql, ws.id, 'env_plain'))?.name).toBe(unnamed.email);
+      expect((await listApiKeys(sql, ws.id)).map((k) => k.createdByName)).toEqual([unnamed.email]);
+      expect((await listMembers(sql, ws.id)).map((m) => [m.name, m.email])).toEqual([
+        ['Asha Rao', owner.email],
+        ['', unnamed.email],
+      ]);
+
+      await setOwnName(sql, unnamed.id, 'Ravi Kumar');
+      expect((await senderOf(sql, ws.id, 'env_plain'))?.name).toBe('Ravi Kumar');
+      expect((await listApiKeys(sql, ws.id)).map((k) => k.createdByName)).toEqual(['Ravi Kumar']);
     });
   });
 });

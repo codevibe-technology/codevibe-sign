@@ -14,7 +14,7 @@ function setup(role: Role | null = 'member', sent: string[] = [], withName = fal
       key === 'cvs_good' ? { id: 'key_1', workspaceId: 'ws_a' } : null,
     sessionUser: async (headers) =>
       headers.get('cookie') === 'session'
-        ? { id: 'u1', ...(withName ? { name: 'Asha Rao' } : {}) }
+        ? { id: 'u1', email: 'asha@example.com', ...(withName ? { name: 'Asha Rao' } : {}) }
         : null,
     roleOf: async (userId, workspaceId) =>
       userId === 'u1' && workspaceId === 'ws_a' ? role : null,
@@ -53,7 +53,12 @@ describe('createAuthenticate', () => {
     const principal = await setup()(
       request('POST', { cookie: 'session', 'x-workspace': 'ws_a', origin: APP }),
     );
-    expect(principal).toEqual({ id: 'user:u1', workspaceId: 'ws_a', readOnly: false });
+    expect(principal).toEqual({
+      id: 'user:u1',
+      workspaceId: 'ws_a',
+      readOnly: false,
+      actorName: 'asha@example.com',
+    });
   });
 
   it('makes viewers read-only', async () => {
@@ -137,6 +142,12 @@ describe('fixing envelopes after sending', () => {
   it('names the signed-in user for the audit trail', async () => {
     expect(await setup('admin', [], true)(at('env_1/recipients/r1/link'))).toMatchObject({
       actorName: 'Asha Rao',
+    });
+  });
+
+  it('falls back to their email address only when they have saved no name', async () => {
+    expect(await setup('admin')(at('env_1/recipients/r1/link'))).toMatchObject({
+      actorName: 'asha@example.com',
     });
   });
 });

@@ -10,6 +10,7 @@ import {
 } from '@/lib/sample-envelope';
 import { SAMPLE_AGREEMENT_PDF } from './sample/agreement-pdf';
 import { apiError } from './sign/api';
+import { displayName } from '@/lib/person-name';
 
 type Sql = postgres.Sql;
 
@@ -26,7 +27,7 @@ export interface SampleDeps {
 
 /** The body that creates the sample draft: our own one-page PDF, the user as the signer. */
 export function sampleEnvelopeBody(user: { name: string; email: string }) {
-  const name = user.name.trim() || user.email.split('@')[0] || 'You';
+  const name = displayName(user);
   return {
     title: SAMPLE_TITLE,
     message: SAMPLE_MESSAGE,

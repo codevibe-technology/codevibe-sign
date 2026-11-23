@@ -2,6 +2,7 @@ import 'server-only';
 import type postgres from 'postgres';
 import { canManageRole, type Role } from '@/lib/roles';
 import { AppError } from './errors';
+import { userLabel } from './profile';
 
 export interface Member {
   userId: string;
@@ -14,10 +15,11 @@ export interface Member {
 
 export async function listMembers(sql: postgres.Sql, workspaceId: string): Promise<Member[]> {
   return sql<Member[]>`
-    select u.id as "userId", u.name, u.email, u.image, m.role, m.created_at as "joinedAt"
+    select u.id as "userId", btrim(u.name) as name, u.email, u.image, m.role, m.created_at as "joinedAt"
     from app_members m join auth_users u on u.id = m.user_id
     where m.workspace_id = ${workspaceId}
-    order by array_position(array['owner','admin','member','viewer'], m.role), lower(u.name)`;
+    order by array_position(array['owner','admin','member','viewer'], m.role),
+      lower(${userLabel(sql)})`;
 }
 
 interface Change {

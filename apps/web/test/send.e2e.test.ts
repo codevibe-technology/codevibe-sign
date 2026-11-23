@@ -80,7 +80,7 @@ describe('send, sign, seal and verify through the app', () => {
         resolveApiKey: async () => null,
         sessionUser: async (headers) => {
           const id = /session=(\w+)/.exec(headers.get('cookie') ?? '')?.[1];
-          return id ? { id } : null;
+          return id ? { id, email: `${id}@acme.test` } : null;
         },
         roleOf: async (userId, workspaceId) =>
           workspaceId === WORKSPACE.id ? (state.roles[userId] ?? null) : null,
