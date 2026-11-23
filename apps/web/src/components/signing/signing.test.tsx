@@ -545,6 +545,17 @@ describe('signing with Aadhaar eSign', () => {
     expect(await screen.findByRole('heading', { name: /^Thank you/ })).toBeTruthy();
   });
 
+  it('says nothing was signed when the request closed while the signer was away', async () => {
+    window.history.replaceState(null, '', '/sign?esign=return');
+    server({
+      'GET /api/v1/sign/link': refused(401, 'TOKEN_INVALID'),
+      'GET /api/v1/sign/receipt': refused(401, 'TOKEN_INVALID'),
+      'GET /api/v1/sign/link/esign': refused(401, 'TOKEN_INVALID'),
+    });
+    render(<SigningApp smsAvailable={false} esignPoll={ESIGN_POLL} />);
+    expect((await screen.findByTestId('esign-closed')).textContent).toMatch(/nothing was signed/);
+  });
+
   it('offers another try when the eSign failed or ran out of time', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/sign?esign=return');

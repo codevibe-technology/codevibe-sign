@@ -33,6 +33,7 @@ type Phase =
   | { kind: 'sign' }
   | { kind: 'esign_wait' }
   | { kind: 'esign_off' }
+  | { kind: 'esign_closed' }
   | { kind: 'done'; name: string; approved: boolean };
 
 async function loadBrand(workspaceId: string): Promise<SigningBrand | null> {
@@ -123,7 +124,10 @@ export function SigningApp({
               : { kind: 'ended', state: 'invalid' },
           );
         } catch {
-          setPhase({ kind: 'ended', state: 'invalid' });
+          // Back from the provider to a request that is closed: declined there, or withdrawn.
+          setPhase(
+            returnedFromEsign() ? { kind: 'esign_closed' } : { kind: 'ended', state: 'invalid' },
+          );
         }
       }
     }
@@ -268,6 +272,20 @@ export function SigningApp({
             );
           }}
         />
+      );
+      break;
+    case 'esign_closed':
+      content = (
+        <SigningMessage
+          icon={<Fingerprint aria-hidden className="h-6 w-6" />}
+          title="This document was not signed"
+          tone="warning"
+        >
+          <p data-testid="esign-closed">
+            The Aadhaar eSign was declined or the request was closed, so nothing was signed. The
+            sender has been told. You can close this page.
+          </p>
+        </SigningMessage>
       );
       break;
     case 'esign_off':
