@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { BRAND_COLORS, BRAND_FONTS, LOCKUP } from './brand-assets';
+import { BRAND_COLORS, BRAND_FONTS, EMAIL_LOGO, LOCKUP } from './brand-assets';
 import { contrastRatio } from './contrast';
 
 const web = fileURLToPath(new URL('../../', import.meta.url));
@@ -166,8 +166,15 @@ describe('the lockup', () => {
     );
     expect(named).toEqual([]);
     expect(text(web, 'src/app/share-image.tsx')).toContain('LOCKUP.light');
-    expect(text(web, 'src/server/mail.ts')).toContain('LOCKUP.email');
-    expect(pngSize(read(web, `public${LOCKUP.email}`))[1]).toBe(56);
+    const email = text(web, 'src/lib/email-layout.ts');
+    expect(email).toContain('LOCKUP.email');
+    expect(email).toContain('LOCKUP.emailDark');
+    for (const file of [LOCKUP.email, LOCKUP.emailDark]) {
+      expect(pngSize(read(web, `public${file}`))).toEqual([
+        EMAIL_LOGO.width * 2,
+        EMAIL_LOGO.height * 2,
+      ]);
+    }
   });
 
   it('is the logo of the docs, light and dark, with no text title beside it', () => {
@@ -197,8 +204,10 @@ describe('the typefaces', () => {
 
   it('are not overridden by a font named in a component', () => {
     // A workspace may pick the font of its own signing page and emails; that list lives in
-    // lib/brand.ts. Everything else takes the tokens.
-    const allowed = /(lib\/brand\.ts|lib\/brand-assets\.ts|app\/globals\.css)$/;
+    // lib/brand.ts. Emails cannot load fonts, so their layout names system fallbacks after
+    // Inter. Everything else takes the tokens.
+    const allowed =
+      /(lib\/brand\.ts|lib\/brand-assets\.ts|lib\/email-layout\.ts|app\/globals\.css)$/;
     const named = sources(join(web, 'src'))
       .filter((file) => !allowed.test(file))
       .flatMap((file) =>

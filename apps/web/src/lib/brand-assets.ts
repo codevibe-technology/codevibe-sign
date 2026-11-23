@@ -14,8 +14,14 @@ export const LOCKUP = {
   light: '/brand/logo.svg',
   /** The same lockup for dark surfaces only: white "codevibe", light blue "sign". */
   inverse: '/brand/logo-white.svg',
+  /** The light lockup as a PNG for emails, at twice `EMAIL_LOGO`, with a thin white halo. */
   email: '/brand/logo-email.png',
+  /** The inverse lockup as a PNG, for mail apps in dark mode. */
+  emailDark: '/brand/logo-email-dark.png',
 } as const;
+
+/** The size emails draw the lockup at, in CSS pixels. */
+export const EMAIL_LOGO = { width: 183, height: 30 } as const;
 
 /** The only typefaces the app may load. */
 export const BRAND_FONTS = ['Inter', 'Space Grotesk', 'JetBrains Mono'] as const;

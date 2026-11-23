@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { EMAIL_LOGO, LOCKUP } from '../src/lib/brand-assets';
 
 const NAVY = '#0D1B2A';
 const path = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
@@ -105,13 +106,50 @@ const LOCKUPS = ['logo.svg', 'logo-white.svg'];
 for (const name of LOCKUPS) write(path(`../public/brand/${name}`), readFileSync(brand + name));
 
 const lockup = readFileSync(`${brand}logo.svg`);
-/** Emails cannot show SVG; this PNG is twice the 28 px the account emails draw it at. */
-write(
-  path('../public/brand/logo-email.png'),
-  await sharp(lockup, { density: (72 * 56) / 135 })
-    .resize({ height: 56 })
+
+/**
+ * The lockup for emails, which cannot show SVG: twice the size the emails draw it at
+ * (EMAIL_LOGO in lib/brand-assets), on a clear background. A thin white halo keeps the navy
+ * words readable when a mail app darkens the message around the image.
+ */
+async function emailLogo(svg: Buffer, halo: boolean) {
+  const height = EMAIL_LOGO.height * 2 - 4;
+  const drawn = await sharp(svg, { density: (72 * height) / 135 })
+    .resize({ height })
     .png()
-    .toBuffer(),
+    .toBuffer();
+  const { width = 0 } = await sharp(drawn).metadata();
+  const right = EMAIL_LOGO.width * 2 - width - 2;
+  const padded = await sharp(drawn)
+    .extend({ top: 2, bottom: 2, left: 2, right, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+  if (!halo) return padded;
+  const mask = await sharp(padded).extractChannel(3).blur(1.8).threshold(24).toBuffer();
+  return sharp(padded)
+    .composite([
+      {
+        input: await sharp({
+          create: {
+            width: EMAIL_LOGO.width * 2,
+            height: EMAIL_LOGO.height * 2,
+            channels: 3,
+            background: '#FFFFFF',
+          },
+        })
+          .joinChannel(mask)
+          .png()
+          .toBuffer(),
+        blend: 'dest-over',
+      },
+    ])
+    .png()
+    .toBuffer();
+}
+write(path(`../public${LOCKUP.email}`), await emailLogo(lockup, true));
+write(
+  path(`../public${LOCKUP.emailDark}`),
+  await emailLogo(readFileSync(`${brand}logo-white.svg`), false),
 );
 
 /** The light lockup as data for the PDF certificate, which draws it as vector paths. */
