@@ -28,6 +28,8 @@ put your own server's address in its place when you run Codevibe Sign yourself.
 - [**Webhooks**](/http-api/reference/webhooks): events posted to your backend, and how to verify
   them.
 - [**Errors**](/http-api/errors): every error code and what to do about it.
+- [**Versioning and deprecation**](/http-api/versioning): what can change, what never will, and
+  the notice you get.
 - [**Local sandbox**](/http-api/sandbox): a throwaway server on your machine for trying requests.
 
 ## How the API is shaped
@@ -35,14 +37,16 @@ put your own server's address in its place when you run Codevibe Sign yourself.
 An **envelope** is one signing job: the PDFs, the **recipients** who sign, approve or receive a
 copy, and the **fields** they fill in. You create it and send it, and the server does the rest:
 it emails each recipient in turn, checks one-time codes, records every step in a hash-chained
-audit trail and seals the finished PDF with a digital signature.
+audit trail and seals the finished PDF with a digital signature. A **template** keeps the PDFs,
+roles and fields of an envelope you send often, so each new one only needs the people.
 
 Two kinds of caller use the API:
 
-| Caller               | Authenticates with                          | Routes             |
-| -------------------- | ------------------------------------------- | ------------------ |
-| Your backend         | An API key in `Authorization: Bearer <key>` | `/v1/envelopes...` |
-| The signer's browser | The signing token from their link           | `/v1/sign/...`     |
+| Caller                   | Authenticates with                          | Routes                                 |
+| ------------------------ | ------------------------------------------- | -------------------------------------- |
+| Your backend             | An API key in `Authorization: Bearer <key>` | `/v1/envelopes...`, `/v1/templates...` |
+| The signer's browser     | The signing token from their link           | `/v1/sign/...`                         |
+| Anyone with a sealed PDF | Nothing: verification is public             | `/v1/verify...`                        |
 
 Keep API keys on your server. Only the signing routes are meant for browsers, and only from
 the signing page on your own origin. The server sends no CORS headers, which is the safe

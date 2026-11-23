@@ -1,25 +1,27 @@
 ---
-title: API versioning and changelog
-description: How the Codevibe Sign HTTP API is versioned, what counts as a breaking change, and every change to version 1.
+title: API changelog
+description: Every change to version 1 of the Codevibe Sign HTTP API, newest first.
 ---
 
-# Versioning and changelog
+# Changelog
 
-The API version is in the path. Every route is under `/v1`, and the OpenAPI document of a
-server, `GET /v1/openapi.json`, always describes exactly what that server answers.
+Every change to the HTTP API, newest first. The API is versioned as one unit under `/v1`, and
+within it changes only add. [Versioning and deprecation](/http-api/versioning) says exactly
+what counts as a breaking change and how much notice you get.
 
-**Additive changes** come without notice: new routes, new optional request fields, new response
-fields, new webhook event types and new error codes. Write clients that ignore unknown fields
-and that branch on error `code`, not on `message`.
-
-**Breaking changes**, such as removing a field or changing what a status means, get a new
-version path, announced here before the old one is retired. Before the first stable release, a breaking change may happen within `v1`; it is marked
-**Breaking** below and in the package changelogs.
+Version 1 is not yet declared stable. Until it is, a breaking change may still happen within
+`/v1`; each one is marked **Breaking** below and in the package changelogs.
 
 ## Version 1
 
 ### November 2026
 
+- **Added**: templates. `GET`, `POST`, `PATCH` and `DELETE` under `/v1/templates`, and
+  `POST /v1/templates/{templateId}/envelopes` to make an envelope from one.
+- **Added**: public verification of sealed PDFs, `POST /v1/verify` and
+  `GET /v1/verify/{sha256}`, with no API key.
+- **Added**: every answer carries `Codevibe-Api-Version: 1`, and the
+  [versioning and deprecation policy](/http-api/versioning) is written down.
 - **Changed**: operations are grouped by resource (Envelopes, Recipients, Documents, Audit
   trail, Signing) and every error code has a one-line description in the document.
 - **Added**: the cloud API, `https://sign.codevibe.in/api`, as a second server in the document.

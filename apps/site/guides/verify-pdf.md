@@ -27,6 +27,50 @@ stored. The page also shows the seal certificate's fingerprint and serves the ce
 To produce a sealed PDF as evidence in an Indian court, see
 [Electronic evidence (section 63 BSA)](./section-63-certificate).
 
+## Over the HTTP API
+
+The same check the verify page makes is a public route of the API, so your own product can
+offer it. No API key is needed. Upload the file:
+
+::: code-group
+
+```sh [curl]
+curl -X POST https://sign.codevibe.in/api/v1/verify \
+  -H "Content-Type: application/pdf" \
+  --data-binary @offer-signed.pdf
+```
+
+```ts check [Node.js]
+import { readFile } from 'node:fs/promises';
+import { createVerifyClient } from '@codevibe_technology/sign-client';
+
+const verify = createVerifyClient({ baseUrl: 'https://sign.codevibe.in/api' });
+const result = await verify.pdf(await readFile('offer-signed.pdf'));
+
+if (result.valid) {
+  console.log('Genuine:', result.envelope?.title, 'sealed at', result.signedAt);
+} else {
+  console.log('Not genuine:', result.reason);
+}
+```
+
+:::
+
+Or ask by the file's SHA-256 without sending the file at all, with
+`GET /v1/verify/{sha256}`. The server then checks its own stored copy. A hash it never sealed
+answers `valid: false` with the reason `unknown_document`, and so does a file that was changed,
+because any change gives another hash.
+
+The answer says which checks passed (`sealed`, `singleSignature`, `intact`,
+`coversWholeDocument`, `trustedCertificate`) and, for a valid file, the envelope id, the
+signers with masked contacts, each step with its time, and the head of the audit chain. That
+is what the certificate page inside the file prints, no more. Each client address may make 30
+checks in 10 minutes and a file may be up to 20 MB; nothing about the file is stored. The
+[verification reference](/http-api/reference/verification) has every field.
+
+Use this when you trust the server you are asking. To check a file without contacting anyone,
+use the offline check below.
+
 ## In code
 
 `verify` from `@codevibe_technology/sign-pdf` checks the seal offline, against the operator certificate
