@@ -401,7 +401,12 @@ describe.skipIf(!url)('subscriptions against PostgreSQL', () => {
     it('takes fewer members from the next term only', async () => {
       const ws = await workspace();
       await subscribe(ws, 'month', 5);
-      await setRenewalSeats(sql, { workspaceId: ws.id, userId: ws.owner.id, seats: 2 });
+      await setRenewalSeats(sql, {
+        workspaceId: ws.id,
+        userId: ws.owner.id,
+        seats: 2,
+        config: deps.config,
+      });
       expect((await planOf(ws)).extra_seats).toBe(5);
       now = ist('2026-12-20T10:00:00');
       await subscribe(ws);

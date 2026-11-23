@@ -27,7 +27,9 @@ import {
   type BillingOrder,
   type CheckoutSession,
   type Fulfilment,
+  type Reversal,
 } from './orders';
+import { countSeats } from '../plans';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 type Tx = postgres.TransactionSql;
@@ -59,6 +61,9 @@ interface Row {
   cancel_at_period_end: boolean;
   grace_ends_at: Date | null;
   last_reminder: string | null;
+  /** The order that paid for the current term. */
+  order_id: string | null;
+  prior: Prior | null;
 }
 
 const toSubscription = (row: Row): Subscription => ({
@@ -91,16 +96,50 @@ export function canRenew(subscription: Subscription, now: Date): boolean {
   return subscription.periodEnd.getTime() - now.getTime() <= RENEWAL_WINDOW_DAYS * DAY_MS;
 }
 
-async function planOf(sql: Sql, workspaceId: string): Promise<Plan> {
-  const [row] = await sql<{ plan: string }[]>`
-    select plan from app_workspaces where id = ${workspaceId}`;
-  if (!row) throw new AppError('NOT_FOUND', 'Workspace not found');
-  return isPlan(row.plan) ? row.plan : 'free';
+interface PlanState {
+  plan: Plan;
+  /** Who last set the plan: the operator by hand, or a payment. */
+  source: 'operator' | 'billing';
 }
 
-/** A paid plan without a subscription was set by the operator and is not sold or ended here. */
-const operatorManaged = (plan: Plan, subscription: Subscription | null) =>
-  plan !== 'free' && (!subscription || subscription.status === 'ended');
+async function planOf(sql: Sql, workspaceId: string): Promise<PlanState> {
+  const [row] = await sql<{ plan: string; plan_source: PlanState['source'] }[]>`
+    select plan, plan_source from app_workspaces where id = ${workspaceId}`;
+  if (!row) throw new AppError('NOT_FOUND', 'Workspace not found');
+  return { plan: isPlan(row.plan) ? row.plan : 'free', source: row.plan_source };
+}
+
+/**
+ * A paid plan the operator set by hand is not sold, renewed, changed or ended here, whatever
+ * subscription the workspace once had.
+ */
+const operatorManaged = (state: PlanState) => state.plan !== 'free' && state.source !== 'billing';
+
+/**
+ * The fewest extra members a term can be paid for: the people already in the workspace, open
+ * invitations included, beyond those the plan includes.
+ */
+async function seatFloor(sql: Sql, config: BillingConfig, workspaceId: string, now: Date) {
+  const { members, invited } = await countSeats(sql, workspaceId, now);
+  const people = members + invited;
+  return { people, floor: Math.max(0, people - config.cloud.includedMembers) };
+}
+
+async function assertSeatsCover(
+  sql: Sql,
+  config: BillingConfig,
+  input: { workspaceId: string; seats: number },
+  now: Date,
+): Promise<void> {
+  const { people, floor } = await seatFloor(sql, config, input.workspaceId, now);
+  if (input.seats >= floor) return;
+  const remove = floor - input.seats;
+  throw new AppError(
+    'VALIDATION',
+    `This workspace has ${people} members and open invitations, and ${config.cloud.includedMembers} are included, so it needs at least ${floor} extra ${floor === 1 ? 'member' : 'members'}. To pay for ${input.seats}, first remove ${remove} ${remove === 1 ? 'person' : 'people'} or withdraw their invitations.`,
+    'seats',
+  );
+}
 
 const MANAGED_MESSAGE =
   'The plan of this workspace is managed by our team. Write to us to change it.';
@@ -197,7 +236,7 @@ export async function createSubscriptionOrder(
     planOf(sql, input.workspaceId),
     getSubscription(sql, input.workspaceId),
   ]);
-  if (operatorManaged(plan, subscription)) throw new AppError('CONFLICT', MANAGED_MESSAGE);
+  if (operatorManaged(plan)) throw new AppError('CONFLICT', MANAGED_MESSAGE);
   if (subscription?.status === 'active' && !canRenew(subscription, now)) {
     const from = new Date(subscription.periodEnd.getTime() - RENEWAL_WINDOW_DAYS * DAY_MS);
     throw new AppError(
@@ -214,13 +253,20 @@ export async function createSubscriptionOrder(
       'seats',
     );
   }
+  await assertSeatsCover(sql, deps.config, { workspaceId: input.workspaceId, seats }, now);
   const buyer = await buyerOf(sql, input.workspaceId);
   const quote = quoteTerm(deps.config, live, { term: input.term, seats }, now);
   return createOrder(sql, deps, {
     workspaceId: input.workspaceId,
     kind: 'cloud_subscription',
     lines: quote.lines,
-    payload: { term: input.term, seats, renewal: live !== null },
+    // `from` ties a renewal to the term it continues, so it cannot extend another one.
+    payload: {
+      term: input.term,
+      seats,
+      renewal: live !== null,
+      from: live ? live.periodEnd.toISOString() : null,
+    },
     buyer,
     createdBy: input.userId,
     summary: `Codevibe Sign Cloud, ${TERM_LABELS[input.term]}`,
@@ -263,7 +309,11 @@ export async function createSeatsOrder(
 ): Promise<{ order: BillingOrder; checkout: CheckoutSession }> {
   assertPayments(deps.config);
   const now = deps.now();
-  const subscription = await getSubscription(sql, input.workspaceId);
+  const [plan, subscription] = await Promise.all([
+    planOf(sql, input.workspaceId),
+    getSubscription(sql, input.workspaceId),
+  ]);
+  if (operatorManaged(plan)) throw new AppError('CONFLICT', MANAGED_MESSAGE);
   if (!subscription || subscription.status !== 'active') {
     throw new AppError(
       'CONFLICT',
@@ -302,7 +352,12 @@ export async function createSeatsOrder(
         unitPaise: quote.unitPaise,
       },
     ],
-    payload: { add: input.add },
+    // The price is for the days left of this term only, so the order is good for no other.
+    payload: {
+      add: input.add,
+      periodEnd: subscription.periodEnd.toISOString(),
+      seatsBefore: subscription.seats,
+    },
     buyer,
     createdBy: input.userId,
     summary: `${input.add} extra ${input.add === 1 ? 'member' : 'members'}`,
@@ -323,7 +378,8 @@ async function movePlan(tx: Tx, workspaceId: string, to: Plan, seats: number, by
     select plan from app_workspaces where id = ${workspaceId}`;
   if (!row) return;
   await tx`
-    update app_workspaces set plan = ${to}, extra_seats = ${seats}, updated_at = now()
+    update app_workspaces
+    set plan = ${to}, extra_seats = ${seats}, plan_source = 'billing', updated_at = now()
     where id = ${workspaceId}`;
   if (row.plan !== to) {
     await tx`
@@ -332,25 +388,56 @@ async function movePlan(tx: Tx, workspaceId: string, to: Plan, seats: number, by
   }
 }
 
-/** Paying for a term starts or extends the subscription and puts the workspace on Cloud. */
+/** What the subscription looked like before an order changed it, to put back on a refund. */
+interface Prior {
+  term: string;
+  seats: number;
+  renewalSeats: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
+/**
+ * Paying for a term starts or extends the subscription and puts the workspace on Cloud. An
+ * order delivers nothing when it no longer fits: a first term for a workspace that already
+ * has a running one, a renewal of a term that is not the current one, or a workspace whose
+ * plan the operator has since taken over.
+ */
 export const fulfilSubscription: Fulfilment = async (tx, order, { now }) => {
-  const { term, seats } = order.payload;
+  const { term, seats, from } = order.payload;
   if (!order.workspaceId || !isTerm(term) || typeof seats !== 'number') {
     throw new Error(`Subscription order ${order.id} is incomplete`);
   }
   const current = await lockSubscription(tx, order.workspaceId);
+  if (operatorManaged(await planOf(tx, order.workspaceId))) return { unapplied: 'plan_managed' };
   const renewing = current !== null && current.status !== 'ended';
+  const quotedFrom = typeof from === 'string' ? from : null;
+  if ((renewing ? current.period_end.toISOString() : null) !== quotedFrom) {
+    return { unapplied: 'term_changed' };
+  }
   const start = renewing ? current.period_end : now;
   const end = termEnd(start, term);
+  const prior: Prior | null = renewing
+    ? {
+        term: current.term,
+        seats: current.seats,
+        renewalSeats: current.renewal_seats,
+        periodStart: current.period_start.toISOString(),
+        periodEnd: current.period_end.toISOString(),
+      }
+    : null;
   await tx`
     insert into app_subscriptions (
-      workspace_id, term, seats, renewal_seats, period_start, period_end, status
-    ) values (${order.workspaceId}, ${term}, ${seats}, ${seats}, ${start}, ${end}, 'active')
+      workspace_id, term, seats, renewal_seats, period_start, period_end, status, order_id, prior
+    ) values (
+      ${order.workspaceId}, ${term}, ${seats}, ${seats}, ${start}, ${end}, 'active', ${order.id},
+      ${prior ? tx.json(prior as never) : null}
+    )
     on conflict (workspace_id) do update set
       term = excluded.term, seats = excluded.seats, renewal_seats = excluded.renewal_seats,
       period_start = excluded.period_start, period_end = excluded.period_end, status = 'active',
       cancel_at_period_end = false, grace_ends_at = null, last_reminder = null,
-      updated_at = ${now}`;
+      order_id = excluded.order_id, prior = excluded.prior, updated_at = ${now}`;
   await movePlan(tx, order.workspaceId, 'cloud', seats, order.createdBy ?? 'billing');
   await recordAudit(tx, {
     workspaceId: order.workspaceId,
@@ -361,28 +448,40 @@ export const fulfilSubscription: Fulfilment = async (tx, order, { now }) => {
   });
 };
 
-/** Paying for extra members adds them to the term in progress and to the next one. */
+/**
+ * Paying for extra members adds them to the term in progress and to the next one. The price
+ * was for the days left of one term, so the order adds nothing to any other term, and nothing
+ * beyond the most a workspace can have.
+ */
 export const fulfilSeats: Fulfilment = async (tx, order, { now }) => {
-  const { add } = order.payload;
+  const { add, periodEnd } = order.payload;
   if (!order.workspaceId || typeof add !== 'number' || add < 1) {
     throw new Error(`Seats order ${order.id} is incomplete`);
   }
   const current = await lockSubscription(tx, order.workspaceId);
-  if (!current || current.status === 'ended') {
-    // The term ended between ordering and paying. The payment stands; the operator sees it.
-    await recordAudit(tx, {
+  const unapplied = (reason: 'term_changed' | 'seat_limit' | 'plan_managed') =>
+    recordAudit(tx, {
       workspaceId: order.workspaceId,
       actorId: order.createdBy,
       action: 'subscription.seats_unapplied',
       target: order.id,
-      data: { added: add },
-    });
-    return;
+      data: { added: add, reason },
+    }).then(() => ({ unapplied: reason }));
+  if (operatorManaged(await planOf(tx, order.workspaceId))) return unapplied('plan_managed');
+  if (
+    !current ||
+    current.status !== 'active' ||
+    current.period_end.toISOString() !== periodEnd ||
+    current.period_end.getTime() <= now.getTime()
+  ) {
+    return unapplied('term_changed');
   }
   const seats = current.seats + add;
+  if (seats > MAX_EXTRA_SEATS) return unapplied('seat_limit');
   await tx`
     update app_subscriptions
-    set seats = ${seats}, renewal_seats = renewal_seats + ${add}, updated_at = ${now}
+    set seats = ${seats}, renewal_seats = least(renewal_seats + ${add}, ${MAX_EXTRA_SEATS}),
+      updated_at = ${now}
     where workspace_id = ${order.workspaceId}`;
   await tx`
     update app_workspaces set extra_seats = ${seats}, updated_at = now()
@@ -394,6 +493,66 @@ export const fulfilSeats: Fulfilment = async (tx, order, { now }) => {
     target: order.id,
     data: { added: add, seats },
   });
+};
+
+/**
+ * A refunded term is taken back when it is still the workspace's latest: a renewal returns
+ * the subscription to the term before it, if that one is still running; otherwise the
+ * subscription ends and the workspace moves to Free, with nothing deleted.
+ */
+export const reverseSubscription: Reversal = async (tx, order, { now }) => {
+  if (!order.workspaceId) return;
+  const row = await lockSubscription(tx, order.workspaceId);
+  if (!row || row.status === 'ended' || row.order_id !== order.id) {
+    return { subscription: 'unchanged' };
+  }
+  const prior = row.prior;
+  if (prior && new Date(prior.periodEnd).getTime() > now.getTime()) {
+    await tx`
+      update app_subscriptions
+      set term = ${prior.term}, seats = ${prior.seats}, renewal_seats = ${prior.renewalSeats},
+        period_start = ${new Date(prior.periodStart)}, period_end = ${new Date(prior.periodEnd)},
+        status = 'active', grace_ends_at = null, last_reminder = null, order_id = null,
+        prior = null, updated_at = ${now}
+      where workspace_id = ${order.workspaceId}`;
+    await tx`
+      update app_workspaces set extra_seats = ${prior.seats}, updated_at = now()
+      where id = ${order.workspaceId} and plan = 'cloud' and plan_source = 'billing'`;
+    await recordAudit(tx, {
+      workspaceId: order.workspaceId,
+      action: 'subscription.renewal_reversed',
+      target: order.id,
+      data: { periodEnd: prior.periodEnd },
+    });
+    return { subscription: 'previous term restored' };
+  }
+  await endSubscription(tx, row, now, 'refunded');
+  return { subscription: 'ended, workspace on Free' };
+};
+
+/** Refunded extra members leave the term they were bought for, if it is still running. */
+export const reverseSeats: Reversal = async (tx, order, { now }) => {
+  const { add, periodEnd } = order.payload;
+  if (!order.workspaceId || typeof add !== 'number') return;
+  const current = await lockSubscription(tx, order.workspaceId);
+  if (!current || current.status === 'ended' || current.period_end.toISOString() !== periodEnd) {
+    return { seats: 'unchanged' };
+  }
+  const seats = Math.max(0, current.seats - add);
+  await tx`
+    update app_subscriptions
+    set seats = ${seats}, renewal_seats = greatest(renewal_seats - ${add}, 0), updated_at = ${now}
+    where workspace_id = ${order.workspaceId}`;
+  await tx`
+    update app_workspaces set extra_seats = ${seats}, updated_at = now()
+    where id = ${order.workspaceId} and plan = 'cloud' and plan_source = 'billing'`;
+  await recordAudit(tx, {
+    workspaceId: order.workspaceId,
+    action: 'subscription.seats_changed',
+    target: order.id,
+    data: { removed: add, seats, reason: 'refunded' },
+  });
+  return { seats: `${add} removed, ${seats} left` };
 };
 
 /**
@@ -428,7 +587,7 @@ export async function scheduleCancel(
 /** Sets how many extra members the next term is charged for. The current term keeps its own. */
 export async function setRenewalSeats(
   sql: postgres.Sql,
-  input: { workspaceId: string; userId: string; seats: number },
+  input: { workspaceId: string; userId: string; seats: number; config: BillingConfig; now?: Date },
 ): Promise<Subscription> {
   if (!Number.isInteger(input.seats) || input.seats < 0 || input.seats > MAX_EXTRA_SEATS) {
     throw new AppError(
@@ -442,6 +601,7 @@ export async function setRenewalSeats(
     if (!current || current.status === 'ended') {
       throw new AppError('CONFLICT', 'There is no running Cloud term to change.');
     }
+    await assertSeatsCover(tx, input.config, input, input.now ?? new Date());
     const [row] = await tx<Row[]>`
       update app_subscriptions set renewal_seats = ${input.seats}, updated_at = now()
       where workspace_id = ${input.workspaceId}
@@ -534,16 +694,17 @@ async function endSubscription(
   tx: Tx,
   row: Row,
   now: Date,
-  reason: 'cancelled' | 'unpaid',
+  reason: 'cancelled' | 'unpaid' | 'refunded',
 ): Promise<void> {
   await tx`
     update app_subscriptions
     set status = 'ended', grace_ends_at = null, seats = 0, updated_at = ${now}
     where workspace_id = ${row.workspace_id}`;
-  const [workspace] = await tx<{ plan: string }[]>`
-    select plan from app_workspaces where id = ${row.workspace_id}`;
+  const state = await planOf(tx, row.workspace_id);
   // A plan the operator has since set by hand is left as it is.
-  if (workspace?.plan === 'cloud') await movePlan(tx, row.workspace_id, 'free', 0, 'billing');
+  if (state.plan === 'cloud' && state.source === 'billing') {
+    await movePlan(tx, row.workspace_id, 'free', 0, 'billing');
+  }
   await recordAudit(tx, {
     workspaceId: row.workspace_id,
     action: 'subscription.ended',
@@ -723,7 +884,7 @@ export async function subscriptionView(
     canRenew: false,
     renewFrom: null,
   };
-  if (operatorManaged(plan, subscription)) return { ...none, state: 'managed' };
+  if (operatorManaged(plan)) return { ...none, state: 'managed' };
   if (!subscription) return none;
   if (subscription.status === 'ended') return { ...none, state: 'ended' };
   const renewable = canRenew(subscription, now);

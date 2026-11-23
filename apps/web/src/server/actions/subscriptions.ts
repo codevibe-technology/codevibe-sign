@@ -90,6 +90,7 @@ export const setRenewalSeatsAction = workspaceAction(
       workspaceId: ctx.workspace.id,
       userId: ctx.user.id,
       seats: input.seats,
+      config: billingDeps().config,
     });
     refresh(ctx.workspace.slug);
     return { renewalSeats: subscription.renewalSeats };

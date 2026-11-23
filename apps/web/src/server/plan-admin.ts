@@ -25,7 +25,10 @@ export async function setWorkspacePlan(
     const [row] = await tx<{ id: string; plan: Plan }[]>`
       select id, plan from app_workspaces where slug = ${input.slug} for update`;
     if (!row) throw new Error(`No workspace has the slug "${input.slug}".`);
-    await tx`update app_workspaces set plan = ${to}, updated_at = now() where id = ${row.id}`;
+    // A plan set here is the operator's: billing no longer renews, changes or ends it.
+    await tx`
+      update app_workspaces set plan = ${to}, plan_source = 'operator', updated_at = now()
+      where id = ${row.id}`;
     await tx`insert into app_plan_changes (id, workspace_id, from_plan, to_plan, changed_by)
       values (${randomId('plan')}, ${row.id}, ${row.plan}, ${to}, ${input.changedBy})`;
     return { workspaceId: row.id, slug: input.slug, from: row.plan, to };
