@@ -33,3 +33,9 @@ export async function siteViewer(): Promise<{ name: string; email: string } | nu
   const user = await getSessionUser();
   return user ? { name: user.name, email: user.email } : null;
 }
+
+/** When the current session was signed in, for checks that need a recent sign-in. */
+export async function sessionStartedAt(): Promise<Date | null> {
+  const session = await auth().api.getSession({ headers: await headers() });
+  return session ? new Date(session.session.createdAt) : null;
+}

@@ -103,3 +103,102 @@ export async function sendPasswordChanged(mailer: Mailer, to: string, signInUrl:
     meta: { kind: 'password_changed' },
   });
 }
+
+export type TransferMailKind =
+  | 'offered'
+  | 'started'
+  | 'accepted_owner'
+  | 'accepted_recipient'
+  | 'declined'
+  | 'cancelled';
+
+/**
+ * The emails of a workspace transfer, to whichever side `kind` is for. `url` is where that
+ * person acts or reads more: the offer for the recipient, the workspace settings for the owner.
+ */
+export async function sendTransferMail(
+  mailer: Mailer,
+  kind: TransferMailKind,
+  input: {
+    to: string;
+    url: string;
+    workspaceId: string;
+    workspaceName: string;
+    ownerName: string;
+    recipient: string;
+    expiresOn?: string;
+    previousOwnerStays?: boolean;
+  },
+) {
+  const ws = input.workspaceName;
+  const content: Record<
+    TransferMailKind,
+    { subject: string; title: string; lines: string[]; label: string }
+  > = {
+    offered: {
+      subject: `${input.ownerName} wants to transfer ${ws} to you`,
+      title: `Take over ${ws}?`,
+      lines: [
+        `${input.ownerName} offered to move the ${ws} workspace to your account. Its documents, templates, members, API keys and webhooks come with it, and its address stays the same.`,
+        'It will count against your plan, which pays for it from then on. Invoices already issued stay with the account that paid them.',
+        `You confirm it is you before it moves. The offer is open until ${input.expiresOn ?? 'it expires'}.`,
+      ],
+      label: 'Review the transfer',
+    },
+    started: {
+      subject: `You offered ${ws} to ${input.recipient}`,
+      title: `Transfer of ${ws} started`,
+      lines: [
+        `You offered the ${ws} workspace to ${input.recipient}. Nothing moves until they accept, and you can cancel the offer until then from the workspace settings.`,
+        input.previousOwnerStays
+          ? 'When it moves, you stay in the workspace as an admin.'
+          : 'When it moves, you leave the workspace.',
+        `The offer expires on ${input.expiresOn ?? 'its last day'} if it is not accepted.`,
+      ],
+      label: 'Open workspace settings',
+    },
+    accepted_owner: {
+      subject: `${ws} now belongs to ${input.recipient}`,
+      title: 'Transfer complete',
+      lines: [
+        `${input.recipient} accepted, and the ${ws} workspace is now on their account and plan.`,
+        input.previousOwnerStays
+          ? 'You are an admin of it now. Invoices and eSign credits you paid for stay with your account.'
+          : 'You have left it. Invoices and eSign credits you paid for stay with your account.',
+      ],
+      label: 'Open Codevibe Sign',
+    },
+    accepted_recipient: {
+      subject: `${ws} is now yours`,
+      title: 'Transfer complete',
+      lines: [
+        `The ${ws} workspace is now on your account, and you are its owner. Its address, documents, templates, members, API keys and webhooks are unchanged.`,
+        'Check the plan and billing admins on the Plan and usage and Team pages.',
+      ],
+      label: 'Open the workspace',
+    },
+    declined: {
+      subject: `${input.recipient} declined ${ws}`,
+      title: 'Transfer declined',
+      lines: [
+        `${input.recipient} declined the transfer of the ${ws} workspace. Nothing has changed: it is still on your account.`,
+      ],
+      label: 'Open workspace settings',
+    },
+    cancelled: {
+      subject: `The transfer of ${ws} was cancelled`,
+      title: 'Transfer cancelled',
+      lines: [
+        `${input.ownerName} cancelled the offer to move the ${ws} workspace to you. Nothing has changed, and there is nothing for you to do.`,
+      ],
+      label: 'Open Codevibe Sign',
+    },
+  };
+  const mail = content[kind];
+  await mailer.send({
+    to: input.to,
+    subject: mail.subject,
+    ...layout(mail.title, mail.lines, { label: mail.label, url: input.url }),
+    meta: { kind: 'workspace_transfer', workspaceId: input.workspaceId },
+  });
+}

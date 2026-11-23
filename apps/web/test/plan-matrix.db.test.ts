@@ -35,6 +35,7 @@ import {
   setWebhookEnabled,
   webhookTargetsFor,
 } from '@/server/webhooks';
+import { acceptTransfer, startTransfer } from '@/server/transfers';
 import { createWorkspace, newWorkspaceBlock } from '@/server/workspaces';
 
 const url = process.env.DATABASE_URL;
@@ -293,6 +294,36 @@ describe.skipIf(!url)('every entry point applies the plan', () => {
       attempt: async (ctx) => {
         const plan: Plan = ctx.kind === 'self-hosted' ? 'unlimited' : ctx.kind;
         await createWorkspace(sql, { name: 'Another', userId: ctx.owner.id, plan }, ctx.settings);
+      },
+    },
+    {
+      id: 'owners.transfer',
+      feature: 'ownedWorkspaces',
+      via: 'action',
+      attempt: async (ctx) => {
+        const donor = await user('Donor');
+        const offered = await createWorkspace(
+          sql,
+          { name: 'Offered', userId: donor.id, plan: 'cloud' },
+          hosted,
+        );
+        await sql`insert into app_members (workspace_id, user_id, role)
+          values (${offered.id}, ${ctx.owner.id}, 'member')`;
+        const offer = await startTransfer(
+          sql,
+          {
+            workspaceId: offered.id,
+            actor: { userId: donor.id, role: 'owner' },
+            email: ctx.owner.email,
+            previousOwnerStays: true,
+          },
+          ctx.settings,
+        );
+        await acceptTransfer(
+          sql,
+          { transferId: offer.id, user: ctx.owner, confirmedBy: 'password' },
+          ctx.settings,
+        );
       },
     },
     {
@@ -1075,6 +1106,11 @@ const ACTIONS: Record<string, { entry: string; enforcedBy: string } | { free: st
   retryDeliveryAction: { entry: 'webhooks.send', enforcedBy: 'assertWebhooksLive' },
   // workspace
   createWorkspaceAction: { entry: 'owners.create', enforcedBy: 'createWorkspace' },
+  // workspace transfers
+  startTransferAction: { entry: 'owners.transfer', enforcedBy: 'startTransfer' },
+  acceptTransferAction: { entry: 'owners.transfer', enforcedBy: 'acceptTransfer' },
+  cancelTransferAction: { free: 'withdraws an offer' },
+  declineTransferAction: { free: 'turns an offer down' },
   dismissStartHereAction: { free: 'a preference' },
   renameWorkspaceAction: { free: 'part of every plan' },
   setWorkspaceTimeZoneAction: { free: 'part of every plan' },

@@ -651,4 +651,31 @@ alter table app_invitations add constraint app_invitations_role_check
   check (role in ('owner', 'admin', 'billing', 'member', 'viewer'));
 `,
   },
+  {
+    name: '0021_workspace_transfers',
+    sql: `
+create table app_workspace_transfers (
+  id text primary key,
+  workspace_id text not null references app_workspaces (id) on delete cascade,
+  from_account_id text references app_accounts (id) on delete set null,
+  from_user_id text references auth_users (id) on delete set null,
+  to_email text not null,
+  to_user_id text references auth_users (id) on delete set null,
+  to_account_id text references app_accounts (id) on delete set null,
+  previous_owner_stays boolean not null default true,
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted', 'declined', 'cancelled', 'expired')),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  decided_at timestamptz,
+  decided_by text references auth_users (id) on delete set null
+);
+create unique index app_workspace_transfers_pending_idx on app_workspace_transfers (workspace_id)
+  where status = 'pending';
+create index app_workspace_transfers_workspace_idx
+  on app_workspace_transfers (workspace_id, created_at desc);
+create index app_workspace_transfers_to_idx on app_workspace_transfers (lower(to_email))
+  where status = 'pending';
+`,
+  },
 ];
