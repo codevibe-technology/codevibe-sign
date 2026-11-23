@@ -152,6 +152,22 @@ describe('createRequest', () => {
     });
   });
 
+  it('sends no signature position, which the v3.0 request has no field for', async () => {
+    const { provider, fetch } = setup(() => json(created));
+    await provider.createRequest(
+      signRequest({
+        signaturePositions: [
+          { page: 2, rect: { x: 300, y: 640, width: 180, height: 60 } },
+          { page: 0, rect: { x: 10, y: 10, width: 50, height: 20 } },
+        ],
+      }),
+    );
+    const body = JSON.parse(String(fetch.mock.calls[0]![1]?.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['file', 'invitees', 'irn', 'profileId']);
+    expect(Object.keys((body.invitees as object[])[0]!).sort()).toEqual(['email', 'name', 'phone']);
+    expect(JSON.stringify(body)).not.toMatch(/coordinates|appearances|pageNo|rect|640/);
+  });
+
   it('uses the production base URL and a per-request workflow', async () => {
     const profileId = vi.fn(() => 'wf-two-page');
     const { provider, fetch } = setup(() => json(created), {

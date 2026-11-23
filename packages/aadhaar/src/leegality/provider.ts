@@ -38,7 +38,8 @@ export interface LeegalityOptions {
   /**
    * The Workflow ID to run. Leegality takes signature positions, the eSign type (Aadhaar),
    * the webhook URLs and the redirect URLs from the workflow, not from the API request, so
-   * configure them there. Pass a function to choose a workflow per request, for example
+   * configure them there. The request's `signaturePositions` are not sent: the v3.0 API has
+   * no field for them. Pass a function to choose a workflow per request, for example
    * by document layout.
    */
   profileId: string | ((request: EsignRequest) => string);
@@ -224,6 +225,13 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     if (recipient.email) invitee.email = recipient.email;
     if (phone) invitee.phone = phone;
 
+    // `signaturePositions` is not sent. The v3.0 Create request has no field for a signature
+    // position (https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request);
+    // Leegality places the appearance where the workflow says, or at the bottom left of every
+    // page when the workflow has no coordinates
+    // (https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate).
+    // Only the v4 Pack API takes per-request `coordinates`
+    // (https://knowledge.leegality.com/document-execution/api/create-pack).
     const body = {
       profileId: resolveProfileId(input),
       file: {

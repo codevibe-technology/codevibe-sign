@@ -18,6 +18,11 @@ export interface EsignRequest {
   /** The PDF to be signed. */
   documentBytes: Uint8Array;
   documentName: string;
+  /**
+   * Where the signer's Aadhaar eSign box sits. A provider whose API takes a position per
+   * request places the signature there; one that takes it from its own configuration, such
+   * as Leegality's v3.0 API, ignores it.
+   */
   signaturePositions: SignaturePosition[];
   /** Where the provider should send status callbacks. */
   callbackUrl: string;
