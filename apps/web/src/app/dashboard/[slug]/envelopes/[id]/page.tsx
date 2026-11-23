@@ -13,6 +13,7 @@ import {
   RecipientsCard,
   Timeline,
 } from '@/components/envelopes/envelope-detail';
+import { PublicRecordCard } from '@/components/envelopes/public-record-card';
 import { StatusPill } from '@/components/envelopes/status-pill';
 import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ import { can, canVoidEnvelope } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
 import { senderOf } from '@/server/envelopes';
+import { env } from '@/server/env';
+import { publicRecordsEnabled, recordOfEnvelope, recordUrl } from '@/server/public-records';
 import { completedCopyMail } from '@/server/mail-log';
 import { AppError } from '@/server/errors';
 import { signApi, userPrincipal, type SealCheck } from '@/server/sign/api';
@@ -39,14 +42,17 @@ export default async function EnvelopePage({
     if (err instanceof AppError && err.code === 'NOT_FOUND') notFound();
     throw err;
   });
-  const [{ events, chainValid }, certificate, sender, copies] = await Promise.all([
-    api.events(id),
-    api.certificate(id),
-    senderOf(db(), workspace.id, id),
-    envelope.status === 'completed'
-      ? completedCopyMail(db(), workspace.id, id)
-      : ({} as Awaited<ReturnType<typeof completedCopyMail>>),
-  ]);
+  const [{ events, chainValid }, certificate, sender, record, recordsOn, copies] =
+    await Promise.all([
+      api.events(id),
+      api.certificate(id),
+      senderOf(db(), workspace.id, id),
+      recordOfEnvelope(db(), workspace.id, id),
+      publicRecordsEnabled(db(), workspace.id),
+      envelope.status === 'completed'
+        ? completedCopyMail(db(), workspace.id, id)
+        : ({} as Awaited<ReturnType<typeof completedCopyMail>>),
+    ]);
   const copyMail = Object.fromEntries(
     Object.entries(copies).map(([recipientId, m]) => [
       recipientId,
@@ -165,6 +171,15 @@ export default async function EnvelopePage({
             </p>
           ) : null}
           <DocumentsCard slug={slug} envelope={envelope} checks={checks} />
+          {record && recordsOn && envelope.status === 'completed' ? (
+            <PublicRecordCard
+              workspaceId={workspace.id}
+              envelopeId={envelope.id}
+              url={recordUrl(env().APP_URL, record.id)}
+              revoked={record.revokedAt !== null}
+              canManage={canCopy}
+            />
+          ) : null}
           <CertificateCard
             certificate={certificate}
             downloadHref={`/dashboard/${slug}/envelopes/${envelope.id}/certificate`}
