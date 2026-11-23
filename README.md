@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">
+  <img src=".github/assets/demo.gif" alt="Codevibe Sign in 30 seconds: a PDF is sent with initials on two pages and signature boxes for two people, signed on a phone with a one-time code, sealed with a one-page certificate and a QR code, and checked on the verify page" width="100%">
+</p>
+
+<p align="center">
   <a href="#get-started">Get started</a> ·
   <a href="#features">Features</a> ·
   <a href="#how-it-works">How it works</a> ·
