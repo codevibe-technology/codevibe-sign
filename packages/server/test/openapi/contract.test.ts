@@ -402,16 +402,16 @@ describe('a full run against the server', () => {
     const esignDoc = aadhaar.json.documents[0].id as string;
     expect(
       (await call('GET', '/v1/sign/receipt', { headers: esignReceipt })).json.documents,
-    ).toEqual([{ id: esignDoc, name: 'offer.pdf', sealed: true, certificate: true }]);
+    ).toEqual([{ id: esignDoc, name: 'offer.pdf', sealed: true, certificate: false }]);
     const page2 = await call('GET', `/v1/sign/receipt/documents/${esignDoc}?file=certificate`, {
       headers: esignReceipt,
     });
-    expect(page2.res.headers.get('content-type')).toBe('application/pdf');
+    expect(page2.status).toBe(409);
     const apart = await call(
       'GET',
       `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}?version=certificate`,
     );
-    expect(apart.res.headers.get('content-type')).toBe('application/pdf');
+    expect(apart.status).toBe(409);
     const checkedEsign = await call(
       'GET',
       `/v1/envelopes/${aadhaar.json.id}/documents/${esignDoc}/verification`,

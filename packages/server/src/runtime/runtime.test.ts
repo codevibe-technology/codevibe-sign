@@ -336,7 +336,7 @@ describe('effects', () => {
     h.advance(RETRY_DELAYS_MS[0]!);
     await h.server.tick();
     expect(completed()).toHaveLength(3);
-    expect(completed()[0]?.attachments).toHaveLength(1);
+    expect(completed()[0]?.attachments).toHaveLength(2);
   });
 });
 

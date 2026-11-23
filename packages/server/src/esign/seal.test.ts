@@ -1,4 +1,5 @@
 import { seal, verify, verifySignatures } from '@codevibe_technology/sign-pdf';
+import { PDFDocument } from 'pdf-lib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultPdfEngine } from '../engine';
 import { fakeEsignProvider } from '../testing/fake-esign';
@@ -115,17 +116,21 @@ describe('an Aadhaar eSign with real files', () => {
     const broken = await h.call('POST', '/v1/verify', { body: tamperedForm });
     expect(broken.json).toMatchObject({ valid: false, envelope: null });
 
-    const certificate = await file('certificate');
+    // One file: the two pages and the certificate page, all under the Aadhaar eSign.
+    expect((await PDFDocument.load(sealed)).getPageCount()).toBe(3);
+    expect((await PDFDocument.load(esigned)).getPageCount()).toBe(3);
     const trust = { certificates: [] as string[], fingerprints: [check.json.certificateSha256] };
-    expect((await verify(certificate, { trust })).valid).toBe(true);
+    expect((await verify(sealed, { trust, allowEarlierSignatures: true })).valid).toBe(true);
+    expect(new TextDecoder().decode(await file('certificate'))).toContain(
+      'no separate certificate',
+    );
     const events = (await h.call('GET', `/v1/envelopes/${id}/events`)).json.events as {
       action: string;
       data?: Record<string, unknown>;
     }[];
-    expect(events.find((e) => e.action === 'document.sealed')!.data).toMatchObject({
-      seal: 'countersigned',
-      certificate: 'separate',
-    });
+    const sealEvent = events.find((e) => e.action === 'document.sealed')!.data;
+    expect(sealEvent).toMatchObject({ seal: 'countersigned' });
+    expect(sealEvent).not.toHaveProperty('certificate');
     const signedEvent = events.find((e) => e.action === 'recipient.signed')!;
     expect(signedEvent.data).toMatchObject({ method: 'aadhaar_esign', signerName: 'RAVI KUMAR' });
     expect(JSON.stringify(events)).not.toMatch(/\b\d{12}\b/);
@@ -156,6 +161,6 @@ describe('an Aadhaar eSign with real files', () => {
     const changedForm = new FormData();
     changedForm.set('file', new Blob([changed], { type: 'application/pdf' }), 'sealed.pdf');
     expect((await h.call('POST', '/v1/verify', { body: changedForm })).json.valid).toBe(false);
-    expect((await file('certificate')).byteLength).toBeGreaterThan(1000);
+    expect((await PDFDocument.load(sealed)).getPageCount()).toBe(3);
   }, 60_000);
 });

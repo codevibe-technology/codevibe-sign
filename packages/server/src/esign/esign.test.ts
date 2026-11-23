@@ -786,7 +786,11 @@ describe('sealing after an eSign', () => {
     };
   };
 
-  async function completed(pdfOverrides: Parameters<typeof fakePdfEngine>[0] = {}) {
+  /** `startedBefore` plays a request started before the certificate page went on first. */
+  async function completed(
+    pdfOverrides: Parameters<typeof fakePdfEngine>[0] = {},
+    startedBefore = false,
+  ) {
     const { pdf, calls } = engine(pdfOverrides);
     const provider = fakeEsignProvider({
       sign: (bytes) => new Uint8Array([...bytes, ...new TextEncoder().encode('esp-signature\n')]),
@@ -794,6 +798,15 @@ describe('sealing after an eSign', () => {
     const { h, hooks } = setup({ provider, server: { pdf } });
     const { envelope, token, start } = await readyForRavi(h);
     await start();
+    if (startedBefore) {
+      const list = h.store.listEvents.bind(h.store);
+      h.store.listEvents = async (id) =>
+        (await list(id)).map((e) => {
+          if (e.action !== 'recipient.esign_started' || !e.data) return e;
+          const { certificate: _dropped, ...data } = e.data;
+          return { ...e, data };
+        });
+    }
     const ref = provider.requests[0]!.ref;
     provider.finish(ref);
     await h.call('POST', WEBHOOK, { body: provider.webhook(ref, 'signed') });
@@ -808,12 +821,46 @@ describe('sealing after an eSign', () => {
     return { h, hooks, calls, envelope, token, docId, download };
   }
 
-  it('seals over the provider file without redrawing it and keeps the certificate apart', async () => {
+  it('signs and seals one file: the pages and the certificate page together', async () => {
     const { h, calls, envelope, token, docId, download } = await completed();
+    expect(calls).toEqual(['countersign']);
+    const sealed = await download('sealed');
+    expect(sealed.text).toMatch(
+      new RegExp(
+        `fields=3;values=2\\ncertificate=${envelope.id};events=\\d+[^\\n]*\\nesp-signature\\ncountersigned\\n$`,
+      ),
+    );
+    expect((await download('certificate')).status).toBe(409);
+
+    const events = (await h.call('GET', `/v1/envelopes/${envelope.id}/events`)).json.events as {
+      action: string;
+      data?: Record<string, unknown>;
+    }[];
+    expect(events.find((e) => e.action === 'recipient.esign_started')!.data).toMatchObject({
+      certificate: 'embedded',
+    });
+    const seal = events.find((e) => e.action === 'document.sealed')!;
+    expect(seal.data).toMatchObject({ seal: 'countersigned' });
+    expect(seal.data).not.toHaveProperty('certificate');
+
+    const status = await h.call('GET', `/v1/sign/${token}/esign`);
+    const headers = { 'x-sign-receipt': status.res.headers.get('x-sign-receipt')! };
+    const receipt = await h.call('GET', '/v1/sign/receipt', { headers });
+    expect(receipt.json.documents).toEqual([
+      { id: docId, name: 'offer.pdf', sealed: true, certificate: false },
+    ]);
+    const mail = h.mailer.sent.filter((m) => m.attachments?.length).at(-1)!;
+    expect(mail.attachments!.map((a) => a.filename)).toEqual([
+      'offer.pdf',
+      'Offer letter (audit trail).pdf',
+    ]);
+  });
+
+  it('keeps the certificate apart for a request started before it went on the file', async () => {
+    const { h, calls, envelope, token, docId, download } = await completed({}, true);
     expect(calls).toEqual(['countersign', 'certificate']);
     const sealed = await download('sealed');
-    expect(sealed.text).toMatch(/fields=3;values=2\nesp-signature\ncountersigned\n$/);
-    expect(sealed.text).not.toContain('certificate=');
+    expect(sealed.text).toMatch(/esp-signature\ncountersigned\n$/);
     const certificate = await download('certificate');
     expect(certificate.status).toBe(200);
     expect(certificate.text).toContain(`certificate-of=${envelope.id}`);
@@ -844,6 +891,7 @@ describe('sealing after an eSign', () => {
     expect(mail.attachments!.map((a) => a.filename)).toEqual([
       'offer.pdf',
       'offer (signing certificate).pdf',
+      'Offer letter (audit trail).pdf',
     ]);
   });
 
@@ -862,11 +910,10 @@ describe('sealing after an eSign', () => {
       action: string;
       data?: Record<string, unknown>;
     }[];
-    expect(events.find((e) => e.action === 'document.sealed')!.data).toMatchObject({
-      seal: 'provider_only',
-      certificate: 'separate',
-    });
-    expect((await download('certificate')).status).toBe(200);
+    const seal = events.find((e) => e.action === 'document.sealed')!.data;
+    expect(seal).toMatchObject({ seal: 'provider_only' });
+    expect(seal).not.toHaveProperty('certificate');
+    expect((await download('certificate')).status).toBe(409);
   });
 
   it('says there is no separate certificate for an ordinary envelope', async () => {

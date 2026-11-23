@@ -728,7 +728,7 @@
         "operationId": "downloadDocument",
         "tags": ["Documents"],
         "summary": "Download a PDF",
-        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign cannot take a certificate\npage, so its signing certificate is a sealed file of its own: `version=certificate`.\n",
+        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is one file too: the\ncertificate page goes on before the signer signs, so the Aadhaar eSign and the seal\ncover it. Only an Aadhaar eSign started before that change has its certificate as a\nsealed file of its own: `version=certificate`.\n",
         "parameters": [
           {
             "name": "version",
@@ -3135,7 +3135,7 @@
                 },
                 "certificate": {
                   "type": "boolean",
-                  "description": "The signing certificate is a file of its own (`?file=certificate`), as for a document signed with Aadhaar eSign. Otherwise it is the last page of the signed copy."
+                  "description": "The signing certificate is a file of its own (`?file=certificate`), as for an Aadhaar eSign started before the certificate page went on the file signed. Otherwise it is the last page of the signed copy."
                 }
               }
             }

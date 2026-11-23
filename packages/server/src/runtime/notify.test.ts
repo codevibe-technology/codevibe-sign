@@ -82,7 +82,7 @@ describe('per-workspace mail', () => {
     });
     const done = h.mailer.sent.find((m) => m.subject.startsWith('Done'));
     expect(done).toMatchObject({ subject: 'Done: Offer letter', text: 'attached' });
-    expect(done?.attachments).toHaveLength(1);
+    expect(done?.attachments).toHaveLength(2);
     expect(done).not.toHaveProperty('fromName');
   });
 

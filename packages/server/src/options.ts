@@ -212,8 +212,10 @@ export interface SignServerOptions {
   certificateNote?: (workspaceId: string) => Promise<string | null>;
   /**
    * The sender to name on the signing certificate and the link to the envelope's record, which
-   * is printed as a QR code. Read once when a completed envelope is sealed; it may create the
-   * record then. Return null, or leave a part out, to print the certificate without it.
+   * is printed as a QR code. Read when a completed envelope is sealed, and when an Aadhaar
+   * eSign signer starts, because their file carries the certificate before they sign; it may
+   * create the record then, so make it safe to call more than once. Return null, or leave a
+   * part out, to print the certificate without it.
    */
   certificateDetails?: (input: {
     workspaceId: string;

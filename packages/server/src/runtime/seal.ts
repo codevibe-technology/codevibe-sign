@@ -114,10 +114,14 @@ export async function runSeal(
       (await rt.files.get(esignedFileKey(envelope.id, document.id)));
     if (esigned) {
       sealed.push(
-        await sealEsigned(rt, envelope.id, document.id, esigned, certificate, {
-          sealOptions,
-          assertVerified,
-        }),
+        await sealEsigned(
+          rt,
+          envelope.id,
+          document.id,
+          esigned,
+          certificateEmbedded(history, ref) ? null : certificate,
+          { sealOptions, assertVerified },
+        ),
       );
       continue;
     }
@@ -157,6 +161,19 @@ export async function runSeal(
   await enqueue(payload.afterSeal.map((p) => makeJob(rt, 'notify', p)));
 }
 
+/**
+ * Whether the provider signed a file that already had the certificate page: true for every
+ * request started since the page went on before signing, false for those started earlier.
+ */
+function certificateEmbedded(events: AuditEvent[], ref: string | undefined): boolean {
+  return events.some(
+    (e) =>
+      e.action === 'recipient.esign_started' &&
+      e.data?.certificate === 'embedded' &&
+      (ref === undefined || e.data.ref === ref),
+  );
+}
+
 interface SealedDocument {
   documentId: Id;
   sha256: string;
@@ -166,15 +183,16 @@ interface SealedDocument {
 /**
  * Finishes a file an eSign provider signed. Nothing but another signature can be added to
  * it, so the seal goes on as an incremental update that leaves the provider's bytes as they
- * are, and the signing certificate becomes a sealed file of its own. A file the provider
- * locked against any further signature is kept exactly as it came.
+ * are. The certificate page is normally part of the signed file already; for a request
+ * started before that (`certificate` given), it becomes a sealed file of its own. A file the
+ * provider locked against any further signature is kept exactly as it came.
  */
 async function sealEsigned(
   rt: Runtime,
   envelopeId: Id,
   documentId: Id,
   esigned: Uint8Array,
-  certificate: CertificateInput,
+  certificate: CertificateInput | null,
   tools: {
     sealOptions: (documentId: Id) => SealOptions;
     assertVerified: (output: Uint8Array, documentId: Id, earlier?: boolean) => Promise<boolean>;
@@ -206,7 +224,7 @@ async function sealEsigned(
     });
     data.earlierSignatures = 'unverified';
   }
-  if (rt.pdf.certificatePdf) {
+  if (certificate && rt.pdf.certificatePdf) {
     const page = await rt.pdf.certificatePdf(certificate);
     const sealedPage = await rt.pdf.seal(page, tools.sealOptions(documentId));
     await tools.assertVerified(sealedPage, documentId);

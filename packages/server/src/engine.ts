@@ -80,6 +80,11 @@ export interface CertificateInput extends CertificateDetails {
   note?: string;
   /** IANA zone the times are also shown in, next to UTC. */
   timeZone?: string;
+  /**
+   * The certificate goes on the file an Aadhaar eSign signer is about to sign, so the
+   * provider's signature covers it; see `CertificateData.esign` in the PDF package.
+   */
+  esign?: { recipientId: string; provider: string; sandbox?: boolean };
 }
 
 /**

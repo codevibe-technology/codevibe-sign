@@ -20,6 +20,7 @@ import {
 } from '@codevibe_technology/sign-core';
 import { HttpError, validation } from '../errors';
 import { enforce } from '../http/rate-limit';
+import type { CertificateInput } from '../engine';
 import type { Runtime } from '../runtime/context';
 import { mutate } from '../runtime/mutate';
 import { timeZoneFor } from '../runtime/time-zone';
@@ -315,7 +316,7 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
     const timeZone = await timeZoneFor(rt, workspaceId);
     const fields = envelope.fields.filter((f) => f.documentId === document.id);
     const fieldIds = new Set(fields.map((f) => f.id));
-    const rendered = await rt.pdf.renderFields(
+    const drawn = await rt.pdf.renderFields(
       original,
       fields,
       signed.values.filter((v) => fieldIds.has(v.fieldId)),
@@ -325,6 +326,20 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
         esignProvider: providerLabel(provider.name),
         ...(timeZone ? { timeZone } : {}),
       },
+    );
+    // The certificate page goes on before the signer signs, so the Aadhaar eSign covers it
+    // and the signed file is one file, as with any other envelope.
+    const rendered = await rt.pdf.appendCertificate(
+      drawn,
+      await esignCertificate(rt, {
+        envelope,
+        document,
+        workspaceId,
+        recipientId: recipient.id,
+        provider: provider.name,
+        ...(timeZone ? { timeZone } : {}),
+        ...(session.sandbox ? { sandbox: true } : {}),
+      }),
     );
     // The account `onStart` settled on is the one that signs, even if the workspace's
     // choice changed between the first look and the hold.
@@ -390,11 +405,51 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
         at: at.toISOString(),
         recipientId: recipient.id,
         context,
-        data: { provider: provider.name, providerRef: created.providerRef },
+        data: {
+          provider: provider.name,
+          providerRef: created.providerRef,
+          ref: session.id,
+          certificate: 'embedded',
+        },
       },
     ),
   );
   return { signUrl: created.signUrl, expiresAt: expiresAt.toISOString() };
+}
+
+/** The certificate page for the file sent to the provider, with the signing so far. */
+async function esignCertificate(
+  rt: Runtime,
+  input: {
+    envelope: Envelope;
+    document: Envelope['documents'][number];
+    workspaceId: string;
+    recipientId: Id;
+    provider: string;
+    timeZone?: string;
+    sandbox?: boolean;
+  },
+): Promise<CertificateInput> {
+  const { envelope, workspaceId } = input;
+  const [events, note, details] = await Promise.all([
+    rt.store.listEvents(envelope.id),
+    rt.certificateNote ? rt.certificateNote(workspaceId) : null,
+    rt.certificateDetails ? rt.certificateDetails({ workspaceId, envelope }) : null,
+  ]);
+  return {
+    envelope,
+    document: input.document,
+    events,
+    ...(details?.sender ? { sender: details.sender } : {}),
+    ...(details?.recordUrl ? { recordUrl: details.recordUrl } : {}),
+    ...(note ? { note } : {}),
+    ...(input.timeZone ? { timeZone: input.timeZone } : {}),
+    esign: {
+      recipientId: input.recipientId,
+      provider: input.provider,
+      ...(input.sandbox ? { sandbox: true } : {}),
+    },
+  };
 }
 
 /** "leegality" as the box on the page names it: "Leegality". */
