@@ -46,6 +46,7 @@ export interface RenderOptions {
 const INK = rgb(0.08, 0.09, 0.13);
 const CAPTION_INK = rgb(0.35, 0.38, 0.44);
 const AADHAAR_INK = rgb(0.11, 0.42, 0.88);
+const AADHAAR_GROUND = rgb(0.96, 0.975, 1);
 const CAPTION_MIN_BOX_HEIGHT = 20;
 const CAPTION_MAX_SIZE = 7;
 const CAPTION_MIN_SIZE = 3;
@@ -182,6 +183,16 @@ function drawAadhaarBox(
 ): void {
   const border = Math.max(0.5, Math.min(frame.width, frame.height) * 0.02);
   const corner = (fx: number, fy: number) => frame.at(frame.width * fx, frame.height * fy);
+  // An opaque ground, like a drawn signature, so the box reads clearly over page text.
+  const bottomLeft = corner(0, 0);
+  page.drawRectangle({
+    x: bottomLeft.x,
+    y: bottomLeft.y,
+    width: frame.width,
+    height: frame.height,
+    rotate: degrees(frame.rotate),
+    color: AADHAAR_GROUND,
+  });
   const edge = (from: [number, number], to: [number, number]) =>
     page.drawLine({
       start: corner(...from),
