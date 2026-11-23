@@ -1,13 +1,22 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   CLOUD_PLAN_LIMITS,
   FREE_PLAN_LIMITS,
+  CLOUD_FAIR_USE,
+  PLAN_TABLE_END,
+  PLAN_TABLE_START,
   UNLIMITED_LIMITS,
+  billingVisible,
   formatBytes,
+  formatReset,
   isPlan,
   limitsFor,
   parseLimitOverrides,
   periodKey,
+  planFeatures,
+  planTableMarkdown,
   resetsAt,
   upgradeHint,
 } from './plans';
@@ -19,23 +28,33 @@ describe('plan limits', () => {
   it('gives the free plan its published limits', () => {
     expect(FREE_PLAN_LIMITS).toEqual({
       envelopesPerMonth: 10,
-      members: 3,
-      activeTemplates: 5,
-      webhooks: 1,
-      bulkRows: 25,
-      apiRequestsPerDay: 100,
+      members: 2,
+      activeTemplates: 2,
+      webhooks: 0,
+      bulkRows: 10,
+      apiRequestsPerMonth: 100,
+      apiRequestsPerDay: null,
       fileBytes: 10 * 1024 * 1024,
       envelopeBytes: 25 * 1024 * 1024,
       storageBytes: 200 * 1024 * 1024,
       ownedWorkspaces: 1,
       customDomain: false,
       badgeRequired: true,
+      ownEsignAccount: false,
     });
   });
 
-  it('gives cloud generous limits, a custom domain and an optional badge', () => {
-    expect(CLOUD_PLAN_LIMITS.envelopesPerMonth).toBe(500);
+  it('gives cloud no plan numbers beyond members, and only fair-use caps', () => {
+    expect(CLOUD_PLAN_LIMITS.envelopesPerMonth).toBeNull();
     expect(CLOUD_PLAN_LIMITS.activeTemplates).toBeNull();
+    expect(CLOUD_PLAN_LIMITS.apiRequestsPerMonth).toBeNull();
+    expect(CLOUD_PLAN_LIMITS.members).toBe(25);
+    expect(CLOUD_PLAN_LIMITS.ownEsignAccount).toBe(true);
+    const capped = Object.entries(CLOUD_PLAN_LIMITS)
+      .filter(([key, value]) => typeof value === 'number' && key !== 'members')
+      .map(([key]) => key)
+      .sort();
+    expect(capped).toEqual([...CLOUD_FAIR_USE].sort());
     expect(CLOUD_PLAN_LIMITS.storageBytes).toBe(20 * 1024 ** 3);
     expect(CLOUD_PLAN_LIMITS.customDomain).toBe(true);
     expect(CLOUD_PLAN_LIMITS.badgeRequired).toBe(false);
@@ -43,7 +62,7 @@ describe('plan limits', () => {
 
   it('applies the plan in hosted mode', () => {
     expect(limitsFor('free', hosted)).toEqual(FREE_PLAN_LIMITS);
-    expect(limitsFor('cloud', hosted)).toBe(CLOUD_PLAN_LIMITS);
+    expect(limitsFor('cloud', hosted)).toEqual(CLOUD_PLAN_LIMITS);
     expect(limitsFor('unlimited', hosted)).toBe(UNLIMITED_LIMITS);
   });
 
@@ -57,8 +76,21 @@ describe('plan limits', () => {
   it('lets FREE_PLAN_LIMITS override the free plan only', () => {
     const settings = { mode: 'hosted' as const, freeOverrides: { envelopesPerMonth: 20 } };
     expect(limitsFor('free', settings).envelopesPerMonth).toBe(20);
-    expect(limitsFor('free', settings).members).toBe(3);
-    expect(limitsFor('cloud', settings).envelopesPerMonth).toBe(500);
+    expect(limitsFor('free', settings).members).toBe(2);
+    expect(limitsFor('cloud', settings).envelopesPerMonth).toBeNull();
+  });
+
+  it('adds paid members to the ones cloud includes, and only on cloud', () => {
+    expect(limitsFor('cloud', hosted, 3).members).toBe(28);
+    expect(limitsFor('cloud', { ...hosted, cloudIncludedMembers: 10 }, 2).members).toBe(12);
+    expect(limitsFor('cloud', hosted, -4).members).toBe(25);
+    expect(limitsFor('free', hosted, 5).members).toBe(2);
+    expect(limitsFor('cloud', selfHosted, 5).members).toBeNull();
+  });
+
+  it('shows billing on the hosted cloud only', () => {
+    expect(billingVisible(hosted)).toBe(true);
+    expect(billingVisible(selfHosted)).toBe(false);
   });
 
   it('recognises plan names', () => {
@@ -108,6 +140,19 @@ describe('periods', () => {
     );
     expect(resetsAt('total', now)).toBeNull();
   });
+
+  it('turns the India month over at midnight in India', () => {
+    const before = new Date('2026-11-30T18:29:59Z');
+    const after = new Date('2026-11-30T18:30:00Z');
+    expect(periodKey('ist-month', before)).toBe('2026-11');
+    expect(periodKey('ist-month', after)).toBe('2026-12');
+    expect(resetsAt('ist-month', before)?.toISOString()).toBe('2026-11-30T18:30:00.000Z');
+    expect(resetsAt('ist-month', after)?.toISOString()).toBe('2026-12-31T18:30:00.000Z');
+    expect(formatReset('ist-month', new Date('2026-11-30T18:30:00Z'))).toBe(
+      '1 December 2026 (IST)',
+    );
+    expect(formatReset('month', new Date('2026-12-01T00:00:00Z'))).toBe('1 December 2026 (UTC)');
+  });
 });
 
 describe('formatting', () => {
@@ -120,7 +165,83 @@ describe('formatting', () => {
   });
 
   it('points free workspaces at the upgrade and others at raising the limit', () => {
-    expect(upgradeHint('free')).toBe('Upgrade to Cloud: write to hello@codevibe.in.');
+    expect(upgradeHint('free')).toBe('Upgrade to Cloud on the Plan and usage page.');
     expect(upgradeHint('cloud')).toBe('To raise it, write to hello@codevibe.in.');
+  });
+});
+
+describe('the plan comparison', () => {
+  const rows = planFeatures(hosted);
+  const row = (key: string) => rows.find((r) => r.key === key)!;
+
+  it('is written from the limits', () => {
+    expect(row('members').free).toBe('2 members');
+    expect(row('members').cloud).toBe('25 members included, more can be added');
+    expect(row('activeTemplates').free).toBe('2 templates');
+    expect(row('bulkRows').free).toBe('Up to 10 rows in one send');
+    expect(row('apiRequestsPerMonth').free).toBe('100 requests a month');
+    expect(row('webhooks').free).toBe('Not included');
+    expect(row('ownEsignAccount').free).toBe('Not included');
+    expect(row('ownEsignAccount').cloud).toBe('Included');
+    expect(row('envelopesPerMonth').selfHosted).toBe('Unlimited');
+  });
+
+  it('follows an operator override', () => {
+    const custom = planFeatures({ mode: 'hosted', freeOverrides: { members: 4 } });
+    expect(custom.find((r) => r.key === 'members')?.free).toBe('4 members');
+  });
+
+  it('describes the hosted plans even on a self-hosted install', () => {
+    expect(planFeatures(selfHosted)).toEqual(rows);
+  });
+
+  it('never talks about what a provider charges', () => {
+    const text = JSON.stringify(rows).toLowerCase();
+    for (const word of ['cost', 'markup', 'leegality', 'margin']) expect(text).not.toContain(word);
+  });
+
+  it('renders one table row per feature between the docs markers', () => {
+    const table = planTableMarkdown(hosted);
+    expect(table.split('\n')).toHaveLength(rows.length + 2);
+    expect(table).toContain(
+      '| Members | 2 members | 25 members included, more can be added | Unlimited |',
+    );
+    expect(PLAN_TABLE_START).not.toBe(PLAN_TABLE_END);
+  });
+});
+
+describe('the plan tables in the docs', () => {
+  const root = join(import.meta.dirname, '..', '..', '..', '..');
+  const pages = [join(root, 'README.md')];
+  const walk = (dir: string) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.md')) pages.push(path);
+    }
+  };
+  walk(join(root, 'apps', 'site'));
+  walk(join(root, 'docs'));
+
+  it('carry exactly the table the limits give, wherever a page has one', () => {
+    const table = planTableMarkdown(hosted);
+    for (const page of pages.filter((path) => existsSync(path))) {
+      const text = readFileSync(page, 'utf8');
+      const start = text.indexOf(PLAN_TABLE_START);
+      if (start === -1) continue;
+      const end = text.indexOf(PLAN_TABLE_END, start);
+      expect(end, `${page} closes its plan table`).toBeGreaterThan(start);
+      const body = text.slice(start + PLAN_TABLE_START.length, end).trim();
+      const cells = (value: string) =>
+        value.split('\n').map((line) =>
+          line
+            .split('|')
+            .map((cell) => cell.trim())
+            .map((cell) => (/^-+$/.test(cell) ? '---' : cell)),
+        );
+      expect(cells(body), page).toEqual(cells(table));
+    }
   });
 });

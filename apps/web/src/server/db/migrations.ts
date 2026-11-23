@@ -445,6 +445,13 @@ create index app_esign_credit_ledger_workspace_idx
 `,
   },
   {
+    name: '0014_plan_v2',
+    sql: `
+alter table app_workspaces add column if not exists extra_seats integer not null default 0
+  check (extra_seats >= 0);
+`,
+  },
+  {
     name: '0017_invoice_payment_method',
     sql: `
 alter table app_billing_orders add column payment_method text;

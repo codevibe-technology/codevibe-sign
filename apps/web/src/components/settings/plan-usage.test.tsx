@@ -51,7 +51,7 @@ describe('PlanUsage', () => {
       'href',
       expect.stringMatching(/^mailto:hello@codevibe\.in\?subject=/),
     );
-    expect(screen.getByText('Up to 25')).toBeInTheDocument();
+    expect(screen.getByText(`Up to ${FREE_PLAN_LIMITS.bulkRows}`)).toBeInTheDocument();
     expect(screen.getByText('Up to 10 MB')).toBeInTheDocument();
     expect(screen.getByText('Always shown')).toBeInTheDocument();
   });

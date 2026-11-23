@@ -1,8 +1,12 @@
 import 'server-only';
 import type postgres from 'postgres';
 import {
+  LIMIT_PERIODS,
   METERS,
   PLAN_MODES,
+  PRICING_PATH,
+  billingVisible,
+  formatReset,
   PLAN_NAMES,
   formatAmount,
   formatBytes,
@@ -14,6 +18,7 @@ import {
   resetsAt,
   upgradeHint,
   type CountedLimit,
+  type FeatureLimit,
   type Period,
   type Plan,
   type PlanLimits,
@@ -24,12 +29,24 @@ import { AppError } from './errors';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
+/** What a refused request is told about the limit it met. Plain data, safe to send to a browser. */
+export type PlanLimitDetails = {
+  limit: CountedLimit | FeatureLimit;
+  used: number | null;
+  max: number | null;
+  plan: Plan;
+  /** Where the plans are compared. */
+  upgradeUrl: string;
+  /** When the count starts again, for limits that reset. */
+  resetsAt?: string;
+};
+
 /**
  * A plan limit was reached. The message names the limit, the usage and what to do, and the
  * fields let the API answer with the numbers too.
  */
 export class PlanLimitError extends AppError {
-  readonly limit: CountedLimit | 'customDomain' | 'badgeRequired';
+  readonly limit: CountedLimit | FeatureLimit;
   readonly used: number | null;
   readonly max: number | null;
   readonly plan: Plan;
@@ -53,31 +70,71 @@ export class PlanLimitError extends AppError {
     this.resetsAt = input.resetsAt ?? null;
   }
 
-  /** The body the API answers with, next to status 403. */
-  toJSON() {
+  /** Seconds until the count starts again, for `Retry-After`; null for limits that do not reset. */
+  retryAfterSeconds(now = new Date()): number | null {
+    if (!this.resetsAt) return null;
+    return Math.max(1, Math.ceil((this.resetsAt.getTime() - now.getTime()) / 1000));
+  }
+
+  /** 429 for a count that starts again by itself, 403 for everything else. */
+  get status(): 403 | 429 {
+    return this.limit === 'apiRequestsPerMonth' || this.limit === 'apiRequestsPerDay' ? 429 : 403;
+  }
+
+  /** The numbers behind the message, for an API answer or an upgrade prompt. */
+  details(): PlanLimitDetails {
     return {
-      error: {
-        code: 'PLAN_LIMIT',
-        message: this.message,
-        details: {
-          limit: this.limit,
-          used: this.used,
-          max: this.max,
-          plan: this.plan,
-          ...(this.resetsAt ? { resetsAt: this.resetsAt.toISOString() } : {}),
-        },
-      },
+      limit: this.limit,
+      used: this.used,
+      max: this.max,
+      plan: this.plan,
+      upgradeUrl: upgradeUrl(),
+      ...(this.resetsAt ? { resetsAt: this.resetsAt.toISOString() } : {}),
     };
+  }
+
+  /** The body the API answers with. */
+  toJSON() {
+    return { error: { code: 'PLAN_LIMIT', message: this.message, details: this.details() } };
   }
 }
 
-/** `PLAN_MODE` and `FREE_PLAN_LIMITS`, read from the environment on every call. */
+/** Where the plans are compared: the pricing section of this install, as a full address. */
+export function upgradeUrl(source: NodeJS.ProcessEnv = process.env): string {
+  const base = source.APP_URL?.trim().replace(/\/+$/, '') ?? '';
+  return `${base}${PRICING_PATH}`;
+}
+
+/**
+ * `CLOUD_INCLUDED_MEMBERS`, the one plan number the operator's billing settings own. Read
+ * here rather than through the billing settings so a mistake in an unrelated billing value
+ * cannot take the plan checks down with it.
+ */
+function cloudIncludedMembers(source: NodeJS.ProcessEnv): number | undefined {
+  const raw = source.CLOUD_INCLUDED_MEMBERS?.trim();
+  if (!raw) return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`CLOUD_INCLUDED_MEMBERS must be a whole number of 1 or more, not "${raw}"`);
+  }
+  return value;
+}
+
+/**
+ * `PLAN_MODE`, `FREE_PLAN_LIMITS` and `CLOUD_INCLUDED_MEMBERS`, read from the environment on
+ * every call.
+ */
 export function planSettings(source: NodeJS.ProcessEnv = process.env): PlanSettings {
   const mode = (source.PLAN_MODE?.trim() || 'self-hosted') as PlanMode;
   if (!PLAN_MODES.includes(mode)) {
     throw new Error(`PLAN_MODE must be "self-hosted" or "hosted", not "${source.PLAN_MODE}"`);
   }
-  return { mode, freeOverrides: parseLimitOverrides(source.FREE_PLAN_LIMITS) };
+  const included = cloudIncludedMembers(source);
+  return {
+    mode,
+    freeOverrides: parseLimitOverrides(source.FREE_PLAN_LIMITS),
+    ...(included !== undefined ? { cloudIncludedMembers: included } : {}),
+  };
 }
 
 export const isHosted = (settings: PlanSettings = planSettings()) => settings.mode === 'hosted';
@@ -91,11 +148,18 @@ export interface WorkspacePlan {
   limits: PlanLimits;
 }
 
-async function readPlan(sql: Sql, workspaceId: string, lock: boolean): Promise<Plan> {
-  const [row] = await sql<{ plan: string }[]>`
-    select plan from app_workspaces where id = ${workspaceId} ${lock ? sql`for update` : sql``}`;
+async function readPlan(
+  sql: Sql,
+  workspaceId: string,
+  lock: boolean,
+  settings: PlanSettings,
+): Promise<WorkspacePlan> {
+  const [row] = await sql<{ plan: string; extra_seats: number }[]>`
+    select plan, extra_seats from app_workspaces where id = ${workspaceId}
+    ${lock ? sql`for update` : sql``}`;
   if (!row) throw new AppError('NOT_FOUND', 'Workspace not found');
-  return isPlan(row.plan) ? row.plan : 'free';
+  const plan = isPlan(row.plan) ? row.plan : 'free';
+  return { plan, limits: limitsFor(plan, settings, row.extra_seats) };
 }
 
 export async function workspacePlan(
@@ -105,8 +169,7 @@ export async function workspacePlan(
 ): Promise<WorkspacePlan> {
   if (settings.mode === 'self-hosted')
     return { plan: 'unlimited', limits: limitsFor('unlimited', settings) };
-  const plan = await readPlan(sql, workspaceId, false);
-  return { plan, limits: limitsFor(plan, settings) };
+  return readPlan(sql, workspaceId, false, settings);
 }
 
 /**
@@ -120,8 +183,68 @@ export async function lockedPlan(
   settings: PlanSettings = planSettings(),
 ): Promise<WorkspacePlan | null> {
   if (settings.mode === 'self-hosted') return null;
-  const plan = await readPlan(tx, workspaceId, true);
-  return { plan, limits: limitsFor(plan, settings) };
+  return readPlan(tx, workspaceId, true, settings);
+}
+
+export interface Entitlements extends WorkspacePlan {
+  /** Plans, prices and billing exist on this install. False when self-hosted. */
+  billingVisible: boolean;
+  /** Aadhaar eSign may go through the workspace's own provider account. */
+  ownEsignAccount: boolean;
+  /** Events are delivered to the workspace's webhook endpoints. */
+  webhooks: boolean;
+}
+
+/** What a workspace may do right now, for a page or a check that needs more than one answer. */
+export async function workspaceEntitlements(
+  sql: Sql,
+  workspaceId: string,
+  settings: PlanSettings = planSettings(),
+): Promise<Entitlements> {
+  const workspace = await workspacePlan(sql, workspaceId, settings);
+  return {
+    ...workspace,
+    billingVisible: billingVisible(settings),
+    ownEsignAccount: workspace.limits.ownEsignAccount,
+    webhooks: workspace.limits.webhooks !== 0,
+  };
+}
+
+/**
+ * Refuses a workspace whose plan cannot connect its own eSign provider account. Call it when
+ * the account is saved and again each time it is about to be used, so a workspace that left
+ * Cloud stops using it.
+ */
+export async function assertOwnEsignAccount(
+  sql: Sql,
+  workspaceId: string,
+  settings: PlanSettings = planSettings(),
+): Promise<void> {
+  const workspace = await workspacePlan(sql, workspaceId, settings);
+  if (workspace.limits.ownEsignAccount) return;
+  throw new PlanLimitError({
+    limit: 'ownEsignAccount',
+    plan: workspace.plan,
+    field: 'mode',
+    message: `Connecting your own Leegality account is not part of the ${PLAN_NAMES[workspace.plan]} plan. ${upgradeHint(workspace.plan)} Until then, Aadhaar eSign here uses prepaid credits.`,
+  });
+}
+
+/**
+ * Refuses a workspace whose plan has no webhooks: adding or turning on an endpoint, a test
+ * event, sending a delivery again. Endpoints it already has stay listed and can be edited or
+ * removed; they receive nothing until the plan includes webhooks again.
+ */
+export function assertWebhooksIncluded(workspace: WorkspacePlan | null) {
+  if (workspace && workspace.limits.webhooks === 0) {
+    throw new PlanLimitError({
+      limit: 'webhooks',
+      used: 0,
+      max: 0,
+      plan: workspace.plan,
+      message: `Webhooks are not part of the ${PLAN_NAMES[workspace.plan]} plan, so this workspace's endpoints are paused. ${upgradeHint(workspace.plan)}`,
+    });
+  }
 }
 
 const plural = (n: number, one: string, many = `${one}s`) =>
@@ -141,6 +264,8 @@ function countMessage(key: CountedLimit, used: number, max: number, plan: Plan, 
       return `This workspace has ${plural(used, 'webhook endpoint')}, and the ${name} plan allows ${max}. Remove one first, or ${lower(hint)}`;
     case 'bulkRows':
       return `This file has ${plural(used, 'row')}, and the ${name} plan sends up to ${max} in one bulk send. Split it into files of ${max} rows, or ${lower(hint)}`;
+    case 'apiRequestsPerMonth':
+      return `This workspace has made ${used} of the ${plural(max, 'API request')} the ${name} plan allows each month. The count starts again on ${formatReset('ist-month', resetsAt('ist-month', now)!)}. For more, ${lower(hint)}`;
     case 'apiRequestsPerDay':
       return `This workspace has made ${used} of the ${plural(max, 'API request')} the ${name} plan allows each day. Try again after 00:00 UTC, or ${lower(hint)}`;
     case 'fileBytes':
@@ -160,11 +285,6 @@ const size = (used: number, max: number) =>
 
 const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
-const PERIODS: Partial<Record<CountedLimit, Period>> = {
-  envelopesPerMonth: 'month',
-  apiRequestsPerDay: 'day',
-};
-
 /** The error for a counted limit that would be passed by `used`. */
 export function limitError(
   key: CountedLimit,
@@ -174,7 +294,7 @@ export function limitError(
   now = new Date(),
   field?: string,
 ): PlanLimitError {
-  const period = PERIODS[key];
+  const period = LIMIT_PERIODS[key];
   return new PlanLimitError({
     limit: key,
     used,
@@ -255,18 +375,24 @@ export function assertBadgeOptional(workspace: WorkspacePlan | null) {
   }
 }
 
-export type UsageMetric = 'envelopes_sent' | 'api_requests' | 'storage_bytes';
-
-const METRIC_PERIOD: Record<UsageMetric, Period> = {
-  envelopes_sent: 'month',
-  api_requests: 'day',
-  storage_bytes: 'total',
-};
+export type UsageMetric =
+  | 'envelopes_sent'
+  | 'api_requests'
+  | 'api_requests_month'
+  | 'storage_bytes';
 
 const METRIC_LIMIT: Record<UsageMetric, CountedLimit> = {
   envelopes_sent: 'envelopesPerMonth',
   api_requests: 'apiRequestsPerDay',
+  api_requests_month: 'apiRequestsPerMonth',
   storage_bytes: 'storageBytes',
+};
+
+const METRIC_PERIOD: Record<UsageMetric, Period> = {
+  envelopes_sent: 'month',
+  api_requests: 'day',
+  api_requests_month: 'ist-month',
+  storage_bytes: 'total',
 };
 
 export interface Reservation {
@@ -384,10 +510,23 @@ export async function usageReport(
     members: seats.members + seats.invited,
     activeTemplates: counts?.templates ?? 0,
     webhooks: counts?.webhooks ?? 0,
+    apiRequestsPerMonth: await usageOf(sql, workspaceId, 'api_requests_month', now),
     apiRequestsPerDay: await usageOf(sql, workspaceId, 'api_requests', now),
     storageBytes: await usageOf(sql, workspaceId, 'storage_bytes', now),
   };
-  const lines = METERS.map((meter): UsageLine => {
+  // A plan counts API requests by the month or under a daily ceiling, never both.
+  const shown = METERS.filter((meter) => {
+    if (meter.key === 'apiRequestsPerDay')
+      return !(
+        workspace.limits.apiRequestsPerDay === null && workspace.limits.apiRequestsPerMonth !== null
+      );
+    if (meter.key === 'apiRequestsPerMonth')
+      return !(
+        workspace.limits.apiRequestsPerMonth === null && workspace.limits.apiRequestsPerDay !== null
+      );
+    return true;
+  });
+  const lines = shown.map((meter): UsageLine => {
     const value = used[meter.key] ?? 0;
     const max = workspace.limits[meter.key];
     const reset = resetsAt(meter.period, now);
@@ -399,7 +538,7 @@ export async function usageReport(
       max,
       usedText: formatAmount(value, meter.unit),
       maxText: max === null ? null : formatAmount(max, meter.unit),
-      resetsAt: reset ? formatDay(reset) : null,
+      resetsAt: reset ? formatReset(meter.period, reset) : null,
     };
   });
   return { ...workspace, lines };

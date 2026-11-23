@@ -178,10 +178,12 @@ describe('Landing', () => {
     );
     const pricing = document.getElementById('pricing')!;
     expect(within(pricing).getByText('20 envelopes a month, bulk sends included')).toBeTruthy();
-    expect(within(pricing).getByText('3 members')).toBeTruthy();
+    expect(within(pricing).getByText(`${FREE_PLAN_LIMITS.members} members`)).toBeTruthy();
     expect(within(pricing).getByText('PDFs up to 10 MB, 25 MB per envelope')).toBeTruthy();
     expect(within(pricing).getByText('200 MB of stored documents')).toBeTruthy();
-    expect(within(pricing).getByText('500 envelopes a month, bulk sends included')).toBeTruthy();
+    expect(
+      within(pricing).getByText('Unlimited envelopes a month, bulk sends included'),
+    ).toBeTruthy();
     expect(within(pricing).getByText('Unlimited templates')).toBeTruthy();
     expect(within(pricing).getByText('Coming soon')).toBeTruthy();
     expect(within(pricing).getByRole('link', { name: 'Upgrade by email' })).toHaveAttribute(

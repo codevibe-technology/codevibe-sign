@@ -3,12 +3,20 @@ import { z } from 'zod';
 import { can, type Permission, type Role } from '@/lib/roles';
 import { db } from '../db';
 import { AppError, type AppErrorCode } from '../errors';
+import type { PlanLimitDetails } from '../plans';
 import { getSessionUser, type SessionUser } from '../auth/session';
 import { findMembership, type Workspace } from '../workspaces';
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
-  | { ok: false; code: AppErrorCode | 'INTERNAL'; error: string; field?: string };
+  | {
+      ok: false;
+      code: AppErrorCode | 'INTERNAL';
+      error: string;
+      field?: string;
+      /** Set with `PLAN_LIMIT`: the limit that was met, for an upgrade prompt. */
+      limit?: PlanLimitDetails;
+    };
 
 export interface ActionContext {
   user: SessionUser;
@@ -20,6 +28,9 @@ const workspaceInput = z.object({ workspaceId: z.string().min(1).max(64) });
 
 const fail = (code: AppErrorCode | 'INTERNAL', error: string, field?: string) =>
   ({ ok: false, code, error, ...(field ? { field } : {}) }) as const;
+
+const hasLimitDetails = (err: AppError): err is AppError & { details(): PlanLimitDetails } =>
+  typeof (err as { details?: unknown }).details === 'function';
 
 /** FormData from a form, or a plain object from code, as one object to validate. */
 function toObject(input: unknown): unknown {
@@ -35,6 +46,9 @@ async function run<T>(work: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return { ok: true, data: await work() };
   } catch (err) {
+    if (err instanceof AppError && err.code === 'PLAN_LIMIT' && hasLimitDetails(err)) {
+      return { ...fail(err.code, err.message, err.field), limit: err.details() };
+    }
     if (err instanceof AppError) return fail(err.code, err.message, err.field);
     console.error('action failed', err instanceof Error ? err.message : err);
     return fail('INTERNAL', 'Something went wrong on our side. Try again in a moment.');
