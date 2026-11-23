@@ -6,8 +6,9 @@ import { APP_HOME } from '@/lib/safe-next';
 import { DOCS_URL } from './links';
 
 const SECTIONS = [
-  { label: 'How it works', href: '/#how-it-works' },
-  { label: 'Features', href: '/#features' },
+  { label: 'How it works', href: '/#features' },
+  { label: 'Developers', href: '/#developers' },
+  { label: 'Open source', href: '/#open-source' },
   { label: 'Pricing', href: '/#pricing' },
 ];
 
