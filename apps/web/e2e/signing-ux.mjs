@@ -446,7 +446,7 @@ try {
         await shot(s, `g5-signature-${width}`);
         await axe(s, `Signature dialog at ${width}`);
       }
-      await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Adopt and sign', exact: true }).click();
       await sleep(900);
       if (signed === 0) {
         const moved =
@@ -468,6 +468,13 @@ try {
     check(barOnScreen(m), 'the action bar is still on screen at the end');
     await shot(s, `g7-ready-to-finish-${width}`);
     await finish.click();
+    const confirm = s.getByRole('dialog', { name: 'Ready to sign?' });
+    await confirm.waitFor();
+    await sleep(400);
+    check(true, 'Finish asks once more before signing');
+    await shot(s, `g7b-confirm-${width}`);
+    await axe(s, `Finish confirmation at ${width}`);
+    await confirm.getByRole('button', { name: 'Finish and sign' }).click();
     await s.getByTestId('signing-shell').getByRole('heading').first().waitFor();
     await bar.waitFor({ state: 'detached', timeout: 30_000 });
     await shot(s, `g8-done-${width}`);
