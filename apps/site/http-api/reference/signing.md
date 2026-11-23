@@ -32,6 +32,8 @@ or the literal `link` to use the token held in the `cvsign_link` cookie.
 <li><a href="#mark-viewed"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/view</code></a></li>
 <li><a href="#submit-signature"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/submit</code></a></li>
 <li><a href="#decline-signature"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/decline</code></a></li>
+<li><a href="#get-esign-status"><span class="api-method" data-method="get">GET</span><code>/v1/sign/{token}/esign</code></a></li>
+<li><a href="#start-esign"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/esign</code></a></li>
 <li><a href="#open-signing-link"><span class="api-method" data-method="get">GET</span><code>/sign/{token}</code></a></li>
 </ul>
 </nav>
@@ -333,6 +335,42 @@ It is this recipient's turn.
 IANA time zone the signing date is printed in on the document, for example `Asia/Kolkata`: the workspace's own, or the server's. `UTC` when none is set.
 
 </div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">esign</code> <span class="api-field__type">object</span></p>
+
+Present only for a recipient who signs with Aadhaar eSign.
+
+<details class="api-field__children">
+<summary>Attributes of <code>esign</code></summary>
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">available</code> <span class="api-field__type">boolean</span></p>
+
+The sender's workspace can start an Aadhaar eSign right now.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">provider</code> <span class="api-field__type">string or null</span></p>
+
+The eSign provider, once the recipient has started.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">status</code> <span class="api-field__type">string or null</span></p>
+
+Where the latest attempt stands; `null` before the first.
+
+<p class="api-field__meta">One of <code>pending</code> <code>signed</code> <code>declined</code> <code>expired</code> <code>failed</code></p>
+
+</div>
+
+</div>
+
+</details>
+
+</div>
 
 </div>
 
@@ -396,7 +434,12 @@ IANA time zone the signing date is printed in on the document, for example `Asia
   "otpRequired": true,
   "authenticated": true,
   "canAct": true,
-  "timeZone": "Asia/Kolkata"
+  "timeZone": "Asia/Kolkata",
+  "esign": {
+    "available": true,
+    "provider": "leegality",
+    "status": "pending"
+  }
 }
 ```
 
@@ -530,7 +573,8 @@ func main() {
     {
       "id": "string",
       "name": "string",
-      "sealed": true
+      "sealed": true,
+      "certificate": true
     }
   ]
 }
@@ -564,6 +608,21 @@ is `true`.
 <p class="api-field__head"><code class="api-field__name">docId</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
 
 The document id, from `documents[].id`.
+
+</div>
+
+</div>
+
+### Query parameters {#get-receipt-document-query}
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">file</code> <span class="api-field__type">string</span></p>
+
+`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.
+
+<p class="api-field__meta">One of <code>certificate</code></p>
 
 </div>
 
@@ -718,6 +777,14 @@ The document id, from `documents[].id`.
 The signed value from the download link in the completed-copy email.
 
 <p class="api-field__meta">At most 1024 characters</p>
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">file</code> <span class="api-field__type">string</span></p>
+
+`certificate` for the signing certificate of a document whose `certificate` is `true` in the receipt. Leave out for the signed document.
+
+<p class="api-field__meta">One of <code>certificate</code></p>
 
 </div>
 
@@ -994,7 +1061,12 @@ func main() {
   "otpRequired": true,
   "authenticated": true,
   "canAct": true,
-  "timeZone": "Asia/Kolkata"
+  "timeZone": "Asia/Kolkata",
+  "esign": {
+    "available": true,
+    "provider": "leegality",
+    "status": "pending"
+  }
 }
 ```
 
@@ -2054,6 +2126,378 @@ func main() {
 {
   "envelopeStatus": "in_progress",
   "recipientStatus": "signed"
+}
+```
+
+:::
+
+</div>
+
+</div>
+</section>
+
+<section class="api-op" aria-labelledby="get-esign-status">
+<div class="api-op__main">
+
+## Follow an Aadhaar eSign {#get-esign-status}
+
+<p class="api-route"><span class="api-method" data-method="get">GET</span><code>/v1/sign/{token}/esign</code></p>
+
+Where the recipient's Aadhaar eSign stands. While it is `pending` the server also
+asks the provider, at most once every few seconds, so the page the signer comes
+back to moves on even when the provider's callback is late. Unlike the other signing
+routes it still answers after the recipient has signed, and then hands out the
+receipt for `GET /v1/sign/receipt`.
+
+<p class="api-auth"><span class="api-auth__label">Auth</span> The signing token in the path or the <code>cvsign_link</code> cookie.</p>
+
+### Path parameters {#get-esign-status-path}
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">token</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
+
+The signing token from the link (43 base64url characters), or `link` to use the
+token in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`.
+
+<p class="api-field__meta">Matches <code>^([A-Za-z0-9_-]{43}|link)$</code></p>
+
+</div>
+
+</div>
+
+### Returns {#get-esign-status-returns}
+
+**200 OK**. The latest attempt, or `none` before the first. An object.
+
+- `X-Sign-Receipt`: The receipt, once `status` is `signed`. Send it back as `X-Sign-Receipt`.
+
+### Errors {#get-esign-status-errors}
+
+| Status | When |
+| ------ | ---- |
+| 401 | `TOKEN_INVALID`: the link is unknown, used, expired or withdrawn. `OTP_INVALID`: the code is wrong (`details.attemptsLeft`), or the session is missing (`details.otpRequired`). `OTP_EXPIRED`: the code timed out or none was sent. |
+| 429 | `RATE_LIMITED`: too many requests. Wait `Retry-After` seconds. |
+
+</div>
+<div class="api-op__aside">
+
+<div class="api-panel" data-label="Request">
+
+::: code-group
+
+```sh [curl]
+curl https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign
+```
+
+```ts check [Node.js]
+const response = await fetch('https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign');
+console.log(response.status, await response.json());
+```
+
+```python [Python]
+import requests
+
+response = requests.get(
+    "https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign",
+    timeout=30,
+)
+
+response.raise_for_status()
+print(response.json())
+```
+
+```go [Go]
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	req, err := http.NewRequest("GET", "https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign", nil)
+	if err != nil {
+		panic(err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer res.Body.Close()
+	out, err := io.ReadAll(res.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(res.Status, string(out))
+}
+```
+
+:::
+
+<ApiTryIt operation="getEsignStatus" />
+
+</div>
+
+<div class="api-panel" data-label="Response">
+
+::: code-group
+
+```json [200 OK]
+{
+  "status": "pending",
+  "signUrl": "https://sandbox.leegality.com/sign/2c0c9c1e-7f0a-4a55-9a53-0f0d5b8e6a11",
+  "expiresAt": "2026-03-03T09:10:00.000Z"
+}
+```
+
+:::
+
+</div>
+
+</div>
+</section>
+
+<section class="api-op" aria-labelledby="start-esign">
+<div class="api-op__main">
+
+## Start an Aadhaar eSign {#start-esign}
+
+<p class="api-route"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/esign</code></p>
+
+For a recipient with `auth: aadhaar`, in place of `submit`. Takes the same body:
+the recipient's field values and their consent. The server draws the values on the
+document, asks the eSign provider to sign that file and answers the provider's
+signing page; send the signer there. The recipient becomes `signed` once the
+provider reports the signature. Asking again while an attempt is open answers the
+same page.
+
+<p class="api-auth"><span class="api-auth__label">Auth</span> The signing token in the path or the <code>cvsign_link</code> cookie.</p>
+
+Send an `Idempotency-Key` to retry safely: the same key and body within 24 hours return the first response. See [retries](/http-api/conventions#retries).
+
+### Path parameters {#start-esign-path}
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">token</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
+
+The signing token from the link (43 base64url characters), or `link` to use the
+token in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`.
+
+<p class="api-field__meta">Matches <code>^([A-Za-z0-9_-]{43}|link)$</code></p>
+
+</div>
+
+</div>
+
+### Headers {#start-esign-headers}
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">Idempotency-Key</code> <span class="api-field__type">string</span></p>
+
+Any unique string, up to 255 characters. A retry with the same key and body within
+24 hours returns the first response. The same key with a different body is a
+`VALIDATION` error; while the first request is still running, `CONFLICT`.
+
+<p class="api-field__meta">1 to 255 characters</p>
+
+</div>
+
+</div>
+
+### Request body {#start-esign-body}
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">consent</code> <span class="api-field__type">boolean</span> <span class="api-field__required">Required</span></p>
+
+The signer agrees to sign electronically.
+
+<p class="api-field__meta">Always <code>true</code></p>
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">values</code> <span class="api-field__type">array of objects</span> <span class="api-field__required">Required</span></p>
+
+<p class="api-field__meta">At most 500 items</p>
+
+<details class="api-field__children">
+<summary>Attributes of <code>values</code></summary>
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">fieldId</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
+
+<p class="api-field__meta">Not empty</p>
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">value</code> <span class="api-field__type">string</span> <span class="api-field__required">Required</span></p>
+
+Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true` or
+`false`. Date: an ISO date.
+
+</div>
+
+</div>
+
+</details>
+
+</div>
+
+</div>
+
+### Returns {#start-esign-returns}
+
+**200 OK**. Where to send the signer. An object.
+
+- `Idempotent-Replayed`: `true` when this is the stored response to an earlier request with the same `Idempotency-Key`.
+
+### Errors {#start-esign-errors}
+
+| Status | When |
+| ------ | ---- |
+| 400 | `VALIDATION`: the request is malformed. `details.issues` lists each problem. |
+| 401 | `TOKEN_INVALID`: the link is unknown, used, expired or withdrawn. `OTP_INVALID`: the code is wrong (`details.attemptsLeft`), or the session is missing (`details.otpRequired`). `OTP_EXPIRED`: the code timed out or none was sent. |
+| 403 | `FIELD_NOT_YOURS`: a value names a field that belongs to another recipient. |
+| 409 | `INVALID_STATE`: not allowed in the envelope's status (`details.status`). `NOT_YOUR_TURN`: sequential routing, an earlier recipient has not acted. `CONFLICT`: another request changed the envelope, or one with the same `Idempotency-Key` is still running; try again. |
+| 410 | `ENVELOPE_EXPIRED`: the envelope is past its expiry. |
+| 413 | `DOCUMENT_TOO_LARGE`: a PDF or the whole request is over the limit (`details.maxBytes`). |
+| 422 | `DOCUMENT_INVALID`: a file is not a readable PDF. `PDF_ALREADY_SIGNED`: a file already carries digital signatures; upload the unsigned original. `REQUIRED_FIELDS_MISSING`: required fields were left empty. `INVALID_FIELD_VALUE`: a value does not suit its field (PNG, date, length). |
+| 429 | `RATE_LIMITED`: too many requests. Wait `Retry-After` seconds. |
+| 502 | The eSign provider failed or could not be reached. Try again. |
+
+</div>
+<div class="api-op__aside">
+
+<div class="api-panel" data-label="Request">
+
+::: code-group
+
+```sh [curl]
+curl -X POST https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign \
+  -H "Idempotency-Key: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "consent": true,
+  "values": [
+    {
+      "fieldId": "e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94",
+      "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    }
+  ]
+}'
+```
+
+```ts check [Node.js]
+const response = await fetch('https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign', {
+  method: 'POST',
+  headers: {
+    'Idempotency-Key': '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    consent: true,
+    values: [
+      {
+        fieldId: 'e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94',
+        value: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      },
+    ],
+  }),
+});
+console.log(response.status, await response.json());
+```
+
+```python [Python]
+import requests
+
+response = requests.post(
+    "https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign",
+    headers={
+        "Idempotency-Key": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    },
+    json={
+        "consent": True,
+        "values": [
+            {
+                "fieldId": "e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94",
+                "value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+            },
+        ],
+    },
+    timeout=30,
+)
+
+response.raise_for_status()
+print(response.json())
+```
+
+```go [Go]
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	payload, err := json.Marshal(map[string]any{
+		"consent": true,
+		"values": []any{
+			map[string]any{
+				"fieldId": "e9d2b7c1-4a6f-4e3b-8d5c-3f1a0b2c6d94",
+				"value": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest("POST", "https://sign.codevibe.in/api/v1/sign/q3X9vL2pR8mT4kW7nB1cF6hJ0dS5gY2uE9aZ3xK7oPw/esign", bytes.NewReader(payload))
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Idempotency-Key", "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d")
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer res.Body.Close()
+	out, err := io.ReadAll(res.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(res.Status, string(out))
+}
+```
+
+:::
+
+<ApiTryIt operation="startEsign" />
+
+</div>
+
+<div class="api-panel" data-label="Response">
+
+::: code-group
+
+```json [200 OK]
+{
+  "signUrl": "https://sandbox.leegality.com/sign/2c0c9c1e-7f0a-4a55-9a53-0f0d5b8e6a11",
+  "expiresAt": "2026-03-03T09:10:00.000Z"
 }
 ```
 

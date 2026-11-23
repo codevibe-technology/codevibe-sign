@@ -52,6 +52,7 @@ With the Node.js client every failure is a `SignApiError` carrying `code`, `stat
 | <span id="invalid-state">`INVALID_STATE`</span> | 409 Conflict | Not allowed in the envelope's current status (`details.status`). |
 | <span id="not-your-turn">`NOT_YOUR_TURN`</span> | 409 Conflict | Sequential routing, and an earlier recipient has not acted yet. |
 | <span id="conflict">`CONFLICT`</span> | 409 Conflict | Another request changed the envelope, or one with the same `Idempotency-Key` is still running. Try again. |
+| <span id="esign-unavailable">`ESIGN_UNAVAILABLE`</span> | 409 Conflict | Aadhaar eSign cannot be used for this envelope right now (`details.reason`), for example because it is not set up. |
 | <span id="envelope-expired">`ENVELOPE_EXPIRED`</span> | 410 Gone | The envelope is past its expiry date. |
 | <span id="document-too-large">`DOCUMENT_TOO_LARGE`</span> | 413 Content Too Large | A PDF or the whole request is over the size limit (`details.maxBytes`). |
 | <span id="required-fields-missing">`REQUIRED_FIELDS_MISSING`</span> | 422 Unprocessable Content | Required fields were left empty. |

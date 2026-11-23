@@ -53,7 +53,7 @@ The first check that failed; `null` when valid. `unreadable`: the file could not
 be read as a PDF. `unknown_document`: no sealed document has this SHA-256. More
 values may be added.
 
-<p class="api-field__meta">One of <code>not_sealed</code> <code>multiple_signatures</code> <code>signature_invalid</code> <code>not_whole_document</code> <code>untrusted_signer</code> <code>unreadable</code> <code>unknown_document</code> <code>null</code></p>
+<p class="api-field__meta">One of <code>not_sealed</code> <code>multiple_signatures</code> <code>signature_invalid</code> <code>earlier_signature_invalid</code> <code>not_whole_document</code> <code>untrusted_signer</code> <code>unreadable</code> <code>unknown_document</code> <code>null</code></p>
 
 </div>
 <div class="api-field">
@@ -150,6 +150,52 @@ SHA-256 of the certificate the seal was made with.
 
 </div>
 <div class="api-field">
+<p class="api-field__head"><code class="api-field__name">seal</code> <span class="api-field__type">string</span></p>
+
+`operator`: the file ends with this server's seal. `provider_only`: an eSign provider locked the file against further signatures, so it is kept as the provider signed it and recognised by its SHA-256 in the audit trail.
+
+<p class="api-field__meta">One of <code>operator</code> <code>provider_only</code></p>
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">earlierSignatures</code> <span class="api-field__type">array of objects</span></p>
+
+Signatures made before the seal, earliest first. Empty for most files.
+
+<details class="api-field__children">
+<summary>Attributes of <code>earlierSignatures</code></summary>
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">valid</code> <span class="api-field__type">boolean</span></p>
+
+The signature matches the bytes it covers.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">signerCommonName</code> <span class="api-field__type">string or null</span></p>
+
+Who the signing certificate was issued to.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">issuerCommonName</code> <span class="api-field__type">string or null</span></p>
+
+The authority that issued the signing certificate.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">signedAt</code> <span class="api-field__type">string (date-time) or null</span></p>
+
+</div>
+
+</div>
+
+</details>
+
+</div>
+<div class="api-field">
 <p class="api-field__head"><code class="api-field__name">envelope</code> <span class="api-field__type">object or null</span></p>
 
 The envelope of a valid file; `null` otherwise, or when it is no longer held.
@@ -231,6 +277,28 @@ How the recipient proves who they are. `email_otp`, the default, asks for the li
 <p class="api-field__head"><code class="api-field__name">actedAt</code> <span class="api-field__type">string (date-time) or null</span></p>
 
 </div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">esign</code> <span class="api-field__type">object</span></p>
+
+Present for a recipient who signed, or is to sign, with Aadhaar eSign.
+
+<details class="api-field__children">
+<summary>Attributes of <code>esign</code></summary>
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">provider</code> <span class="api-field__type">string</span></p>
+
+The eSign provider, for example `leegality`.
+
+</div>
+
+</div>
+
+</details>
+
+</div>
 
 </div>
 
@@ -254,7 +322,7 @@ How the recipient proves who they are. `email_otp`, the default, asks for the li
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">action</code> <span class="api-field__type">string</span></p>
 
-<p class="api-field__meta">One of <code>envelope.created</code> <code>envelope.updated</code> <code>envelope.sent</code> <code>envelope.completed</code> <code>envelope.declined</code> <code>envelope.expired</code> <code>envelope.voided</code> <code>recipient.notified</code> <code>recipient.reminded</code> <code>recipient.viewed</code> <code>recipient.authenticated</code> <code>recipient.signed</code> <code>recipient.approved</code> <code>recipient.declined</code> <code>recipient.link_shared</code> <code>recipient.corrected</code> <code>envelope.recalled</code> <code>envelope.revised</code> <code>document.sealed</code></p>
+<p class="api-field__meta">One of <code>envelope.created</code> <code>envelope.updated</code> <code>envelope.sent</code> <code>envelope.completed</code> <code>envelope.declined</code> <code>envelope.expired</code> <code>envelope.voided</code> <code>recipient.notified</code> <code>recipient.reminded</code> <code>recipient.viewed</code> <code>recipient.authenticated</code> <code>recipient.signed</code> <code>recipient.approved</code> <code>recipient.declined</code> <code>recipient.link_shared</code> <code>recipient.corrected</code> <code>recipient.esign_started</code> <code>recipient.esign_failed</code> <code>envelope.recalled</code> <code>envelope.revised</code> <code>document.sealed</code></p>
 
 </div>
 <div class="api-field">
@@ -337,6 +405,8 @@ The last hash of the chain, as printed on the certificate page.
   },
   "signedAt": "2026-03-02T09:14:31.000Z",
   "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+  "seal": "operator",
+  "earlierSignatures": [],
   "envelope": {
     "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
     "title": "Offer letter",
@@ -548,6 +618,8 @@ func main() {
   },
   "signedAt": "2026-03-02T09:14:31.000Z",
   "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+  "seal": "operator",
+  "earlierSignatures": [],
   "envelope": {
     "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
     "title": "Offer letter",
@@ -745,6 +817,8 @@ func main() {
   },
   "signedAt": "2026-03-02T09:14:31.000Z",
   "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+  "seal": "operator",
+  "earlierSignatures": [],
   "envelope": {
     "id": "7f3c9a2e-5b1d-4e8a-9c6f-2d4b8e1a0c37",
     "title": "Offer letter",

@@ -226,6 +226,46 @@ How the recipient proves who they are. `email_otp`, the default, asks for the li
 <p class="api-field__head"><code class="api-field__name">lastRemindedAt</code> <span class="api-field__type">string (date-time)</span></p>
 
 </div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">esign</code> <span class="api-field__type">object</span></p>
+
+Where the recipient's Aadhaar eSign stands, once they have started one. Only for `auth: aadhaar`.
+
+<details class="api-field__children">
+<summary>Attributes of <code>esign</code></summary>
+
+<div class="api-fields">
+
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">provider</code> <span class="api-field__type">string</span></p>
+
+The eSign provider.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">status</code> <span class="api-field__type">string</span></p>
+
+`pending`: the recipient is at the provider. `expired` and `failed`: the attempt ended without a signature and the recipient may start again.
+
+<p class="api-field__meta">One of <code>pending</code> <code>signed</code> <code>declined</code> <code>expired</code> <code>failed</code></p>
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">signerName</code> <span class="api-field__type">string</span></p>
+
+The signer's name as the provider reported it.
+
+</div>
+<div class="api-field">
+<p class="api-field__head"><code class="api-field__name">signedAt</code> <span class="api-field__type">string (date-time)</span></p>
+
+</div>
+
+</div>
+
+</details>
+
+</div>
 
 </div>
 
@@ -2136,7 +2176,13 @@ func main() {
       "notifiedAt": "2026-03-02T09:14:31.000Z",
       "viewedAt": "2026-03-02T09:14:31.000Z",
       "remindersSent": 0,
-      "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+      "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+      "esign": {
+        "provider": "leegality",
+        "status": "pending",
+        "signerName": "string",
+        "signedAt": "2026-03-02T09:14:31.000Z"
+      }
     }
   ],
   "fields": [
@@ -2366,7 +2412,13 @@ func main() {
       "notifiedAt": "2026-03-02T09:14:31.000Z",
       "viewedAt": "2026-03-02T09:14:31.000Z",
       "remindersSent": 0,
-      "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+      "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+      "esign": {
+        "provider": "leegality",
+        "status": "pending",
+        "signerName": "string",
+        "signedAt": "2026-03-02T09:14:31.000Z"
+      }
     }
   ],
   "fields": [
@@ -2624,7 +2676,13 @@ func main() {
       "notifiedAt": "2026-03-02T09:14:31.000Z",
       "viewedAt": "2026-03-02T09:14:31.000Z",
       "remindersSent": 0,
-      "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+      "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+      "esign": {
+        "provider": "leegality",
+        "status": "pending",
+        "signerName": "string",
+        "signedAt": "2026-03-02T09:14:31.000Z"
+      }
     }
   ],
   "fields": [
@@ -2862,7 +2920,13 @@ func main() {
         "notifiedAt": "2026-03-02T09:14:31.000Z",
         "viewedAt": "2026-03-02T09:14:31.000Z",
         "remindersSent": 0,
-        "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+        "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+        "esign": {
+          "provider": "leegality",
+          "status": "pending",
+          "signerName": "string",
+          "signedAt": "2026-03-02T09:14:31.000Z"
+        }
       }
     ],
     "fields": [
@@ -2937,7 +3001,13 @@ func main() {
         "notifiedAt": "2026-03-02T09:14:31.000Z",
         "viewedAt": "2026-03-02T09:14:31.000Z",
         "remindersSent": 0,
-        "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+        "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+        "esign": {
+          "provider": "leegality",
+          "status": "pending",
+          "signerName": "string",
+          "signedAt": "2026-03-02T09:14:31.000Z"
+        }
       }
     ],
     "fields": [
@@ -3144,7 +3214,13 @@ func main() {
         "notifiedAt": "2026-03-02T09:14:31.000Z",
         "viewedAt": "2026-03-02T09:14:31.000Z",
         "remindersSent": 0,
-        "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+        "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+        "esign": {
+          "provider": "leegality",
+          "status": "pending",
+          "signerName": "string",
+          "signedAt": "2026-03-02T09:14:31.000Z"
+        }
       }
     ],
     "fields": [
@@ -3219,7 +3295,13 @@ func main() {
         "notifiedAt": "2026-03-02T09:14:31.000Z",
         "viewedAt": "2026-03-02T09:14:31.000Z",
         "remindersSent": 0,
-        "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+        "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+        "esign": {
+          "provider": "leegality",
+          "status": "pending",
+          "signerName": "string",
+          "signedAt": "2026-03-02T09:14:31.000Z"
+        }
       }
     ],
     "fields": [

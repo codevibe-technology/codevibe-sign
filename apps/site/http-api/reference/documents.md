@@ -128,7 +128,8 @@ Size of each page in PDF points, in page order.
 <p class="api-route"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/documents/{docId}</code></p>
 
 The sealed PDF once the envelope is complete, otherwise the original. Ask for one of
-them with `version`.
+them with `version`. A document signed with Aadhaar eSign cannot take a certificate
+page, so its signing certificate is a sealed file of its own: `version=certificate`.
 
 <p class="api-auth"><span class="api-auth__label">Auth</span> Sender API key, as <code>Authorization: Bearer &lt;key&gt;</code></p>
 
@@ -158,9 +159,9 @@ The document id, from `documents[].id`.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">version</code> <span class="api-field__type">string</span></p>
 
-`original`, or `sealed` (fails with `INVALID_STATE` until sealing has finished).
+`original`, `sealed` (fails with `INVALID_STATE` until sealing has finished) or `certificate` (fails with `INVALID_STATE` when the certificate is the last page of the sealed file).
 
-<p class="api-field__meta">One of <code>original</code> <code>sealed</code></p>
+<p class="api-field__meta">One of <code>original</code> <code>sealed</code> <code>certificate</code></p>
 
 </div>
 
@@ -507,7 +508,13 @@ func main() {
         "notifiedAt": "2026-03-02T09:14:31.000Z",
         "viewedAt": "2026-03-02T09:14:31.000Z",
         "remindersSent": 0,
-        "lastRemindedAt": "2026-03-02T09:14:31.000Z"
+        "lastRemindedAt": "2026-03-02T09:14:31.000Z",
+        "esign": {
+          "provider": "leegality",
+          "status": "pending",
+          "signerName": "string",
+          "signedAt": "2026-03-02T09:14:31.000Z"
+        }
       }
     ],
     "fields": [
@@ -689,7 +696,9 @@ func main() {
   },
   "signedAt": "2026-03-02T09:14:31.000Z",
   "certificateSha256": "9f2c1a7b3e4d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
-  "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d"
+  "sha256": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d",
+  "seal": "operator",
+  "earlierSignatures": []
 }
 ```
 

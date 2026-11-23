@@ -100,7 +100,17 @@ What the recipient's browser calls.
 <li><a href="/docs/http-api/reference/signing.html#mark-viewed"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/view</code><span>Record that the document was opened</span></a></li>
 <li><a href="/docs/http-api/reference/signing.html#submit-signature"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/submit</code><span>Sign or approve</span></a></li>
 <li><a href="/docs/http-api/reference/signing.html#decline-signature"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/decline</code><span>Decline</span></a></li>
+<li><a href="/docs/http-api/reference/signing.html#get-esign-status"><span class="api-method" data-method="get">GET</span><code>/v1/sign/{token}/esign</code><span>Follow an Aadhaar eSign</span></a></li>
+<li><a href="/docs/http-api/reference/signing.html#start-esign"><span class="api-method" data-method="post">POST</span><code>/v1/sign/{token}/esign</code><span>Start an Aadhaar eSign</span></a></li>
 <li><a href="/docs/http-api/reference/signing.html#open-signing-link"><span class="api-method" data-method="get">GET</span><code>/sign/{token}</code><span>Open a signing link</span></a></li>
+</ul>
+
+## Provider callbacks {#provider-callbacks}
+
+Where an Aadhaar eSign provider reports what became of a signing request.
+
+<ul class="api-index">
+<li><a href="/docs/http-api/reference/provider-callbacks.html#receive-esign-webhook"><span class="api-method" data-method="post">POST</span><code>/v1/esign/webhooks/{provider}</code><span>Receive an eSign provider's callback</span></a></li>
 </ul>
 
 ## Service {#service}
