@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import { ChevronRight, Plus, Webhook } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { relativeTime } from '@/lib/envelopes';
 import { MAX_WEBHOOKS, eventsSummary, type DeliveryStatus } from '@/lib/webhooks';
 import { createWebhookAction } from '@/server/actions/webhooks';
 import { DeliveryPill } from './delivery-pill';
@@ -88,7 +88,7 @@ export function WebhooksPanel({
                   {w.lastDelivery ? (
                     <span className="hidden items-center gap-2 text-sm text-muted sm:flex">
                       <DeliveryPill status={w.lastDelivery.status} />
-                      {relativeTime(w.lastDelivery.at)}
+                      <LocalTime iso={w.lastDelivery.at} format="relative" />
                     </span>
                   ) : (
                     <span className="hidden text-sm text-muted sm:inline">No deliveries yet</span>

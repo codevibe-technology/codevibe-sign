@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import {
   ArrowRight,
   Ban,
@@ -21,7 +22,7 @@ import { Card, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/cn';
-import { actionLabel, actionTone, relativeTime } from '@/lib/envelopes';
+import { actionLabel, actionTone } from '@/lib/envelopes';
 import { can } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
@@ -169,8 +170,19 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                           {item.title}
                         </Link>
                         <p className="text-sm text-muted">
-                          {item.sentAt ? `Sent ${relativeTime(item.sentAt)}` : 'Sent'}
-                          {item.expiresAt ? ` · expires ${relativeTime(item.expiresAt)}` : ''}
+                          Sent
+                          {item.sentAt ? (
+                            <>
+                              {' '}
+                              <LocalTime iso={item.sentAt} format="relative" />
+                            </>
+                          ) : null}
+                          {item.expiresAt ? (
+                            <>
+                              {' · expires '}
+                              <LocalTime iso={item.expiresAt} format="relative" />
+                            </>
+                          ) : null}
                         </p>
                       </div>
                       <RemindButton
@@ -223,7 +235,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                           </Link>
                         </p>
                         <p className="text-muted">
-                          <time dateTime={item.at}>{relativeTime(item.at)}</time>
+                          <LocalTime iso={item.at} format="relative" />
                         </p>
                       </div>
                     </li>

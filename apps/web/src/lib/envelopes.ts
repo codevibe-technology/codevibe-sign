@@ -257,8 +257,11 @@ export function progressOf(recipients: EnvelopeSummary['recipients']) {
 
 const DAY = 86_400_000;
 
-/** Short, human relative time: "just now", "5 min ago", "yesterday", "12 Mar". */
-export function relativeTime(iso: string, now: Date = new Date()): string {
+/**
+ * Short, human relative time: "just now", "5 min ago", "yesterday", "12 Mar". Older dates are
+ * days in `timeZone`, or in the zone of whatever runs this when none is given.
+ */
+export function relativeTime(iso: string, now: Date = new Date(), timeZone?: string): string {
   const at = new Date(iso);
   const diff = now.getTime() - at.getTime();
   const future = diff < 0;
@@ -277,16 +280,20 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
     const d = Math.round(abs / DAY);
     return future ? `in ${d} days` : `${d} days ago`;
   }
+  const zone = timeZone ? { timeZone } : {};
+  const year = (date: Date) => date.toLocaleDateString('en-GB', { year: 'numeric', ...zone });
   return at.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
-    ...(at.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+    ...(year(at) !== year(now) ? { year: 'numeric' } : {}),
+    ...zone,
   });
 }
 
 /**
- * `23 Nov 2026, 00:23` in `timeZone`, or in the zone of whatever runs this when none is given.
- * A server-rendered page does not know the reader's zone: show times with `LocalTime` there.
+ * `23 Nov 2026, 00:23 GMT+5:30`: a moment in `timeZone`, or in the zone of whatever runs this
+ * when none is given, with the zone named so the reader never has to guess it. A
+ * server-rendered page does not know the reader's zone: show times with `LocalTime` there.
  */
 export const formatDateTime = (iso: string, timeZone?: string) =>
   new Date(iso).toLocaleString('en-GB', {
@@ -295,6 +302,17 @@ export const formatDateTime = (iso: string, timeZone?: string) =>
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
+    timeZoneName: 'short',
+    ...(timeZone ? { timeZone } : {}),
+  });
+
+/** `23 Nov 2026`: the day a moment falls on in `timeZone`, or in the local zone. */
+export const formatDay = (iso: string, timeZone?: string) =>
+  new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
     ...(timeZone ? { timeZone } : {}),
   });
 

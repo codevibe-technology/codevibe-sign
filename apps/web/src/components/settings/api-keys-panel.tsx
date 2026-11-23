@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import { Check, Copy, KeyRound, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -19,14 +20,7 @@ export interface ApiKeyRow {
   lastUsedAt: string | null;
 }
 
-const when = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleDateString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
-    : 'Never';
+const when = (iso: string | null) => (iso ? <LocalTime iso={iso} format="day" /> : 'Never');
 
 export function ApiKeysPanel({
   workspaceId,

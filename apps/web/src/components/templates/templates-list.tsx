@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import {
   Archive,
   ArchiveRestore,
@@ -21,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
-import { relativeTime } from '@/lib/envelopes';
 import type { TemplateSummary } from '@/lib/templates';
 import { archiveTemplateAction, duplicateTemplateAction } from '@/server/actions/templates';
 
@@ -112,7 +112,9 @@ export function TemplatesList({
                   {t.documentCount} {t.documentCount === 1 ? 'document' : 'documents'} ·{' '}
                   {t.pageCount} {t.pageCount === 1 ? 'page' : 'pages'}
                 </span>
-                <span>Updated {relativeTime(t.updatedAt)}</span>
+                <span>
+                  Updated <LocalTime iso={t.updatedAt} format="relative" />
+                </span>
               </p>
             </div>
             <div className="flex w-full items-center justify-end gap-2 sm:w-auto">

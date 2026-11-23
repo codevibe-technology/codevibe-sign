@@ -408,7 +408,9 @@ describe('envelope detail', () => {
         }}
       />,
     );
-    expect(screen.getByTestId('copy-mail-r1')).toHaveTextContent(/^Copy emailed \d\d:\d\d$/);
+    expect(screen.getByTestId('copy-mail-r1')).toHaveTextContent(
+      /^Copy emailed (\d+ \w+( \d+)?, )?\d\d:\d\d (UTC|GMT\S*)$/,
+    );
     expect(screen.getByTestId('copy-mail-r2')).toHaveTextContent(
       'Email failed: 550 mailbox unavailable',
     );

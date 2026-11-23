@@ -15,14 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { copyMailLine, type CopyMailStatus } from '@/lib/mail-log';
-import {
-  AUTH_LABELS,
-  ROLE_OPTIONS,
-  actionLabel,
-  actionTone,
-  eventDetail,
-  relativeTime,
-} from '@/lib/envelopes';
+import { AUTH_LABELS, ROLE_OPTIONS, actionLabel, actionTone, eventDetail } from '@/lib/envelopes';
 import type { CertificateView, SealCheck } from '@/server/sign/api';
 import { CorrectRecipientButton, ShareLinkButton } from './recipient-fixes';
 import { RemindButton } from './remind-button';
@@ -221,9 +214,7 @@ export function RecipientsCard({
               <div className="flex flex-wrap items-center gap-2">
                 <RecipientStatusPill status={r.status} />
                 {r.actedAt ? (
-                  <time dateTime={r.actedAt} className="text-xs text-muted">
-                    {relativeTime(r.actedAt)}
-                  </time>
+                  <LocalTime iso={r.actedAt} format="relative" className="text-xs text-muted" />
                 ) : null}
                 {current && canRemind ? (
                   <RemindButton

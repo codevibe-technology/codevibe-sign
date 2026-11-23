@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import { MailPlus, Trash2, UserMinus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
@@ -29,9 +30,6 @@ export interface PendingInvitation {
   role: Role;
   expiresAt: string;
 }
-
-const date = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
 export function TeamPanel({
   workspaceId,
@@ -207,7 +205,8 @@ export function TeamPanel({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{invitation.email}</p>
                   <p className="text-sm text-muted">
-                    {ROLE_LABELS[invitation.role]} · expires {date(invitation.expiresAt)}
+                    {ROLE_LABELS[invitation.role]} · expires{' '}
+                    <LocalTime iso={invitation.expiresAt} format="day" />
                   </p>
                 </div>
                 <Button

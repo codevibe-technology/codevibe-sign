@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import { KeyRound, PenLine, Power, RotateCw, Send, Trash2, Webhook } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,7 +12,6 @@ import { Card, CardHeader } from '@/components/ui/card';
 import { DialogClose, DialogContent, DialogRoot } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
-import { relativeTime } from '@/lib/envelopes';
 import { deliveryHint, eventsSummary, prettyPayload, type DeliveryStatus } from '@/lib/webhooks';
 import type { ActionResult } from '@/server/actions/action';
 import {
@@ -274,7 +274,7 @@ export function WebhookDetail({
                     {d.attempts > 1 ? ` · ${d.attempts} attempts` : ''}
                     <span className="sm:ml-3">
                       {d.responseStatus !== null || d.attempts > 1 ? ' · ' : ''}
-                      {relativeTime(d.lastAttemptAt)}
+                      <LocalTime iso={d.lastAttemptAt} format="relative" />
                     </span>
                   </span>
                 </button>
@@ -301,11 +301,15 @@ export function WebhookDetail({
                 <dt className="text-muted">Attempts</dt>
                 <dd>{open.attempts}</dd>
                 <dt className="text-muted">Last tried</dt>
-                <dd>{new Date(open.lastAttemptAt).toLocaleString()}</dd>
+                <dd>
+                  <LocalTime iso={open.lastAttemptAt} />
+                </dd>
                 {open.nextRetryAt ? (
                   <>
                     <dt className="text-muted">Next try</dt>
-                    <dd>{new Date(open.nextRetryAt).toLocaleString()}</dd>
+                    <dd>
+                      <LocalTime iso={open.nextRetryAt} />
+                    </dd>
                   </>
                 ) : null}
               </dl>

@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import { Download, ExternalLink, Lock } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -27,12 +28,7 @@ function seal() {
       subject: [certificate.subject.commonName, certificate.subject.organization]
         .filter(Boolean)
         .join(', '),
-      notAfter: new Date(certificate.notAfter).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-      }),
+      notAfter: new Date(certificate.notAfter).toISOString(),
     };
   } catch {
     return null;
@@ -82,7 +78,7 @@ export default function PublicVerifyPage() {
                   <p className="text-ink">
                     Files are sealed with{' '}
                     <span className="font-semibold">{certificate.subject || 'this site'}</span>,
-                    valid until {certificate.notAfter}.
+                    valid until <LocalTime iso={certificate.notAfter} />.
                   </p>
                   <p className="mt-3 text-muted">SHA-256 fingerprint</p>
                   <code

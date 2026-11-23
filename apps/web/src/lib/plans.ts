@@ -178,13 +178,14 @@ export function formatBytes(bytes: number): string {
 
 const trim = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ''));
 
+/** `1 December 2026 (UTC)`: usage periods turn over at midnight UTC, so the day is UTC's. */
 export const formatDay = (date: Date) =>
-  date.toLocaleDateString('en-GB', {
+  `${date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
-  });
+  })} (UTC)`;
 
 /** What to write after a limit message: who to ask, depending on the plan. */
 export const upgradeHint = (plan: Plan) =>

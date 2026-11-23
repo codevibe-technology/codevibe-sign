@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/shell/app-shell';
+import { ViewerTimeZone } from '@/components/ui/local-time';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
 import { env } from '@/server/env';
+import { getPreferences } from '@/server/preferences';
 import { listWorkspacesForUser } from '@/server/workspaces';
 
 export default async function WorkspaceLayout({
@@ -14,7 +16,10 @@ export default async function WorkspaceLayout({
 }) {
   const { slug } = await params;
   const access = await requireWorkspace(slug);
-  const memberships = await listWorkspacesForUser(db(), access.user.id);
+  const [memberships, preferences] = await Promise.all([
+    listWorkspacesForUser(db(), access.user.id),
+    getPreferences(db(), access.user.id),
+  ]);
   return (
     <AppShell
       user={{ name: access.user.name, email: access.user.email }}
@@ -24,7 +29,7 @@ export default async function WorkspaceLayout({
         canCreate: !env().SINGLE_WORKSPACE,
       }}
     >
-      {children}
+      <ViewerTimeZone zone={preferences.timezone}>{children}</ViewerTimeZone>
     </AppShell>
   );
 }

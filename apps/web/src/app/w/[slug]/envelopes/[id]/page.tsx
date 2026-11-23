@@ -16,7 +16,7 @@ import {
 import { StatusPill } from '@/components/envelopes/status-pill';
 import { LiveUpdates } from '@/components/live/live-updates';
 import { Button } from '@/components/ui/button';
-import { isFinalStatus, isOpen, relativeTime } from '@/lib/envelopes';
+import { isFinalStatus, isOpen } from '@/lib/envelopes';
 import { can, canVoidEnvelope } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
@@ -95,7 +95,12 @@ export default async function EnvelopePage({
                 : 'Created through the API · '}
             {envelope.sentAt ? 'sent ' : 'created '}
             <LocalTime iso={envelope.sentAt ?? envelope.createdAt} />
-            {envelope.expiresAt && open ? ` · expires ${relativeTime(envelope.expiresAt)}` : ''}
+            {envelope.expiresAt && open ? (
+              <>
+                {' · expires '}
+                <LocalTime iso={envelope.expiresAt} />
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

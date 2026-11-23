@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -38,7 +39,12 @@ export default async function BulkSendProgressPage({
       <PageHeader
         eyebrow="Templates"
         title={`Bulk send: ${bulk.templateName}`}
-        description={`${bulk.total} ${bulk.total === 1 ? 'envelope' : 'envelopes'}, started ${bulk.createdAt.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}.`}
+        description={
+          <>
+            {bulk.total} {bulk.total === 1 ? 'envelope' : 'envelopes'}, started{' '}
+            <LocalTime iso={bulk.createdAt.toISOString()} />.
+          </>
+        }
       />
       <BulkProgress
         slug={slug}

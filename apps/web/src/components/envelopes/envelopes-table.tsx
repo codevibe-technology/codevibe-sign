@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import {
   Ban,
   Download,
@@ -28,7 +29,6 @@ import {
   declineLine,
   peopleLine,
   progressOf,
-  relativeTime,
   sortEnvelopes,
   SORTS,
   statusesFor,
@@ -397,7 +397,7 @@ export function EnvelopesTable({
                       ) : null}
                     </td>
                     <td className="hidden px-4 py-3 text-muted sm:table-cell">
-                      <time dateTime={e.createdAt}>{relativeTime(e.createdAt)}</time>
+                      <LocalTime iso={e.createdAt} format="relative" />
                     </td>
                     <td className="py-3 pr-3 text-right">
                       <RowActions

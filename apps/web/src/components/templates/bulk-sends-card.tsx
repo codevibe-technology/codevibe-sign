@@ -1,8 +1,8 @@
+import { LocalTime } from '@/components/ui/local-time';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardHeader } from '@/components/ui/card';
 import { bulkProgress, bulkStatusLabel, type BulkSendView } from '@/lib/bulk-send';
-import { relativeTime } from '@/lib/envelopes';
 import { BulkStatusPill } from './bulk-status-pill';
 
 /** The latest bulk sends, each linking to its progress and results. */
@@ -32,7 +32,7 @@ export function BulkSendsCard({
                 </p>
                 <p className="text-sm text-muted">
                   {bulkStatusLabel(b)} · {b.total} {b.total === 1 ? 'envelope' : 'envelopes'} ·{' '}
-                  {relativeTime(b.createdAt)}
+                  <LocalTime iso={b.createdAt} format="relative" />
                   {b.createdByName ? ` by ${b.createdByName}` : ''}
                 </p>
                 {b.status === 'sending' ? (

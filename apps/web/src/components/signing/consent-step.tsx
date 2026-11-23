@@ -1,5 +1,6 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/local-time';
 import { FileText } from 'lucide-react';
 import { useId, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -77,7 +78,7 @@ export function ConsentStep({
       </ul>
       {view.envelope.expiresAt ? (
         <p className="mt-3 text-sm text-muted">
-          Please {verb} by {new Date(view.envelope.expiresAt).toLocaleDateString()}.
+          Please {verb} by <LocalTime iso={view.envelope.expiresAt} />.
         </p>
       ) : null}
       <form onSubmit={submit} noValidate className="mt-6 space-y-4">

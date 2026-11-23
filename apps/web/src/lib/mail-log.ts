@@ -24,12 +24,21 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** `14:42` for today, `3 Nov, 14:42` otherwise, in `timeZone` or the local zone. */
+/**
+ * `14:42 GMT+5:30` for today, `3 Nov, 14:42 GMT+5:30` otherwise, in `timeZone` or the local
+ * zone, with the zone named.
+ */
 export function mailTime(iso: string, now: Date = new Date(), timeZone?: string): string {
   const at = new Date(iso);
   const zone = timeZone ? { timeZone } : {};
   const dayOf = (date: Date) => date.toLocaleDateString('en-CA', zone);
-  const time = at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...zone });
+  const time = at.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZoneName: 'short',
+    ...zone,
+  });
   if (dayOf(at) === dayOf(now)) return time;
   const year = (date: Date) => date.toLocaleDateString('en-GB', { year: 'numeric', ...zone });
   const day = at.toLocaleDateString('en-GB', {

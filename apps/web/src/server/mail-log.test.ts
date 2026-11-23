@@ -110,16 +110,30 @@ describe('trimError', () => {
 });
 
 describe('mail log display', () => {
-  const now = new Date(2026, 10, 20, 18, 0);
+  const now = new Date('2026-11-20T12:30:00.000Z');
 
-  it('shows the time for today and the date otherwise', () => {
-    expect(mailTime(new Date(2026, 10, 20, 14, 42).toISOString(), now)).toBe('14:42');
-    expect(mailTime(new Date(2026, 10, 3, 9, 5).toISOString(), now)).toBe('3 Nov, 09:05');
+  it('shows the time for today and the date otherwise, with the zone named', () => {
+    const today = '2026-11-20T09:12:00.000Z';
+    expect(mailTime(today, now, 'Asia/Kolkata')).toBe('14:42 GMT+5:30');
+    expect(mailTime(today, now, 'UTC')).toBe('09:12 UTC');
+    expect(mailTime('2026-11-03T03:35:00.000Z', now, 'Asia/Kolkata')).toBe('3 Nov, 09:05 GMT+5:30');
+    expect(mailTime('2025-11-03T03:35:00.000Z', now, 'Asia/Kolkata')).toBe(
+      '3 Nov 2025, 09:05 GMT+5:30',
+    );
+  });
+
+  it('decides "today" in the reader\'s zone, not in UTC', () => {
+    const lateEvening = '2026-11-19T20:00:00.000Z';
+    expect(mailTime(lateEvening, now, 'Asia/Kolkata')).toBe('01:30 GMT+5:30');
+    expect(mailTime(lateEvening, now, 'America/New_York')).toBe('19 Nov, 15:00 GMT-5');
+    expect(mailTime(lateEvening, now, 'Pacific/Auckland')).toBe('20 Nov, 09:00 GMT+13');
   });
 
   it('says whether the copy went out', () => {
-    const at = new Date(2026, 10, 20, 14, 42).toISOString();
-    expect(copyMailLine({ status: 'sent', at, error: null }, now)).toBe('Copy emailed 14:42');
+    const at = '2026-11-20T09:12:00.000Z';
+    expect(copyMailLine({ status: 'sent', at, error: null }, now)).toMatch(
+      /^Copy emailed \d\d:\d\d \S+$/,
+    );
     expect(copyMailLine({ status: 'failed', at, error: '550 mailbox unavailable' }, now)).toBe(
       'Email failed: 550 mailbox unavailable',
     );
