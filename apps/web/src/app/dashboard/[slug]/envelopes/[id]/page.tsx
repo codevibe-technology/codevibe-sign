@@ -182,7 +182,9 @@ export default async function EnvelopePage({
           ) : null}
           <CertificateCard
             esignProviders={Object.fromEntries(
-              envelope.recipients.flatMap((r) => (r.esign ? [[r.id, r.esign.provider]] : [])),
+              envelope.recipients.flatMap((r) =>
+                r.esign ? [[r.id, { provider: r.esign.provider, sandbox: r.esign.sandbox }]] : [],
+              ),
             )}
             certificate={certificate}
             downloadHref={`/dashboard/${slug}/envelopes/${envelope.id}/certificate`}

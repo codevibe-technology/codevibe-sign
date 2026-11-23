@@ -118,6 +118,8 @@ const reasons = (by: string): Record<string, string> => ({
     'Something was added to the file after it was sealed, so it is not the original.',
   multiple_signatures: `The file carries more than one signature; only a single seal from ${by} is accepted.`,
   untrusted_signer: `The seal is intact but was made by a different certificate, not by ${by}.`,
+  content_between_signatures:
+    'Something was added to the file between the Aadhaar eSign and the seal, so the signer did not sign that part.',
   earlier_signature_invalid:
     'A signature made before the seal, such as the Aadhaar eSign, is broken: that part of the file was changed.',
 });

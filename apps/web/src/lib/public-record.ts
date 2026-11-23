@@ -42,7 +42,7 @@ export interface PublicRecordSigner {
   status: RecipientStatus;
   auth: AuthMethod;
   /** The eSign provider, for a signer who signed with Aadhaar eSign. */
-  esign?: { provider: string };
+  esign?: { provider: string; sandbox?: boolean };
   actedAt: string | null;
 }
 

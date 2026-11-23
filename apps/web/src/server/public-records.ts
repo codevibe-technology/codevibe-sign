@@ -279,7 +279,14 @@ export async function publicRecordView(
         role: r.role,
         status: r.status,
         auth: r.auth,
-        ...(r.esign?.provider ? { esign: { provider: r.esign.provider } } : {}),
+        ...(r.esign?.provider
+          ? {
+              esign: {
+                provider: r.esign.provider,
+                ...(r.esign.sandbox ? { sandbox: true } : {}),
+              },
+            }
+          : {}),
         actedAt: r.actedAt ?? null,
       })),
     trail: events.map((event) => ({

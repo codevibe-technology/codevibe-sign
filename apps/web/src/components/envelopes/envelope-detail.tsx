@@ -369,7 +369,7 @@ export function CertificateCard({
   certificate: CertificateView;
   downloadHref: string;
   /** The eSign provider of each recipient who signed with Aadhaar eSign, by recipient id. */
-  esignProviders?: Record<string, string>;
+  esignProviders?: Record<string, { provider: string; sandbox?: boolean }>;
 }) {
   return (
     <Card>
@@ -437,7 +437,7 @@ export function CertificateCard({
                   <span className="text-muted">
                     {r.email ?? r.phone ?? ''} ·{' '}
                     {r.auth === 'aadhaar' && esignProviders[r.id]
-                      ? authLabel({ auth: 'aadhaar', esign: { provider: esignProviders[r.id]! } })
+                      ? authLabel({ auth: 'aadhaar', esign: esignProviders[r.id]! })
                       : (AUTH_LABELS[r.auth as keyof typeof AUTH_LABELS] ?? r.auth)}
                   </span>
                 </p>

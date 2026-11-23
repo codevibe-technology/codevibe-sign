@@ -8,6 +8,9 @@ describe('aadhaar esign labels', () => {
     expect(authLabel({ auth: 'aadhaar', esign: { provider: 'leegality' } })).toBe(
       'Aadhaar eSign (via Leegality)',
     );
+    expect(authLabel({ auth: 'aadhaar', esign: { provider: 'leegality', sandbox: true } })).toBe(
+      'Aadhaar eSign (via Leegality sandbox, test only)',
+    );
     expect(authLabel({ auth: 'email_otp', esign: { provider: 'leegality' } })).toBe('Email code');
   });
 

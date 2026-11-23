@@ -140,11 +140,17 @@ const PROVIDER_NAMES: Record<string, string> = { leegality: 'Leegality', emudhra
 export const esignProviderName = (provider: string) => PROVIDER_NAMES[provider] ?? provider;
 
 /** How a recipient proves who they are, naming the eSign provider once one is known. */
-export function authLabel(recipient: { auth: AuthMethod; esign?: { provider: string } }): string {
+export function authLabel(recipient: {
+  auth: AuthMethod;
+  esign?: { provider: string; sandbox?: boolean };
+}): string {
   const label = AUTH_LABELS[recipient.auth] ?? recipient.auth;
-  return recipient.auth === 'aadhaar' && recipient.esign?.provider
-    ? `${label} (via ${esignProviderName(recipient.esign.provider)})`
-    : label;
+  if (recipient.auth !== 'aadhaar' || !recipient.esign?.provider) return label;
+  const provider = esignProviderName(recipient.esign.provider);
+  // A signature made in the provider's test environment has no legal effect.
+  return recipient.esign.sandbox
+    ? `${label} (via ${provider} sandbox, test only)`
+    : `${label} (via ${provider})`;
 }
 
 /** Why an Aadhaar eSign did not go through, from the `reason` of the audit event. */
