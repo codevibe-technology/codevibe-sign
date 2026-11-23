@@ -728,7 +728,7 @@
         "operationId": "downloadDocument",
         "tags": ["Documents"],
         "summary": "Download a PDF",
-        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is the file the eSign\nprovider signed, with the seal added as a further signature and no page added or\nchanged. Its signing certificate and the audit trail are one sealed file of their own,\n`version=certificate`, saved as \"<title> (certificate and audit trail).pdf\", and the\nprovider's own audit trail, when it was kept, is `version=provider-audit-trail`.\n",
+        "description": "The sealed PDF once the envelope is complete, otherwise the original. Ask for one of\nthem with `version`. A document signed with Aadhaar eSign is the file the eSign\nprovider signed, with the seal added as a further signature and no page added or\nchanged. Its signing certificate and the audit trail are one sealed file of their own,\n`version=certificate`, saved under the envelope title, for example \"Offer letter\n(certificate and audit trail).pdf\", and the\nprovider's own audit trail, when it was kept, is `version=provider-audit-trail`.\n",
         "parameters": [
           {
             "name": "version",

@@ -131,7 +131,8 @@ The sealed PDF once the envelope is complete, otherwise the original. Ask for on
 them with `version`. A document signed with Aadhaar eSign is the file the eSign
 provider signed, with the seal added as a further signature and no page added or
 changed. Its signing certificate and the audit trail are one sealed file of their own,
-`version=certificate`, saved as "<title> (certificate and audit trail).pdf", and the
+`version=certificate`, saved under the envelope title, for example "Offer letter
+(certificate and audit trail).pdf", and the
 provider's own audit trail, when it was kept, is `version=provider-audit-trail`.
 
 <p class="api-auth"><span class="api-auth__label">Auth</span> Sender API key, as <code>Authorization: Bearer &lt;key&gt;</code></p>

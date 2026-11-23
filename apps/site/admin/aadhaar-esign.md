@@ -76,8 +76,7 @@ When it is signed, everyone gets two files:
 
 - **Signed document (Aadhaar eSign):** the file Leegality signed, with the Codevibe Sign seal
   added as a second signature that changes no page. A PDF reader shows both signatures valid.
-- **Certificate and audit trail:** one sealed PDF, "<title> (certificate and audit
-  trail).pdf", with the signing certificate (the signer's eSign certificate name and issuer,
+- **Certificate and audit trail:** one sealed PDF, named after the envelope, for example "Offer letter (certificate and audit trail).pdf", with the signing certificate (the signer's eSign certificate name and issuer,
   and the time of the signature) and every event.
 
 The envelope page also offers **Leegality audit trail**, Leegality's own record, which goes

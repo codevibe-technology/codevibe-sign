@@ -91,8 +91,7 @@ recipient name" and the envelope page shows it to the sender. The envelope still
 - **Signed document (Aadhaar eSign).** The file Leegality signed, kept byte for byte, with the
   Codevibe Sign seal added after it as one more signature. The seal is invisible and adds or
   changes no page, so the document has exactly the pages you sent.
-- **Certificate and audit trail**, one sealed PDF named "<title> (certificate and audit
-  trail).pdf": the signing certificate page (the envelope, the sender, every signer and how they
+- **Certificate and audit trail**, one sealed PDF named after the envelope, for example "Offer letter (certificate and audit trail).pdf": the signing certificate page (the envelope, the sender, every signer and how they
   signed, the name and issuer of the Aadhaar signer's eSign certificate and the time of the
   signature, the SHA-256 of the original and of the signed document, the record QR code), then
   every event of the audit trail.
