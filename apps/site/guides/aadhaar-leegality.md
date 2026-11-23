@@ -9,6 +9,9 @@ Use Aadhaar eSign where a law asks for a document to be signed in the statutory 
 (IT Act s.3A). For offer letters, policies and most business documents the built-in signature
 is usually enough; see [Legal](/legal).
 
+`@codevibe_technology/sign-aadhaar` is a standalone library. The Codevibe Sign server and the
+web app do not call it yet, so the steps below run in your own backend.
+
 ## You need your own provider account
 
 Codevibe Sign does not resell eSign. You sign up with Leegality, buy eSign credits from them

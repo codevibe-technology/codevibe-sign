@@ -286,6 +286,10 @@ for the dark palette, or `data-cvs-theme="auto"` to follow the system.
 
 Animations and transitions are turned off under `prefers-reduced-motion`.
 
+## Docs
+
+Guides and the full API reference are at [sign.codevibe.in](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-react&utm_content=body).
+
 ## Licence
 
 Apache-2.0 © Codevibe

@@ -4,6 +4,9 @@ The standalone Codevibe Sign service as a Docker image. It reads its configurati
 environment variables and runs `startSignServer` from `@codevibe_technology/sign-server`: PostgreSQL
 (migrated on start), documents on disk, SMTP email and email one-time codes.
 
+Without Docker, `npx @codevibe_technology/sign-server start` runs the same service from the
+same variables.
+
 ## Build and run
 
 From the repository root:

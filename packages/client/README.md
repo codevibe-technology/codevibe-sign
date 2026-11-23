@@ -3,7 +3,7 @@
 A typed client for the Codevibe Sign HTTP API. One part sends envelopes from your server,
 one part drives a signing session in the browser, and a helper checks webhook signatures.
 
-No runtime dependencies. It uses the global `fetch` and Web Crypto, so it runs in Node 20+,
+No runtime dependencies. It uses the global `fetch` and Web Crypto, so it runs in Node 22+,
 browsers, Deno, Bun and edge runtimes. Pass your own `fetch` to route requests anywhere,
 including straight into an in-process server.
 
@@ -125,6 +125,10 @@ Client options: `timeoutMs` per attempt (default 30 000), `retries` (default 2),
 
 The domain types (`Envelope`, `Recipient`, `Field`, `FieldValue`, `AuditEvent` and the rest)
 are those of `@codevibe_technology/sign-core`, re-exported here so you need only this package.
+
+## Docs
+
+Guides and the full API reference are at [sign.codevibe.in](https://sign.codevibe.in?utm_source=github&utm_medium=readme&utm_campaign=sign-client&utm_content=body).
 
 ## Licence
 

@@ -17,8 +17,10 @@ packages you can embed in your own product, or run as a standalone service.
 
 Two more packages sit on top of these: `@codevibe_technology/sign-templates` (reusable
 templates and bulk drafts from a CSV file; depends on core) and `codevibe-sign`, the one
-package to install, which re-exports the others under subpaths and adds the `codevibe-sign`
-command line.
+library package to install, which re-exports core, pdf, client and react under subpaths and adds
+the `codevibe-sign` command line. `codevibe-sign` is Apache-2.0 and never contains or depends on
+`sign-server`, the only AGPL-3.0 package; the server has its own `codevibe-sign-server` command
+(`start` and `start --memory`).
 
 Apps: `apps/web` (the product: workspaces, sending, the signing page and the HTTP API in one
 Next.js server; see [APP-ARCHITECTURE.md](APP-ARCHITECTURE.md)), `apps/server` (Docker image
@@ -108,7 +110,7 @@ This is not legal advice; integrators should take their own.
 
 ## Conventions
 
-- TypeScript strict, ESM first (`tsup` builds ESM and CJS with types), Node 20+.
+- TypeScript strict, ESM first (`tsup` builds ESM and CJS with types), Node 22+.
 - `vitest` for tests; every package keeps its own tests next to the code.
 - Errors are typed (`SignError` with a stable `code`), never bare strings.
 - Public API is exported only from each package's `src/index.ts`.
