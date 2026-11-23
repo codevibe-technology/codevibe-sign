@@ -31,18 +31,23 @@ payment is still confirmed in the background and the credits appear on the page.
 
 ### When a credit is used
 
-| What happens                                    | The credit                          |
-| ----------------------------------------------- | ----------------------------------- |
-| The signer starts the Aadhaar eSign             | is held                             |
-| The eSign completes                             | is used                             |
-| The signer declines, or the eSign fails         | is returned                         |
-| The eSign is not finished in time (24 hours)    | is returned                         |
-| The envelope is voided or expires while waiting | is returned                         |
-| The signer starts again after a failure         | a credit is held again, as at first |
+| What happens                                    | The credit                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| The signer starts the Aadhaar eSign             | is held                                                                  |
+| The eSign completes                             | is used                                                                  |
+| The signer declines, or the eSign fails         | is returned                                                              |
+| The eSign is not finished in time (24 hours)    | is returned                                                              |
+| The envelope is voided or expires while waiting | is returned                                                              |
+| The signer starts again after a failure         | a credit is held again, as at first                                      |
+| The signer starts again with other details      | a second credit is held; the first is returned when its request runs out |
 
 The page shows credits as available and held, with a history of every purchase, hold, use and
 return. A balance never goes below zero: with no credit available, an envelope with an Aadhaar
 signer cannot be sent.
+
+Rarely an eSign is signed after its credit was returned, for example when the signer finishes
+at the provider after the wait ended, and no credit is left by then. That eSign is shown as
+owed. The next credits you buy pay for it first, and Aadhaar eSign starts again after that.
 
 Credits do not expire. This is the current policy.
 

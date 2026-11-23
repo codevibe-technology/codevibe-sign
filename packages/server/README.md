@@ -354,14 +354,23 @@ How it runs:
    as it came and is recognised by its SHA-256 (`seal: 'provider_only'` in the
    `document.sealed` event and in verification answers).
 
-| Option                   | What it does                                                                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `provider(workspaceId)`  | The `EsignProvider` a workspace signs with, or null. Return your own account, or one built from the workspace's own credentials.                       |
-| `available(workspaceId)` | Why the workspace cannot eSign now (`{ reason, message, signerMessage? }`), or null. Asked when the envelope is sent and again when the signer starts. |
-| `onStart(input)`         | Called before the provider, for example to reserve a credit. Throw `SignError('ESIGN_UNAVAILABLE', message, { reason })` to refuse.                    |
-| `onEnd(input)`           | Called once per outcome (`signed`, `declined`, `expired`, `failed`) with the same `ref` as `onStart`. Retried by `tick()` until it returns.            |
-| `webhookRef`             | Reads the provider reference from a callback body for a provider other than Leegality.                                                                 |
-| `sessionTtlMs`           | How long the server waits for a started eSign. Default 24 hours, never past the envelope's expiry.                                                     |
+| Option                       | What it does                                                                                                                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider(workspaceId)`      | The `EsignProvider` a workspace signs with, or null. Return your own account, or one built from the workspace's own credentials.                                                                          |
+| `available(workspaceId)`     | Why the workspace cannot eSign now (`{ reason, message, signerMessage? }`), or null. Asked when the envelope is sent and again when the signer starts.                                                    |
+| `onStart(input)`             | Called before the provider, for example to reserve a credit. Throw `SignError('ESIGN_UNAVAILABLE', message, { reason })` to refuse.                                                                       |
+| `onEnd(input)`               | Called once per outcome (`signed`, `declined`, `expired`, `failed`) with the same `ref` as `onStart`. Retried by `tick()` until it returns.                                                               |
+| `webhookRef`                 | Reads the provider reference from a callback body for a provider other than Leegality.                                                                                                                    |
+| `sessionTtlMs`               | How long the server waits for a started eSign and keeps what `onStart` reserved. Default 24 hours, never past the envelope's expiry. Set it at least as long as the provider keeps its signing page open. |
+| `acceptUnreadableSignatures` | Accept a provider file whose signature the server cannot check, and note it on the record. Off by default: such a file fails the eSign.                                                                   |
+
+A signer who starts again with other values gets a new request, and `onStart` runs again:
+the first request stays reserved until it runs out, because the provider can still sign it.
+When the second cannot be reserved, the answer is the first request with `resumed: true`.
+When the sender corrects the recipient, that recipient's requests are cancelled; a signature
+the provider still reports for one is never applied to the envelope, but `onEnd` hears
+`signed`, since the provider did the work. The provider's file must end with a signature
+that covers all of it and verifies, or the eSign fails with `provider_file_invalid`.
 
 `signed` can follow `expired` or `failed` for the same `ref`: the provider may report a
 signature after the server stopped waiting, and that signature is still recorded when the

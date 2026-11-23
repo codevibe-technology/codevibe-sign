@@ -342,6 +342,7 @@ interface VerifyResult {
     | 'signature_invalid'
     | 'not_whole_document'
     | 'earlier_signature_invalid'
+    | 'content_between_signatures'
     | 'untrusted_signer';
   signer?: { commonName?: string; organization?: string };
   signedAt?: string;
