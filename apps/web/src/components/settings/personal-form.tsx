@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
 import { Field, NativeSelect } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { displayName } from '@/lib/person-name';
 import type { Preferences, Theme } from '@/lib/preferences';
 import { updatePreferencesAction } from '@/server/actions/personal';
 import { TimeZoneSelect } from './time-zone-select';
@@ -39,7 +40,7 @@ export function PersonalForm({
       <Card>
         <CardHeader
           title="Personal"
-          description={`Only for you, ${user.name || user.email}. Applies in every workspace.`}
+          description={`Only for you, ${displayName(user)}. Applies in every workspace.`}
         />
         <CardBody className="space-y-6">
           <fieldset>

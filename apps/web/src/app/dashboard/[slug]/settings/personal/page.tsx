@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { NameForm } from '@/components/settings/name-form';
 import { PasswordForm } from '@/components/settings/password-form';
 import { PersonalForm } from '@/components/settings/personal-form';
 import { requireWorkspace } from '@/server/auth/guards';
@@ -18,6 +19,7 @@ export default async function PersonalSettings({ params }: { params: Promise<{ s
   const account = { name: user.name, email: user.email };
   return (
     <div className="space-y-6">
+      <NameForm user={account} />
       <PersonalForm user={account} preferences={preferences} />
       <PasswordForm user={account} hasPassword={password} />
     </div>

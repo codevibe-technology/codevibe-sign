@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { THEME_COOKIE } from '@/lib/preferences';
 import { db } from '../db';
 import { updatePreferences } from '../preferences';
+import { personNameInput, setOwnName } from '../profile';
 import { userAction } from './action';
 
 export const updatePreferencesAction = userAction(
@@ -22,5 +23,15 @@ export const updatePreferencesAction = userAction(
     });
     revalidatePath('/dashboard/[slug]', 'layout');
     return saved;
+  },
+);
+
+/** Saves the signed-in person's own name. Whose name is never part of the input. */
+export const updateNameAction = userAction(
+  z.object({ name: personNameInput }),
+  async (user, input) => {
+    const name = await setOwnName(db(), user.id, input.name);
+    revalidatePath('/dashboard/[slug]', 'layout');
+    return { name };
   },
 );

@@ -71,6 +71,14 @@ vi.mock('../preferences', () => ({
   updatePreferences: record('updatePreferences', { theme: 'dark', timezone: null, locale: 'en' }),
 }));
 
+vi.mock('../profile', async (original) => ({
+  ...(await original<typeof import('../profile')>()),
+  setOwnName: async (_sql: unknown, userId: string, name: string) => {
+    state.calls.push(`setOwnName:${userId}:${name}`);
+    return name;
+  },
+}));
+
 const { createApiKeyAction, revokeApiKeyAction } = await import('./api-keys');
 const {
   removeLogoAction,
@@ -79,7 +87,7 @@ const {
   updateSigningSettingsAction,
   uploadLogoAction,
 } = await import('./brand');
-const { updatePreferencesAction } = await import('./personal');
+const { updateNameAction, updatePreferencesAction } = await import('./personal');
 const {
   acceptInvitationAction,
   changeRoleAction,
@@ -245,6 +253,7 @@ describe('user actions', () => {
       await createWorkspaceAction({ name: 'Acme' }),
       await acceptInvitationAction({ token: 'x' }),
       await updatePreferencesAction({ theme: 'dark' }),
+      await updateNameAction({ name: 'Asha Rao' }),
     ]) {
       expect(result).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
     }
@@ -271,5 +280,22 @@ describe('user actions', () => {
       data: { workspaceSlug: 'acme' },
     });
     expect(await updatePreferencesAction({ theme: 'dark' })).toMatchObject({ ok: true });
+  });
+
+  it("save a tidied name on the signed-in person's own account only", async () => {
+    const result = await updateNameAction({ name: '  Asha   Rao ', id: 'u2', userId: 'u2' });
+    expect(result).toEqual({ ok: true, data: { name: 'Asha Rao' } });
+    expect(state.calls).toEqual([`setOwnName:${state.user!.id}:Asha Rao`]);
+  });
+
+  it('refuse a name that breaks the rule, next to the field', async () => {
+    for (const name of ['', '   ', 'A', 'a'.repeat(81), 'Asha\u0007Rao', 42]) {
+      expect(await updateNameAction({ name })).toMatchObject({
+        ok: false,
+        code: 'VALIDATION',
+        field: 'name',
+      });
+    }
+    expect(state.calls).toEqual([]);
   });
 });
