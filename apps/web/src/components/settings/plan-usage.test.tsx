@@ -36,8 +36,15 @@ const meters: UsageMeter[] = [
 ];
 
 describe('PlanUsage', () => {
-  it('shows the plan, every meter, the reset date and the upgrade contact', () => {
-    render(<PlanUsage plan="free" limits={FREE_PLAN_LIMITS} meters={meters} />);
+  it('shows the plan, every meter, the reset date and the way to pay', () => {
+    render(
+      <PlanUsage
+        plan="free"
+        limits={FREE_PLAN_LIMITS}
+        meters={meters}
+        billing={<button type="button">Upgrade to Cloud</button>}
+      />,
+    );
     expect(screen.getByTestId('plan-name')).toHaveTextContent('Free');
     const sends = screen.getByTestId('meter-envelopesPerMonth');
     expect(within(sends).getByRole('meter')).toHaveAttribute('aria-valuetext', '10 of 10');
@@ -47,10 +54,8 @@ describe('PlanUsage', () => {
       within(screen.getByTestId('meter-storageBytes')).getByText('Nearly full'),
     ).toBeInTheDocument();
     expect(within(screen.getByTestId('meter-members')).queryByText(/full|reached/)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Upgrade to Cloud' })).toHaveAttribute(
-      'href',
-      expect.stringMatching(/^mailto:hello@codevibe\.in\?subject=/),
-    );
+    expect(screen.getByRole('button', { name: 'Upgrade to Cloud' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('hello@codevibe.in');
     expect(screen.getByText(`Up to ${FREE_PLAN_LIMITS.bulkRows}`)).toBeInTheDocument();
     expect(screen.getByText('Up to 10 MB')).toBeInTheDocument();
     expect(screen.getByText('Always shown')).toBeInTheDocument();
@@ -65,7 +70,7 @@ describe('PlanUsage', () => {
       />,
     );
     expect(screen.queryByRole('meter')).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Upgrade to Cloud' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Upgrade to Cloud' })).toBeNull();
     expect(screen.getAllByText('(no limit)')).toHaveLength(3);
   });
 });

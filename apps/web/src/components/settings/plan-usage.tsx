@@ -1,15 +1,8 @@
-import { Mail } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import {
-  PER_USE_LIMITS,
-  PLAN_NAMES,
-  UPGRADE_EMAIL,
-  formatAmount,
-  type Plan,
-  type PlanLimits,
-} from '@/lib/plans';
+import { PER_USE_LIMITS, PLAN_NAMES, formatAmount, type Plan, type PlanLimits } from '@/lib/plans';
 
 export interface UsageMeter {
   key: string;
@@ -23,7 +16,7 @@ export interface UsageMeter {
 
 const PLAN_LINES: Record<Plan, string> = {
   free: 'Free while you try it out, with room for a small team.',
-  cloud: 'Higher limits, your own signing domain and an optional badge.',
+  cloud: 'For teams that send every day: no monthly envelope count, webhooks and your own brand.',
   unlimited: 'No limits on this workspace.',
 };
 
@@ -34,15 +27,18 @@ function tone(used: number, max: number) {
   return { bar: 'bg-primary', badge: null, text: null };
 }
 
-/** The workspace's plan, a meter for every running limit, and who to write to for more. */
+/** The workspace's plan, how to pay for it, and a meter for every running limit. */
 export function PlanUsage({
   plan,
   limits,
   meters,
+  billing,
 }: {
   plan: Plan;
   limits: PlanLimits;
   meters: UsageMeter[];
+  /** The part that pays for the plan; left out where nothing is sold. */
+  billing?: ReactNode;
 }) {
   return (
     <>
@@ -55,36 +51,14 @@ export function PlanUsage({
             </p>
             <p className="mt-1 text-sm opacity-80">{PLAN_LINES[plan]}</p>
           </div>
-          {plan !== 'unlimited' ? (
-            <a
-              href={`mailto:${UPGRADE_EMAIL}?subject=${encodeURIComponent(
-                plan === 'free' ? 'Move my workspace to Cloud' : 'Raise my Cloud limits',
-              )}`}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink hover:opacity-90"
-            >
-              <Mail aria-hidden className="h-4 w-4" />
-              {plan === 'free' ? 'Upgrade to Cloud' : 'Ask for more'}
-            </a>
-          ) : null}
         </div>
-        <p className="px-5 py-3 text-sm text-muted">
-          {plan === 'free'
-            ? 'The Cloud plan is coming soon. Write to '
-            : 'For changes to your plan, write to '}
-          <a
-            className="font-semibold text-primary hover:underline"
-            href={`mailto:${UPGRADE_EMAIL}`}
-          >
-            {UPGRADE_EMAIL}
-          </a>{' '}
-          and we will move this workspace for you.
-        </p>
+        {billing}
       </Card>
 
       <Card>
         <CardHeader
           title="Usage"
-          description="Counted as things happen. Monthly counts start again on the 1st (UTC)."
+          description="Counted as things happen. Each monthly count says when it starts again."
         />
         <ul className="divide-y divide-line">
           {meters.map((meter) => {
