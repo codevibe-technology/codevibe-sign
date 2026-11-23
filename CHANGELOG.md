@@ -113,6 +113,7 @@ the minor version and says so in its first line.
   verify page with the published seal certificate. The package banners share one style.
 - The home page share card uses the hero's headline and claims in Space Grotesk and Inter, with
   the current dashboard.
+- The docs share card is redrawn in the light style of the site.
 
 ---
 
