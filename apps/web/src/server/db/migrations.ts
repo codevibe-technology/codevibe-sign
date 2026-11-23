@@ -640,4 +640,15 @@ create index app_esign_usage_owed on app_esign_usage (account_id)
   where unbilled and owed_settled_at is null;
 `,
   },
+  {
+    name: '0020_billing_admin_role',
+    sql: `
+alter table app_members drop constraint app_members_role_check;
+alter table app_members add constraint app_members_role_check
+  check (role in ('owner', 'admin', 'billing', 'member', 'viewer'));
+alter table app_invitations drop constraint app_invitations_role_check;
+alter table app_invitations add constraint app_invitations_role_check
+  check (role in ('owner', 'admin', 'billing', 'member', 'viewer'));
+`,
+  },
 ];

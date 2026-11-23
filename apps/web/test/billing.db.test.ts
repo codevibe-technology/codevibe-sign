@@ -1150,6 +1150,73 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       expect(await getBillingDetails(sql, ws.accountId)).toEqual(HARYANA);
     });
 
+    it('lets a billing admin run billing but not the workspace', async () => {
+      vi.stubEnv('PLAN_MODE', 'hosted');
+      const ws = await workspace(null);
+      const billing = await actions();
+      const subscriptions = await import('@/server/actions/subscriptions');
+      const team = await import('@/server/actions/team');
+      const keys = await import('@/server/actions/api-keys');
+      const settings = await import('@/server/actions/workspace');
+      const form = { workspaceId: ws.id, ...HARYANA, gstin: HARYANA.gstin ?? '', addressLine2: '' };
+
+      state.user = await member(ws.id, 'billing');
+      expect(await billing.saveBillingDetailsAction(form)).toMatchObject({ ok: true });
+      expect(await billing.listInvoicesAction({ workspaceId: ws.id })).toEqual({
+        ok: true,
+        data: [],
+      });
+      expect(await billing.creditHistoryAction({ workspaceId: ws.id })).toMatchObject({
+        ok: true,
+      });
+      const credits = await billing.createCreditsOrderAction({ workspaceId: ws.id, credits: 10 });
+      expect(credits).toMatchObject({ ok: true, data: { keyId: 'rzp_live_TESTKEY123' } });
+      expect(
+        await subscriptions.startSubscriptionAction({ workspaceId: ws.id, term: 'month' }),
+      ).toMatchObject({ ok: true });
+
+      const refused = { ok: false, code: 'FORBIDDEN' };
+      expect(
+        await team.inviteMemberAction({
+          workspaceId: ws.id,
+          email: 'new@example.com',
+          role: 'member',
+        }),
+      ).toMatchObject(refused);
+      expect(
+        await team.changeRoleAction({ workspaceId: ws.id, userId: ws.owner.id, role: 'admin' }),
+      ).toMatchObject(refused);
+      expect(await keys.createApiKeyAction({ workspaceId: ws.id, name: 'CI' })).toMatchObject(
+        refused,
+      );
+      expect(
+        await settings.renameWorkspaceAction({ workspaceId: ws.id, name: 'Renamed' }),
+      ).toMatchObject(refused);
+
+      // A plain admin runs the workspace but not its money, and cannot hand out billing admin.
+      state.user = await member(ws.id, 'admin');
+      expect(await billing.listInvoicesAction({ workspaceId: ws.id })).toMatchObject({
+        ok: false,
+        code: 'FORBIDDEN',
+      });
+      expect(
+        await billing.createCreditsOrderAction({ workspaceId: ws.id, credits: 10 }),
+      ).toMatchObject(refused);
+      expect(
+        await subscriptions.startSubscriptionAction({ workspaceId: ws.id, term: 'month' }),
+      ).toMatchObject(refused);
+      expect(
+        await team.inviteMemberAction({
+          workspaceId: ws.id,
+          email: 'payer@example.com',
+          role: 'billing',
+        }),
+      ).toMatchObject({ ok: false, code: 'FORBIDDEN', field: 'role' });
+
+      state.user = ws.owner;
+      expect(await billing.listInvoicesAction({ workspaceId: ws.id })).toMatchObject({ ok: true });
+    });
+
     it('runs a purchase end to end through the actions', async () => {
       vi.stubEnv('PLAN_MODE', 'hosted');
       const ws = await workspace();
@@ -1238,7 +1305,7 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
       vi.unstubAllEnvs();
     });
 
-    it('serves an invoice file to the owner of its account and 404s everyone else', async () => {
+    it('serves an invoice file to the owner and billing admins, 403s members, 404s outsiders', async () => {
       vi.stubEnv('PLAN_MODE', 'hosted');
       const ws = await workspace();
       const { order } = await buy(ws, 10);
@@ -1252,10 +1319,22 @@ describe.skipIf(!url)('billing against PostgreSQL', () => {
 
       state.user = null;
       expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
-      for (const role of ['member', 'admin', 'owner'] as const) {
+      // Typing the address of the file by hand does not get around the role.
+      for (const role of ['viewer', 'member', 'admin', 'owner'] as const) {
         state.user = await member(ws.id, role);
-        expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
+        const refused = await download(ws.id, outcome.invoice.id);
+        expect(refused.status).toBe(403);
+        expect(refused.headers.get('content-type')).toContain('application/json');
+        expect(await refused.json()).toMatchObject({
+          code: 'FORBIDDEN',
+          error: expect.stringContaining('billing admin'),
+          fix: `/dashboard/${ws.slug}/settings/team`,
+        });
       }
+      state.user = await member(ws.id, 'billing');
+      const billingAdmin = await download(ws.id, outcome.invoice.id);
+      expect(billingAdmin.status).toBe(200);
+      expect(billingAdmin.headers.get('content-type')).toBe('application/pdf');
       state.user = other.owner;
       expect((await download(ws.id, outcome.invoice.id)).status).toBe(404);
       expect((await download(other.id, outcome.invoice.id)).status).toBe(404);

@@ -1183,7 +1183,7 @@ describe('no entry point is left out of the matrix', () => {
     expect(server).toContain('return gate()(request, async (r) => signServer().app.fetch(r));');
   });
 
-  it('lets only the account owner reach what an account holds', () => {
+  it('lets only the account owner, or a billing admin for billing, reach what an account holds', () => {
     // Billing, credits, the subscription and the own eSign account belong to an account. An
     // action on any of them must go through `accountAction`, never `workspaceAction` alone.
     const dir = join(SRC, 'server', 'actions');
@@ -1198,7 +1198,9 @@ describe('no entry point is left out of the matrix', () => {
     const route = read(
       join(SRC, 'app/api/billing/workspaces/[workspaceId]/invoices/[invoiceId]/route.ts'),
     );
-    expect(route).toContain('account.ownerUserId !== user.id');
+    expect(route).toContain(
+      'if (!canManageBilling(membership.role, account.ownerUserId === user.id)) {',
+    );
     // Billing exists on the hosted cloud only; a self-hosted install answers 404 everywhere.
     expect(route).toContain('if (!isHosted()) return notFound();');
     expect(read(join(SRC, 'app/api/billing/razorpay/webhook/route.ts'))).toContain(

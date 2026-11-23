@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ManagedBy } from '@/components/billing/managed-by';
 import { BillingPanel } from '@/components/settings/billing-panel';
+import { canManageBilling } from '@/lib/roles';
 import { accountOfWorkspace, accountOwnerName } from '@/server/accounts';
 import { requireWorkspace } from '@/server/auth/guards';
 import { billingConfig } from '@/server/billing/config';
@@ -14,13 +15,14 @@ export const metadata: Metadata = { title: 'Billing' };
 
 export default async function BillingSettings({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { workspace, user } = await requireWorkspace(slug, 'billing.manage');
+  const { workspace, user, role } = await requireWorkspace(slug, 'billing.manage');
   const sql = db();
   const entitlements = await workspaceEntitlements(sql, workspace.id);
   if (!entitlements.billingVisible) notFound();
   const account = await accountOfWorkspace(sql, workspace.id);
-  // Invoices, billing details and credits belong to the account; only its owner sees them.
-  if (account.ownerUserId !== user.id) {
+  // Invoices, billing details and credits belong to the account: its owner and billing admins
+  // see them, nobody else.
+  if (!canManageBilling(role, account.ownerUserId === user.id)) {
     return (
       <ManagedBy
         owner={await accountOwnerName(sql, workspace.id)}

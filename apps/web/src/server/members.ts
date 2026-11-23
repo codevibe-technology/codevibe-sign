@@ -18,7 +18,7 @@ export async function listMembers(sql: postgres.Sql, workspaceId: string): Promi
     select u.id as "userId", btrim(u.name) as name, u.email, u.image, m.role, m.created_at as "joinedAt"
     from app_members m join auth_users u on u.id = m.user_id
     where m.workspace_id = ${workspaceId}
-    order by array_position(array['owner','admin','member','viewer'], m.role),
+    order by array_position(array['owner','admin','billing','member','viewer'], m.role),
       lower(${userLabel(sql)})`;
 }
 

@@ -155,7 +155,7 @@ export function TeamPanel({
                     <label className="sr-only" htmlFor={`role-${member.userId}`}>
                       Role of {displayName(member)}
                     </label>
-                    <div className="w-36">
+                    <div className="w-40">
                       <NativeSelect
                         id={`role-${member.userId}`}
                         value={member.role}

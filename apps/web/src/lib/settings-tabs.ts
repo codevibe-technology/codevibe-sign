@@ -2,7 +2,8 @@ import { can, type Role } from './roles';
 
 /**
  * The settings sections a role can open, in order. `plans` adds Billing and Plan and usage
- * (hosted cloud).
+ * (hosted cloud). Billing is for owners and billing admins; admins run the workspace, not its
+ * payments.
  */
 export function settingsTabs(slug: string, role: Role, options: { plans?: boolean } = {}) {
   const base = `/dashboard/${slug}/settings`;
@@ -17,8 +18,10 @@ export function settingsTabs(slug: string, role: Role, options: { plans?: boolea
           { label: 'Webhooks', href: `${base}/webhooks` },
           { label: 'Email log', href: `${base}/email-log` },
           { label: 'Aadhaar eSign', href: `${base}/aadhaar-esign` },
-          ...(options.plans ? [{ label: 'Billing', href: `${base}/billing` }] : []),
         ]
+      : []),
+    ...(options.plans && can(role, 'billing.manage')
+      ? [{ label: 'Billing', href: `${base}/billing` }]
       : []),
     ...(options.plans ? [{ label: 'Plan and usage', href: `${base}/plan` }] : []),
     { label: 'Personal', href: `${base}/personal` },

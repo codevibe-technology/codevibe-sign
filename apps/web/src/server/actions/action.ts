@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { can, type Permission, type Role } from '@/lib/roles';
+import { can, canManageBilling, type Permission, type Role } from '@/lib/roles';
 import { db } from '../db';
 import { AppError, type AppErrorCode } from '../errors';
 import type { PlanLimitDetails } from '../plans';
@@ -99,7 +99,8 @@ export interface AccountContext extends ActionContext {
  * A server action on what an account holds: its plan, payments, invoices, eSign credits and
  * own provider account. Everything `workspaceAction` checks, and then that the signed-in
  * person owns the account of that workspace. An admin or another owner of the workspace is
- * refused: the account pays, so only its owner decides.
+ * refused: the account pays, so only its owner decides. With `billing.manage`, a billing
+ * admin of the workspace may act too.
  */
 export function accountAction<S extends z.ZodObject, T>(
   permission: Permission,
@@ -108,10 +109,13 @@ export function accountAction<S extends z.ZodObject, T>(
 ) {
   return workspaceAction(permission, schema, async (ctx, input) => {
     const account = await accountOfWorkspace(db(), ctx.workspace.id);
-    if (account.ownerUserId !== ctx.user.id) {
+    const holds = account.ownerUserId === ctx.user.id;
+    if (permission === 'billing.manage' ? !canManageBilling(ctx.role, holds) : !holds) {
       throw new AppError(
         'FORBIDDEN',
-        'Only the owner of this account can do this. Ask the person whose plan this workspace is on.',
+        permission === 'billing.manage'
+          ? 'Only the account owner or a billing admin can do this. Ask the owner to make you a billing admin in Settings, Team.'
+          : 'Only the owner of this account can do this. Ask the person whose plan this workspace is on.',
       );
     }
     return handler({ ...ctx, accountId: account.id }, input);

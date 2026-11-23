@@ -2,6 +2,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { FREE_PLAN_LIMITS, UNLIMITED_LIMITS } from '@/lib/plans';
+import type { Role } from '@/lib/roles';
 import { settingsTabs } from '@/lib/settings-tabs';
 import { PlanUsage, type UsageMeter } from './plan-usage';
 
@@ -128,5 +129,16 @@ describe('settingsTabs', () => {
       settingsTabs('acme', 'viewer', { plans }).map((t) => t.label);
     expect(labels(false)).toEqual(['Personal']);
     expect(labels(true)).toEqual(['Plan and usage', 'Personal']);
+  });
+
+  it('shows Billing to owners and billing admins but not to admins', () => {
+    const labels = (role: Role) => settingsTabs('acme', role, { plans: true }).map((t) => t.label);
+    expect(labels('owner')).toContain('Billing');
+    expect(labels('billing')).toEqual(['Billing', 'Plan and usage', 'Personal']);
+    expect(labels('admin')).not.toContain('Billing');
+    expect(labels('admin')).toContain('Team');
+    expect(settingsTabs('acme', 'billing', { plans: false }).map((t) => t.label)).toEqual([
+      'Personal',
+    ]);
   });
 });
