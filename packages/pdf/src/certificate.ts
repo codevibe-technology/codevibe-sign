@@ -1,6 +1,5 @@
 import { PDFDocument, PDFString } from 'pdf-lib';
 import {
-  SignError,
   type AuditEvent,
   type Document,
   type Envelope,
@@ -8,7 +7,7 @@ import {
   type Recipient,
 } from '@codevibe_technology/sign-core';
 import { AUTH_LABELS, ROLE_LABELS, STATUS_LABELS, shortHash } from './certificate-text';
-import { canEncode, embedFonts, encodable, type FontSet } from './fonts';
+import { embedFonts, type FontSet } from './fonts';
 import { loadPdf } from './inspect';
 import { maskEmail, maskPhone } from './mask';
 import { A4, CONTENT_WIDTH, MARGIN, PageFlow, type Box, type Part } from './page-flow';
@@ -42,13 +41,16 @@ export interface CertificateData {
   recordUrl?: string;
   /**
    * A short line from whoever sent the envelope, printed at the end, for example a company
-   * registration number. Characters the font cannot draw become `?` rather than failing.
+   * registration number.
    */
   note?: string;
 }
 
 export interface CertificateOptions {
-  /** TrueType or OpenType font for names and titles outside Latin script. */
+  /**
+   * TrueType or OpenType font tried first for names and titles. Without one, text the
+   * standard fonts cannot draw uses the bundled Noto fonts.
+   */
   font?: Uint8Array;
   /** Largest accepted input PDF, in bytes. Defaults to 25 MB. */
   maxBytes?: number;
@@ -118,17 +120,6 @@ function drawCertificate(
   if (timeZone) {
     assertTimeZone(timeZone);
   }
-  const human = (value: string, what: string): string => {
-    if (!canEncode(fonts.regular, value)) {
-      throw new SignError(
-        'VALIDATION',
-        `The ${what} uses characters the standard font cannot draw. Pass a font that covers them in options.font.`,
-        { option: 'font', value },
-      );
-    }
-    return value;
-  };
-  const machine = (value: string) => encodable(fonts.regular, value);
   const modules = data.recordUrl ? qrModules(data.recordUrl) : undefined;
   const recordUrl = data.recordUrl && modules ? new URL(data.recordUrl).href : undefined;
 
@@ -141,14 +132,14 @@ function drawCertificate(
   const moment = (value: string, nameZone = false): Part[] => {
     const date = parseDate(value);
     if (!date) {
-      return [{ text: machine(value), style: body }];
+      return [{ text: value, style: body }];
     }
     if (!zoned) {
       return [{ text: formatUtc(date), style: body }];
     }
     return [
       {
-        text: machine(formatSigningTime(value, timeZone) + (nameZone ? ` (${timeZone})` : '')),
+        text: formatSigningTime(value, timeZone) + (nameZone ? ` (${timeZone})` : ''),
         style: body,
       },
       { text: formatUtc(date), style: small },
@@ -163,19 +154,15 @@ function drawCertificate(
   flow.field(
     'Document',
     [
-      { text: human(envelope.title, 'envelope title'), style: flow.style('strong') },
+      { text: envelope.title, style: flow.style('strong') },
       {
-        text: `${human(document.name, 'document name')} · ${document.pageCount} ${document.pageCount === 1 ? 'page' : 'pages'}`,
+        text: `${document.name} · ${document.pageCount} ${document.pageCount === 1 ? 'page' : 'pages'}`,
         style: small,
       },
     ],
     summaryWidth,
   );
-  flow.field(
-    'Envelope ID',
-    [{ text: machine(envelope.id), style: flow.style('mono') }],
-    summaryWidth,
-  );
+  flow.field('Envelope ID', [{ text: envelope.id, style: flow.style('mono') }], summaryWidth);
   flow.field('Status', [{ text: STATUS_LABELS[envelope.status], style: body }], summaryWidth);
   if (envelope.completedAt) {
     flow.field('Completed', moment(envelope.completedAt, true), summaryWidth);
@@ -187,10 +174,7 @@ function drawCertificate(
     const who = organization && organization !== name ? `${name}, ${organization}` : name;
     flow.field(
       'Sender',
-      [
-        { text: machine(who), style: body },
-        ...(email ? [{ text: machine(maskEmail(email)), style: small }] : []),
-      ],
+      [{ text: who, style: body }, ...(email ? [{ text: maskEmail(email), style: small }] : [])],
       summaryWidth,
     );
   }
@@ -199,11 +183,10 @@ function drawCertificate(
     const x = A4.width - MARGIN - QR_SIZE;
     drawQr(first, modules, { x, top, size: QR_SIZE });
     const caption = 'Scan to check this document';
-    first.drawText(caption, {
+    small.font.draw(first, caption, {
       x: x + (QR_SIZE - small.font.widthOfTextAtSize(caption, small.size)) / 2,
       y: top - QR_SIZE - small.size - 2,
       size: small.size,
-      font: small.font,
       color: small.color,
     });
     if (flow.page === first) {
@@ -243,7 +226,7 @@ function drawCertificate(
         when = [{ text: 'Declined', style: body }, ...moment(declined)];
         if (recipient.declineReason) {
           when.push({
-            text: `Reason: ${human(recipient.declineReason, 'decline reason')}`,
+            text: `Reason: ${recipient.declineReason}`,
             style: small,
           });
         }
@@ -254,10 +237,10 @@ function drawCertificate(
       }
       return [
         [
-          { text: human(recipient.name, 'recipient name'), style: body },
+          { text: recipient.name, style: body },
           { text: ROLE_LABELS[recipient.role], style: small },
         ],
-        [{ text: machine(contact(recipient)), style: body }],
+        [{ text: contact(recipient), style: body }],
         [{ text: recipient.role === 'viewer' ? '' : AUTH_LABELS[recipient.auth], style: body }],
         when,
       ];
@@ -280,7 +263,7 @@ function drawCertificate(
       `Audit trail when sealed: ${events.length} ${events.length === 1 ? 'event' : 'events'}, chain head`,
       small,
     );
-    flow.paragraph(machine(auditHead), flow.style('monoSmall'));
+    flow.paragraph(auditHead, flow.style('monoSmall'));
   }
 
   flow.gap(10);
@@ -294,13 +277,10 @@ function drawCertificate(
   const note = data.note?.replace(/\s+/g, ' ').trim().slice(0, 500);
   if (note) {
     flow.gap(3);
-    flow.paragraph(machine(note), label);
+    flow.paragraph(note, label);
   }
 
-  flow.footers(
-    `Envelope ${machine(envelope.id)}`,
-    formatUtc(new Date(data.generatedAt ?? Date.now())),
-  );
+  flow.footers(`Envelope ${envelope.id}`, formatUtc(new Date(data.generatedAt ?? Date.now())));
 }
 
 /**
@@ -318,6 +298,7 @@ export async function appendCertificate(
   const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
   const fonts = await embedFonts(doc, options.font);
   drawCertificate(doc, fonts, data, SEALED_FILE_LINE);
+  await fonts.finish();
   return doc.save();
 }
 
@@ -338,5 +319,6 @@ export async function certificatePdf(
   }
   const title = list[0]?.envelope.title;
   doc.setTitle(title ? `Signing certificate: ${title}` : 'Signing certificate');
+  await fonts.finish();
   return doc.save();
 }

@@ -1,5 +1,6 @@
-import { rgb, type PDFDocument, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
+import { rgb, type PDFDocument, type PDFPage, type RGB } from 'pdf-lib';
 import type { FontSet } from './fonts';
+import type { Face } from './typeset';
 import { wrapText } from './text';
 
 export const A4 = { width: 595.28, height: 841.89 };
@@ -21,7 +22,7 @@ const SIZE = { title: 18, continued: 12, section: 10.5, strong: 9.5, body: 9, la
 export const LEADING = 1.35;
 
 export interface TextStyle {
-  font: PDFFont;
+  font: Face;
   size: number;
   color: RGB;
 }
@@ -100,11 +101,10 @@ export class PageFlow {
   }
 
   private write(text: string, x: number, style: TextStyle, y = this.y): void {
-    this.page.drawText(text, {
+    style.font.draw(this.page, text, {
       x,
       y: y - style.size,
       size: style.size,
-      font: style.font,
       color: style.color,
     });
   }
@@ -245,12 +245,11 @@ export class PageFlow {
       const right = `Page ${index + 1} of ${total}  ·  Generated ${generatedAt}`;
       const rightWidth = style.font.widthOfTextAtSize(right, style.size);
       const y = MARGIN - 12;
-      page.drawText(left, { x: MARGIN, y, size: style.size, font: style.font, color: style.color });
-      page.drawText(right, {
+      style.font.draw(page, left, { x: MARGIN, y, size: style.size, color: style.color });
+      style.font.draw(page, right, {
         x: A4.width - MARGIN - rightWidth,
         y,
         size: style.size,
-        font: style.font,
         color: style.color,
       });
     });

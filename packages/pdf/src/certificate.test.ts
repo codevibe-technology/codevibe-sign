@@ -2,6 +2,7 @@ import jsQR from 'jsqr';
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { SignError, type AuditEvent, type Recipient } from '@codevibe_technology/sign-core';
+import { extractText } from './testing/extract';
 import { appendCertificate, certificatePdf, type CertificateData } from './certificate';
 import {
   A4,
@@ -310,16 +311,13 @@ describe('appendCertificate', () => {
     expect(pieces.length).toBeGreaterThan(2);
   });
 
-  it('asks for a custom font for names outside Latin script', async () => {
-    const error = await rejection(
-      appendCertificate(await makePdf([{ size: A4 }]), {
-        envelope: envelope({ recipients: [recipient({ name: 'शुभ कुमार' })] }),
-        document: document(),
-        events,
-      }),
-    );
-    expect(error.code).toBe('VALIDATION');
-    expect(error.details).toMatchObject({ option: 'font' });
+  it('draws names outside Latin script with the bundled fonts', async () => {
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope({ recipients: [recipient({ name: 'शुभ कुमार' })] }),
+      document: document(),
+      events,
+    });
+    expect((await extractText(output)).join(' ')).toContain('शुभ कुमार');
   });
 
   it('rejects an unknown time zone and unreadable input', async () => {

@@ -1,62 +1,78 @@
 import fontkit from '@pdf-lib/fontkit';
-import { StandardFonts, type PDFDocument, type PDFFont } from 'pdf-lib';
+import { StandardFonts, type PDFDocument } from 'pdf-lib';
 import { SignError } from '@codevibe_technology/sign-core';
+import { shapingFont } from './script-fonts';
+import { Face, Typesetter, type FaceOptions } from './typeset';
 
 export interface FontSet {
-  regular: PDFFont;
-  bold: PDFFont;
-  mono: PDFFont;
-  /** True when a caller-supplied font is used for regular and bold text. */
+  regular: Face;
+  bold: Face;
+  /** Courier, for hashes and ids; it only ever holds ASCII. */
+  mono: Face;
+  /** True when a caller-supplied font is tried first for regular and bold text. */
   custom: boolean;
+  /** Embeds the script fonts the text used. Call before saving the document. */
+  finish(): Promise<void>;
+}
+
+const unreadable = () =>
+  new SignError('VALIDATION', 'The custom font could not be read. Use a TTF or OTF file.', {
+    field: 'font',
+  });
+
+/**
+ * A TrueType font is shaped with HarfBuzz like the bundled ones. A CFF-based OpenType font
+ * cannot be embedded that way and goes through pdf-lib instead.
+ */
+async function customFont(
+  doc: PDFDocument,
+  bytes: Uint8Array,
+): Promise<Pick<FaceOptions, 'custom' | 'customCff'>> {
+  let parsed: ReturnType<typeof fontkit.create>;
+  try {
+    parsed = fontkit.create(bytes);
+  } catch {
+    throw unreadable();
+  }
+  const tables = (parsed as unknown as { directory?: { tables?: Record<string, unknown> } })
+    .directory?.tables;
+  if (!tables?.['CFF '] && !tables?.CFF2) {
+    try {
+      return { custom: shapingFont(bytes) };
+    } catch {
+      throw unreadable();
+    }
+  }
+  // fontkit's layout code for complex scripts expects this global.
+  await import('regenerator-runtime/runtime.js');
+  doc.registerFontkit(fontkit);
+  try {
+    const font = await doc.embedFont(bytes, { subset: false });
+    return { customCff: { font, has: (code) => parsed.hasGlyphForCodePoint(code) } };
+  } catch {
+    throw unreadable();
+  }
 }
 
 /**
- * Standard Helvetica and Courier cover Latin script only (WinAnsi). A custom
- * TrueType or OpenType font replaces the regular and bold faces so names in other
- * scripts can be drawn; hashes stay in Courier, which only ever holds hex.
+ * Helvetica draws what WinAnsi can encode; names and titles in other scripts (Indian scripts,
+ * Arabic, Greek, Cyrillic, accented Latin beyond WinAnsi) use the bundled Noto fonts, shaped
+ * and subset into the file. A custom TrueType or OpenType font, when given, is tried first for
+ * every character it covers.
  */
-export async function embedFonts(doc: PDFDocument, customFont?: Uint8Array): Promise<FontSet> {
-  const mono = await doc.embedFont(StandardFonts.Courier);
-  if (customFont) {
-    // fontkit's shapers for complex scripts (Devanagari and others) expect this global.
-    await import('regenerator-runtime/runtime.js');
-    doc.registerFontkit(fontkit);
-    let font: PDFFont;
-    try {
-      font = await doc.embedFont(customFont, { subset: false });
-    } catch {
-      throw new SignError(
-        'VALIDATION',
-        'The custom font could not be read. Use a TTF or OTF file.',
-        {
-          field: 'font',
-        },
-      );
-    }
-    return { regular: font, bold: font, mono, custom: true };
-  }
-  const regular = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  return { regular, bold, mono, custom: false };
-}
-
-/** Whether every character of the text can be drawn with the font. */
-export function canEncode(font: PDFFont, text: string): boolean {
-  try {
-    font.encodeText(text);
-    font.widthOfTextAtSize(text, 10);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Replaces characters the font cannot draw with '?', one character at a time. */
-export function encodable(font: PDFFont, text: string): string {
-  if (canEncode(font, text)) {
-    return text;
-  }
-  return Array.from(text)
-    .map((char) => (canEncode(font, char) ? char : '?'))
-    .join('');
+export async function embedFonts(doc: PDFDocument, customFontBytes?: Uint8Array): Promise<FontSet> {
+  const custom = customFontBytes ? await customFont(doc, customFontBytes) : {};
+  const typesetter = new Typesetter(doc);
+  const [regular, bold, mono] = await Promise.all([
+    doc.embedFont(StandardFonts.Helvetica),
+    doc.embedFont(StandardFonts.HelveticaBold),
+    doc.embedFont(StandardFonts.Courier),
+  ]);
+  return {
+    regular: new Face(typesetter, regular, custom),
+    bold: new Face(typesetter, bold, { ...custom, bold: true }),
+    mono: new Face(typesetter, mono, { fallback: false }),
+    custom: customFontBytes !== undefined,
+    finish: () => typesetter.finish(),
+  };
 }

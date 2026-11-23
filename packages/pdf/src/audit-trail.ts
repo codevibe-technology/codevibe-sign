@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import type { AuditEvent, Envelope, IsoDateTime } from '@codevibe_technology/sign-core';
 import { actionLabel, actorOf } from './certificate-text';
-import { embedFonts, encodable } from './fonts';
+import { embedFonts } from './fonts';
 import { CONTENT_WIDTH, PageFlow, type Part } from './page-flow';
 import { assertTimeZone, formatInZone, formatUtc, parseDate } from './time';
 
@@ -37,21 +37,20 @@ export async function auditTrailPdf(
   }
   const doc = await PDFDocument.create();
   const fonts = await embedFonts(doc, options.font);
-  const text = (value: string) => encodable(fonts.regular, value);
   const names = new Map(envelope.recipients.map((recipient) => [recipient.id, recipient.name]));
 
   const flow = new PageFlow(doc, fonts, 'Audit trail');
   const body = flow.style('body');
   flow.newPage();
-  flow.field('Document', [{ text: text(envelope.title), style: flow.style('strong') }]);
-  flow.field('Envelope ID', [{ text: text(envelope.id), style: flow.style('mono') }]);
+  flow.field('Document', [{ text: envelope.title, style: flow.style('strong') }]);
+  flow.field('Envelope ID', [{ text: envelope.id, style: flow.style('mono') }]);
   flow.field('Events', [{ text: String(events.length), style: body }]);
   const head = envelope.auditHead ?? events[events.length - 1]?.hash;
   if (head) {
-    flow.field('Chain head', [{ text: text(head), style: flow.style('monoSmall') }]);
+    flow.field('Chain head', [{ text: head, style: flow.style('monoSmall') }]);
   }
   if (data.recordUrl) {
-    flow.field('Public record', [{ text: text(data.recordUrl), style: flow.style('mono') }]);
+    flow.field('Public record', [{ text: data.recordUrl, style: flow.style('mono') }]);
   }
   flow.gap(4);
   flow.paragraph(
@@ -66,11 +65,11 @@ export async function auditTrailPdf(
   const when = (value: string): Part[] => {
     const date = parseDate(value);
     if (!date) {
-      return [{ text: text(value), style: body }];
+      return [{ text: value, style: body }];
     }
     return [
       { text: formatUtc(date), style: body },
-      ...(zoned ? [{ text: text(formatInZone(date, timeZone)), style: small }] : []),
+      ...(zoned ? [{ text: formatInZone(date, timeZone), style: small }] : []),
     ];
   };
   const widths = { seq: 30, time: 200, action: 125 };
@@ -85,14 +84,12 @@ export async function auditTrailPdf(
       [{ text: String(event.seq), style: body }],
       when(event.at),
       [{ text: actionLabel(event), style: body }],
-      [{ text: text(actorOf(event, names)), style: body }],
+      [{ text: actorOf(event, names), style: body }],
     ]),
   );
 
-  flow.footers(
-    `Envelope ${text(envelope.id)}`,
-    formatUtc(new Date(data.generatedAt ?? Date.now())),
-  );
+  flow.footers(`Envelope ${envelope.id}`, formatUtc(new Date(data.generatedAt ?? Date.now())));
   doc.setTitle(`Audit trail: ${envelope.title}`);
+  await fonts.finish();
   return doc.save();
 }

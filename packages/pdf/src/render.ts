@@ -1,22 +1,26 @@
-import { degrees, rgb, type PDFDocument, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
+import { degrees, rgb, type PDFDocument, type PDFImage, type PDFPage } from 'pdf-lib';
 import {
   SignError,
   type Field,
   type FieldValue,
   type Recipient,
 } from '@codevibe_technology/sign-core';
-import { canEncode, embedFonts, encodable, type FontSet } from './fonts';
+import { embedFonts, type FontSet } from './fonts';
 import { boxFrame, clampRect, fitContain, pageGeometry, type BoxFrame } from './geometry';
 import { loadPdf } from './inspect';
 import { sanitizeDocument } from './sanitize';
 import { reencodePng } from './png';
 import { fitText, LINE_HEIGHT } from './text';
+import type { Face } from './typeset';
 import { assertTimeZone, formatSigningDate, formatSigningTime } from './time';
 
 export interface RenderOptions {
   /** Draw only the fields that belong to this document. */
   documentId?: string;
-  /** TrueType or OpenType font for text and names outside Latin script. */
+  /**
+   * TrueType or OpenType font tried first for text and names. Without one, text the standard
+   * fonts cannot draw uses the bundled Noto fonts.
+   */
   font?: Uint8Array;
   /** IANA time zone used to turn a date-signed timestamp into a calendar date. */
   timeZone?: string;
@@ -93,7 +97,7 @@ function drawImage(page: PDFPage, frame: BoxFrame, image: PDFImage, reserved = 0
   });
 }
 
-function drawText(page: PDFPage, frame: BoxFrame, text: string, font: PDFFont): void {
+function drawText(page: PDFPage, frame: BoxFrame, text: string, font: Face): void {
   const padding = 2;
   const fitted = fitText(text, font, frame.width, frame.height);
   const lineHeight = fitted.size * LINE_HEIGHT;
@@ -105,13 +109,12 @@ function drawText(page: PDFPage, frame: BoxFrame, text: string, font: PDFFont): 
     const lineBottom = blockTop - (index + 1) * lineHeight;
     const baseline = lineBottom + (lineHeight - fullHeight) / 2 + descent;
     const origin = frame.at(padding, baseline);
-    page.drawText(line, {
+    font.draw(page, line, {
       x: origin.x,
       y: origin.y,
       size: fitted.size,
-      font,
       color: INK,
-      rotate: degrees(frame.rotate),
+      rotate: frame.rotate,
     });
   });
 }
@@ -131,7 +134,7 @@ function drawCaption(
   frame: BoxFrame,
   strip: number,
   text: string,
-  font: PDFFont,
+  font: Face,
 ): void {
   const fitted = fitText(text, font, frame.width, strip, {
     minSize: CAPTION_MIN_SIZE,
@@ -145,13 +148,12 @@ function drawCaption(
   const descent =
     font.heightAtSize(fitted.size) - font.heightAtSize(fitted.size, { descender: false });
   const origin = frame.at(Math.max(0, (frame.width - width) / 2), descent + 0.5);
-  page.drawText(line, {
+  font.draw(page, line, {
     x: origin.x,
     y: origin.y,
     size: fitted.size,
-    font,
     color: CAPTION_INK,
-    rotate: degrees(frame.rotate),
+    rotate: frame.rotate,
   });
 }
 
@@ -302,7 +304,7 @@ export async function renderFields(
         drawImage(page, frame, image, strip);
         if (strip > 0) {
           fonts ??= await embedFonts(doc, options.font);
-          drawCaption(page, frame, strip, encodable(fonts.regular, caption), fonts.regular);
+          drawCaption(page, frame, strip, caption, fonts.regular);
         }
         break;
       }
@@ -330,18 +332,12 @@ export async function renderFields(
           break;
         }
         fonts ??= await embedFonts(doc, options.font);
-        if (!canEncode(fonts.regular, text)) {
-          throw new SignError(
-            'INVALID_FIELD_VALUE',
-            'The text uses characters the standard font cannot draw. Pass a font that covers them in options.font.',
-            { fieldId: field.id, option: 'font' },
-          );
-        }
         drawText(page, frame, text, fonts.regular);
         break;
       }
     }
   }
 
+  await fonts?.finish();
   return doc.save();
 }

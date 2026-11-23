@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { SignError, type Field, type FieldValue } from '@codevibe_technology/sign-core';
+import { extractText } from './testing/extract';
 import { renderFields } from './render';
 import {
   A4,
@@ -318,13 +319,26 @@ describe('renderFields: text', () => {
     expect(shownText(custom)).toEqual(['2026-11-19']);
   });
 
-  it('asks for a custom font when text is outside Latin script', async () => {
+  it('draws text outside Latin script with the bundled fonts', async () => {
     const pdf = await makePdf([{ size: A4 }]);
-    const error = await rejection(
-      renderFields(pdf, [field('name')], [{ fieldId: 'f-name', value: 'शुभ कुमार' }], [signer]),
+    const output = await renderFields(
+      pdf,
+      [field('name')],
+      [{ fieldId: 'f-name', value: 'शुभ कुमार' }],
+      [signer],
     );
-    expect(error.code).toBe('INVALID_FIELD_VALUE');
-    expect(error.details).toMatchObject({ fieldId: 'f-name', option: 'font' });
+    expect((await extractText(output)).join(' ')).toContain('शुभ कुमार');
+  });
+
+  it('replaces characters no font covers instead of failing', async () => {
+    const pdf = await makePdf([{ size: A4 }]);
+    const output = await renderFields(
+      pdf,
+      [field('name')],
+      [{ fieldId: 'f-name', value: 'Asha 😀' }],
+      [signer],
+    );
+    expect(shownText(await pageContent(output, 0))).toContain('Asha ?');
   });
 
   const unicodeFont = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf';
@@ -340,8 +354,7 @@ describe('renderFields: text', () => {
         font,
       },
     );
-    const content = await pageContent(output, 0);
-    expect(content).toMatch(/Tj/);
+    expect((await extractText(output)).join(' ')).toContain('शुभ कुमार');
   });
 });
 

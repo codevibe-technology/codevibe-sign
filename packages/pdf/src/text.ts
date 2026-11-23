@@ -1,12 +1,19 @@
-import type { PDFFont } from 'pdf-lib';
+import type { Measure } from './typeset';
 
 /** Line height as a multiple of the font size. */
 export const LINE_HEIGHT = 1.2;
 
-function splitLongWord(word: string, font: PDFFont, size: number, maxWidth: number): string[] {
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/** User-perceived characters: a conjunct with its vowel sign stays in one piece. */
+function clusters(text: string): string[] {
+  return Array.from(graphemes.segment(text), (part) => part.segment);
+}
+
+function splitLongWord(word: string, font: Measure, size: number, maxWidth: number): string[] {
   const pieces: string[] = [];
   let current = '';
-  for (const char of Array.from(word)) {
+  for (const char of clusters(word)) {
     const candidate = current + char;
     if (current !== '' && font.widthOfTextAtSize(candidate, size) > maxWidth) {
       pieces.push(current);
@@ -25,7 +32,7 @@ function splitLongWord(word: string, font: PDFFont, size: number, maxWidth: numb
  * Wraps text to a width: breaks at spaces, and inside words that are wider than
  * a whole line (hashes, user agents, long e-mail addresses). Keeps explicit newlines.
  */
-export function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+export function wrapText(text: string, font: Measure, size: number, maxWidth: number): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split(/\r?\n/)) {
     const words = paragraph.split(/\s+/).filter((word) => word !== '');
@@ -56,9 +63,9 @@ export function wrapText(text: string, font: PDFFont, size: number, maxWidth: nu
   return lines;
 }
 
-function ellipsize(line: string, font: PDFFont, size: number, maxWidth: number): string {
+function ellipsize(line: string, font: Measure, size: number, maxWidth: number): string {
   const ellipsis = '...';
-  let chars = Array.from(line);
+  let chars = clusters(line);
   while (chars.length > 0 && font.widthOfTextAtSize(chars.join('') + ellipsis, size) > maxWidth) {
     chars = chars.slice(0, -1);
   }
@@ -84,7 +91,7 @@ export interface FitTextOptions {
  */
 export function fitText(
   text: string,
-  font: PDFFont,
+  font: Measure,
   boxWidth: number,
   boxHeight: number,
   options: FitTextOptions = {},
