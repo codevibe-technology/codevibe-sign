@@ -144,6 +144,19 @@ function build(): SignServer {
   });
 }
 
+/** The stored size of each document of a workspace's envelope; null when it has no such envelope. */
+async function documentSizes(sql: ReturnType<typeof db>, workspaceId: string, envelopeId: string) {
+  const stored = await postgresStore(sql).load(envelopeId);
+  if (!stored || (stored.workspaceId ?? 'default') !== workspaceId) return null;
+  const { files } = appRuntime();
+  return Promise.all(
+    stored.envelope.documents.map(async (document) => ({
+      id: document.id,
+      bytes: (await files.get(document.fileKey))?.byteLength ?? 0,
+    })),
+  );
+}
+
 type Gate = ReturnType<typeof createPlanGate>;
 
 const holder = globalThis as unknown as { __cvsSign?: SignServer; __cvsSignGate?: Gate };
@@ -164,6 +177,7 @@ function gate(): Gate {
     templateSizes: async (workspaceId, templateId) =>
       (await getTemplate(sql, workspaceId, templateId))?.definition.documents.map((d) => d.size) ??
       null,
+    documentSizes: (workspaceId, envelopeId) => documentSizes(sql, workspaceId, envelopeId),
     basePath: SIGN_BASE_PATH,
     maxBodyBytes: MAX_REQUEST_BYTES,
   });

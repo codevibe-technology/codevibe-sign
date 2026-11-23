@@ -2,10 +2,12 @@ import 'server-only';
 import type { Principal } from '@codevibe_technology/sign-server';
 import type postgres from 'postgres';
 import type { PlanSettings } from '@/lib/plans';
+import { AppError } from '../errors';
 import { routedParam, routedPath } from './route-path';
 import {
   PlanLimitError,
   assertWithin,
+  releaseStorage,
   releaseUsage,
   reserveUsage,
   workspacePlan,
@@ -22,6 +24,15 @@ export interface PlanGateDeps {
    * envelope made from it stores a copy of each.
    */
   templateSizes?: (workspaceId: string, templateId: string) => Promise<number[] | null>;
+  /**
+   * The stored size of each document of an envelope, or null when the workspace has no such
+   * envelope. Replacing a draft's PDF and copying an envelope to a new draft are counted
+   * against these.
+   */
+  documentSizes?: (
+    workspaceId: string,
+    envelopeId: string,
+  ) => Promise<{ id: string; bytes: number }[] | null>;
   /** The first-run sample envelope, whose sending does not count. */
   isSampleEnvelope?: (workspaceId: string, envelopeId: string) => Promise<boolean>;
   basePath: string;
@@ -43,18 +54,36 @@ const malformedPath = () =>
     { status: 400, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } },
   );
 
-const planLimitResponse = (err: PlanLimitError) =>
-  new Response(JSON.stringify(err.toJSON()), {
-    status: 403,
-    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+/** 429 with `Retry-After` for a count that starts again by itself, 403 for the rest. */
+const planLimitResponse = (err: PlanLimitError, now: Date) => {
+  const retry = err.status === 429 ? err.retryAfterSeconds(now) : null;
+  return new Response(JSON.stringify(err.toJSON()), {
+    status: err.status,
+    headers: {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      ...(retry !== null ? { 'retry-after': String(retry) } : {}),
+    },
   });
+};
+
+/**
+ * The path the gate matches on: escapes decoded as the router decodes them, and repeated
+ * slashes folded, so no spelling of a counted route reads as a different one here.
+ */
+function gatedPath(url: string): string | null {
+  const path = routedPath(url);
+  return path === null ? null : path.replace(/\/{2,}/g, '/');
+}
 
 /**
  * Applies the workspace's plan to calls of the sign API, at the one place every call passes:
  * browser and API-key requests through the route handlers, and the app's own in-process calls.
- * It counts API-key requests per day, refuses PDFs larger than the plan takes, and reserves
- * the storage and the monthly send before the server does the work, giving them back if the
- * server then refuses. Self-hosted installs skip it entirely.
+ * It counts API-key requests by the month and the day, refuses PDFs larger than the plan takes,
+ * and reserves the storage and the monthly send before the server does the work, giving them
+ * back if the server then refuses. That covers a new envelope, one made from a template, a
+ * draft being sent, a draft's PDF being replaced and an envelope copied to a new draft.
+ * Self-hosted installs skip it entirely.
  */
 export function createPlanGate(deps: PlanGateDeps) {
   const prefix = `${deps.basePath}/v1/`;
@@ -63,7 +92,7 @@ export function createPlanGate(deps: PlanGateDeps) {
   return async (request: Request, forward: Forward): Promise<Response> => {
     const settings = deps.settings();
     if (settings.mode === 'self-hosted') return forward(request);
-    const path = routedPath(request.url);
+    const path = gatedPath(request.url);
     if (path === null) return malformedPath();
     if (!path.startsWith(prefix) || path.startsWith(`${prefix}sign/`)) return forward(request);
     const route = path.slice(deps.basePath.length);
@@ -72,20 +101,45 @@ export function createPlanGate(deps: PlanGateDeps) {
       request.method === 'POST' ? /^\/v1\/envelopes\/([^/]+)\/send\/?$/.exec(route) : null;
     const fromTemplate =
       request.method === 'POST' ? /^\/v1\/templates\/([^/]+)\/envelopes\/?$/.exec(route) : null;
+    const replacing =
+      request.method === 'PUT'
+        ? /^\/v1\/envelopes\/([^/]+)\/documents\/([^/]+)\/?$/.exec(route)
+        : null;
+    const copying =
+      request.method === 'POST'
+        ? /^\/v1\/envelopes\/([^/]+)\/(?:recall|revise)\/?$/.exec(route)
+        : null;
     const keyCall = /^Bearer\s/i.test(request.headers.get('authorization') ?? '');
-    if (!creating && !sending && !fromTemplate && !keyCall) return forward(request);
+    const counted = creating || sending || fromTemplate || replacing || copying;
+    if (!counted && !keyCall) return forward(request);
 
     const principal = await deps.authenticate(request).catch(() => null);
     if (!principal?.workspaceId) return forward(request);
-    const found = await workspacePlan(deps.sql, principal.workspaceId, settings).catch(() => null);
+    // Only a workspace that does not exist goes on unchecked (the server answers 404); any
+    // other failure to read the plan stops the request rather than letting it through.
+    const found = await workspacePlan(deps.sql, principal.workspaceId, settings).catch(
+      (err: unknown) => {
+        if (err instanceof AppError && err.code === 'NOT_FOUND') return null;
+        throw err;
+      },
+    );
     if (!found) return forward(request);
     const plan = { id: principal.workspaceId, ...found };
     const at = now();
     const held: Reservation[] = [];
+    let freed = 0;
 
     try {
+      // Every call made with a key counts, whatever the server then answers; a call refused
+      // here for the count itself does not.
       if (keyCall && !principal.id.startsWith('user:')) {
-        await reserveUsage(deps.sql, plan, 'api_requests', 1, at);
+        const month = await reserveUsage(deps.sql, plan, 'api_requests_month', 1, at);
+        try {
+          await reserveUsage(deps.sql, plan, 'api_requests', 1, at);
+        } catch (err) {
+          await releaseUsage(deps.sql, month);
+          throw err;
+        }
       }
       if (creating) {
         const body = await readCreateBody(request, deps.maxBodyBytes);
@@ -124,9 +178,37 @@ export function createPlanGate(deps: PlanGateDeps) {
           if (sent) held.push(sent);
         }
       }
+      if (replacing) {
+        const envelopeId = routedParam(replacing[1]!);
+        const documentId = routedParam(replacing[2]!);
+        const sizes = envelopeId ? await deps.documentSizes?.(plan.id, envelopeId) : null;
+        const size = sizes ? await readReplacementSize(request, deps.maxBodyBytes) : null;
+        const current = sizes?.find((d) => d.id === documentId);
+        if (sizes && size !== null && current) {
+          assertWithin(plan, 'fileBytes', size, 'document');
+          const others = sizes.reduce((a, d) => a + (d.id === current.id ? 0 : d.bytes), 0);
+          assertWithin(plan, 'envelopeBytes', others + size, 'document');
+          const growth = size - current.bytes;
+          if (growth > 0) {
+            const storage = await reserveUsage(deps.sql, plan, 'storage_bytes', growth, at);
+            if (storage) held.push(storage);
+          } else {
+            freed = -growth;
+          }
+        }
+      }
+      if (copying) {
+        const envelopeId = routedParam(copying[1]!);
+        const sizes = envelopeId ? await deps.documentSizes?.(plan.id, envelopeId) : null;
+        if (sizes) {
+          const total = sizes.reduce((a, d) => a + d.bytes, 0);
+          const storage = await reserveUsage(deps.sql, plan, 'storage_bytes', total, at);
+          if (storage) held.push(storage);
+        }
+      }
     } catch (err) {
       await Promise.all(held.map((r) => releaseUsage(deps.sql, r)));
-      if (err instanceof PlanLimitError) return planLimitResponse(err);
+      if (err instanceof PlanLimitError) return planLimitResponse(err, at);
       throw err;
     }
 
@@ -140,6 +222,7 @@ export function createPlanGate(deps: PlanGateDeps) {
     // A replayed answer is the first request's, which was already counted.
     const replayed = response.headers.get('idempotent-replayed') === 'true';
     if (!response.ok || replayed) await Promise.all(held.map((r) => releaseUsage(deps.sql, r)));
+    else if (freed > 0) await releaseStorage(deps.sql, plan.id, freed);
     return response;
   };
 }
@@ -221,6 +304,29 @@ async function readSendFlag(request: Request, cap: number): Promise<{ send: bool
   try {
     const body = JSON.parse(new TextDecoder().decode(bytes)) as { send?: unknown } | null;
     return { send: body?.send === true };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The size of the PDF a replace request carries, read from a copy of the body: the multipart
+ * `document` file, or JSON `content` in base64. Null when the body cannot be read.
+ */
+export async function readReplacementSize(request: Request, cap: number): Promise<number | null> {
+  const bytes = await readCapped(request, cap);
+  if (!bytes) return null;
+  const type = request.headers.get('content-type') ?? '';
+  try {
+    if (type.startsWith('multipart/form-data')) {
+      const form = await new Response(bytes as BlobPart, {
+        headers: { 'content-type': type },
+      }).formData();
+      const file = form.get('document');
+      return file !== null && typeof file !== 'string' ? file.size : null;
+    }
+    const body = JSON.parse(new TextDecoder().decode(bytes)) as { content?: unknown } | null;
+    return typeof body?.content === 'string' ? base64Bytes(body.content) : null;
   } catch {
     return null;
   }
