@@ -395,4 +395,23 @@ describe('SigningView with many signature boxes', () => {
       within(screen.getByRole('dialog')).getByText(/this is your electronic signature/),
     ).toBeInTheDocument();
   });
+
+  it('shows the Aadhaar eSign box as a note and finishes without a value for it', async () => {
+    const { onSubmit } = setup({
+      fields: [
+        field('box', 'aadhaar', 'r1', { y: 600, width: 200, height: 64 }),
+        field('city', 'text', 'r1', { y: 200 }),
+      ],
+    });
+    const box = screen.getByRole('note', { name: /^Aadhaar eSign:/ });
+    expect(box).toHaveTextContent('You sign here with Aadhaar eSign after you finish');
+    expect(screen.queryByRole('button', { name: /Signature/ })).toBeNull();
+    expect(screen.getByText('0 of 1 required fields done')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Text, required' }), {
+      target: { value: 'Pune' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0]![0]).toEqual([{ fieldId: 'city', value: 'Pune' }]);
+  });
 });

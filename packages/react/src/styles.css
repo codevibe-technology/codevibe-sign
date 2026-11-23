@@ -675,6 +675,32 @@
   overflow: hidden;
 }
 
+.cvs-field--esign {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px 8px;
+  border-style: solid;
+  border-color: var(--cvs-accent);
+  background: color-mix(in srgb, var(--cvs-accent) 8%, rgb(255 255 255 / 0.85));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cvs-esign-title {
+  color: var(--cvs-accent);
+  font-weight: 700;
+  font-size: var(--cvs-field-font);
+  line-height: 1.15;
+}
+
+.cvs-esign-note {
+  color: var(--cvs-text-muted);
+  font-size: calc(var(--cvs-field-font) * 0.72);
+  line-height: 1.2;
+}
+
 .cvs-field--check {
   padding: 0;
   cursor: pointer;

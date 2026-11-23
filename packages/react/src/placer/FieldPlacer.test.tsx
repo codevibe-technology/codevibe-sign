@@ -478,4 +478,51 @@ describe('FieldPlacer editing tools', () => {
     expect(within(pages).getByRole('button', { name: 'Page 1, 1 field' })).toBeInTheDocument();
     expect(within(pages).getByRole('button', { name: 'Page 2' })).toBeInTheDocument();
   });
+
+  describe('for a signer who uses Aadhaar eSign', () => {
+    const withAadhaar = [
+      recipient('r1', 'Asha Rao', 1),
+      { ...recipient('r2', 'Ravi Kumar', 2), auth: 'aadhaar' as const },
+    ];
+
+    it('offers the Aadhaar eSign box instead of a signature or initials', () => {
+      const { last } = setup({ recipients: withAadhaar });
+      expect(screen.queryByRole('button', { name: 'Aadhaar eSign' })).toBeNull();
+      fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
+      expect(screen.queryByRole('button', { name: 'Signature' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Initials' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Initials on every page' })).toBeNull();
+      expect(
+        screen.getByText(/Ravi Kumar signs with Aadhaar eSign and draws nothing/),
+      ).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar eSign' }));
+      expect(last()).toEqual([
+        expect.objectContaining({
+          type: 'aadhaar',
+          recipientId: 'r2',
+          rect: expect.objectContaining({ width: 200, height: 64 }),
+          required: true,
+        }),
+      ]);
+      expect(screen.getByRole('button', { name: 'Date signed' })).toBeInTheDocument();
+    });
+
+    it('puts the box on the last page and asks for it in the summary', () => {
+      const { last } = setup({
+        recipients: withAadhaar,
+        documents: [{ id: 'doc', source: letterSource(3) }],
+      });
+      const summary = screen.getByRole('region', { name: 'Fields summary' });
+      expect(within(summary).getByText('No Aadhaar eSign box yet.')).toBeInTheDocument();
+      fireEvent.click(
+        within(summary).getByRole('button', { name: 'Add the Aadhaar eSign box for Ravi Kumar' }),
+      );
+      expect(last()).toEqual([
+        expect.objectContaining({ type: 'aadhaar', recipientId: 'r2', page: 2 }),
+      ]);
+      fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar eSign box on last page' }));
+      expect(last().filter((f) => f.type === 'aadhaar')).toHaveLength(2);
+    });
+  });
 });

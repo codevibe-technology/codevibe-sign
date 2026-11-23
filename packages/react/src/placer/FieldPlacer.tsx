@@ -79,6 +79,10 @@ export interface FieldPlacerLabels extends ViewerLabels {
   presets: string;
   initialsEveryPage: string;
   signatureLastPage: string;
+  /** The "Signature on last page" preset for a signer who signs with Aadhaar eSign. */
+  aadhaarLastPage: string;
+  /** Under the field tray while an Aadhaar eSign signer is picked. */
+  aadhaarHint: (name: string) => string;
   placeFromTags: (count: number) => string;
   tagsPlaced: (placed: number, unmatched: number) => string;
   fieldCount: (count: number) => string;
@@ -105,6 +109,8 @@ export interface FieldPlacerLabels extends ViewerLabels {
   summaryCounts: (required: number, optional: number) => string;
   noSignature: string;
   addSignatureFor: (name: string) => string;
+  noAadhaarBox: string;
+  addAadhaarBoxFor: (name: string) => string;
   showField: string;
   fieldLabel: string;
   fieldLabelHint: string;
@@ -126,6 +132,7 @@ export interface FieldPlacerLabels extends ViewerLabels {
   stopPreview: string;
   previewSign: string;
   previewInitial: string;
+  previewAadhaar: string;
 }
 
 export const defaultFieldPlacerLabels: FieldPlacerLabels = {
@@ -170,6 +177,9 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   presets: 'Quick add',
   initialsEveryPage: 'Initials on every page',
   signatureLastPage: 'Signature on last page',
+  aadhaarLastPage: 'Aadhaar eSign box on last page',
+  aadhaarHint: (name) =>
+    `${name} signs with Aadhaar eSign and draws nothing. Place one Aadhaar eSign box where the signature belongs.`,
   placeFromTags: (count) => `Place fields from tags (found ${count})`,
   tagsPlaced: (placed, unmatched) =>
     unmatched === 0
@@ -207,6 +217,8 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   },
   noSignature: 'No signature field yet.',
   addSignatureFor: (name) => `Add a signature for ${name}`,
+  noAadhaarBox: 'No Aadhaar eSign box yet.',
+  addAadhaarBoxFor: (name) => `Add the Aadhaar eSign box for ${name}`,
   showField: 'Show it',
   fieldLabel: 'Label',
   fieldLabelHint: 'The name the signer sees on this field.',
@@ -236,6 +248,7 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   stopPreview: 'Back to editing',
   previewSign: 'Sign',
   previewInitial: 'Initial',
+  previewAadhaar: 'Aadhaar eSign',
 };
 
 interface TrayItem {
@@ -246,7 +259,12 @@ interface TrayItem {
 const TRAY: { group: keyof FieldPlacerLabels['trayGroups']; items: TrayItem[] }[] = [
   {
     group: 'signature',
-    items: [{ type: 'signature' }, { type: 'initials' }, { type: 'date_signed' }],
+    items: [
+      { type: 'signature' },
+      { type: 'initials' },
+      { type: 'aadhaar' },
+      { type: 'date_signed' },
+    ],
   },
   {
     group: 'details',
@@ -267,6 +285,7 @@ const FIELD_TYPES: FieldType[] = [
   'name',
   'text',
   'checkbox',
+  'aadhaar',
 ];
 
 const PRESET_SIZE: Record<TrayPreset, Size> = {
@@ -909,13 +928,16 @@ export function FieldPlacer({
     gesture.current = null;
     const added = Object.entries(pageSizes).flatMap(([documentId, pages]) =>
       pages.length > 0
-        ? signatureOnLastPage({
-            documentId,
-            recipientId: recipient.id,
-            pages,
-            createId: makeId,
-            ...(fieldSizes ? { sizes: fieldSizes } : {}),
-          })
+        ? signatureOnLastPage(
+            {
+              documentId,
+              recipientId: recipient.id,
+              pages,
+              createId: makeId,
+              ...(fieldSizes ? { sizes: fieldSizes } : {}),
+            },
+            recipient.auth === 'aadhaar' ? 'aadhaar' : 'signature',
+          )
         : [],
     );
     placement.addFields(added);
@@ -945,13 +967,15 @@ export function FieldPlacer({
       .map((field) => {
         const box = pointsToPixels(field.rect, s);
         const text =
-          field.type === 'signature'
-            ? labels.previewSign
-            : field.type === 'initials'
-              ? labels.previewInitial
-              : field.type === 'checkbox'
-                ? ''
-                : field.label || labels.fieldTypes[field.type];
+          field.type === 'aadhaar'
+            ? labels.previewAadhaar
+            : field.type === 'signature'
+              ? labels.previewSign
+              : field.type === 'initials'
+                ? labels.previewInitial
+                : field.type === 'checkbox'
+                  ? ''
+                  : field.label || labels.fieldTypes[field.type];
         return (
           <span
             key={field.id}
@@ -1063,6 +1087,13 @@ export function FieldPlacer({
 
   const selected = selectedIds.length === 1 ? placement.selected : null;
   const activeColor = recipientColorIndex(signers, placement.recipientId ?? '');
+  const active = signers.find((r) => r.id === placement.recipientId);
+  const aadhaarActive = active?.auth === 'aadhaar';
+  // An Aadhaar eSign signer gets the Aadhaar eSign box instead of drawn signatures; nobody
+  // else is offered the box.
+  const offered = fieldTypes.filter((type) =>
+    aadhaarActive ? type !== 'signature' && type !== 'initials' : type !== 'aadhaar',
+  );
   const noSigners = signers.length === 0;
   const zoomPercent = Math.round(zoom * 100);
   const zoomChoices = ZOOM_STEPS.includes(zoom)
@@ -1107,7 +1138,7 @@ export function FieldPlacer({
         </h3>
         <div className="cvs-tray" role="group" aria-labelledby={`${id}-palette`}>
           {TRAY.map(({ group, items }) => {
-            const shown = items.filter((item) => fieldTypes.includes(item.type));
+            const shown = items.filter((item) => offered.includes(item.type));
             if (shown.length === 0) return null;
             return (
               <div key={group} className="cvs-tray-group">
@@ -1155,23 +1186,25 @@ export function FieldPlacer({
           })}
         </div>
         <p className="cvs-hint" id={`${id}-palette-hint`}>
-          {labels.paletteHint}
+          {aadhaarActive && active ? labels.aadhaarHint(active.name) : labels.paletteHint}
         </p>
 
         <h3 className="cvs-panel-title">{labels.presets}</h3>
         <div className="cvs-presets" role="group" aria-label={labels.presets}>
-          <button
-            type="button"
-            className="cvs-button cvs-button--quiet"
-            disabled={noSigners || previewing}
-            onClick={() => {
-              gesture.current = null;
-              placement.addInitialsEveryPage();
-            }}
-          >
-            <Icon name="initials" />
-            {labels.initialsEveryPage}
-          </button>
+          {!aadhaarActive && (
+            <button
+              type="button"
+              className="cvs-button cvs-button--quiet"
+              disabled={noSigners || previewing}
+              onClick={() => {
+                gesture.current = null;
+                placement.addInitialsEveryPage();
+              }}
+            >
+              <Icon name="initials" />
+              {labels.initialsEveryPage}
+            </button>
+          )}
           <button
             type="button"
             className="cvs-button cvs-button--quiet"
@@ -1181,8 +1214,8 @@ export function FieldPlacer({
               placement.addSignatureLastPage();
             }}
           >
-            <Icon name="signature" />
-            {labels.signatureLastPage}
+            <Icon name={aadhaarActive ? 'aadhaar' : 'signature'} />
+            {aadhaarActive ? labels.aadhaarLastPage : labels.signatureLastPage}
           </button>
           {tagCount > 0 && !tagsUsed && (
             <button

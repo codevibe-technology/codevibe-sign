@@ -14,6 +14,7 @@ export const defaultFieldSizes: Record<FieldType, Size> = {
   name: { width: 160, height: 22 },
   text: { width: 160, height: 22 },
   checkbox: { width: 18, height: 18 },
+  aadhaar: { width: 200, height: 64 },
 };
 
 export const NUDGE_STEP = 1;

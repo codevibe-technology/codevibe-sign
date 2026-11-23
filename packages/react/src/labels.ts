@@ -7,6 +7,7 @@ export const defaultFieldTypeLabels: Record<FieldType, string> = {
   name: 'Name',
   text: 'Text',
   checkbox: 'Checkbox',
+  aadhaar: 'Aadhaar eSign',
 };
 
 export const RECIPIENT_COLOR_COUNT = 6;

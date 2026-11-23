@@ -3,6 +3,7 @@ import type { Field, FieldType, Rect, Recipient } from '@codevibe_technology/sig
 import { clampRect, roundRect, type PageSize } from '../geometry';
 import {
   fieldGroups,
+  aadhaarBoxOnLastPage,
   initialsOnEveryPage,
   repeatField as repeatCopies,
   scaleRectBetween,
@@ -395,8 +396,16 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     [recipientId, pageSizes, createId, fieldSizes, addFields],
   );
 
-  const addInitialsEveryPage = useCallback(() => preset(initialsOnEveryPage), [preset]);
-  const addSignatureLastPage = useCallback(() => preset(signatureOnLastPage), [preset]);
+  // An Aadhaar eSign signer draws nothing: no initials, and an Aadhaar eSign box for a signature.
+  const signsWithAadhaar = recipients.find((r) => r.id === recipientId)?.auth === 'aadhaar';
+  const addInitialsEveryPage = useCallback(
+    () => (signsWithAadhaar ? 0 : preset(initialsOnEveryPage)),
+    [preset, signsWithAadhaar],
+  );
+  const addSignatureLastPage = useCallback(
+    () => preset(signsWithAadhaar ? aadhaarBoxOnLastPage : (input) => signatureOnLastPage(input)),
+    [preset, signsWithAadhaar],
+  );
 
   const selected = useMemo(
     () => fields.find((f) => f.id === selectedId) ?? null,

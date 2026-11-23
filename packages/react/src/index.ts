@@ -29,6 +29,7 @@ export { useFieldPlacement } from './placer/useFieldPlacement';
 export type { FieldPlacementState, UseFieldPlacementOptions } from './placer/useFieldPlacement';
 export { createField, defaultFieldSizes, freeRect, nudgeRect } from './placer/placement';
 export {
+  aadhaarBoxOnLastPage,
   choiceForPages,
   fieldGroups,
   formatPageList,

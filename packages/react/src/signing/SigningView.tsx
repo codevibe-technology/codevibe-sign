@@ -58,6 +58,9 @@ export interface SigningViewLabels extends ViewerLabels {
   reuseInitials: string;
   finish: string;
   submitting: string;
+  /** On the Aadhaar eSign box, which the signer does not fill: they sign it at the provider. */
+  aadhaarBox: string;
+  aadhaarBoxNote: string;
   decline: string;
   declineTitle: string;
   declineReason: string;
@@ -109,6 +112,8 @@ export const defaultSigningViewLabels: SigningViewLabels = {
   reuseInitials: 'Your other initials boxes take these initials with one tap.',
   finish: 'Finish',
   submitting: 'Sending…',
+  aadhaarBox: 'Aadhaar eSign',
+  aadhaarBoxNote: 'You sign here with Aadhaar eSign after you finish',
   decline: 'Decline',
   declineTitle: 'Decline to sign',
   declineReason: 'Tell the sender why you are declining',
@@ -186,7 +191,7 @@ export function SigningView({
   const labels = mergeLabels(defaultSigningViewLabels, labelOverrides);
   const id = useId();
   const states = usePdfSources(documents, pdf);
-  const fields = useMemo(
+  const own = useMemo(
     () =>
       sortFields(
         allFields.filter((f) => f.recipientId === recipient.id),
@@ -194,6 +199,10 @@ export function SigningView({
       ),
     [allFields, recipient.id, documents],
   );
+  // The Aadhaar eSign box is shown where it sits but takes nothing here: the signer signs
+  // it at the eSign provider once they finish.
+  const fields = useMemo(() => own.filter((f) => f.type !== 'aadhaar'), [own]);
+  const esignBoxes = useMemo(() => own.filter((f) => f.type === 'aadhaar'), [own]);
 
   const [values, setValues] = useState<FieldValues>(() => {
     const start = prefillValues(fields, recipient, today ?? new Date());
@@ -546,8 +555,35 @@ export function SigningView({
       (f) => started && f.id === current && !hasValue(f, values[f.id]) && f.type !== 'date_signed',
     );
     const at = flagged && pointsToPixels(flagged.rect, ctx.scale);
+    const boxes = esignBoxes.filter(
+      (f) => f.documentId === ctx.documentId && f.page === ctx.pageIndex,
+    );
     return (
       <>
+        {boxes.map((f) => {
+          const box = pointsToPixels(f.rect, ctx.scale);
+          return (
+            <div
+              key={f.id}
+              className="cvs-field cvs-field--esign"
+              data-type="aadhaar"
+              role="note"
+              aria-label={`${labels.aadhaarBox}: ${labels.aadhaarBoxNote}`}
+              style={
+                {
+                  left: box.left,
+                  top: box.top,
+                  width: box.width,
+                  height: box.height,
+                  '--cvs-field-font': `${Math.max(9, Math.min(box.height * 0.3, 15))}px`,
+                } as CSSProperties
+              }
+            >
+              <span className="cvs-esign-title">{labels.aadhaarBox}</span>
+              <span className="cvs-esign-note">{labels.aadhaarBoxNote}</span>
+            </div>
+          );
+        })}
         {onPage.map((f) => renderField(f, ctx))}
         {flagged && at && (
           <>

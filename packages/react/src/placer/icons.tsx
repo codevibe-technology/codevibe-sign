@@ -8,6 +8,8 @@ const PATHS = {
   name: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.4-4 4.4-6 8-6s6.6 2 8 6',
   text: 'M5 6V4h14v2M12 4v16M9 20h6',
   checkbox: 'M4 4h16v16H4zM8 12l3 3 5-6',
+  aadhaar:
+    'M6.5 18.5A9 9 0 0 1 5 13.5V11a7 7 0 0 1 14 0v2M9 20.5a12 12 0 0 1-1-4.5v-5a4 4 0 0 1 8 0v2.5M12 11v4.5a10 10 0 0 0 1.5 5.5M16 16.5a14 14 0 0 1-.5 3',
   email: 'M3 6h18v12H3zM3 7l9 6 9-6',
   company: 'M4 21V5l8-2v18M12 9h8v12M7 8h2M7 12h2M7 16h2M15 13h2M15 17h2M2 21h20',
   title: 'M4 7h16v13H4zM9 7V4h6v3M4 12h16',
