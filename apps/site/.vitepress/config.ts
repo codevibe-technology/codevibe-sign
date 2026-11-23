@@ -58,8 +58,8 @@ function serveDownloads(): Plugin {
 // own origin, so the reference can call it without CORS.
 const signServer = process.env.SIGN_SERVER;
 
-const fonts =
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap';
+/** The faces every page sets first, fetched with the page instead of after its CSS. */
+const preloadedFonts = ['space-grotesk-latin', 'jetbrains-mono-latin'];
 
 export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: SearchStart }>({
   base: BASE,
@@ -93,7 +93,18 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
     ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
     ['link', { rel: 'manifest', href: `${BASE}site.webmanifest` }],
     ['meta', { name: 'theme-color', content: '#0D1B2A' }],
-    ['link', { rel: 'stylesheet', href: fonts }],
+    ...preloadedFonts.map(
+      (name): HeadConfig => [
+        'link',
+        {
+          rel: 'preload',
+          href: `${BASE}fonts/${name}.woff2`,
+          as: 'font',
+          type: 'font/woff2',
+          crossorigin: '',
+        },
+      ],
+    ),
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: SITE_NAME }],
     ['meta', { property: 'og:image', content: new URL(OG_IMAGE.slice(1), DOCS_URL).href }],
@@ -143,8 +154,8 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
   },
 
   themeConfig: {
-    logo: { src: '/mark.svg', alt: '' },
-    siteTitle: SITE_NAME,
+    logo: { light: '/brand/logo.svg', dark: '/brand/logo-white.svg', alt: SITE_NAME },
+    siteTitle: false,
 
     nav: [
       { text: 'Get started', link: '/getting-started', activeMatch: '^/getting-started(/|$)' },

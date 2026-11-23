@@ -260,21 +260,21 @@ h1,
 h2,
 h3 {
   font-family: var(--vp-font-family-heading);
-  letter-spacing: -0.015em;
+  font-weight: 700;
   color: var(--vp-c-text-1);
 }
 
 h2 {
   font-size: clamp(26px, 3.2vw, 34px);
-  line-height: 1.2;
-  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
   margin: 0 0 10px;
 }
 
 h3 {
   font-size: 18px;
-  line-height: 1.35;
-  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
   margin: 0 0 8px;
 }
 
@@ -297,8 +297,9 @@ p {
 
 .eyebrow {
   display: inline-block;
-  font: 600 13px var(--vp-font-family-heading);
-  letter-spacing: 0.02em;
+  font: 400 11px var(--vp-font-family-mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: var(--vp-c-brand-1);
   background: var(--vp-c-brand-soft);
   border-radius: 999px;
@@ -308,8 +309,8 @@ p {
 
 h1 {
   font-size: clamp(36px, 5.2vw, 58px);
-  line-height: 1.08;
-  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
   margin: 0 0 20px;
   max-width: 17ch;
 }

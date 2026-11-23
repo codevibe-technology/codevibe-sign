@@ -23,6 +23,12 @@ describe('contentSecurityPolicy', () => {
     }
   });
 
+  it('takes fonts and styles from the app itself, with no font service', () => {
+    const policy = directives(contentSecurityPolicy({ development: false }));
+    expect(policy.get('font-src')).toEqual(["'self'", 'data:']);
+    expect(policy.get('style-src')).toEqual(["'self'", "'unsafe-inline'"]);
+  });
+
   it('allows eval only in development, where the dev server needs it', () => {
     expect(contentSecurityPolicy({ development: false })).not.toContain("'unsafe-eval'");
     expect(contentSecurityPolicy({ development: true })).toContain("'unsafe-eval'");

@@ -8,7 +8,7 @@ export interface HeaderRule {
  * come from the app's own origin only. Next.js starts pages with inline scripts and the UI sets
  * inline styles, so both stay allowed inline; what the policy stops is code or data being
  * loaded from, or sent to, anywhere else, and the app being framed. The docs under `/docs`
- * load their fonts from Google Fonts.
+ * serve their own fonts too.
  */
 export function contentSecurityPolicy({ development }: { development: boolean }): string {
   const directives: [string, string[]][] = [
@@ -22,9 +22,9 @@ export function contentSecurityPolicy({ development }: { development: boolean })
         ...(development ? ["'unsafe-eval'"] : []),
       ],
     ],
-    ['style-src', ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com']],
+    ['style-src', ["'self'", "'unsafe-inline'"]],
     ['img-src', ["'self'", 'data:', 'blob:']],
-    ['font-src', ["'self'", 'data:', 'https://fonts.gstatic.com']],
+    ['font-src', ["'self'", 'data:']],
     ['connect-src', ["'self'"]],
     ['worker-src', ["'self'", 'blob:']],
     ['frame-src', ["'self'"]],

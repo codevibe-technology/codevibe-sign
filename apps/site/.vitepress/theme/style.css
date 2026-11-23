@@ -1,3 +1,60 @@
+/* The codevibe.in faces, served from the docs themselves; Inter comes with the theme. The
+   fallbacks are Arial sized to each face's metrics, so the swap does not move the text. */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Space Grotesk Fallback';
+  src: local('Arial');
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+  size-adjust: 109.69%;
+}
+@font-face {
+  font-family: 'JetBrains Mono Fallback';
+  src: local('Arial');
+  ascent-override: 75.79%;
+  descent-override: 22.29%;
+  line-gap-override: 0%;
+  size-adjust: 134.59%;
+}
+
 :root {
   --cv-navy: #0d1b2a;
   --cv-navy-2: #16283c;
@@ -8,8 +65,9 @@
 
   --vp-font-family-base: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     sans-serif;
-  --vp-font-family-heading: 'Space Grotesk', var(--vp-font-family-base);
-  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --vp-font-family-heading: 'Space Grotesk', 'Space Grotesk Fallback', var(--vp-font-family-base);
+  --vp-font-family-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', ui-monospace, SFMono-Regular,
+    Menlo, monospace;
 
   /* Links sit on tinted rows and code chips too; the darker blue keeps them above 4.5:1. */
   --vp-c-brand-1: var(--cv-blue-dark);
@@ -66,16 +124,32 @@
   --cv-ink-soft: #2f4763;
 }
 
+/* Headings as on codevibe.in: Space Grotesk, bold, tracked tighter the larger they are. */
 .vp-doc h1,
 .vp-doc h2,
 .vp-doc h3,
-.VPNavBarTitle .title {
+.VPHero .name,
+.VPHero .text {
   font-family: var(--vp-font-family-heading);
-  letter-spacing: -0.01em;
+  font-weight: 700;
 }
 
+.vp-doc h1 {
+  letter-spacing: -0.03em;
+}
+
+.vp-doc h2 {
+  letter-spacing: -0.025em;
+}
+
+.vp-doc h3 {
+  letter-spacing: -0.02em;
+}
+
+/* The lockup carries the name; the text title is switched off in the config. */
 .VPNavBarTitle .logo {
-  height: 26px;
+  height: 30px;
+  width: auto;
 }
 
 .vp-doc .coming-soon {

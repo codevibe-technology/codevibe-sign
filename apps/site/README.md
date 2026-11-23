@@ -39,8 +39,9 @@ planned sections with its README's API and remove the component.
 
 ## OpenGraph image
 
-`public/og.png` (1200 × 630) is rendered from `assets/og.svg`. After editing the SVG, open it in
-a browser at that size, take a screenshot and save it over the PNG.
+`public/og.png` (1200 × 630) is rendered from `assets/og.svg`. The lockup in it is paths; the
+text uses Space Grotesk and Inter, so render it on a machine that has both installed (open it in
+a browser at that size and screenshot it, or convert it with `sharp`) and save it over the PNG.
 
 ## Licence
 
