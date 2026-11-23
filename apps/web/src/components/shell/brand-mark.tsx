@@ -1,37 +1,20 @@
-/** The Codevibe mark: an asterisk with an open corner, drawn on the brand blue tile. */
-export function CodevibeMark({
-  className,
-  color = 'currentColor',
-}: {
-  className?: string;
-  color?: string;
-}) {
-  return (
-    <svg viewBox="380 380 1172 1172" className={className} aria-hidden fill="none">
-      <g stroke={color} strokeWidth="108" strokeLinecap="butt" strokeLinejoin="miter">
-        <path d="M890 577V1508M424 1043H1356M561 713L1219 1371M561 1371L890 1043" />
-        <path d="M988 478H1454V943" />
-      </g>
-    </svg>
-  );
-}
+import { BRAND_NAME } from '@/lib/brand-assets';
 
+/**
+ * The Codevibe Sign mark, the same file the docs use as their logo. It is only ever drawn
+ * from `/mark.svg`: no second drawing of the logo lives in the code.
+ */
 export function BrandMark({ className = 'h-8 w-8' }: { className?: string }) {
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-[6px] bg-primary ${className}`}
-    >
-      <CodevibeMark className="h-[62%] w-[62%]" color="#ffffff" />
-    </span>
-  );
+  return <img src="/mark.svg" alt="" width={32} height={32} className={`shrink-0 ${className}`} />;
 }
 
+/** The mark with the product name beside it, set as the docs set their title. */
 export function Wordmark() {
   return (
     <span className="flex items-center gap-2.5">
-      <BrandMark />
-      <span className="font-display text-[17px] leading-none font-bold tracking-tight">
-        codevibe <span className="text-accent">sign</span>
+      <BrandMark className="h-7 w-7" />
+      <span className="font-display text-[17px] leading-none font-semibold tracking-[-0.01em]">
+        {BRAND_NAME}
       </span>
     </span>
   );

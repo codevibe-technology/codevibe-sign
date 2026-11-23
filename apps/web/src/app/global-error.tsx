@@ -11,7 +11,7 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
           placeItems: 'center',
           background: '#F4F6FA',
           color: '#0D1B2A',
-          fontFamily: 'system-ui, sans-serif',
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
           padding: 16,
         }}
       >

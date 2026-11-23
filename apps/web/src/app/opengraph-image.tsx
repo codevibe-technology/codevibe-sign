@@ -1,4 +1,7 @@
 import { ImageResponse } from 'next/og';
+import { MARK_SVG } from '@/lib/brand-assets';
+
+const MARK = `data:image/svg+xml;base64,${Buffer.from(MARK_SVG).toString('base64')}`;
 
 export const alt = 'Codevibe Sign: send documents for signature in minutes';
 export const size = { width: 1200, height: 630 };
@@ -33,24 +36,7 @@ export default function OpenGraphImage() {
           }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 10,
-              background: '#1B6AE0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <svg width="40" height="40" viewBox="380 380 1172 1172" fill="none">
-              <g stroke="#ffffff" strokeWidth="108" strokeLinecap="butt" strokeLinejoin="miter">
-                <path d="M890 577V1508M424 1043H1356M561 713L1219 1371M561 1371L890 1043" />
-                <path d="M988 478H1454V943" />
-              </g>
-            </svg>
-          </div>
+          <img src={MARK} width={64} height={64} />
           <div style={{ fontSize: 40, fontWeight: 700 }}>Codevibe Sign</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

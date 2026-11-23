@@ -45,7 +45,7 @@ function serveDownloads(): Plugin {
 const signServer = process.env.SIGN_SERVER;
 
 const fonts =
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap';
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap';
 
 export default defineConfig({
   base: BASE,
@@ -65,7 +65,10 @@ export default defineConfig({
   sitemap: { hostname: DOCS_URL },
 
   head: [
+    ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}favicon.svg` }],
+    ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
+    ['link', { rel: 'manifest', href: `${BASE}site.webmanifest` }],
     ['meta', { name: 'theme-color', content: '#0D1B2A' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
