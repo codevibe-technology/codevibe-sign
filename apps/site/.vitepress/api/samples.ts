@@ -14,6 +14,9 @@ export const LANGUAGES = [
 export type Language = (typeof LANGUAGES)[number]['id'];
 
 /** A file read from disk and sent as base64, standing in for the inline example bytes. */
+/** The file the samples of an upload-only route send. */
+const UPLOAD_FILE = 'sealed.pdf';
+
 export class FileRef {
   readonly path: string;
   constructor(path: string) {
@@ -31,6 +34,8 @@ export interface SampleRequest {
   binaryResponse: boolean;
   redirect: boolean;
   files: string[];
+  /** Set when the body is one file sent as it is: where it is read from, and its type. */
+  upload?: { path: string; mediaType: string };
 }
 
 const SECRET_ENV: Record<string, string> = {
@@ -105,6 +110,8 @@ export function sampleRequest(op: Operation, doc: OpenApiDocument = spec): Sampl
 
   const body = op.body ? withFiles(op.body.example, op.body.schema, doc) : undefined;
   if (body !== undefined) headers.push(['Content-Type', 'application/json']);
+  const upload = op.upload ? { path: UPLOAD_FILE, mediaType: op.upload.mediaTypes[0]! } : undefined;
+  if (upload) headers.push(['Content-Type', upload.mediaType]);
   const success = successResponse(op);
   return {
     method: op.method.toUpperCase(),
@@ -115,6 +122,7 @@ export function sampleRequest(op: Operation, doc: OpenApiDocument = spec): Sampl
     binaryResponse: success?.mediaType === 'application/pdf',
     redirect: success?.status.startsWith('3') ?? false,
     files: collectFiles(body),
+    ...(upload ? { upload } : {}),
   };
 }
 
@@ -200,6 +208,7 @@ export function curlSample(request: SampleRequest): string {
     );
     lines.push(`-d ${quoted}`);
   }
+  if (request.upload) lines.push(`--data-binary @${request.upload.path}`);
   if (request.binaryResponse) lines.push('-o document.pdf');
   if (request.redirect) lines.push('-i');
   return lines.join(' \\\n  ');
@@ -251,6 +260,24 @@ const SENDER_CALLS: Record<string, NodeCall> = {
     imports: [`import { writeFile } from 'node:fs/promises';`],
     code: `const pdf = await sign.envelopes.downloadDocument(${jsLiteral(path.id)}, ${jsLiteral(path.docId)}, {\n  version: 'sealed',\n});\nawait writeFile('sealed.pdf', pdf);`,
   }),
+  listTemplates: () => ({
+    code: `const { templates, nextCursor } = await sign.templates.list({ limit: 25 });`,
+  }),
+  createTemplate: ({ body }) => ({
+    code: `const template = await sign.templates.create(${jsLiteral(body)});\n\nconsole.log(template.id, template.roles);`,
+  }),
+  getTemplate: ({ path }) => ({
+    code: `const template = await sign.templates.get(${jsLiteral(path.templateId)});`,
+  }),
+  updateTemplate: ({ path, body }) => ({
+    code: `const template = await sign.templates.update(${jsLiteral(path.templateId)}, ${jsLiteral(body)});`,
+  }),
+  deleteTemplate: ({ path }) => ({
+    code: `await sign.templates.delete(${jsLiteral(path.templateId)});`,
+  }),
+  createEnvelopeFromTemplate: ({ path, body }) => ({
+    code: `const envelope = await sign.templates.createEnvelope(${jsLiteral(path.templateId)}, ${jsLiteral(body)});\n\nconsole.log(envelope.id, envelope.status);`,
+  }),
   getCertificate: ({ path }) => ({
     code: `const certificate = await sign.envelopes.certificate(${jsLiteral(path.id)});`,
   }),
@@ -272,12 +299,26 @@ const SIGNER_CALLS: Record<string, NodeCall> = {
   }),
 };
 
-export const hasClientMethod = (op: Operation) => op.id in SENDER_CALLS || op.id in SIGNER_CALLS;
+/** Public routes the client reaches without any credential. */
+const PUBLIC_CALLS: Record<string, NodeCall> = {
+  verifyPdf: () => ({
+    imports: [`import { readFile } from 'node:fs/promises';`],
+    code: `const result = await verify.pdf(await readFile('${UPLOAD_FILE}'));\n\nconsole.log(result.valid, result.reason, result.envelope?.title);`,
+  }),
+  verifySha256: ({ path }) => ({
+    code: `const result = await verify.sha256(${jsLiteral(path.sha256)});\n\nconsole.log(result.valid, result.reason);`,
+  }),
+};
+
+const PUBLIC_SETUP = `// No API key: verification is public.\nconst verify = createVerifyClient({ baseUrl: '${BASE_URL}' });`;
+
+export const hasClientMethod = (op: Operation) =>
+  op.id in SENDER_CALLS || op.id in SIGNER_CALLS || op.id in PUBLIC_CALLS;
 
 function nodeFetch(request: SampleRequest): string {
   const lines: string[] = [];
   const fsNames = [
-    request.files.length ? 'readFile' : '',
+    request.files.length || request.upload ? 'readFile' : '',
     request.binaryResponse ? 'writeFile' : '',
   ].filter(Boolean);
   if (fsNames.length) lines.push(`import { ${fsNames.join(', ')} } from 'node:fs/promises';`, '');
@@ -297,6 +338,7 @@ function nodeFetch(request: SampleRequest): string {
     ...(request.body !== undefined
       ? [`  body: JSON.stringify(${jsLiteral(request.body, '  ')}),`]
       : []),
+    ...(request.upload ? [`  body: await readFile('${request.upload.path}'),`] : []),
     ...(request.redirect ? [`  redirect: 'manual',`] : []),
   ];
   lines.push(
@@ -327,16 +369,19 @@ export function nodeSample(op: Operation, request: SampleRequest): string {
   };
   const sender = SENDER_CALLS[op.id];
   const signer = SIGNER_CALLS[op.id];
-  if (!sender && !signer) return nodeFetch(request);
+  const open = PUBLIC_CALLS[op.id];
+  if (!sender && !signer && !open) return nodeFetch(request);
 
-  const call = (sender ?? signer)!(args);
+  const call = (sender ?? signer ?? open)!(args);
   const imports = [...(call.imports ?? [])];
   if (request.files.length) imports.unshift(`import { readFile } from 'node:fs/promises';`);
-  const client = sender ? 'createSignClient' : 'createSignerClient';
+  const client = sender ? 'createSignClient' : signer ? 'createSignerClient' : 'createVerifyClient';
   imports.push(`import { ${client} } from '@codevibe_technology/sign-client';`);
   const setup = sender
     ? SENDER_SETUP
-    : `// The token is the last part of the recipient's signing link.\nconst signer = createSignerClient({\n  baseUrl: '${BASE_URL}',\n  token: ${jsLiteral(args.path.token ?? '')},\n});`;
+    : open
+      ? PUBLIC_SETUP
+      : `// The token is the last part of the recipient's signing link.\nconst signer = createSignerClient({\n  baseUrl: '${BASE_URL}',\n  token: ${jsLiteral(args.path.token ?? '')},\n});`;
   return `${mergeImports(imports).join('\n')}\n\n${setup}\n\n${call.code}`;
 }
 
@@ -367,7 +412,7 @@ export function pythonSample(request: SampleRequest): string {
     );
   }
   const headers = request.headers
-    .filter(([name]) => name !== 'Content-Type')
+    .filter(([name]) => name !== 'Content-Type' || request.upload !== undefined)
     .map(([name, value]) => {
       const env = request.secrets[name];
       const literal = env
@@ -381,9 +426,13 @@ export function pythonSample(request: SampleRequest): string {
     `    "${request.url}",`,
     ...(headers.length ? ['    headers={', ...headers, '    },'] : []),
     ...(request.body !== undefined ? [`    json=${pyLiteral(request.body, '    ')},`] : []),
+    ...(request.upload ? ['    data=pdf,'] : []),
     ...(request.redirect ? ['    allow_redirects=False,'] : []),
     '    timeout=30,',
   ];
+  if (request.upload) {
+    lines.push(`with open("${request.upload.path}", "rb") as file:\n    pdf = file.read()`);
+  }
   lines.push(`response = requests.${request.method.toLowerCase()}(\n${args.join('\n')}\n)`);
   if (request.redirect) {
     lines.push(`print(response.status_code, response.headers["Location"])`);
@@ -410,7 +459,18 @@ export function goSample(request: SampleRequest): string {
       '\t}',
     );
   }
-  const reader = request.body !== undefined ? 'bytes.NewReader(payload)' : 'nil';
+  if (request.upload) {
+    imports.add('os');
+    body.push(
+      `\tfile, err := os.Open(${JSON.stringify(request.upload.path)})`,
+      '\tif err != nil {',
+      '\t\tpanic(err)',
+      '\t}',
+      '\tdefer file.Close()',
+    );
+  }
+  const reader =
+    request.body !== undefined ? 'bytes.NewReader(payload)' : request.upload ? 'file' : 'nil';
   body.push(
     `\treq, err := http.NewRequest(${JSON.stringify(request.method)}, ${JSON.stringify(request.url)}, ${reader})`,
     '\tif err != nil {',

@@ -30,6 +30,8 @@ export interface TryItModel {
   pathParams: { name: string; example: string }[];
   queryParams: { name: string; example: string; required: boolean }[];
   body?: string;
+  /** The request is a file upload; the form has no file field, so only the mock runs it. */
+  upload: boolean;
   bodyRequired: string[];
   success?: { status: number; example: unknown; mediaType?: string };
 }
@@ -86,6 +88,7 @@ function toModel(op: Operation): TryItModel {
         required: p.required,
       })),
     ...(body !== undefined ? { body } : {}),
+    upload: op.upload !== undefined,
     bodyRequired: op.body ? (flatten(op.body.schema).schema.required ?? []) : [],
     ...(success
       ? {
@@ -166,6 +169,12 @@ export function mockResponse(model: TryItModel, input: TryItInput): TryItResult 
       );
     }
   }
+  const sha256 = model.pathParams.some((p) => p.name === 'sha256') ? input.path.sha256 : undefined;
+  if (sha256 !== undefined && !/^[0-9a-f]{64}$/i.test(sha256.trim())) {
+    return validationError([
+      { path: 'sha256', message: 'sha256 must be 64 hexadecimal characters' },
+    ]);
+  }
   const success = model.success;
   if (!success)
     return { status: 204, statusText: 'No Content', body: '', contentType: '', ms: 0, mock: true };
@@ -199,11 +208,14 @@ export function mockResponse(model: TryItModel, input: TryItInput): TryItResult 
   };
 }
 
-/** Echoes the envelope id typed into the form, so the answer reads as an answer to it. */
+/** Echoes the id or hash typed into the form, so the answer reads as an answer to it. */
 function withPathIds(example: unknown, path: Record<string, string>): unknown {
-  const id = path.id?.trim();
-  if (!id || !example || typeof example !== 'object' || Array.isArray(example)) return example;
+  if (!example || typeof example !== 'object' || Array.isArray(example)) return example;
   const record = example as Record<string, unknown>;
+  const sha256 = path.sha256?.trim().toLowerCase();
+  if (sha256 && typeof record.sha256 === 'string') return { ...record, sha256 };
+  const id = (path.id ?? path.templateId)?.trim();
+  if (!id) return example;
   if (typeof record.id === 'string') return { ...record, id };
   if (typeof record.envelopeId === 'string') return { ...record, envelopeId: id };
   return example;
@@ -224,6 +236,9 @@ export async function sandboxResponse(
 ): Promise<TryItResult> {
   if (!sandboxAvailable(sandbox.pageHostname)) {
     throw new Error('The sandbox can only be called when these docs run on your machine.');
+  }
+  if (model.upload) {
+    throw new Error('This route takes a file. Send it with the curl sample above.');
   }
   const base = sandbox.baseUrl.trim().replace(/\/+$/, '');
   if (!isSandboxTarget(base)) {

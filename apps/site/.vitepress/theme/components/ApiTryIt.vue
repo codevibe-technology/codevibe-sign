@@ -224,6 +224,11 @@ const sandboxGuide = withBase('/http-api/sandbox.html');
           </label>
         </div>
 
+        <p v-if="model.upload" class="tryit__note">
+          This route takes a PDF file. The mock answers with the documented example; to check a real
+          file, use the curl sample above against your own server.
+        </p>
+
         <label v-if="model.body !== undefined" class="tryit__field tryit__field--body">
           <span class="tryit__label">Body <span class="tryit__muted">JSON</span></span>
           <textarea

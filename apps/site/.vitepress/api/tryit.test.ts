@@ -148,6 +148,53 @@ describe('mock answers', () => {
     expect(JSON.parse(result.body).id).toBe('env_typed');
   });
 
+  it('echoes a template id and a hash typed into the form', () => {
+    const template = modelFor('getTemplate')!;
+    const got = mockResponse(template, { ...inputFor(template), path: { templateId: 'tpl_x' } });
+    expect(JSON.parse(got.body).id).toBe('tpl_x');
+    const verify = modelFor('verifySha256')!;
+    const hash = 'AB'.repeat(32);
+    const checked = mockResponse(verify, { ...inputFor(verify), path: { sha256: hash } });
+    expect(JSON.parse(checked.body).sha256).toBe(hash.toLowerCase());
+    const bad = mockResponse(verify, { ...inputFor(verify), path: { sha256: 'not-a-hash' } });
+    expect(bad.status).toBe(400);
+    expect(JSON.parse(bad.body).error.details.issues[0].path).toBe('sha256');
+  });
+
+  it('answers the new routes without a key field or any request', () => {
+    for (const id of ['verifyPdf', 'verifySha256']) expect(modelFor(id)!.needsKey).toBe(false);
+    for (const id of ['listTemplates', 'createTemplate', 'createEnvelopeFromTemplate']) {
+      expect(modelFor(id)!.needsKey, id).toBe(true);
+    }
+    const remove = modelFor('deleteTemplate')!;
+    expect(remove.method).toBe('DELETE');
+    expect(JSON.parse(mockResponse(remove, inputFor(remove)).body)).toMatchObject({
+      deleted: true,
+    });
+    const from = modelFor('createEnvelopeFromTemplate')!;
+    const refused = mockResponse(from, { ...inputFor(from), body: '{"send":true}' });
+    expect(JSON.parse(refused.body).error.details.issues).toEqual([
+      { path: 'roles', message: 'roles is required' },
+    ]);
+  });
+
+  it('runs a file upload as a mock only, never against a server', async () => {
+    const model = modelFor('verifyPdf')!;
+    expect(model.upload).toBe(true);
+    expect(model.body).toBeUndefined();
+    expect(JSON.parse(mockResponse(model, inputFor(model)).body)).toMatchObject({ valid: true });
+    const fetcher = vi.fn();
+    await expect(
+      sandboxResponse(
+        model,
+        inputFor(model),
+        { baseUrl: 'http://localhost:3000', apiKey: '', pageHostname: 'localhost' },
+        fetcher as unknown as typeof fetch,
+      ),
+    ).rejects.toThrow(/takes a file/);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('rejects a missing path parameter like the server', () => {
     const model = modelFor('getEnvelope')!;
     const result = mockResponse(model, { ...inputFor(model), path: { id: '  ' } });

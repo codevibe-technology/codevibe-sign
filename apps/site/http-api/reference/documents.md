@@ -592,7 +592,7 @@ The document id, from `documents[].id`.
 
 ### Returns {#verify-document-returns}
 
-**200 OK**. The result of the check. An `Verification` object.
+**200 OK**. The result of the check. A `Verification` object.
 
 ### Errors {#verify-document-errors}
 

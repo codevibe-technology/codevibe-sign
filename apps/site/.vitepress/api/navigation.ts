@@ -22,7 +22,8 @@ export function apiSidebar(): DefaultTheme.SidebarItem[] {
         { text: 'Errors', link: '/http-api/errors' },
         { text: 'Pagination and retries', link: '/http-api/conventions' },
         { text: 'Local sandbox', link: '/http-api/sandbox' },
-        { text: 'Versioning and changelog', link: '/http-api/changelog' },
+        { text: 'Versioning and deprecation', link: '/http-api/versioning' },
+        { text: 'Changelog', link: '/http-api/changelog' },
       ],
     },
     {
@@ -56,6 +57,8 @@ export function apiSidebar(): DefaultTheme.SidebarItem[] {
 /** Operations offered in the search box before anything is typed, most used first. */
 const SHORTCUTS = [
   'createEnvelope',
+  'createEnvelopeFromTemplate',
+  'verifyPdf',
   'getEnvelope',
   'listEnvelopes',
   'sendEnvelope',

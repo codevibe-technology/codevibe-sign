@@ -424,7 +424,7 @@ itself stops working once the recipient has acted.
 
 ### Returns {#get-signing-receipt-returns}
 
-**200 OK**. The receipt. An `SigningReceipt` object.
+**200 OK**. The receipt. A `SigningReceipt` object.
 
 ### Errors {#get-signing-receipt-errors}
 
@@ -860,7 +860,7 @@ token in the `cvsign_link` cookie. Anything else is refused with `TOKEN_INVALID`
 
 ### Returns {#get-signing-session-returns}
 
-**200 OK**. The signer's view. An [signing session object](/http-api/reference/signing#the-signing-session-object).
+**200 OK**. The signer's view. A [signing session object](/http-api/reference/signing#the-signing-session-object).
 
 ### Errors {#get-signing-session-errors}
 
@@ -1536,7 +1536,7 @@ Any unique string, up to 255 characters. A retry with the same key and body with
 
 ### Returns {#mark-viewed-returns}
 
-**200 OK**. Where the envelope and this recipient stand now. An `SignerActionResult` object.
+**200 OK**. Where the envelope and this recipient stand now. A `SignerActionResult` object.
 
 - `Idempotent-Replayed`: `true` when this is the stored response to an earlier request with the same `Idempotency-Key`.
 
@@ -1734,7 +1734,7 @@ Signature and initials: PNG as base64. Text and name: the text. Checkbox: `true`
 ### Returns {#submit-signature-returns}
 
 **200 OK**. Where the envelope and this recipient stand now, with a receipt for following the
-envelope and downloading the signed copy (`GET /v1/sign/receipt`). An `SignerActionResult` object.
+envelope and downloading the signed copy (`GET /v1/sign/receipt`). A `SignerActionResult` object.
 
 - `X-Sign-Receipt`: The receipt. Send it back as `X-Sign-Receipt`.
 - `Set-Cookie`: `cvsign_receipt=<receipt>; Path=/v1/sign; HttpOnly; SameSite=Strict; Max-Age=604800`
@@ -1944,7 +1944,7 @@ Any unique string, up to 255 characters. A retry with the same key and body with
 
 ### Returns {#decline-signature-returns}
 
-**200 OK**. Where the envelope and this recipient stand now. An `SignerActionResult` object.
+**200 OK**. Where the envelope and this recipient stand now. A `SignerActionResult` object.
 
 - `Idempotent-Replayed`: `true` when this is the stored response to an earlier request with the same `Idempotency-Key`.
 

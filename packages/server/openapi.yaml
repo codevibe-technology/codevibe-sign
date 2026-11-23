@@ -961,7 +961,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/TemplateConflict'
     post:
       operationId: createTemplate
       tags: [Templates]
@@ -1044,7 +1044,7 @@ paths:
         '403':
           $ref: '#/components/responses/ReadOnly'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/TemplateConflict'
         '413':
           $ref: '#/components/responses/TooLarge'
         '422':
@@ -1076,7 +1076,7 @@ paths:
         '404':
           $ref: '#/components/responses/TemplateNotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/TemplateConflict'
     patch:
       operationId: updateTemplate
       tags: [Templates]
@@ -1115,7 +1115,7 @@ paths:
         '404':
           $ref: '#/components/responses/TemplateNotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/TemplateConflict'
     delete:
       operationId: deleteTemplate
       tags: [Templates]
@@ -1147,7 +1147,7 @@ paths:
         '404':
           $ref: '#/components/responses/TemplateNotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/TemplateConflict'
   /v1/templates/{templateId}/envelopes:
     parameters:
       - $ref: '#/components/parameters/TemplateId'
@@ -1206,7 +1206,7 @@ paths:
         '404':
           $ref: '#/components/responses/TemplateNotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/TemplateConflict'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -1266,11 +1266,11 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/VerifyUnavailable'
         '413':
           $ref: '#/components/responses/TooLarge'
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          $ref: '#/components/responses/NotAPdf'
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/verify/{sha256}:
@@ -1323,7 +1323,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/VerifyUnavailable'
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/sign/receipt:
@@ -2067,6 +2067,39 @@ components:
             error:
               code: NOT_FOUND
               message: Template not found
+    TemplateConflict:
+      description: |
+        `INVALID_STATE`: this server keeps no templates, or a PDF of the template is missing
+        from storage. `CONFLICT`: another request changed the template, or one with the same
+        `Idempotency-Key` is still running; try again.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: CONFLICT
+              message: The template changed, try again
+    VerifyUnavailable:
+      description: '`INVALID_STATE`: this server has no seal certificate to compare files with.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INVALID_STATE
+              message: This server cannot verify sealed files
+    NotAPdf:
+      description: '`DOCUMENT_INVALID`: the file is not a PDF.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: DOCUMENT_INVALID
+              message: The file is not a PDF
     Conflict:
       description: |
         `INVALID_STATE`: not allowed in the envelope's status (`details.status`).

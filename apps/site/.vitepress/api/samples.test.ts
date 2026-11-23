@@ -69,12 +69,47 @@ describe('code samples', () => {
   it('send the API key only on sender routes and never inline', () => {
     for (const op of operations()) {
       const { curl, node, python: py } = samplesFor(op);
-      const sender = op.path.startsWith('/v1/envelopes');
+      const sender = /^\/v1\/(envelopes|templates)/.test(op.path);
       expect(curl.includes('Authorization: Bearer $SIGN_API_KEY'), op.id).toBe(sender);
       if (sender) {
         expect(node).toMatch(/process\.env\.SIGN_API_KEY/);
         expect(py).toContain("os.environ['SIGN_API_KEY']");
       }
+    }
+  });
+
+  it('send a file as the body where the route takes nothing else', () => {
+    const op = operations().find((o) => o.id === 'verifyPdf')!;
+    const request = sampleRequest(op);
+    expect(request.upload).toEqual({ path: 'sealed.pdf', mediaType: 'application/pdf' });
+    const { curl, node, python: py, go } = samplesFor(op);
+    expect(curl).toContain('-H "Content-Type: application/pdf"');
+    expect(curl).toContain('--data-binary @sealed.pdf');
+    expect(curl).not.toContain('Authorization');
+    expect(node).toContain("verify.pdf(await readFile('sealed.pdf'))");
+    expect(node).toContain('createVerifyClient');
+    expect(node).not.toContain('apiKey');
+    expect(py).toContain('data=pdf');
+    expect(py).toContain('"Content-Type": "application/pdf"');
+    expect(go).toContain('os.Open("sealed.pdf")');
+    expect(go).toContain('http.NewRequest("POST", "https://sign.codevibe.in/api/v1/verify", file)');
+  });
+
+  it('cover templates and verification with the client', () => {
+    const ids = operations()
+      .filter(hasClientMethod)
+      .map((op) => op.id);
+    for (const id of [
+      'listTemplates',
+      'createTemplate',
+      'getTemplate',
+      'updateTemplate',
+      'deleteTemplate',
+      'createEnvelopeFromTemplate',
+      'verifyPdf',
+      'verifySha256',
+    ]) {
+      expect(ids, id).toContain(id);
     }
   });
 

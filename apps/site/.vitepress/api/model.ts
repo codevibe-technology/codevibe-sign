@@ -44,6 +44,8 @@ export interface Operation {
   security: Record<string, string[]>[];
   parameters: Parameter[];
   body?: { required: boolean; schema: Schema; example: unknown; mediaTypes: string[] };
+  /** Set when the request is a file and nothing else: its media types, the raw one first. */
+  upload?: { mediaTypes: string[]; field: string };
   responses: ResponseDoc[];
 }
 
@@ -130,6 +132,17 @@ function operationOf(
             schema: json.schema,
             example: mediaExample(json) ?? exampleOf(json.schema, doc),
             mediaTypes: Object.keys(body.content ?? {}),
+          },
+        }
+      : {}),
+    ...(body && !json && body.content?.['application/pdf']
+      ? {
+          upload: {
+            mediaTypes: [
+              'application/pdf',
+              ...Object.keys(body.content).filter((t) => t !== 'application/pdf'),
+            ],
+            field: 'file',
           },
         }
       : {}),

@@ -306,7 +306,7 @@ The envelope id.
 
 ### Returns {#get-certificate-returns}
 
-**200 OK**. The certificate. An `Certificate` object.
+**200 OK**. The certificate. A `Certificate` object.
 
 ### Errors {#get-certificate-errors}
 

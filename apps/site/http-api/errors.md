@@ -48,7 +48,7 @@ With the Node.js client every failure is a `SignApiError` carrying `code`, `stat
 | <span id="forbidden">`FORBIDDEN`</span> | 403 Forbidden | The credential may only read; only `GET` routes are allowed. |
 | <span id="envelope-not-found">`ENVELOPE_NOT_FOUND`</span> | 404 Not Found | No envelope with this id in the caller's workspace. |
 | <span id="recipient-not-found">`RECIPIENT_NOT_FOUND`</span> | 404 Not Found | No recipient with this id on the envelope. |
-| <span id="not-found">`NOT_FOUND`</span> | 404 Not Found | No route or document at this address. |
+| <span id="not-found">`NOT_FOUND`</span> | 404 Not Found | No route, document or template at this address. |
 | <span id="invalid-state">`INVALID_STATE`</span> | 409 Conflict | Not allowed in the envelope's current status (`details.status`). |
 | <span id="not-your-turn">`NOT_YOUR_TURN`</span> | 409 Conflict | Sequential routing, and an earlier recipient has not acted yet. |
 | <span id="conflict">`CONFLICT`</span> | 409 Conflict | Another request changed the envelope, or one with the same `Idempotency-Key` is still running. Try again. |

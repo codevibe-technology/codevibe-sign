@@ -195,6 +195,7 @@ export default defineConfigWithTheme<DefaultTheme.Config & { searchStart: Search
           items: [
             { text: 'Send your first envelope', link: '/guides/first-envelope' },
             { text: 'Add the React signing view', link: '/guides/react-signing-view' },
+            { text: 'Reuse a document with templates', link: '/guides/templates' },
             { text: 'Verify a sealed PDF', link: '/guides/verify-pdf' },
             { text: 'Trust the seal in Adobe', link: '/guides/trust-seal-adobe' },
             { text: 'Electronic evidence (s.63 BSA)', link: '/guides/section-63-certificate' },

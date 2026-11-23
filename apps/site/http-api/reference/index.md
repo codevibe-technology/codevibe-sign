@@ -10,7 +10,7 @@ outline: false
 
 # API reference
 
-The Codevibe Sign API is organised around envelopes. It takes and returns JSON, uses standard HTTP status codes, and authenticates your backend with an API key. Version 1 lives under `/v1`.
+The Codevibe Sign API is organised around envelopes. It takes and returns JSON, uses standard HTTP status codes, and authenticates your backend with an API key. Version 1 lives under `/v1` as one unit; see [versioning and deprecation](/http-api/versioning).
 
 <div class="api-base">
 <p><span class="api-base__label">Cloud</span><code>https://sign.codevibe.in/api</code></p>
@@ -61,6 +61,28 @@ The hash-chained audit log of an envelope and the signing certificate built from
 <ul class="api-index">
 <li><a href="/docs/http-api/reference/audit-trail.html#list-envelope-events"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/events</code><span>Audit log</span></a></li>
 <li><a href="/docs/http-api/reference/audit-trail.html#get-certificate"><span class="api-method" data-method="get">GET</span><code>/v1/envelopes/{id}/certificate</code><span>Signing certificate</span></a></li>
+</ul>
+
+## Templates {#templates}
+
+A template is an envelope without the people: its PDFs, the roles that act on them (Employee, HR), the fields each role fills and the settings.
+
+<ul class="api-index">
+<li><a href="/docs/http-api/reference/templates.html#list-templates"><span class="api-method" data-method="get">GET</span><code>/v1/templates</code><span>List templates</span></a></li>
+<li><a href="/docs/http-api/reference/templates.html#create-template"><span class="api-method" data-method="post">POST</span><code>/v1/templates</code><span>Create a template</span></a></li>
+<li><a href="/docs/http-api/reference/templates.html#get-template"><span class="api-method" data-method="get">GET</span><code>/v1/templates/{templateId}</code><span>Get a template</span></a></li>
+<li><a href="/docs/http-api/reference/templates.html#update-template"><span class="api-method" data-method="patch">PATCH</span><code>/v1/templates/{templateId}</code><span>Change a template</span></a></li>
+<li><a href="/docs/http-api/reference/templates.html#delete-template"><span class="api-method" data-method="delete">DELETE</span><code>/v1/templates/{templateId}</code><span>Delete a template</span></a></li>
+<li><a href="/docs/http-api/reference/templates.html#create-envelope-from-template"><span class="api-method" data-method="post">POST</span><code>/v1/templates/{templateId}/envelopes</code><span>Create an envelope from a template</span></a></li>
+</ul>
+
+## Verification {#verification}
+
+Check that a PDF is a document this server sealed and that nothing changed since.
+
+<ul class="api-index">
+<li><a href="/docs/http-api/reference/verification.html#verify-pdf"><span class="api-method" data-method="post">POST</span><code>/v1/verify</code><span>Verify a PDF</span></a></li>
+<li><a href="/docs/http-api/reference/verification.html#verify-sha256"><span class="api-method" data-method="get">GET</span><code>/v1/verify/{sha256}</code><span>Verify by SHA-256</span></a></li>
 </ul>
 
 ## Signing {#signing}

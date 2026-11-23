@@ -59,6 +59,16 @@ const OBJECTS: Record<
     example: (doc) => (sentEnvelope(doc) as { documents?: unknown[] })?.documents?.[0],
   },
   'Audit trail': { schema: 'AuditEvent', title: 'The audit event object' },
+  Templates: {
+    schema: 'Template',
+    title: 'The template object',
+    example: (doc) => doc.components.examples?.OfferTemplate?.value,
+  },
+  Verification: {
+    schema: 'PublicVerification',
+    title: 'The verification object',
+    example: (doc) => doc.components.examples?.ValidVerification?.value,
+  },
   Signing: { schema: 'SignerView', title: 'The signing session object' },
 };
 
@@ -200,6 +210,18 @@ const parameterSections: { in: Parameter['in']; title: string; suffix: string }[
 ];
 
 function bodySection(op: Operation, doc: OpenApiDocument): string[] {
+  if (op.upload) {
+    const [raw, ...others] = op.upload.mediaTypes;
+    const form = others.includes('multipart/form-data')
+      ? `, or as \`multipart/form-data\` in a form field named \`${op.upload.field}\``
+      : '';
+    return [
+      `### Request body {#${op.anchor}-body}`,
+      '',
+      `The file itself as the body, with \`Content-Type: ${raw}\`${form}.`,
+      '',
+    ];
+  }
   if (!op.body) return [];
   const out = [`### Request body {#${op.anchor}-body}`, ''];
   const media = op.body.mediaTypes.map((type) => `\`${type}\``).join(' or ');
@@ -217,9 +239,8 @@ function returnsSection(op: Operation, doc: OpenApiDocument): string[] {
   if (!success.length) return [];
   const out = [`### Returns {#${op.anchor}-returns}`, ''];
   for (const response of success) {
-    const type = response.schema
-      ? ` A${/^[aeiou]/i.test(typeLabel(response.schema, doc)) ? 'n' : ''} ${schemaLink(response.schema, doc)}.`
-      : '';
+    const link = response.schema ? schemaLink(response.schema, doc) : '';
+    const type = link ? ` A${/^[[`]?[aeiou]/i.test(link) ? 'n' : ''} ${link}.` : '';
     out.push(
       `**${response.status} ${STATUS_TEXT[response.status] ?? ''}**. ${response.description}${type}`.trim(),
       '',
@@ -642,7 +663,7 @@ export function referenceIndexPage(doc: OpenApiDocument = spec): string {
     '',
     '# API reference',
     '',
-    `The Codevibe Sign API is organised around envelopes. It takes and returns JSON, uses standard HTTP status codes, and authenticates your backend with an API key. Version ${doc.info.version} lives under \`/v1\`.`,
+    `The Codevibe Sign API is organised around envelopes. It takes and returns JSON, uses standard HTTP status codes, and authenticates your backend with an API key. Version ${doc.info.version} lives under \`/v1\` as one unit; see [versioning and deprecation](/http-api/versioning).`,
     '',
     '<div class="api-base">',
     '<p><span class="api-base__label">Cloud</span><code>' + BASE_URL + '</code></p>',
