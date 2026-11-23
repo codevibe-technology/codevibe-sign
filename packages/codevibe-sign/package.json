@@ -136,7 +136,7 @@
   },
   "devDependencies": {
     "@codevibe_technology/sign-react": "workspace:*",
-    "@types/node": "22.19.1",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "pdf-lib": "1.17.1"
   }

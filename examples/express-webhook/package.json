@@ -13,7 +13,7 @@
     "@codevibe_technology/sign-client": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "22.19.1",
+    "@types/node": "26.6.6",
     "tsx": "4.23.15"
   }
 }
