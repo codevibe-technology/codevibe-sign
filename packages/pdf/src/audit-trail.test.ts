@@ -108,6 +108,22 @@ describe('auditTrailPdf', () => {
     expect(joined).not.toContain('198.51.100.4');
   });
 
+  it('records an eSign certificate name that differs from the recipient name', async () => {
+    const text = await allText(
+      await auditTrailPdf({
+        envelope: envelope(),
+        events: [
+          event(1, 'recipient.esign_name_differs', {
+            recipientId: 'r1',
+            data: { recipientName: 'Shubh Kumar', certificateName: 'MEERA IYER' },
+          }),
+        ],
+      }),
+    );
+    expect(text.join(' ')).toContain('Aadhaar name differs from recipient name');
+    expect(text.join(' ')).toContain('Name on the eSign certificate: MEERA IYER');
+  });
+
   it('prints network addresses only when asked to', async () => {
     const text = await allText(
       await auditTrailPdf({ envelope: envelope(), events }, { networkAddresses: true }),

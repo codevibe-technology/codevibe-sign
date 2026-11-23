@@ -196,6 +196,12 @@ export type AuditAction =
   | 'recipient.esign_started'
   /** An eSign did not finish; `data.reason` says why. The recipient may start again. */
   | 'recipient.esign_failed'
+  /**
+   * The name on the signer's eSign certificate (`data.certificateName`) is not the
+   * recipient's name (`data.recipientName`). Recorded for the sender to check; it does not
+   * stop the envelope.
+   */
+  | 'recipient.esign_name_differs'
   | 'document.sealed';
 
 export interface AuditContext {

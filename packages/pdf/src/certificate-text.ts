@@ -67,6 +67,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'recipient.corrected': 'Recipient corrected',
   'recipient.esign_started': 'Aadhaar eSign started',
   'recipient.esign_failed': 'Aadhaar eSign not completed',
+  'recipient.esign_name_differs': 'Aadhaar name differs from recipient name',
   'document.sealed': 'Document sealed',
 };
 

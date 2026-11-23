@@ -43,8 +43,12 @@ const STATUS_WORDS: Record<Recipient['status'], string> = {
   declined: 'Declined',
 };
 
-/** How a signature was given, for the event that records it. */
+/** How a signature was given, or what the eSign certificate said, for the event. */
 function methodOf(event: AuditEvent, envelope: Envelope): string | undefined {
+  if (event.action === 'recipient.esign_name_differs') {
+    const name = event.data?.certificateName;
+    return typeof name === 'string' ? `Name on the eSign certificate: ${name}` : undefined;
+  }
   if (event.action !== 'recipient.signed') return undefined;
   if (event.data?.method !== 'aadhaar_esign') return 'Electronic signature';
   const recipient = envelope.recipients.find((r) => r.id === event.recipientId);
