@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { LegalPage, LegalSection } from '@/components/marketing/legal-page';
+import { ExternalLink } from '@/components/marketing/external-link';
 import { CONTACT_EMAIL, GITHUB_URL } from '@/components/marketing/links';
 import { siteViewer } from '@/server/auth/session';
 import { isHosted } from '@/server/plans';
@@ -81,8 +82,11 @@ export default async function TermsPage() {
       <LegalSection title="Open source">
         <p>
           The software itself is open source: the libraries under Apache-2.0, the server and app
-          under AGPL-3.0, published on <a href={GITHUB_URL}>GitHub</a>. These terms cover only our
-          running of the cloud.
+          under AGPL-3.0, published on{' '}
+          <ExternalLink href={GITHUB_URL} bare>
+            GitHub
+          </ExternalLink>
+          . These terms cover only our running of the cloud.
         </p>
       </LegalSection>
       <LegalSection title="Law and contact">

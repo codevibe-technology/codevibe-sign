@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Wordmark } from '@/components/shell/brand-mark';
+import { ExternalLink } from './external-link';
 import { CODEVIBE_URL, CONTACT_EMAIL, DOCS_URL, GITHUB_URL, VERIFY_URL } from './links';
 
 const LINKS = [
@@ -18,7 +19,7 @@ export function SiteFooter() {
         <div className="max-w-sm">
           <Wordmark />
           <p className="mt-3 text-sm text-white/70">
-            Open-source e-signatures, made in India by Codevibe. Questions:{' '}
+            Open-source e-signatures, made in India by Codevibe, a software agency. Questions:{' '}
             <a
               className="font-semibold text-white hover:underline"
               href={`mailto:${CONTACT_EMAIL}`}
@@ -32,14 +33,12 @@ export function SiteFooter() {
             {LINKS.map((link) => (
               <li key={link.label}>
                 {link.external ? (
-                  <a
+                  <ExternalLink
                     href={link.href}
-                    target="_blank"
-                    rel="noopener"
                     className="font-medium text-white/80 hover:text-white hover:underline"
                   >
                     {link.label}
-                  </a>
+                  </ExternalLink>
                 ) : link.href.startsWith('/docs') ? (
                   <a
                     href={link.href}
