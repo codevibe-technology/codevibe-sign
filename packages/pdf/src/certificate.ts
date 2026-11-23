@@ -45,6 +45,21 @@ export interface CertificateData {
    * registration number.
    */
   note?: string;
+  /**
+   * Draws the certificate for the file an Aadhaar eSign signer is about to sign, so the
+   * provider's signature covers it too: that signer's row says they sign with Aadhaar eSign,
+   * and the time and their certificate are left to the digital signature and the audit trail.
+   */
+  esign?: CertificateEsign;
+}
+
+/** The Aadhaar eSign still to come on the file the certificate is part of. */
+export interface CertificateEsign {
+  recipientId: string;
+  /** The eSign provider, for example "leegality". */
+  provider: string;
+  /** The provider's test environment: the certificate says the signature has no legal effect. */
+  sandbox?: boolean;
 }
 
 export interface CertificateOptions {
@@ -71,6 +86,11 @@ const PROVIDED_BY = 'Signing certificate provided by:';
 const SEALED_FILE_LINE =
   'This file is sealed with a digital signature that covers every page, including this one. ' +
   'Any change made after sealing breaks the seal.';
+const ESIGN_FILE_LINE =
+  'This file is signed with Aadhaar eSign and then sealed with a digital signature; both ' +
+  'cover every page, including this one, and any change made afterwards breaks them. The ' +
+  'time of the Aadhaar eSign and the signer certificate are in the digital signature and ' +
+  'in the audit trail.';
 const STANDALONE_LINE =
   'This certificate summarises a completed signing. The signed document is sealed with a ' +
   'digital signature, and any change made to it after sealing breaks the seal.';
@@ -172,8 +192,21 @@ function drawCertificate(
     summaryWidth,
   );
   flow.field('Envelope ID', [{ text: envelope.id, style: flow.style('mono') }], summaryWidth);
-  flow.field('Status', [{ text: STATUS_LABELS[envelope.status], style: body }], summaryWidth);
-  if (envelope.completedAt) {
+  const esign = data.esign;
+  const esigner = esign && envelope.recipients.find((r) => r.id === esign.recipientId);
+  flow.field(
+    'Status',
+    [
+      {
+        text: esigner
+          ? `Completed by the Aadhaar eSign of ${esigner.name} on this file`
+          : STATUS_LABELS[envelope.status],
+        style: body,
+      },
+    ],
+    summaryWidth,
+  );
+  if (envelope.completedAt && !esigner) {
     flow.field('Completed', moment(envelope.completedAt, true), summaryWidth);
   } else if (envelope.sentAt) {
     flow.field('Sent', moment(envelope.sentAt, true), summaryWidth);
@@ -245,7 +278,12 @@ function drawCertificate(
       const declined =
         seen.declinedAt ?? (recipient.status === 'declined' ? recipient.actedAt : undefined);
       let when: Part[];
-      if (declined) {
+      if (esigner && recipient.id === esigner.id) {
+        when = [
+          { text: 'With the Aadhaar eSign on this file', style: body },
+          { text: 'The time is in the digital signature', style: small },
+        ];
+      } else if (declined) {
         when = [{ text: 'Declined', style: body }, ...moment(declined)];
         if (recipient.declineReason) {
           when.push({
@@ -264,7 +302,24 @@ function drawCertificate(
           { text: ROLE_LABELS[recipient.role], style: small },
         ],
         [{ text: contact(recipient), style: body }],
-        [{ text: recipient.role === 'viewer' ? '' : authLabel(recipient), style: body }],
+        [
+          {
+            text:
+              recipient.role === 'viewer'
+                ? ''
+                : esign && recipient.id === esigner?.id
+                  ? authLabel({
+                      auth: 'aadhaar',
+                      esign: {
+                        provider: esign.provider,
+                        status: 'signed',
+                        ...(esign.sandbox ? { sandbox: true } : {}),
+                      },
+                    })
+                  : authLabel(recipient),
+            style: body,
+          },
+        ],
         when,
       ];
     }),
@@ -280,7 +335,7 @@ function drawCertificate(
   flow.gap(1);
   flow.paragraph(document.sha256, flow.style('monoSmall'));
   flow.paragraph('SHA-256 of the document as it was sent for signing.', small);
-  if (auditHead) {
+  if (auditHead && !esigner) {
     flow.gap(3);
     flow.paragraph(
       `Audit trail when sealed: ${events.length} ${events.length === 1 ? 'event' : 'events'}, chain head`,
@@ -318,7 +373,7 @@ export async function appendCertificate(
 ): Promise<Uint8Array> {
   const doc = await loadPdf(pdfBytes, { maxBytes: options.maxBytes });
   const fonts = await embedFonts(doc, options.font);
-  drawCertificate(doc, fonts, data, SEALED_FILE_LINE);
+  drawCertificate(doc, fonts, data, data.esign ? ESIGN_FILE_LINE : SEALED_FILE_LINE);
   await fonts.finish();
   return doc.save();
 }

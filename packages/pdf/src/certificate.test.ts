@@ -86,6 +86,39 @@ async function rejection(promise: Promise<unknown>): Promise<SignError> {
 }
 
 describe('appendCertificate', () => {
+  it('certifies the file an Aadhaar eSign signer is about to sign', async () => {
+    const ravi = recipient({
+      id: 'r3',
+      name: 'Ravi Kumar',
+      email: 'ravi@example.com',
+      order: 2,
+      auth: 'aadhaar',
+      status: 'viewed',
+      actedAt: undefined,
+    });
+    const output = await appendCertificate(await makePdf([{ size: A4 }]), {
+      envelope: envelope({
+        status: 'in_progress',
+        completedAt: undefined,
+        recipients: [signer, ravi],
+      }),
+      document: document(),
+      events: events.slice(0, 5),
+      recordUrl: RECORD_URL,
+      esign: { recipientId: 'r3', provider: 'leegality' },
+    });
+    expect(await pageCount(output)).toBe(2);
+    const text = (await certificateText(output, 1)).join(' ');
+    expect(text).toContain('Completed by the Aadhaar eSign of Ravi Kumar on this file');
+    expect(text).toContain('Aadhaar eSign (via Leegality)');
+    expect(text).toContain('With the Aadhaar eSign on this file');
+    expect(text).toContain('The time is in the digital signature');
+    expect(text).toContain('One-time code by email');
+    expect(text).toContain('2026-11-18 09:00:05 UTC');
+    expect(text).toContain('signed with Aadhaar eSign and then sealed');
+    expect(text).not.toContain('chain head');
+  });
+
   it('prints the facts of the signing on one page', async () => {
     const pdf = await makePdf([{ size: A4 }]);
     const output = await appendCertificate(pdf, {

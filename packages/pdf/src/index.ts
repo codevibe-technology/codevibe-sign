@@ -6,7 +6,12 @@ export { renderFields } from './render';
 export { sanitizePdf } from './sanitize';
 export type { RenderOptions } from './render';
 export { appendCertificate, certificatePdf } from './certificate';
-export type { CertificateData, CertificateOptions, CertificateSender } from './certificate';
+export type {
+  CertificateData,
+  CertificateEsign,
+  CertificateOptions,
+  CertificateSender,
+} from './certificate';
 export { auditTrailPdf } from './audit-trail';
 export type { AuditTrailData, AuditTrailOptions } from './audit-trail';
 export { maskEmail, maskPhone } from './mask';
