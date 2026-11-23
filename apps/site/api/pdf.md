@@ -137,14 +137,14 @@ Boxes that run off the page are trimmed to it.
 | Option          | Default | Purpose                                                       |
 | --------------- | ------- | ------------------------------------------------------------- |
 | `documentId`    | all     | Draw only the fields of this document.                        |
-| `font`          | none    | TTF/OTF bytes for text outside Latin script.                  |
+| `font`          | none    | TTF/OTF bytes tried first; see Fonts and scripts.             |
 | `timeZone`      | `UTC`   | IANA zone used to turn a `date_signed` timestamp into a date. |
 | `formatDate`    | none    | `(isoValue) => string` for `date_signed` text.                |
 | `maxImageBytes` | 1 MB    | Largest signature image.                                      |
 | `maxBytes`      | 25 MB   | Largest input PDF.                                            |
 
 Errors: `REQUIRED_FIELDS_MISSING` (`details.fieldIds`), `INVALID_FIELD_VALUE` (bad image,
-checkbox value, or characters the font cannot draw), `RECIPIENT_NOT_FOUND`, `VALIDATION`
+checkbox value), `RECIPIENT_NOT_FOUND`, `VALIDATION`
 (page out of range, box outside the page, unknown time zone).
 
 ### `appendCertificate(pdfBytes, data, options?) → Promise<Uint8Array>`
@@ -164,7 +164,7 @@ core's types. The page shows:
 - `recordUrl`, when given: a QR code and a link to a page that shows this signing's record,
   such as the public record page of the web app;
 - `note`, when given: one line from the sender at the end, such as a company registration
-  number. Characters the font cannot draw become `?`.
+  number.
 
 IP addresses, browser details and the list of audit events are not printed; `auditTrailPdf`
 makes the event list a file of its own. Times are shown in the given time zone with UTC
@@ -292,9 +292,20 @@ The masking used on the certificate, for reuse in emails and screens.
 
 ## Fonts and scripts
 
-The standard fonts cover Latin script only. Names, titles or text in other scripts
-(Devanagari, Tamil, and so on) need a font that covers them, passed as `font` to
-`renderFields` and `appendCertificate`, for example Noto Sans Devanagari:
+Names, titles and field text can be in any of these scripts without extra setup:
+Devanagari (Hindi, Marathi, Nepali), Bengali, Gurmukhi, Gujarati, Odia, Tamil, Telugu,
+Kannada, Malayalam, Arabic (including Urdu), and Latin, Greek and Cyrillic beyond the
+WinAnsi set. Text the standard fonts can encode stays in Helvetica; everything else is
+drawn with the bundled Noto Sans fonts. Each run is shaped with HarfBuzz, so conjuncts
+(क्ष, त्र, श्री), vowel signs and Arabic joining come out right, and only the glyphs used
+are embedded: a certificate with a Hindi name grows by about 2 KB. Copying or searching
+the PDF gives back the text as typed. Characters no font covers (emoji, for example)
+become `?` rather than failing.
+
+For other scripts, such as Chinese, Japanese or Korean, pass a font that covers them as
+`font` to `renderFields`, `appendCertificate`, `certificatePdf` and `auditTrailPdf`. It
+is tried first for every character it has. A TrueType font is shaped and subset like the
+bundled ones; a CFF-based OpenType font is embedded whole and laid out by pdf-lib.
 
 <!-- check:
 import { readFile } from 'node:fs/promises';
@@ -308,15 +319,12 @@ const { fields, values, recipients } = envelope;
 -->
 
 ```ts check
-const font = new Uint8Array(await readFile('NotoSansDevanagari-Regular.ttf'));
+const font = new Uint8Array(await readFile('NotoSansSC-Regular.otf'));
 await renderFields(pdf, fields, values, recipients, { font });
 await appendCertificate(signed, data, { font });
 ```
 
-Without it, those calls fail with a message pointing at `options.font` rather than
-drawing the wrong glyphs. The font is embedded whole (not subset). Shaping for complex
-scripts comes from fontkit; it handles conjuncts and vowel signs, but check the output
-with the font you choose.
+The bundled fonts are Noto Sans, under the SIL Open Font License 1.1 (see `fonts/OFL.txt`).
 
 ## Limits
 
