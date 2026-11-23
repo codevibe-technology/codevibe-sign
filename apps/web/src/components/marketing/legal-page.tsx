@@ -19,7 +19,7 @@ export function LegalPage({
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
       <SiteHeader viewer={viewer} />
-      <main id="main" className="flex-1 px-4 py-12 sm:px-6 sm:py-16">
+      <main id="main" className="page-enter flex-1 px-4 py-12 sm:px-6 sm:py-16">
         <article className="mx-auto max-w-2xl">
           <p className="text-sm font-semibold text-primary">Codevibe Sign cloud</p>
           <h1 className="mt-1 text-3xl font-bold sm:text-4xl">{title}</h1>

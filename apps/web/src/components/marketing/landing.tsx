@@ -16,6 +16,8 @@ import {
   SELF_HOST_DOCS,
   VERIFY_URL,
 } from './links';
+import { reveal } from './reveal';
+import { RevealOnScroll } from './reveal-on-scroll';
 import { SAMPLE_TRAIL, shortHash } from './sample-trail';
 import { ScrollStory, type StoryStep } from './scroll-story';
 import { SiteFooter } from './site-footer';
@@ -393,7 +395,12 @@ function PlanColumn({
   first?: boolean;
 }) {
   return (
-    <div className={cn('flex flex-col p-6 sm:p-8', first && 'bg-surface')}>
+    <div
+      className={cn(
+        'flex flex-col p-6 transition-colors duration-200 ease-out sm:p-8',
+        first ? 'bg-surface' : 'hover:bg-surface/60',
+      )}
+    >
       <h3 className="text-lg font-semibold">{name}</h3>
       <p className="mt-3 font-display text-4xl font-bold tracking-tight">{price}</p>
       <p className="mt-2 text-muted">{note}</p>
@@ -426,6 +433,7 @@ export function Landing({
   return (
     <div className="marketing flex min-h-dvh flex-col bg-canvas">
       <SmoothAnchors />
+      <RevealOnScroll />
       <SiteHeader viewer={viewer} />
       <main id="main" className="flex-1">
         <section
@@ -506,7 +514,7 @@ export function Landing({
           className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div className="lg:pt-4">
+            <div className="lg:pt-4" {...reveal()}>
               <h2 id="proof-title" className="text-3xl font-bold sm:text-4xl">
                 Every step goes on the record
               </h2>
@@ -538,7 +546,9 @@ export function Landing({
                 </li>
               </ul>
             </div>
-            <AuditSheet />
+            <div className="min-w-0" {...reveal(1)}>
+              <AuditSheet />
+            </div>
           </div>
         </section>
 
@@ -551,7 +561,7 @@ export function Landing({
 
         <section aria-labelledby="more-title" className="px-4 py-20 sm:px-6 sm:py-24">
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div>
+            <div {...reveal()}>
               <h2 id="more-title" className="text-3xl font-bold sm:text-4xl">
                 Also in the box
               </h2>
@@ -560,8 +570,8 @@ export function Landing({
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
-              {MORE.map((item) => (
-                <div key={item.title} className="border-t border-line py-5">
+              {MORE.map((item, i) => (
+                <div key={item.title} className="border-t border-line py-5" {...reveal(i % 2)}>
                   <dt className="font-semibold">{item.title}</dt>
                   <dd className="mt-1 text-muted">{item.text}</dd>
                 </div>
@@ -576,15 +586,19 @@ export function Landing({
           className="scroll-mt-16 bg-[#0D1B2A] px-4 py-20 text-white sm:px-6 sm:py-28"
         >
           <div className="mx-auto max-w-6xl">
-            <h2 id="developers-title" className="max-w-2xl text-3xl font-bold sm:text-4xl">
+            <h2
+              id="developers-title"
+              className="max-w-2xl text-3xl font-bold sm:text-4xl"
+              {...reveal()}
+            >
               An API for everything in the app
             </h2>
-            <p className="mt-4 max-w-2xl text-lg text-white/80">
+            <p className="mt-4 max-w-2xl text-lg text-white/80" {...reveal()}>
               Make an API key for each system, send envelopes from your backend, and get a signed
               webhook when something happens.
             </p>
             <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-2">
-              <div className="min-w-0">
+              <div className="min-w-0" {...reveal(1)}>
                 <div className="overflow-hidden rounded-[3px] ring-1 ring-white/12">
                   <p className="border-b border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-xs text-white/70">
                     send-agreement.ts
@@ -625,7 +639,7 @@ export function Landing({
                   </a>
                 </div>
               </div>
-              <figure className="min-w-0">
+              <figure className="min-w-0" {...reveal(2)}>
                 <Sheet className="ring-white/10">
                   <Clip clip={CLIPS.api} describedBy="api-clip-text" />
                 </Sheet>
@@ -644,7 +658,7 @@ export function Landing({
           className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div>
+            <div {...reveal()}>
               <h2 id="open-source-title" className="text-3xl font-bold sm:text-4xl">
                 Read the code. Run it yourself.
               </h2>
@@ -669,7 +683,7 @@ export function Landing({
                 </div>
               </div>
             </div>
-            <div className="min-w-0 self-end">
+            <div className="min-w-0 self-end" {...reveal(1)}>
               <div className="overflow-hidden rounded-[3px] bg-[#0D1B2A] text-white">
                 <div className="border-b border-white/10 px-5 py-3">
                   <h3 className="font-semibold">Self-host with Docker</h3>
@@ -713,14 +727,19 @@ docker compose up -d`}</code>
           className="scroll-mt-16 border-t border-line bg-surface-2/50 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto max-w-6xl">
-            <h2 id="pricing-title" className="max-w-2xl text-3xl font-bold sm:text-4xl">
-              Start free. <span className="whitespace-nowrap">Self-host</span> for nothing.
-            </h2>
-            <p className="mt-4 max-w-2xl text-lg text-muted">
-              Every plan seals the same way and keeps the same audit trail. The limits are the only
-              difference.
-            </p>
-            <div className="mt-12 grid grid-cols-1 divide-y divide-line rounded-[3px] bg-canvas ring-1 ring-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+            <div {...reveal()}>
+              <h2 id="pricing-title" className="max-w-2xl text-3xl font-bold sm:text-4xl">
+                Start free. <span className="whitespace-nowrap">Self-host</span> for nothing.
+              </h2>
+              <p className="mt-4 max-w-2xl text-lg text-muted">
+                Every plan seals the same way and keeps the same audit trail. The limits are the
+                only difference.
+              </p>
+            </div>
+            <div
+              {...reveal(1)}
+              className="mt-12 grid grid-cols-1 divide-y divide-line rounded-[3px] bg-canvas ring-1 ring-line lg:grid-cols-3 lg:divide-x lg:divide-y-0"
+            >
               <PlanColumn
                 name="Free"
                 price="₹0"
@@ -778,7 +797,7 @@ docker compose up -d`}</code>
           className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28"
         >
           <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-            <div>
+            <div {...reveal()}>
               <h2 id="faq-title" className="text-3xl font-bold sm:text-4xl">
                 Good to know
               </h2>
@@ -793,7 +812,7 @@ docker compose up -d`}</code>
                 .
               </p>
             </div>
-            <div className="divide-y divide-line border-y border-line">
+            <div className="divide-y divide-line border-y border-line" {...reveal(1)}>
               {FAQ.map((item) => (
                 <details key={item.q} className="group py-5 [&_a]:font-semibold [&_a]:text-primary">
                   <summary className="flex cursor-pointer list-none items-start justify-between gap-6 text-lg font-semibold [&::-webkit-details-marker]:hidden">
@@ -814,7 +833,10 @@ docker compose up -d`}</code>
         </section>
 
         <section aria-labelledby="start-title" className="px-4 pb-24 sm:px-6 sm:pb-32">
-          <div className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-10 border-t-2 border-ink pt-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+          <div
+            className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-10 border-t-2 border-ink pt-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]"
+            {...reveal()}
+          >
             <div>
               <h2 id="start-title" className="text-4xl font-bold sm:text-5xl">
                 Send your first document today

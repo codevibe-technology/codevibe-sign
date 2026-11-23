@@ -79,7 +79,7 @@ export function AuthFrame({ children, wide }: { children: ReactNode; wide?: bool
         className="flex flex-1 items-start justify-center px-4 py-8 sm:py-12 lg:items-center lg:px-10"
       >
         <div
-          className={`w-full rounded-xl border border-line border-t-[3px] border-t-accent bg-surface p-6 shadow-card sm:p-8 ${wide ? 'max-w-xl' : 'max-w-md'}`}
+          className={`page-enter w-full rounded-xl border border-line border-t-[3px] border-t-accent bg-surface p-6 shadow-card sm:p-8 ${wide ? 'max-w-xl' : 'max-w-md'}`}
         >
           {children}
         </div>
