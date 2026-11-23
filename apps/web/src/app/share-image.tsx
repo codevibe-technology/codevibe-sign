@@ -7,14 +7,25 @@ import { HOME_TITLE } from '@/lib/home-seo';
 export const shareAlt = HOME_TITLE;
 export const shareSize = { width: 1200, height: 630 };
 
+const INK = '#0F172A';
+const MUTED = '#5A6980';
+
+/** The four claims under the promise, each in its own colour, as the home page shows them. */
+const PILLS = [
+  { label: 'PAdES seal', bg: '#E6EFFC', fg: '#1860D0' },
+  { label: 'Audit trail', bg: '#DDF7F2', fg: '#0E7466' },
+  { label: 'Aadhaar eSign', bg: '#FDEDE3', fg: '#B4471A' },
+  { label: 'Open source', bg: '#F1E8FB', fg: '#7A35B5' },
+];
+
 /**
- * The card shown when the home page is shared: navy, the promise, the four steps and a frame of
- * the real app. Rendered once at build time.
+ * The card shown when the home page is shared, in the light style of the site: the logo, the
+ * promise, four claims and the real app in a browser frame. Rendered once at build time.
  */
 export async function shareImage() {
   const shot = await readFile(join(process.cwd(), 'src/app/share-shot.jpg'));
   const shotUrl = `data:image/jpeg;base64,${shot.toString('base64')}`;
-  const lockup = await readFile(join(process.cwd(), 'public', LOCKUP.inverse));
+  const lockup = await readFile(join(process.cwd(), 'public', LOCKUP.light));
   const lockupUrl = `data:image/svg+xml;base64,${lockup.toString('base64')}`;
   return new ImageResponse(
     (
@@ -23,60 +34,60 @@ export async function shareImage() {
           width: '100%',
           height: '100%',
           display: 'flex',
-          background: BRAND_COLORS.navy,
-          color: '#ffffff',
           position: 'relative',
           overflow: 'hidden',
+          color: INK,
+          backgroundColor: '#F7FAFF',
+          backgroundImage:
+            'radial-gradient(circle at 0% 0%, #DCE9FF 0%, rgba(220,233,255,0) 55%), radial-gradient(circle at 100% 100%, #D5F6F0 0%, rgba(213,246,240,0) 55%)',
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            right: -180,
-            top: -220,
-            width: 640,
-            height: 640,
-            borderRadius: 640,
-            background: '#12333F',
-          }}
-        />
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            padding: '64px 0 64px 72px',
-            width: 620,
+            padding: '60px 0 60px 64px',
+            width: 640,
           }}
         >
           <img
             src={lockupUrl}
             alt={BRAND_NAME}
-            width={Math.round((LOCKUP.width * 52) / LOCKUP.height)}
-            height={52}
+            width={Math.round((LOCKUP.width * 46) / LOCKUP.height)}
+            height={46}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-            <div style={{ fontSize: 62, fontWeight: 700, lineHeight: 1.05 }}>
-              Send documents for signature in minutes
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                fontSize: 54,
+                fontWeight: 700,
+                lineHeight: 1.04,
+                letterSpacing: '-0.03em',
+              }}
+            >
+              <span>Get documents signed.</span>
+              <span style={{ color: BRAND_COLORS.blue }}>Keep the proof.</span>
             </div>
-            <div style={{ fontSize: 26, color: '#C9D5E3', lineHeight: 1.35 }}>
-              Signed on any phone. Sealed PDF with a certificate. Open source.
+            <div style={{ fontSize: 25, color: MUTED, lineHeight: 1.4 }}>
+              Signed on any phone, sealed with a certificate anyone can check. Aadhaar eSign built
+              in.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 22, fontWeight: 600 }}>
-            {['Send', 'Sign', 'Seal', 'Verify'].map((step, i) => (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 18, fontWeight: 600 }}>
+            {PILLS.map((pill) => (
               <div
-                key={step}
+                key={pill.label}
                 style={{
-                  padding: '8px 22px',
-                  borderRadius: 4,
-                  background:
-                    i === 0 ? BRAND_COLORS.blue : i === 3 ? BRAND_COLORS.teal : 'transparent',
-                  color: i === 3 ? BRAND_COLORS.navy : i === 0 ? '#ffffff' : BRAND_COLORS.teal,
-                  border: i === 1 || i === 2 ? `2px solid ${BRAND_COLORS.teal}` : 'none',
+                  padding: '7px 14px',
+                  borderRadius: 999,
+                  background: pill.bg,
+                  color: pill.fg,
                 }}
               >
-                {step}
+                {pill.label}
               </div>
             ))}
           </div>
@@ -84,15 +95,15 @@ export async function shareImage() {
         <div
           style={{
             position: 'absolute',
-            left: 690,
-            top: 120,
+            left: 700,
+            top: 140,
             display: 'flex',
             flexDirection: 'column',
             width: 640,
-            borderRadius: 10,
+            borderRadius: 16,
             overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.18)',
-            boxShadow: '0 30px 60px rgba(0,0,0,0.45)',
+            border: '1px solid #D6E2F5',
+            boxShadow: '0 30px 60px rgba(27,106,224,0.28)',
             background: '#ffffff',
           }}
         >
@@ -100,8 +111,9 @@ export async function shareImage() {
             style={{
               display: 'flex',
               gap: 7,
-              padding: '10px 12px',
-              background: '#EEF0F3',
+              padding: '11px 14px',
+              background: '#F7F9FC',
+              borderBottom: '1px solid #E3E6EB',
             }}
           >
             {['#F26B5B', '#F5BE4F', '#4CC38A'].map((c) => (

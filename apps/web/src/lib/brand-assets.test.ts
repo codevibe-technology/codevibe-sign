@@ -165,7 +165,7 @@ describe('the lockup', () => {
       ),
     );
     expect(named).toEqual([]);
-    expect(text(web, 'src/app/share-image.tsx')).toContain('LOCKUP.inverse');
+    expect(text(web, 'src/app/share-image.tsx')).toContain('LOCKUP.light');
     expect(text(web, 'src/server/mail.ts')).toContain('LOCKUP.email');
     expect(pngSize(read(web, `public${LOCKUP.email}`))[1]).toBe(56);
   });
