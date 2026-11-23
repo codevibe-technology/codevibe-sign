@@ -566,6 +566,32 @@ enter. Their credentials cannot be read back from the app, by them or by you.
   signs through your account and no credits are involved.
 - With `PLAN_MODE=self-hosted` there are no plan limits and no billing screens.
 
+### Bot protection (optional)
+
+Cloudflare Turnstile can check that a person, not a script, is behind the public forms: sign-in
+(password and emailed link), "forgot password", the password step of an invitation and the
+installation help booking. It is off until both keys are set, so installs without it work as
+before. Signing links are not checked: they already carry their own secret.
+
+1. In the Cloudflare dashboard, open **Turnstile > Add widget**. Name it, add the host name the
+   app is served on (`SIGN_HOST`, for example `sign.codevibe.in`), and pick the **Managed**
+   widget mode.
+2. Set both keys and start the app again:
+
+   ```sh
+   ./set-secret.sh TURNSTILE_SITE_KEY
+   ./set-secret.sh TURNSTILE_SECRET_KEY
+   ./restart.sh
+   ```
+
+3. Open `/sign-in` in a private window and sign in. Most people never see the check; when
+   Cloudflare is unsure it shows a box to tick above the button.
+
+The server asks Cloudflare about each token and refuses the request when the answer is not a
+clear yes, including when Cloudflare cannot be reached. The person then sees what to do and can
+try again. If sign-in breaks after setting the keys, check that the host name in the widget
+matches `SIGN_HOST`, or clear both keys and run `./restart.sh` to turn the check off.
+
 ## Troubleshooting
 
 | What you see                                     | What to check                                                                                                |
@@ -576,3 +602,4 @@ enter. Their credentials cannot be read back from the app, by them or by you.
 | `404 page not found` from Traefik                | `TRAEFIK_NETWORK` is the network Traefik watches, and `web` is healthy (`docker compose ps`).                |
 | `billing.problems` in `/api/health` is not empty | `docker compose logs web \| grep '\[billing\]'` names the variable (step 12); fix it and run `./restart.sh`. |
 | No sign-in emails                                | `MAIL_TRANSPORT` and `MAIL_FROM`; the logs show the SMTP or Microsoft Graph error.                           |
+| "The security check …" on every sign-in          | The Turnstile widget's host name matches `SIGN_HOST`, and both `TURNSTILE_*` keys are from the same widget.  |
