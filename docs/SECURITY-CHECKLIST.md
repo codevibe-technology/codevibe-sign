@@ -85,6 +85,14 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
 - [ ] Use the sandbox environment and credentials only outside production, and never mix them.
 - [ ] Treat the provider auth token and private salt like API keys: secret manager, rotation,
       no logging.
+- [ ] Point the provider's webhook at `POST /v1/esign/webhooks/<provider>` over https. The
+      route is public by design: it verifies each body with the credentials of the workspace
+      that started the request and answers 404 to anything it cannot match.
+- [ ] When workspaces bring their own provider account, encrypt the credentials at rest and
+      build the provider per workspace in `esign.provider`; never fall back to another
+      workspace's account.
+- [ ] Make `esign.onStart` and `esign.onEnd` idempotent on `ref`: they are where credits are
+      reserved and settled, and `onEnd` is retried.
 
 ## Rate limits behind a proxy
 
@@ -149,6 +157,7 @@ to do and why. The reasoning behind them is in [THREAT-MODEL.md](THREAT-MODEL.md
       grant select, insert on sign_audit_events to sign_app;
       grant select, insert, update, delete
         on sign_tokens, sign_otp_challenges, sign_idempotency, sign_jobs to sign_app;
+      grant select, insert, update on sign_esign_sessions to sign_app;
       ```
 
       Start the server with `sign_app` in `DATABASE_URL`; on a migrated database its own

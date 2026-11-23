@@ -285,17 +285,19 @@ is completed, declined, voided or expired. A link that no longer works still red
 `expired` or `invalid`) and `&w=<workspaceId>` when the envelope is known, so the page can
 explain it in the sender's brand.
 
-| Route                                   | What it does                                                  |
-| --------------------------------------- | ------------------------------------------------------------- |
-| `GET /v1/sign/:token`                   | The envelope basics and this signer's own fields.             |
-| `GET /v1/sign/:token/documents/:docId`  | The original PDF.                                             |
-| `POST /v1/sign/:token/otp`              | Send a one-time code (OTP recipients).                        |
-| `POST /v1/sign/:token/otp/verify`       | `{ "code" }`; sets a 30-minute session cookie and returns it. |
-| `POST /v1/sign/:token/view`             | Record that the signer opened the document.                   |
-| `POST /v1/sign/:token/submit`           | `{ "consent": true, "values": [{ "fieldId", "value" }] }`.    |
-| `POST /v1/sign/:token/decline`          | `{ "reason": "..." }`.                                        |
-| `GET /v1/sign/receipt`                  | After signing: status, people still to act, sealed documents. |
-| `GET /v1/sign/receipt/documents/:docId` | After signing: the sealed copy, once everyone has acted.      |
+| Route                                   | What it does                                                   |
+| --------------------------------------- | -------------------------------------------------------------- |
+| `GET /v1/sign/:token`                   | The envelope basics and this signer's own fields.              |
+| `GET /v1/sign/:token/documents/:docId`  | The original PDF.                                              |
+| `POST /v1/sign/:token/otp`              | Send a one-time code (OTP recipients).                         |
+| `POST /v1/sign/:token/otp/verify`       | `{ "code" }`; sets a 30-minute session cookie and returns it.  |
+| `POST /v1/sign/:token/view`             | Record that the signer opened the document.                    |
+| `POST /v1/sign/:token/submit`           | `{ "consent": true, "values": [{ "fieldId", "value" }] }`.     |
+| `POST /v1/sign/:token/decline`          | `{ "reason": "..." }`.                                         |
+| `POST /v1/sign/:token/esign`            | Aadhaar signers: same body as `submit`; answers `{ signUrl }`. |
+| `GET /v1/sign/:token/esign`             | Aadhaar signers: where the eSign stands; gives the receipt.    |
+| `GET /v1/sign/receipt`                  | After signing: status, people still to act, sealed documents.  |
+| `GET /v1/sign/receipt/documents/:docId` | After signing: the sealed copy, once everyone has acted.       |
 
 OTP recipients must verify before they can read the document or act. Send the session as
 the `cvsign_session` cookie or the `X-Sign-Session` header. Each new code replaces the
@@ -306,6 +308,74 @@ A successful submit hands back a receipt, as an HttpOnly `cvsign_receipt` cookie
 `X-Sign-Receipt` header, valid for 7 days. It lets the signer follow the envelope to
 completion and download their sealed copy from the receipt routes, without keeping the
 signing link alive.
+
+## Aadhaar eSign
+
+A recipient with `auth: 'aadhaar'` signs with Aadhaar eSign through an eSign provider. Pass
+`esign` to turn it on; without it an envelope with such a recipient cannot be sent
+(`ESIGN_UNAVAILABLE`).
+
+```ts
+import { createLeegalityProvider } from '@codevibe_technology/sign-aadhaar';
+
+const leegality = createLeegalityProvider({
+  environment: 'sandbox',
+  authToken: process.env.LEEGALITY_AUTH_TOKEN!,
+  privateSalt: process.env.LEEGALITY_PRIVATE_SALT!,
+  profileId: process.env.LEEGALITY_WORKFLOW_ID!,
+});
+
+createSignServer({
+  // ...
+  esign: { provider: async () => leegality },
+});
+```
+
+How it runs:
+
+1. The signer fills their fields on your signing page and posts them to
+   `POST /v1/sign/:token/esign`. The server draws every value on the document, asks the
+   provider to sign that file and answers `{ signUrl, expiresAt }`. Send the signer to
+   `signUrl`. Asking again while the attempt is open answers the same page.
+2. The provider calls `POST /v1/esign/webhooks/<provider name>`. The body names the
+   request; the server finds the workspace that started it and verifies the body with that
+   workspace's provider before acting. The signing page can also poll
+   `GET /v1/sign/:token/esign`, which asks the provider at most once every ten seconds, so a
+   late or missing webhook does not leave the signer waiting.
+3. When the provider reports the signature, the server fetches the signed file, marks the
+   recipient signed (the `recipient.signed` event carries `method: 'aadhaar_esign'`, the
+   provider, its reference, the signer name the provider gave and the SHA-256 of the signing
+   certificate) and the envelope completes.
+4. Sealing never rewrites the provider's file. The seal is added after it as an incremental
+   update (`countersign` in the PDF package), so both signatures stay valid, and the signing
+   certificate becomes a sealed file of its own: `?version=certificate` on the document
+   route, `?file=certificate` on the receipt and copy routes, and a second attachment on the
+   completed email. A file the provider locked against further signatures is kept exactly
+   as it came and is recognised by its SHA-256 (`seal: 'provider_only'` in the
+   `document.sealed` event and in verification answers).
+
+| Option                   | What it does                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `provider(workspaceId)`  | The `EsignProvider` a workspace signs with, or null. Return your own account, or one built from the workspace's own credentials.                       |
+| `available(workspaceId)` | Why the workspace cannot eSign now (`{ reason, message, signerMessage? }`), or null. Asked when the envelope is sent and again when the signer starts. |
+| `onStart(input)`         | Called before the provider, for example to reserve a credit. Throw `SignError('ESIGN_UNAVAILABLE', message, { reason })` to refuse.                    |
+| `onEnd(input)`           | Called once per outcome (`signed`, `declined`, `expired`, `failed`) with the same `ref` as `onStart`. Retried by `tick()` until it returns.            |
+| `webhookRef`             | Reads the provider reference from a callback body for a provider other than Leegality.                                                                 |
+| `sessionTtlMs`           | How long the server waits for a started eSign. Default 24 hours, never past the envelope's expiry.                                                     |
+
+`signed` can follow `expired` or `failed` for the same `ref`: the provider may report a
+signature after the server stopped waiting, and that signature is still recorded when the
+envelope is open. Make `onEnd` idempotent on `ref` and `outcome`.
+
+Rules, checked when the envelope is sent: one recipient may sign with Aadhaar eSign, they
+must be a signer, the envelope holds one document, and they act last (sequential routing
+when anyone else acts). The reason is the file format: the provider signs the finished
+file, and nothing but another signature can be added after that without breaking it.
+
+Sessions live in the store (`store.esign`, table `sign_esign_sessions`, migration
+`0005_esign_sessions`); the built-in memory and PostgreSQL stores have it. Field values wait
+there until the provider answers. No Aadhaar number reaches the server: the provider
+collects it on its own page.
 
 ## Email per workspace
 
@@ -445,7 +515,8 @@ for 30 days, signed with `sessionSecret`).
 Invitations, reminders, completion copies, webhooks and sealing are jobs in the store.
 They run right after the request (`effects: 'await'`, the default) or just after the
 response (`'background'`), and `tick()` retries the ones that failed. Call `tick()` every
-minute: it also sends due reminders and expires envelopes.
+minute: it also sends due reminders, expires envelopes, gives up on Aadhaar eSign attempts
+past their time (after asking the provider once more) and retries `onEnd` calls that failed.
 
 ## Adapters
 

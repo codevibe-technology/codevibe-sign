@@ -3,10 +3,11 @@
 Aadhaar eSign for Codevibe Sign, through an eSign provider you hold an account with. It defines a
 small `EsignProvider` interface and ships an adapter for [Leegality](https://www.leegality.com).
 
-> **Standalone library.** This package is not yet wired into the Codevibe Sign server or the
-> web app. Neither of them calls it, and sending an envelope with `auth: 'aadhaar'` does not
-> start an Aadhaar eSign for you. Today you call the provider from your own backend, as shown
-> below, and store the signed file yourself. Built-in support in the server is on the roadmap.
+The Codevibe Sign server runs it for you: pass a provider as the server's `esign` option and
+a recipient with `auth: 'aadhaar'` is sent to the provider, the callback is verified, the
+signed file is kept and sealed, and the audit trail records it (see "Aadhaar eSign" in the
+server README). The web app does the same from its settings. You can also call the provider
+from your own backend, as shown below, and store the signed file yourself.
 
 ## What Aadhaar eSign is
 
@@ -26,10 +27,12 @@ policies, NDAs and most business documents, the built-in electronic signature in
 
 This is not legal advice. Ask your own counsel which documents need which kind of signature.
 
-## You need your own provider account
+## You need a provider account
 
-Codevibe Sign does not resell eSign. You sign up with the provider, buy eSign credits from them
-and give this package your API credentials. Each eSign is billed to your account.
+This package talks to the provider with the API credentials you give it, and each eSign is
+billed to that account. When you run the server yourself, that is your own account with the
+provider. The hosted Codevibe Sign app can also sign through Codevibe's account with prepaid
+credits.
 
 ## Install
 
@@ -49,6 +52,10 @@ Node 22 or later. The package uses `fetch` and `node:crypto`.
    `{ providerRef, status }`, where `status` is `signed`, `declined`, `expired` or `failed`.
 4. When the status is `signed`, `fetchSignedDocument(providerRef)` returns the signed PDF. Store it
    and record the event in the envelope's audit trail.
+
+The signed PDF carries the provider's digital signature. Do not draw on it or add pages to it
+afterwards: any change other than another signature breaks that signature. To seal it, use
+`countersign` from `@codevibe_technology/sign-pdf`.
 
 ## Usage
 
@@ -89,13 +96,26 @@ if (event?.status === 'signed') {
 
 ## API
 
-| Export                    | What it is                                                                                                      |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`. Implement it to add a provider.                         |
-| `EsignRequest`            | `envelopeId`, `recipient`, `documentBytes`, `documentName`, `signaturePositions`, `callbackUrl`, `redirectUrl`. |
-| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                              |
-| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                           |
-| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                     |
+| Export                    | What it is                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `webhookRef` and `checkCredentials`. Implement it to add a provider. |
+| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `signaturePositions`, `callbackUrl`, `redirectUrl`.                |
+| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                          |
+| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                       |
+| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                 |
+| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                  |
+
+`reference` is your own id for one request, sent to Leegality as the `irn`; it defaults to
+`envelopeId`. Give each attempt its own when a signer can start again.
+
+`webhookRef(rawBody)` reads the provider reference from a callback without checking anything.
+A server that holds several provider accounts uses it to find whose credentials must verify
+the callback; never act on it before `parseWebhook` has accepted the same body.
+
+`checkCredentials()` makes one read-only call and resolves when the provider accepts the
+credentials. The Leegality adapter asks for the status of a document id that cannot exist:
+an account Leegality recognises is told there is no such document, and any other answer
+throws `SignError('PROVIDER_ERROR')`.
 
 `parseWebhook` throws `SignError('WEBHOOK_INVALID')` for any body it cannot verify, and returns
 `null` for a verified callback that does not change the signer's status (such as a reviewer
@@ -155,6 +175,11 @@ by configuration rather than guessed:
 - **Response `status` on success**: the published sample shows `status: 0` beside a success
   message, so a returned `documentId` is treated as success.
 - **Webhook versions** other than 2.5 are not documented in the API reference.
+
+## Roadmap
+
+eMudhra as a second provider is planned. The `EsignProvider` interface is what it will
+implement, so nothing in your code changes when you switch.
 
 ## Docs
 

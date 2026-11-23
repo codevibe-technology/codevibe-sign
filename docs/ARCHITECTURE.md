@@ -13,7 +13,7 @@ packages you can embed in your own product, or run as a standalone service.
 | `@codevibe_technology/sign-server`  | HTTP API and runtime: stores envelopes, sends invitations and OTPs, runs signing sessions, fires webhooks, produces the sealed file. Adapters for storage, files, mail and OTP. | core, pdf, `hono`                     |
 | `@codevibe_technology/sign-client`  | Typed client for the HTTP API: sending, signing sessions, webhook checks. Uses `fetch` and Web Crypto only.                                                                     | nothing at runtime                    |
 | `@codevibe_technology/sign-react`   | UI: signature pad (draw, type, upload), signing view for recipients, field placement for senders. Unstyled by default, themed with CSS variables.                               | core, `react` (peer)                  |
-| `@codevibe_technology/sign-aadhaar` | Aadhaar eSign through a licensed eSign provider, using the integrator's own provider account.                                                                                   | core                                  |
+| `@codevibe_technology/sign-aadhaar` | Aadhaar eSign through a licensed eSign provider: the `EsignProvider` interface and the Leegality adapter. The server runs it for recipients with `auth: 'aadhaar'`.             | core                                  |
 
 Two more packages sit on top of these: `@codevibe_technology/sign-templates` (reusable
 templates and bulk drafts from a CSV file; depends on core) and `codevibe-sign`, the one
@@ -85,6 +85,28 @@ ports they need as arguments; nothing is global.
 
 The operator certificate is the platform's, not the signer's: it proves the file
 has not changed since sealing. Signer intent is proven by the audit trail.
+
+### After an Aadhaar eSign
+
+A recipient with `auth: 'aadhaar'` signs at an eSign provider, which puts its own digital
+signature on the file. Nothing but another signature can be added to a signed PDF without
+breaking that signature, so such an envelope is sealed differently:
+
+1. When the signer starts, the server draws every field value on the document and sends
+   that file to the provider. This is why the Aadhaar signer acts last, and why the
+   envelope holds one document and one Aadhaar signer.
+2. The provider's signed file is stored as it came. The seal is added after it as an
+   incremental update that changes none of its bytes, so the provider's signature and the
+   seal are both valid; `verify` accepts the seal over earlier signatures and reports them.
+3. The certificate cannot be a page of that file, so it is a sealed one-page PDF of its
+   own, stored and sent next to the signed document. It names the signer's method as
+   "Aadhaar eSign (via Leegality)".
+4. If the provider locked the file against any further signature, it is kept exactly as
+   the provider signed it, without the seal, and recognised by the SHA-256 recorded in the
+   audit trail.
+
+The server keeps the signer name the provider reports and the subject, issuer and SHA-256
+of the signing certificate. It never receives an Aadhaar number.
 
 ## Legal position (India, and in general)
 
