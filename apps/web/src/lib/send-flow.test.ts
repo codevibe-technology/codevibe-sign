@@ -2,6 +2,7 @@ import type { Envelope, Field } from '@codevibe_technology/sign-core';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_PDF_BYTES,
+  aadhaarProblems,
   adoptSavedRecipients,
   documentProblems,
   draftBody,
@@ -295,5 +296,65 @@ describe('reopening a draft', () => {
     expect(state.routing).toBe('parallel');
     expect(resumeStep(state)).toBe('fields');
     expect(resumeStep({ ...state, fields: [signature('r1'), signature('r2')] })).toBe('review');
+  });
+});
+
+describe('aadhaar esign', () => {
+  const ravi = person({
+    id: 'r_ravi',
+    name: 'Ravi Kumar',
+    email: 'ravi@example.com',
+    auth: 'aadhaar',
+  });
+  const asha = person({ id: 'r_asha' });
+
+  it('accepts one aadhaar signer who signs last on one document', () => {
+    expect(aadhaarProblems(flow({ recipients: [asha, ravi] }))).toEqual({});
+    expect(aadhaarProblems(flow({ recipients: [ravi] }))).toEqual({});
+    const copy = person({ id: 'r_copy', role: 'viewer' });
+    expect(aadhaarProblems(flow({ recipients: [asha, ravi, copy] }))).toEqual({});
+  });
+
+  it('points at the identity check when the rules are broken', () => {
+    const at = 'recipients.r_ravi.auth';
+    expect(aadhaarProblems(flow({ recipients: [ravi, asha] }))[at]).toMatch(/has to be last/);
+    expect(aadhaarProblems(flow({ recipients: [asha, ravi], routing: 'parallel' }))[at]).toMatch(
+      /One after another/,
+    );
+    const two = flow({
+      recipients: [ravi],
+      documents: [
+        { id: 'doc_1', name: 'a.pdf', size: 1, pages: [] },
+        { id: 'doc_2', name: 'b.pdf', size: 1, pages: [] },
+      ],
+    });
+    expect(aadhaarProblems(two)[at]).toMatch(/covers one document/);
+    const second = person({ id: 'r_two', auth: 'aadhaar', email: 'two@example.com' });
+    expect(aadhaarProblems(flow({ recipients: [ravi, second] }))['recipients.r_two.auth']).toMatch(
+      /Only one person/,
+    );
+    const approver = { ...ravi, role: 'approver' as const };
+    expect(aadhaarProblems(flow({ recipients: [approver] }))[at]).toMatch(/for signers/);
+  });
+
+  it('wants an Indian mobile number when one is given', () => {
+    const abroad = { ...ravi, phone: '+14155550100' };
+    expect(aadhaarProblems(flow({ recipients: [abroad] }))['recipients.r_ravi.phone']).toMatch(
+      /10-digit Indian mobile/,
+    );
+    const local = { ...ravi, phone: '+91 98123 45678' };
+    expect(aadhaarProblems(flow({ recipients: [local] }))).toEqual({});
+  });
+
+  it('is part of the recipients and review steps, and survives reopening a draft', () => {
+    const state = flow({
+      recipients: [ravi, asha],
+      fields: [signature('r_ravi'), signature('r_asha')],
+    });
+    expect(stepProblems('recipients', state)['recipients.r_ravi.auth']).toBeTruthy();
+    expect(stepProblems('review', state)['recipients.r_ravi.auth']).toBeTruthy();
+    expect(draftBody(flow({ recipients: [asha, ravi] })).recipients[1]).toMatchObject({
+      auth: 'aadhaar',
+    });
   });
 });

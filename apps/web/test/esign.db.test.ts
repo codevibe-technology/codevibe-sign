@@ -568,7 +568,9 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       const bare = await esignState({ sql, config: () => billingConfig({}) }, ws.id);
       expect(bare.blocked).toMatchObject({ reason: 'not_configured' });
       expect(bare.blocked!.message).toMatch(/coming soon/);
-      const { ESIGN_PROVIDER_COST_INR: _cost, ...noPrice } = ENV;
+      const noPrice = Object.fromEntries(
+        Object.entries(ENV).filter(([name]) => name !== 'ESIGN_PROVIDER_COST_INR'),
+      );
       const unpriced = await esignState({ sql, config: () => billingConfig(noPrice) }, ws.id);
       expect(unpriced.blocked).toMatchObject({ reason: 'price_not_set' });
       expect(unpriced.blocked!.message).not.toMatch(/cost|markup/i);

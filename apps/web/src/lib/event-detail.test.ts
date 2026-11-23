@@ -1,6 +1,41 @@
 import { describe, expect, it } from 'vitest';
-import { declineLine, eventDetail, maskEmail } from './envelopes';
+import { authLabel, declineLine, eventDetail, maskEmail } from './envelopes';
 import { declineNotice, renderMail, sampleInput } from './mail-templates';
+
+describe('aadhaar esign labels', () => {
+  it('names the provider once it is known', () => {
+    expect(authLabel({ auth: 'aadhaar' })).toBe('Aadhaar eSign');
+    expect(authLabel({ auth: 'aadhaar', esign: { provider: 'leegality' } })).toBe(
+      'Aadhaar eSign (via Leegality)',
+    );
+    expect(authLabel({ auth: 'email_otp', esign: { provider: 'leegality' } })).toBe('Email code');
+  });
+
+  it('describes the esign events without raw reason words', () => {
+    expect(
+      eventDetail({ action: 'recipient.esign_started', data: { provider: 'leegality' } }).label,
+    ).toBe('Started Aadhaar eSign with Leegality');
+    expect(
+      eventDetail({ action: 'recipient.esign_failed', data: { reason: 'no_credits' } }),
+    ).toEqual({
+      label: 'Aadhaar eSign did not finish',
+      note: 'Nothing was signed: the workspace had no Aadhaar eSign credits left.',
+    });
+    expect(eventDetail({ action: 'recipient.esign_failed', data: { reason: 'zzz' } })).toEqual({
+      label: 'Aadhaar eSign did not finish',
+    });
+    expect(
+      eventDetail({
+        action: 'recipient.signed',
+        data: { method: 'aadhaar_esign', provider: 'leegality', signerName: 'RAVI KUMAR' },
+      }),
+    ).toEqual({
+      label: 'Signed with Aadhaar eSign (via Leegality)',
+      note: 'Name on the signing certificate: RAVI KUMAR',
+    });
+    expect(eventDetail({ action: 'recipient.signed', data: {} })).toEqual({ label: 'Signed' });
+  });
+});
 
 describe('eventDetail', () => {
   it('names who shared a link by hand', () => {

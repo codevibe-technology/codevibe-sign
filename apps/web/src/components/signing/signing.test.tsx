@@ -471,3 +471,134 @@ describe('consent and signing', () => {
     );
   });
 });
+
+describe('signing with Aadhaar eSign', () => {
+  const aadhaar = (esign: NonNullable<SignerView['esign']>) =>
+    view({ recipient: { ...view().recipient, auth: 'aadhaar' }, esign });
+  const ESIGN_POLL = { every: 5, giveUpAfter: 60_000 };
+  const off = { available: true, provider: null, status: null } as const;
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/sign');
+  });
+
+  it('hands the filled-in document to the provider and leaves for its page', async () => {
+    const user = userEvent.setup();
+    const navigate = vi.fn();
+    const calls = server({
+      'GET /api/v1/sign/link': ok(aadhaar(off)),
+      [BRAND]: ok(brand),
+      'POST /api/v1/sign/link/view': ok({}),
+      'POST /api/v1/sign/link/esign': ok({
+        signUrl: 'https://sandbox.leegality.com/sign/abc',
+        expiresAt: '2026-11-24T10:00:00.000Z',
+      }),
+    });
+    render(<SigningApp smsAvailable={false} navigate={navigate} />);
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /continue|review/i }));
+    expect((await screen.findByTestId('esign-note')).textContent).toMatch(
+      /never sees your Aadhaar number/,
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue to Aadhaar eSign' }));
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith('https://sandbox.leegality.com/sign/abc'),
+    );
+    const start = calls.find((c) => c.method === 'POST' && c.path.endsWith('/link/esign'));
+    expect(start?.body).toEqual({ consent: true, values: [{ fieldId: 'f1', value: 'PNG' }] });
+    expect(calls.some((c) => c.path.endsWith('/link/submit'))).toBe(false);
+  });
+
+  it('waits after the provider sends the signer back, then thanks them', async () => {
+    window.history.replaceState(null, '', '/sign?esign=return');
+    server({
+      'GET /api/v1/sign/link': ok(
+        aadhaar({ available: true, provider: 'leegality', status: 'pending' }),
+      ),
+      [BRAND]: ok(brand),
+      'GET /api/v1/sign/link/esign': [
+        ok({
+          status: 'pending',
+          signUrl: 'https://sandbox.leegality.com/sign/abc',
+          expiresAt: null,
+        }),
+        ok({ status: 'signed', signUrl: null, expiresAt: null }),
+      ],
+      'GET /api/v1/sign/receipt': ok(receipt()),
+    });
+    render(<SigningApp smsAvailable={false} poll={POLL} esignPoll={ESIGN_POLL} />);
+    expect(
+      await screen.findByRole('heading', { name: 'Checking your Aadhaar eSign' }),
+    ).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Thank you, Ravi' })).toBeTruthy();
+    expect(window.location.search).toBe('');
+  });
+
+  it('thanks a signer whose link was already spent by the provider callback', async () => {
+    window.history.replaceState(null, '', '/sign?esign=return');
+    server({
+      'GET /api/v1/sign/link': refused(401, 'TOKEN_INVALID'),
+      'GET /api/v1/sign/receipt': [refused(401, 'TOKEN_INVALID'), ok(receipt())],
+      'GET /api/v1/sign/link/esign': ok({ status: 'signed', signUrl: null, expiresAt: null }),
+    });
+    render(<SigningApp smsAvailable={false} poll={POLL} esignPoll={ESIGN_POLL} />);
+    expect(await screen.findByRole('heading', { name: /^Thank you/ })).toBeTruthy();
+  });
+
+  it('offers another try when the eSign failed or ran out of time', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/sign?esign=return');
+    server({
+      'GET /api/v1/sign/link': ok(
+        aadhaar({ available: true, provider: 'leegality', status: 'failed' }),
+      ),
+      [BRAND]: ok(brand),
+      'GET /api/v1/sign/link/esign': ok({ status: 'failed', signUrl: null, expiresAt: null }),
+    });
+    render(<SigningApp smsAvailable={false} esignPoll={ESIGN_POLL} />);
+    expect(
+      await screen.findByRole('heading', { name: 'The Aadhaar eSign did not go through' }),
+    ).toBeTruthy();
+    await user.click(screen.getByTestId('esign-retry'));
+    expect(await screen.findByRole('checkbox')).toBeTruthy();
+  });
+
+  it('says the sender was told when a declined eSign comes back', async () => {
+    window.history.replaceState(null, '', '/sign?esign=return');
+    server({
+      'GET /api/v1/sign/link': ok(
+        aadhaar({ available: true, provider: 'leegality', status: 'pending' }),
+      ),
+      [BRAND]: ok(brand),
+      'GET /api/v1/sign/link/esign': ok({ status: 'declined', signUrl: null, expiresAt: null }),
+    });
+    render(<SigningApp smsAvailable={false} esignPoll={ESIGN_POLL} />);
+    expect(await screen.findByRole('heading', { name: 'You declined to sign' })).toBeTruthy();
+  });
+
+  it('explains, without blaming the signer, when the sender cannot start an eSign', async () => {
+    server({
+      'GET /api/v1/sign/link': ok(aadhaar({ available: false, provider: null, status: null })),
+      [BRAND]: ok(brand),
+    });
+    render(<SigningApp smsAvailable={false} />);
+    const note = await screen.findByTestId('esign-off');
+    expect(note.textContent).toMatch(/Acme HR cannot start at the moment/);
+    expect(note.textContent).not.toMatch(/credit|price|pay/i);
+  });
+
+  it('moves to the same message when the start is refused', async () => {
+    const user = userEvent.setup();
+    server({
+      'GET /api/v1/sign/link': ok(aadhaar(off)),
+      [BRAND]: ok(brand),
+      'POST /api/v1/sign/link/view': ok({}),
+      'POST /api/v1/sign/link/esign': refused(409, 'ESIGN_UNAVAILABLE', { reason: 'no_credits' }),
+    });
+    render(<SigningApp smsAvailable={false} navigate={vi.fn()} />);
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /continue|review/i }));
+    await user.click(await screen.findByRole('button', { name: 'Continue to Aadhaar eSign' }));
+    expect(await screen.findByTestId('esign-off')).toBeTruthy();
+  });
+});
