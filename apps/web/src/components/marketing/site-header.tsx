@@ -22,7 +22,14 @@ export interface SiteViewer {
  * The top bar of the public pages: wordmark, section links, docs and the way in. Someone
  * already signed in gets their dashboard and account menu instead of the sign-in buttons.
  */
-export function SiteHeader({ viewer = null }: { viewer?: SiteViewer | null }) {
+export function SiteHeader({
+  viewer = null,
+  samePage = false,
+}: {
+  viewer?: SiteViewer | null;
+  /** The page carries the home page sections itself, so the links stay on it. */
+  samePage?: boolean;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-header/95 text-header-ink backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
@@ -30,7 +37,7 @@ export function SiteHeader({ viewer = null }: { viewer?: SiteViewer | null }) {
           <Wordmark />
         </Link>
         <nav aria-label="Site" className="ml-6 hidden items-center gap-1 md:flex">
-          <SectionLinks links={SECTIONS} />
+          <SectionLinks links={SECTIONS} samePage={samePage} />
           <a
             href={DOCS_URL}
             className="rounded-md px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"

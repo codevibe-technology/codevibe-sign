@@ -15,7 +15,16 @@ const idOf = (link: SectionLink) => link.href.slice(2);
  * The header's links to the home page sections. On the home page the one for the section in
  * view is marked as the current location; elsewhere they are plain links back to the home page.
  */
-export function SectionLinks({ links, className }: { links: SectionLink[]; className?: string }) {
+export function SectionLinks({
+  links,
+  className,
+  samePage = false,
+}: {
+  links: SectionLink[];
+  className?: string;
+  /** Link to the sections on this page rather than on the home page. */
+  samePage?: boolean;
+}) {
   const [current, setCurrent] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,7 +57,7 @@ export function SectionLinks({ links, className }: { links: SectionLink[]; class
         return (
           <a
             key={link.href}
-            href={link.href}
+            href={samePage ? link.href.slice(1) : link.href}
             aria-current={here ? 'location' : undefined}
             className={cn(
               'relative rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10 hover:text-white',
