@@ -1,9 +1,11 @@
-import { ArrowRight, Check, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { pricedFeatures } from '@/components/billing/plan-comparison';
 import { cn } from '@/lib/cn';
-import { formatBytes, type PlanLimits } from '@/lib/plans';
+import type { PlanFeature } from '@/lib/plans';
+import type { PricingView } from '@/server/billing/pricing';
 import { APP_HOME } from '@/lib/safe-next';
 import { Clip } from './clip';
 import { CLIPS } from './clips';
@@ -146,7 +148,7 @@ await sign.envelopes.create({
   ],
 });`;
 
-const FAQ: { q: string; a: ReactNode }[] = [
+const faq = (pricing: PricingView): { q: string; a: ReactNode }[] => [
   {
     q: 'Are electronic signatures legally valid in India?',
     a: (
@@ -172,12 +174,19 @@ const FAQ: { q: string; a: ReactNode }[] = [
   {
     q: 'Is Aadhaar eSign available?',
     a: (
-      <p>
-        Not in the app yet. The open-source <code>sign-aadhaar</code> package is a standalone
-        library: the server and the web app do not call it, so today you use it from your own
-        backend with your own eSign provider account. Aadhaar eSign in the app, through a licensed
-        eSign provider, is planned.
-      </p>
+      <>
+        <p>
+          Yes. When you send a document you can ask a signer to sign with Aadhaar eSign: they
+          confirm with a one-time code from Aadhaar on the page of a licensed eSign provider, and
+          the signed file carries their Aadhaar-based digital signature as well as our seal. You pay
+          for each completed eSign with prepaid credits: {pricing.esignFree} on the Free plan and{' '}
+          {pricing.esignCloud} on Cloud, plus GST. An eSign that is not completed costs nothing.
+        </p>
+        <p className="mt-3">
+          A Cloud workspace can also connect its own Leegality account and be billed by Leegality
+          directly. Self-hosted installs use their own account.
+        </p>
+      </>
     ),
   },
   {
@@ -198,7 +207,21 @@ const FAQ: { q: string; a: ReactNode }[] = [
         Nothing already sent is affected: people can still sign, and every sealed copy stays
         downloadable. A new send that would go past a limit is refused with a message that names the
         limit and what to do. The monthly envelope count starts again on the 1st (UTC). To go
-        further, write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+        further, upgrade to Cloud from Settings, Plan and usage in your workspace: it takes effect
+        as soon as the payment is confirmed.
+      </p>
+    ),
+  },
+  {
+    q: 'How does paying for Cloud work?',
+    a: (
+      <p>
+        Cloud is {pricing.cloudMonth} a month for a workspace with {pricing.includedMembers}{' '}
+        members, or {pricing.cloudYear} for a year, plus {pricing.gstPercent}% GST. You pay for each
+        term up front by card, UPI or net banking and get a GST tax invoice by email. There is no
+        automatic charge: we remind you before a term ends, and if it is not renewed the workspace
+        has {pricing.graceDays} more days on Cloud and then moves back to the Free plan with all its
+        documents. You can cancel at any time and keep Cloud until the end of the term you paid for.
       </p>
     ),
   },
@@ -223,27 +246,9 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
 ];
 
-const count = (n: number | null, unit: string, many = `${unit}s`) =>
-  n === null ? `Unlimited ${many}` : `${n.toLocaleString('en-IN')} ${n === 1 ? unit : many}`;
-
-const size = (n: number | null) => (n === null ? 'any size' : formatBytes(n));
-
-function planLines(limits: PlanLimits): string[] {
-  return [
-    `${count(limits.envelopesPerMonth, 'envelope')} a month, bulk sends included`,
-    count(limits.members, 'member'),
-    limits.activeTemplates === null
-      ? 'Unlimited templates'
-      : `${count(limits.activeTemplates, 'active template')}`,
-    count(limits.webhooks, 'webhook endpoint'),
-    `Bulk send up to ${limits.bulkRows === null ? 'any number of' : limits.bulkRows.toLocaleString('en-IN')} rows`,
-    `${count(limits.apiRequestsPerDay, 'API request')} a day`,
-    `PDFs up to ${size(limits.fileBytes)}, ${size(limits.envelopeBytes)} per envelope`,
-    `${size(limits.storageBytes)} of stored documents`,
-    limits.customDomain ? 'Your own signing domain' : 'Signing links on sign.codevibe.in',
-    limits.badgeRequired ? '"Secured by Codevibe Sign" badge shown' : 'Badge optional',
-  ];
-}
+/** One line per row of the plan comparison, as a plan column lists them. */
+const planLines = (features: PlanFeature[], plan: 'free' | 'cloud'): string[] =>
+  features.map((row) => `${row.label}: ${row[plan].replace(/^./, (c) => c.toLowerCase())}`);
 
 /** A sheet of paper: the frame for the app's own screens on this page. */
 function Sheet({ children, className }: { children: ReactNode; className?: string }) {
@@ -382,6 +387,7 @@ function AuditSheet() {
 function PlanColumn({
   name,
   price,
+  per,
   note,
   lines,
   action,
@@ -389,6 +395,8 @@ function PlanColumn({
 }: {
   name: string;
   price: string;
+  /** What the price is for, after it: `a month`. */
+  per?: string;
   note: string;
   lines: string[];
   action: ReactNode;
@@ -402,7 +410,12 @@ function PlanColumn({
       )}
     >
       <h3 className="text-lg font-semibold">{name}</h3>
-      <p className="mt-3 font-display text-4xl font-bold tracking-tight">{price}</p>
+      <p className="mt-3 font-display text-4xl font-bold tracking-tight">
+        {price}
+        {per ? (
+          <span className="ml-2 font-sans text-base font-normal text-muted">{per}</span>
+        ) : null}
+      </p>
       <p className="mt-2 text-muted">{note}</p>
       <ul className="mt-6 flex-1 space-y-2.5 border-t border-line pt-5 text-sm">
         {lines.map((line) => (
@@ -419,14 +432,17 @@ function PlanColumn({
 
 /** The public home page of the hosted cloud. A signed-in visitor gets their dashboard instead of "Start free". */
 export function Landing({
-  free,
-  cloud,
+  features,
+  pricing,
   viewer = null,
 }: {
-  free: PlanLimits;
-  cloud: PlanLimits;
+  /** The plan comparison, from `planFeatures`. */
+  features: PlanFeature[];
+  /** Every price on the page, as text made on the server. */
+  pricing: PricingView;
   viewer?: SiteViewer | null;
 }) {
+  const rows = pricedFeatures(features, pricing);
   const start = viewer
     ? { href: APP_HOME, label: 'Go to dashboard' }
     : { href: '/sign-in', label: 'Start free' };
@@ -745,8 +761,8 @@ docker compose up -d`}</code>
               <PlanColumn
                 name="Free"
                 price="₹0"
-                note="A cloud workspace for trying it out and small teams."
-                lines={planLines(free)}
+                note="A cloud workspace for trying it out and for small teams."
+                lines={planLines(rows, 'free')}
                 action={
                   <Button asChild className="h-11 w-full">
                     <Link href={start.href}>{start.label}</Link>
@@ -756,18 +772,23 @@ docker compose up -d`}</code>
               />
               <PlanColumn
                 name="Cloud"
-                price="Coming soon"
-                note="For teams that send every day. Write to us from a Free workspace to be upgraded."
-                lines={planLines(cloud)}
+                price={pricing.cloudMonth}
+                per="a month"
+                note={`For one workspace with ${pricing.includedMembers} members. ${pricing.cloudYear} if you pay for a year${pricing.yearSaving ? `, ${pricing.yearSaving}` : ''}. More members are ${pricing.extraMember} each a month.`}
+                lines={planLines(rows, 'cloud')}
                 action={
-                  <Button asChild variant="secondary" className="h-11 w-full">
-                    <a
-                      href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Codevibe Sign Cloud plan')}`}
-                    >
-                      <Mail aria-hidden className="h-4 w-4" />
-                      Upgrade by email
-                    </a>
-                  </Button>
+                  <>
+                    <Button asChild variant="secondary" className="h-11 w-full">
+                      <Link href={start.href}>
+                        {viewer ? 'Upgrade in your workspace' : 'Start free, upgrade any time'}
+                      </Link>
+                    </Button>
+                    <p className="mt-2 text-center text-[13px] text-muted">
+                      {pricing.paymentsOpen
+                        ? 'Upgrade from Settings, Plan and usage. Cancel any time.'
+                        : 'Paying for Cloud opens shortly.'}
+                    </p>
+                  </>
                 }
               />
               <PlanColumn
@@ -779,17 +800,34 @@ docker compose up -d`}</code>
                   'Every feature, including the API and webhooks',
                   'Your documents stay on your server',
                   'Your own domain and brand',
+                  'Aadhaar eSign with your own eSign provider account',
                   'Help from the community on GitHub',
                 ]}
                 action={
-                  <Button asChild variant="secondary" className="h-11 w-full">
-                    <ExternalLink href={GITHUB_URL} bare>
-                      Self-host it
-                    </ExternalLink>
-                  </Button>
+                  <>
+                    <Button asChild variant="secondary" className="h-11 w-full">
+                      <ExternalLink href={GITHUB_URL} bare>
+                        Self-host it
+                      </ExternalLink>
+                    </Button>
+                    <p className="mt-2 text-center text-[13px] text-muted">
+                      <Link
+                        className="font-semibold text-primary hover:underline"
+                        href="/install-help"
+                      >
+                        Have it installed for you
+                      </Link>
+                      , {pricing.installHelp} plus GST
+                    </p>
+                  </>
                 }
               />
             </div>
+            <p {...reveal(2)} className="mt-6 text-sm text-muted">
+              Prices are in Indian rupees and do not include {pricing.gstPercent}% GST. Every
+              payment gets a GST tax invoice. Aadhaar eSign is paid per completed eSign with prepaid
+              credits.
+            </p>
           </div>
         </section>
 
@@ -815,7 +853,7 @@ docker compose up -d`}</code>
               </p>
             </div>
             <div className="divide-y divide-line border-y border-line" {...reveal(1)}>
-              {FAQ.map((item) => (
+              {faq(pricing).map((item) => (
                 <details key={item.q} className="group py-5 [&_a]:font-semibold [&_a]:text-primary">
                   <summary className="flex cursor-pointer list-none items-start justify-between gap-6 text-lg font-semibold [&::-webkit-details-marker]:hidden">
                     {item.q}

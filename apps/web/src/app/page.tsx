@@ -9,9 +9,10 @@ import {
   jsonLdScript,
   softwareApplicationJsonLd,
 } from '@/lib/home-seo';
-import { limitsFor } from '@/lib/plans';
+import { planFeatures } from '@/lib/plans';
 import { APP_HOME } from '@/lib/safe-next';
 import { getSessionUser } from '@/server/auth/session';
+import { currentPricing } from '@/server/billing/pricing';
 import { env } from '@/server/env';
 import { planSettings } from '@/server/plans';
 
@@ -53,8 +54,8 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: jsonLdScript(softwareApplicationJsonLd(env().APP_URL)) }}
       />
       <Landing
-        free={limitsFor('free', settings)}
-        cloud={limitsFor('cloud', settings)}
+        features={planFeatures(settings)}
+        pricing={currentPricing()}
         viewer={user ? { name: user.name, email: user.email } : null}
       />
     </>

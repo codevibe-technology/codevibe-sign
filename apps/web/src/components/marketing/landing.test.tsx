@@ -6,13 +6,32 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), refres
 vi.mock('@/lib/auth-client', () => ({ authClient: { signOut: vi.fn() } }));
 vi.mock('@/server/actions/personal', () => ({ updatePreferencesAction: vi.fn() }));
 
-import { CLOUD_PLAN_LIMITS, FREE_PLAN_LIMITS } from '@/lib/plans';
+import { FREE_PLAN_LIMITS, planFeatures } from '@/lib/plans';
+import type { PricingView } from '@/server/billing/pricing';
+
+const FEATURES = planFeatures({ mode: 'hosted', freeOverrides: {} });
+const PRICING: PricingView = {
+  cloudMonth: '₹999',
+  cloudYear: '₹9,990',
+  yearSaving: '2 months free',
+  extraMember: '₹99',
+  includedMembers: 25,
+  esignFree: '₹35 per eSign',
+  esignCloud: '₹25 per eSign',
+  installHelp: '₹1,999',
+  gstPercent: 18,
+  graceDays: 7,
+  paymentsOpen: true,
+  testMode: false,
+  operatorEmail: null,
+  hostingOffers: [],
+};
 const { Landing } = await import('./landing');
 const { LegalPage, LegalSection } = await import('./legal-page');
 
 describe('Landing', () => {
   it('leads with the promise and the two ways in', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     expect(
       screen.getByRole('heading', { level: 1, name: 'Get it signed. Keep the proof.' }),
     ).toBeInTheDocument();
@@ -39,8 +58,8 @@ describe('Landing', () => {
   it('offers a signed-in visitor their dashboard instead of the ways in', () => {
     render(
       <Landing
-        free={FREE_PLAN_LIMITS}
-        cloud={CLOUD_PLAN_LIMITS}
+        features={FEATURES}
+        pricing={PRICING}
         viewer={{ name: 'Asha Rao', email: 'asha@example.com' }}
       />,
     );
@@ -62,7 +81,7 @@ describe('Landing', () => {
   });
 
   it('shows the ways in to everyone else', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} viewer={null} />);
+    render(<Landing features={FEATURES} pricing={PRICING} viewer={null} />);
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
@@ -74,7 +93,7 @@ describe('Landing', () => {
   });
 
   it('has every section, reachable from the header', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     for (const id of ['features', 'developers', 'open-source', 'pricing', 'faq']) {
       expect(document.getElementById(id)).not.toBeNull();
     }
@@ -92,16 +111,16 @@ describe('Landing', () => {
   });
 
   it('sends everyone else to sign-in from every call to action', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const ways = screen.getAllByRole('link', { name: /Start free/ });
-    // the header, the hero, the Free plan and the closing call to action
-    expect(ways).toHaveLength(4);
+    // the header, the hero, the Free and Cloud plans and the closing call to action
+    expect(ways).toHaveLength(5);
     for (const link of ways) expect(link).toHaveAttribute('href', '/sign-in');
     expect(screen.queryByRole('link', { name: /Go to dashboard/ })).toBeNull();
   });
 
   it('tells the six steps with a still and a description of each', () => {
-    const { container } = render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    const { container } = render(<Landing features={FEATURES} pricing={PRICING} />);
     const story = document.getElementById('features')!;
     expect(
       within(story).getByRole('heading', {
@@ -149,7 +168,7 @@ describe('Landing', () => {
   });
 
   it('shows the audit trail as a real hash chain', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const proof = document.getElementById('proof')!;
     const entries = [...proof.querySelectorAll('figure ol > li')];
     expect(entries.map((li) => li.querySelector('code')?.textContent)).toEqual([
@@ -163,7 +182,7 @@ describe('Landing', () => {
   });
 
   it('shows the API with a working client call', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const developers = document.getElementById('developers')!;
     const code = within(developers).getByLabelText(
       'Sending an envelope with the TypeScript client',
@@ -172,41 +191,67 @@ describe('Landing', () => {
     expect(code.textContent).toContain('sign.envelopes.create(');
   });
 
-  it('prices from the plan limits it is given', () => {
+  it('prices from the plan limits and the prices it is given', () => {
     render(
-      <Landing free={{ ...FREE_PLAN_LIMITS, envelopesPerMonth: 20 }} cloud={CLOUD_PLAN_LIMITS} />,
+      <Landing
+        features={planFeatures({ mode: 'hosted', freeOverrides: { envelopesPerMonth: 20 } })}
+        pricing={PRICING}
+      />,
     );
     const pricing = document.getElementById('pricing')!;
-    expect(within(pricing).getByText('20 envelopes a month, bulk sends included')).toBeTruthy();
-    expect(within(pricing).getByText(`${FREE_PLAN_LIMITS.members} members`)).toBeTruthy();
-    expect(within(pricing).getByText('PDFs up to 10 MB, 25 MB per envelope')).toBeTruthy();
-    expect(within(pricing).getByText('200 MB of stored documents')).toBeTruthy();
+    expect(within(pricing).getByText('Envelopes sent: 20 envelopes a month')).toBeTruthy();
+    expect(within(pricing).getByText(`Members: ${FREE_PLAN_LIMITS.members} members`)).toBeTruthy();
+    expect(within(pricing).getByText('Webhooks: not included')).toBeTruthy();
+    expect(within(pricing).getByText('Envelopes sent: unlimited')).toBeTruthy();
+    expect(within(pricing).getByText('₹999')).toBeTruthy();
+    expect(within(pricing).getByText(/₹9,990 if you pay for a year, 2 months free/)).toBeTruthy();
+    expect(within(pricing).getByText(/More members are ₹99 each a month/)).toBeTruthy();
+    expect(within(pricing).getByText('Aadhaar eSign: ₹35 per eSign, prepaid')).toBeTruthy();
+    expect(within(pricing).getByText('Aadhaar eSign: ₹25 per eSign, prepaid')).toBeTruthy();
     expect(
-      within(pricing).getByText('Unlimited envelopes a month, bulk sends included'),
-    ).toBeTruthy();
-    expect(within(pricing).getByText('Unlimited templates')).toBeTruthy();
-    expect(within(pricing).getByText('Coming soon')).toBeTruthy();
-    expect(within(pricing).getByRole('link', { name: 'Upgrade by email' })).toHaveAttribute(
-      'href',
-      expect.stringMatching(/^mailto:hello@codevibe\.in/),
-    );
+      within(pricing).getByRole('link', { name: 'Have it installed for you' }),
+    ).toHaveAttribute('href', '/install-help');
+    expect(within(pricing).getByText(/do not include 18% GST/)).toBeTruthy();
     expect(
       within(pricing).getByText('No limits on envelopes, members or storage'),
     ).toBeInTheDocument();
   });
 
+  it('says a price is coming while none is set, and never how a price is made up', () => {
+    render(
+      <Landing
+        features={FEATURES}
+        pricing={{
+          ...PRICING,
+          esignFree: 'Price coming soon',
+          esignCloud: 'Price coming soon',
+          paymentsOpen: false,
+        }}
+      />,
+    );
+    const pricing = document.getElementById('pricing')!;
+    expect(within(pricing).getAllByText('Aadhaar eSign: price coming soon, prepaid')).toHaveLength(
+      2,
+    );
+    expect(within(pricing).getByText('Paying for Cloud opens shortly.')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/markup|at cost|provider cost|\+ ?₹10/i);
+  });
+
   it('answers the legal, data and limit questions', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const faq = document.getElementById('faq')!;
     expect(within(faq).getByText(/Information Technology Act, 2000/)).toBeTruthy();
     expect(within(faq).getByText('Is Aadhaar eSign available?')).toBeTruthy();
-    expect(within(faq).getByText(/standalone\s+library/)).toBeTruthy();
+    expect(
+      within(faq).getByText(/₹35 per eSign on the Free plan\s+and ₹25 per eSign on Cloud/),
+    ).toBeTruthy();
+    expect(within(faq).getByText('How does paying for Cloud work?')).toBeTruthy();
     expect(within(faq).getByText('Where is my data kept?')).toBeTruthy();
     expect(within(faq).getByText(/Nothing already sent is affected/)).toBeTruthy();
   });
 
   it('opens links to other sites in a new tab and says so', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const links = [...document.querySelectorAll<HTMLAnchorElement>('a[href^="http"]')];
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
@@ -224,7 +269,7 @@ describe('Landing', () => {
   });
 
   it('links the footer to docs, the verify page, GitHub, terms, privacy and Codevibe', () => {
-    render(<Landing free={FREE_PLAN_LIMITS} cloud={CLOUD_PLAN_LIMITS} />);
+    render(<Landing features={FEATURES} pricing={PRICING} />);
     const footer = screen.getByRole('navigation', { name: 'Footer' });
     const hrefs = within(footer)
       .getAllByRole('link')
