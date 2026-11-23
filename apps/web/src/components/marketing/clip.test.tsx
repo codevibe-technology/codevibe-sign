@@ -24,6 +24,20 @@ function setReducedMotion(reduce: boolean) {
 
 const scrollTo = (isIntersecting: boolean) => act(() => observed?.([{ isIntersecting }]));
 
+/** The browser gives up on the file it picked, the way Chrome does on a VP9 it cannot decode. */
+function failToDecode(video: HTMLVideoElement) {
+  const picked = video.querySelector('source')!.src;
+  Object.defineProperty(video, 'currentSrc', { value: picked, configurable: true });
+  Object.defineProperty(video, 'error', { value: { code: 3 }, configurable: true });
+  Object.defineProperty(video, 'paused', { value: true, configurable: true });
+  act(() => {
+    video.dispatchEvent(new Event('error'));
+  });
+}
+
+const sourcesOf = (container: HTMLElement) =>
+  [...container.querySelectorAll('video source')].map((s) => s.getAttribute('src'));
+
 beforeEach(() => {
   observed = null;
   vi.stubGlobal(
@@ -57,7 +71,7 @@ afterEach(() => {
 });
 
 describe('Clip', () => {
-  it('downloads nothing up front and offers both formats with a poster', () => {
+  it('downloads nothing up front and offers H.264 before VP9, with a poster', () => {
     setReducedMotion(false);
     const { container } = render(<Clip clip={CLIP} />);
     const video = container.querySelector('video')!;
@@ -71,9 +85,11 @@ describe('Clip', () => {
     expect(video).toHaveAttribute('height', '800');
     expect(video.loop).toBe(true);
     expect(video.muted).toBe(true);
-    expect([...video.querySelectorAll('source')].map((s) => s.getAttribute('src'))).toEqual([
-      '/home/send.webm',
-      '/home/send.mp4',
+    expect(
+      [...video.querySelectorAll('source')].map((s) => [s.getAttribute('src'), s.type]),
+    ).toEqual([
+      ['/home/send.mp4', 'video/mp4'],
+      ['/home/send.webm', 'video/webm'],
     ]);
     expect(play).not.toHaveBeenCalled();
   });
@@ -157,5 +173,95 @@ describe('Clip', () => {
     const { container } = render(<Clip clip={CLIP} active={false} prefetch />);
     expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata');
     expect(play).not.toHaveBeenCalled();
+  });
+
+  it('moves on to the other file when the first one fails to decode, and keeps playing', () => {
+    setReducedMotion(false);
+    const { container } = render(<Clip clip={CLIP} active />);
+    scrollTo(true);
+    const first = container.querySelector('video')!;
+    act(() => {
+      first.dispatchEvent(new Event('playing'));
+    });
+    expect(container.querySelector('img')).toBeNull();
+    play.mockClear();
+
+    failToDecode(first);
+
+    const second = container.querySelector('video')!;
+    expect(second).not.toBe(first);
+    expect(sourcesOf(container)).toEqual(['/home/send.webm']);
+    // the poster covers the clip again until the next file really plays
+    expect(container.querySelector('img')).toHaveAttribute('src', '/home/send.webp');
+    expect(play).toHaveBeenCalled();
+    expect(play.mock.contexts.every((video) => video === second)).toBe(true);
+    // the new element is watched: it still pauses when scrolled away
+    scrollTo(false);
+    expect(pause.mock.contexts).toContain(second);
+  });
+
+  it('keeps the poster when the last file fails as well, without retrying for ever', () => {
+    setReducedMotion(false);
+    const { container } = render(<Clip clip={CLIP} active />);
+    scrollTo(true);
+    failToDecode(container.querySelector('video')!);
+    const last = container.querySelector('video')!;
+    play.mockClear();
+    failToDecode(last);
+    expect(container.querySelector('video')).toBe(last);
+    expect(sourcesOf(container)).toEqual(['/home/send.webm']);
+    expect(container.querySelector('img')).toHaveAttribute('src', '/home/send.webp');
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it('skips straight to the next file the browser has not tried yet', () => {
+    setReducedMotion(false);
+    const { container } = render(<Clip clip={CLIP} active />);
+    scrollTo(true);
+    const video = container.querySelector('video')!;
+    // a browser without H.264 passes over the MP4 and fails on the WebM: nothing is left
+    Object.defineProperty(video, 'currentSrc', {
+      value: 'http://localhost/home/send.webm',
+      configurable: true,
+    });
+    Object.defineProperty(video, 'error', { value: { code: 3 }, configurable: true });
+    act(() => {
+      video.dispatchEvent(new Event('error'));
+    });
+    expect(container.querySelector('video')).toBe(video);
+    expect(sourcesOf(container)).toEqual(['/home/send.mp4', '/home/send.webm']);
+  });
+
+  it('switches the file of a waiting clip without starting it', () => {
+    setReducedMotion(false);
+    const { container } = render(<Clip clip={CLIP} active={false} prefetch />);
+    failToDecode(container.querySelector('video')!);
+    expect(sourcesOf(container)).toEqual(['/home/send.webm']);
+    expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata');
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it('with reduced motion resumes a clip the visitor started on the next file', async () => {
+    setReducedMotion(true);
+    const { container } = render(<Clip clip={CLIP} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Play the clip: sending a document' }),
+    );
+    play.mockClear();
+    failToDecode(container.querySelector('video')!);
+    const next = container.querySelector('video')!;
+    expect(sourcesOf(container)).toEqual(['/home/send.webm']);
+    expect(play.mock.contexts).toEqual([next]);
+  });
+
+  it('ignores an error event that carries no media error', () => {
+    setReducedMotion(false);
+    const { container } = render(<Clip clip={CLIP} active />);
+    const video = container.querySelector('video')!;
+    act(() => {
+      video.dispatchEvent(new Event('error'));
+    });
+    expect(container.querySelector('video')).toBe(video);
+    expect(sourcesOf(container)).toEqual(['/home/send.mp4', '/home/send.webm']);
   });
 });

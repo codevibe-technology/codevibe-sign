@@ -155,7 +155,7 @@ describe('Landing', () => {
       expect(step.getAttribute('aria-hidden')).toBe(id === 'send' ? null : 'true');
       // the still that stands in for the clip when motion is reduced
       expect(step.querySelector('img')).toHaveAttribute('src', `/home/${clip}.webp`);
-      expect(step.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.webm`);
+      expect(step.querySelector('video source')).toHaveAttribute('src', `/home/${clip}.mp4`);
       expect(document.getElementById(`${id}-text`)!.textContent!.length).toBeGreaterThan(40);
     }
     // only the first step's clip is on the pinned stage before anyone scrolls

@@ -1,7 +1,14 @@
 'use client';
 
 import { Pause, Play } from 'lucide-react';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type RefObject,
+  type SyntheticEvent,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { cn } from '@/lib/cn';
 
 export interface ClipSpec {
@@ -26,6 +33,32 @@ const prefersReducedMotion = () =>
   typeof window !== 'undefined' && !!window.matchMedia?.(REDUCED_MOTION).matches;
 
 /**
+ * The files of a clip, in the order the browser should try them. H.264 comes first: every
+ * browser that has it decodes it in hardware without trouble, and Safari on an iPhone needs it.
+ * VP9 is for browsers without H.264. Chrome on a Mac hands VP9 to the hardware decoder, which
+ * can refuse it; Chrome then falls back to software, but not when several clips start at once,
+ * and the clip stops with a decode error.
+ */
+export function clipSources(clip: Pick<ClipSpec, 'name'>) {
+  return [
+    { src: `/home/${clip.name}.mp4`, type: 'video/mp4' },
+    { src: `/home/${clip.name}.webm`, type: 'video/webm' },
+  ];
+}
+
+/** Starts the clip and notes that it should be playing, so a retry after an error resumes it. */
+function start(video: HTMLVideoElement, wanted: RefObject<boolean>) {
+  wanted.current = true;
+  video.muted = true;
+  video.play().catch(() => {});
+}
+
+function stop(video: HTMLVideoElement, wanted: RefObject<boolean>) {
+  wanted.current = false;
+  if (!video.paused) video.pause();
+}
+
+/**
  * A short silent clip of the product. Nothing is downloaded until the clip is on screen; then it
  * plays on a loop, and it pauses again when scrolled away. Visitors who ask for reduced motion see
  * the poster and start it themselves. The button pauses any clip, as moving content must be.
@@ -35,6 +68,9 @@ const prefersReducedMotion = () =>
  *
  * The poster is an image over the video rather than the video's own poster, so the browser can
  * load it lazily like any other image.
+ *
+ * A file that fails to play is dropped and the clip starts again from the next one; with none
+ * left the poster stays.
  */
 export function Clip({
   clip,
@@ -57,9 +93,14 @@ export function Clip({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const pausedByVisitor = useRef(false);
+  const wanted = useRef(false);
+  const resumeAfterError = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
+  const [dropped, setDropped] = useState(0);
   const reduced = useSyncExternalStore(subscribeToMotion, prefersReducedMotion, () => false);
+  const all = clipSources(clip);
+  const sources = all.slice(dropped);
 
   useEffect(() => {
     const video = ref.current;
@@ -67,33 +108,50 @@ export function Clip({
     // React does not write `muted` into the server HTML; browsers only autoplay muted video.
     video.muted = true;
     if (reduced || active === false || typeof IntersectionObserver === 'undefined') {
-      if (!video.paused) video.pause();
+      stop(video, wanted);
       return;
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          if (active || !pausedByVisitor.current) video.play().catch(() => {});
-        } else if (!video.paused) {
-          video.pause();
+          if (active || !pausedByVisitor.current) start(video, wanted);
+        } else {
+          stop(video, wanted);
         }
       },
       { threshold: 0.35 },
     );
     observer.observe(video);
     return () => observer.disconnect();
-  }, [reduced, active]);
+  }, [reduced, active, dropped]);
+
+  useEffect(() => {
+    const video = ref.current;
+    if (!video || dropped === 0 || !resumeAfterError.current) return;
+    resumeAfterError.current = false;
+    start(video, wanted);
+  }, [dropped]);
+
+  const onError = (event: SyntheticEvent<HTMLVideoElement>) => {
+    const video = event.currentTarget;
+    if (!video.error) return;
+    const failed = sources.findIndex((source) => video.currentSrc.endsWith(source.src));
+    const next = dropped + Math.max(failed, 0) + 1;
+    resumeAfterError.current = wanted.current;
+    setPlaying(false);
+    setStarted(false);
+    if (next < all.length) setDropped(next);
+  };
 
   const toggle = () => {
     const video = ref.current;
     if (!video) return;
     if (playing) {
       pausedByVisitor.current = true;
-      video.pause();
+      stop(video, wanted);
     } else {
       pausedByVisitor.current = false;
-      video.muted = true;
-      video.play().catch(() => {});
+      start(video, wanted);
     }
   };
 
@@ -101,6 +159,8 @@ export function Clip({
   return (
     <div className={cn('group relative', className)}>
       <video
+        // A fresh element for the next file: a failed one keeps its error after its sources change.
+        key={dropped}
         ref={ref}
         className="block h-auto w-full bg-surface-2"
         width={clip.width}
@@ -115,9 +175,11 @@ export function Clip({
         onPlay={() => setPlaying(true)}
         onPlaying={() => setStarted(true)}
         onPause={() => setPlaying(false)}
+        onError={onError}
       >
-        <source src={`${src}.webm`} type="video/webm" />
-        <source src={`${src}.mp4`} type="video/mp4" />
+        {sources.map((source) => (
+          <source key={source.src} src={source.src} type={source.type} />
+        ))}
       </video>
       {started ? null : (
         <img
