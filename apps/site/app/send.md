@@ -81,12 +81,16 @@ written in the PDF itself, see [Fields across pages and tags](/guides/field-tags
 
 <HelpClip name="place-fields" caption="Placing initials on every page, a quick add, and a text field on chosen pages." />
 
-A signer who uses Aadhaar eSign has no fields. With them picked, the tray offers nothing and
-a note says: "Leegality places the Aadhaar signature where your Leegality workflow says (set
-the signature position in the workflow). You don't place a box." Give any date, text or
-checkbox to a signer before them. The document Leegality signs is then exactly what you
-approved, with the earlier signers' fields filled in. See
-[Set the signature position](/guides/aadhaar-leegality#set-the-signature-position).
+A signer who uses Aadhaar eSign fills in nothing. With them picked, the tray offers one item,
+**Aadhaar seal position**, and the quick add **Aadhaar seal on last page**. The box is
+optional and only marks where Leegality draws the Aadhaar signature: it has a dashed edge, its
+panel says "Position only", it has no Required switch, and nothing is drawn for it in any PDF.
+There is at most one; drag it to move it. It is used when the Leegality account in use has a
+V4 workflow. Without a box, or without one, Leegality places the signature where its workflow
+says, and the note above the pages says so. Give any date, text or checkbox to a signer
+before them. The document Leegality signs is then exactly what you approved, with the earlier
+signers' fields filled in. See
+[Choose where the signature goes](/guides/aadhaar-leegality#choose-where-the-signature-goes).
 
 **Preview as signer** shows the pages as the recipient you pick sees them, with only their
 fields. **Back to editing** returns to placing fields.

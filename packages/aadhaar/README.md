@@ -122,14 +122,18 @@ if (event?.status === 'signed') {
 
 ## API
 
-| Export                    | What it is                                                                                                                                                     |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EsignProvider`           | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `fetchAuditTrail`, `webhookRef` and `checkCredentials`. Implement it to add a provider. |
-| `EsignRequest`            | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `callbackUrl`, `redirectUrl`, optional `signaturePositions`.                          |
-| `EsignEvent`              | `{ providerRef, status, signerName?, signedAt? }`.                                                                                                             |
-| `createLeegalityProvider` | The Leegality adapter. Options below.                                                                                                                          |
-| `computeLeegalityMac`     | The webhook `mac` for a document id, for tests and tooling.                                                                                                    |
-| `leegalityWebhookRef`     | The document id a Leegality webhook body names, read without verifying it.                                                                                     |
+| Export                                                                                                                             | What it is                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EsignProvider`                                                                                                                    | `createRequest`, `parseWebhook`, `fetchSignedDocument`, and optionally `fetchAuditTrail`, `webhookRef` and `checkCredentials`. Implement it to add a provider. |
+| `EsignRequest`                                                                                                                     | `envelopeId`, `reference`, `recipient`, `documentBytes`, `documentName`, `callbackUrl`, `redirectUrl`, optional `signaturePositions`.                          |
+| `EsignEvent`                                                                                                                       | `{ providerRef, status, signerName?, signedAt? }`.                                                                                                             |
+| `createLeegalityProvider`                                                                                                          | The Leegality adapter. Options below.                                                                                                                          |
+| `computeLeegalityMac`                                                                                                              | The webhook `mac` for a document id, for tests and tooling.                                                                                                    |
+| `leegalityWebhookRef`                                                                                                              | The provider reference a Leegality webhook body names (document id, or `v4:<packId>:<documentId>`), read without verifying it.                                 |
+| `SignaturePosition`, `PageBox`                                                                                                     | `{ page, rect, pageBox? }`; `pageBox` is the page's crop box in user space and its `rotation`.                                                                 |
+| `leegalityV4WorkflowFromPayload`                                                                                                   | The workflow id and part ids from a v4 workflow's downloaded API payload (object or JSON text).                                                                |
+| `toLeegalityRect`                                                                                                                  | The v4 `rect` for a position under a `LeegalityCoordinateMapping`.                                                                                             |
+| `parseLeegalityCoordinateUnits`, `parseLeegalityCoordinateOrigin`, `describeLeegalityCoordinates`, `LEEGALITY_DEFAULT_COORDINATES` | Read and show the coordinate setting (`points` or `pixels@<dpi>`; `bottom-left` or `top-left`).                                                                |
 
 `reference` is your own id for one request, sent to Leegality as the `irn`; it defaults to
 `envelopeId`. Give each attempt its own when a signer can start again.
@@ -157,17 +161,19 @@ your handler idempotent on `(providerRef, status)`.
 
 ### Leegality options
 
-| Option                   | Required | Notes                                                                                               |
-| ------------------------ | -------- | --------------------------------------------------------------------------------------------------- |
-| `environment`            | yes      | `sandbox` (`https://sandbox.leegality.com/api`) or `production` (`https://app1.leegality.com/api`). |
-| `authToken`              | yes      | Dashboard, API Settings. Sent as `X-Auth-Token`.                                                    |
-| `privateSalt`            | yes      | Dashboard, API Settings. Verifies webhook `mac`.                                                    |
-| `profileId`              | yes      | The Workflow ID, or a function `(request) => workflowId`.                                           |
-| `confirmWebhooks`        | no       | Default `true`. Confirms each webhook with the Check transaction status API.                        |
-| `webhookHeader`          | no       | `{ name, value }` of a static header Leegality support adds to your webhooks.                       |
-| `timeoutMs`              | no       | Default 30 000, covering the response body as well. Whole milliseconds, at most 10 minutes.         |
-| `maxSignedDocumentBytes` | no       | Default 50 MB.                                                                                      |
-| `baseUrl`, `fetch`       | no       | Overrides for proxies and tests. `baseUrl` must be https (plain http only for localhost).           |
+| Option                   | Required | Notes                                                                                                         |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `environment`            | yes      | `sandbox` (`https://sandbox.leegality.com/api`) or `production` (`https://app1.leegality.com/api`).           |
+| `authToken`              | yes      | Dashboard, API Settings. Sent as `X-Auth-Token`.                                                              |
+| `privateSalt`            | yes      | Dashboard, API Settings. Verifies webhook `mac`.                                                              |
+| `profileId`              | yes      | The Workflow ID, or a function `(request) => workflowId`.                                                     |
+| `confirmWebhooks`        | no       | Default `true`. Confirms each webhook with the Check transaction status API.                                  |
+| `webhookHeader`          | no       | `{ name, value }` of a static header Leegality support adds to your webhooks.                                 |
+| `timeoutMs`              | no       | Default 30 000, covering the response body as well. Whole milliseconds, at most 10 minutes.                   |
+| `maxSignedDocumentBytes` | no       | Default 50 MB.                                                                                                |
+| `v4`                     | no       | A v4 workflow (`leegalityV4WorkflowFromPayload`). Requests with `signaturePositions` then use it.             |
+| `coordinates`            | no       | `{ units: 'points' \| { pixelsPerInch }, origin: 'bottom-left' \| 'top-left' }`. Default points, bottom-left. |
+| `baseUrl`, `fetch`       | no       | Overrides for proxies and tests. `baseUrl` must be https (plain http only for localhost).                     |
 
 ### Set up the Leegality workflow
 
@@ -180,15 +186,45 @@ API request. In the Leegality dashboard, for the workflow you pass as `profileId
 - under the invitee's custom URLs and webhooks, set the Webhook and Error Webhook to your
   `callbackUrl`, choose webhook version 2.5, and set the Redirect URL to your `redirectUrl`.
 
+### Placing the signature per request (v4)
+
+Leegality's v3.0 request has no field for a signature position. Its v4 Pack API has one:
+`coordinates[]` per invitee, with `appearances[]` of `pageNo` (from 1) and
+`rect { x1Axis, y1Axis, x2Axis, y2Axis }`
+([Send Pack for eSigning (Sync)](https://knowledge.leegality.com/document-execution/api/create-pack-sync)).
+With the `v4` option, a request that carries `signaturePositions` is sent to
+`POST /api/v4/pack/sync` with the signer's appearances at those positions, its success and
+error webhooks set to `callbackUrl` with version 4.0, and `redirectUrl` as the invitee's
+redirect URL. Its `providerRef` is `v4:<packId>:<documentId>`. Webhook 4.0 bodies are verified
+with the same `mac` (HMAC-SHA1 of `document.documentId`) and confirmed with
+[Check Pack Details](https://knowledge.leegality.com/document-execution/api/check-pack-details);
+files come from [Download files](https://knowledge.leegality.com/document-execution/api/download-files).
+Requests without positions keep using v3.0, so both kinds of `providerRef` work side by side.
+
+The v4 API refers to the workflow's document, sub-document, signer and combination by UUID.
+`leegalityV4WorkflowFromPayload(json)` reads them, and the full workflow id, from the file the
+dashboard's **Download API Payload** gives
+([Download the v4 API payload](https://knowledge.leegality.com/document-execution/api/download-v4-api-payload));
+nothing else of the file is kept. Ids left out are generated per request.
+
+A position is `{ page, rect, pageBox }`: the zero-based page, the box in PDF points from the
+top-left of the page as displayed (as `Field.rect`), and the page's crop box in user space with
+its `/Rotate`. Leegality does not document the unit or origin of `rect`; the default, PDF
+points from the bottom-left of the unrotated page, follows its earlier API, which named the
+corners "lower-left" and "upper-right". `toLeegalityRect(position, coordinates)` gives the
+rectangle that is sent; check it once with a sandbox eSign and change `coordinates` if the
+seal lands elsewhere.
+
 ### What Leegality's public documentation does not cover
 
 The adapter only does what Leegality's published API reference confirms. These gaps are handled
 by configuration rather than guessed:
 
-- **Signature positions, callback URL and redirect URL** are not fields of the Create eSigning
-  request API. They come from the workflow (see above), so `signaturePositions`, `callbackUrl`
-  and `redirectUrl` are not sent. Without coordinates in the workflow, Leegality puts the
-  signature at the bottom left of every page.
+- **Signature positions, callback URL and redirect URL** are not fields of the v3.0 Create
+  eSigning request API. They come from the workflow (see above), so a v3.0 request sends none
+  of them. Without coordinates in the workflow, Leegality puts the signature at the bottom left
+  of every page. A v4 request sends all three.
+- **Units and origin of v4 coordinates** are not documented; see `coordinates` above.
 - **Choosing Aadhaar per request** is not documented; the workflow decides the eSign type.
 - **Webhook authenticity**: the documented `mac` is HMAC-SHA1 of the `documentId` only, keyed by
   the Private Salt. The rest of the body is not covered, and no timestamp or replay protection
@@ -201,7 +237,8 @@ by configuration rather than guessed:
   specified, so they are mapped generically.
 - **Response `status` on success**: the published sample shows `status: 0` beside a success
   message, so a returned `documentId` is treated as success.
-- **Webhook versions** other than 2.5 are not documented in the API reference.
+- **Webhook versions**: v3.0 requests rely on version 2.5 set in the workflow; v4 requests ask
+  for 4.0 themselves.
 
 ## Roadmap
 
