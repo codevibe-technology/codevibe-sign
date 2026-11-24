@@ -66,6 +66,8 @@ the minor version and says so in its first line.
 - In the field placer a field starts on "This page only"; "Show on pages" puts it on all pages
   or specific pages.
 - Light theme by default in the app and the docs.
+- Uploading a PDF that already carries digital signatures is refused with a message to upload
+  the unsigned original, since signing it again here would remove them.
 
 ### Stronger evidence
 
