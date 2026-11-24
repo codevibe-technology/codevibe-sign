@@ -313,13 +313,15 @@ The provider's test environment was used. Such a signature is for testing and ha
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature
-where its own workflow says, and signs the document as the sender approved it, with
-the values of the signers before them. `signature`, `initials` and `aadhaar` fields
-given to such a signer are dropped when the envelope is sent, so older requests still
-work; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar
-eSign box, is read on envelopes sent while it marked where the signer signs; it takes
-no value, and only an Aadhaar eSign signer may have one.
+A recipient with `auth: aadhaar` fills in nothing: the eSign provider signs the
+document as the sender approved it, with the values of the signers before them. They
+may have one `aadhaar` field, the Aadhaar seal position: it only says where the
+provider draws its signature, takes no value, and nothing is drawn for it. Without it
+the provider places the signature where its own setting says. A second `aadhaar`
+field is refused with `VALIDATION`. `signature` and `initials` fields given to such a
+signer are dropped when the envelope is sent, so older requests still work; any other
+field for them is refused with `VALIDATION`. Only an Aadhaar eSign signer may have an
+`aadhaar` field.
 
 <p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code></p>
 
@@ -1023,13 +1025,15 @@ The document's `key` or `id`. Optional when the envelope has one document.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature
-where its own workflow says, and signs the document as the sender approved it, with
-the values of the signers before them. `signature`, `initials` and `aadhaar` fields
-given to such a signer are dropped when the envelope is sent, so older requests still
-work; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar
-eSign box, is read on envelopes sent while it marked where the signer signs; it takes
-no value, and only an Aadhaar eSign signer may have one.
+A recipient with `auth: aadhaar` fills in nothing: the eSign provider signs the
+document as the sender approved it, with the values of the signers before them. They
+may have one `aadhaar` field, the Aadhaar seal position: it only says where the
+provider draws its signature, takes no value, and nothing is drawn for it. Without it
+the provider places the signature where its own setting says. A second `aadhaar`
+field is refused with `VALIDATION`. `signature` and `initials` fields given to such a
+signer are dropped when the envelope is sent, so older requests still work; any other
+field for them is refused with `VALIDATION`. Only an Aadhaar eSign signer may have an
+`aadhaar` field.
 
 <p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code><span aria-hidden="true"> · </span>Default <code>signature</code></p>
 
@@ -1956,13 +1960,15 @@ The document's `key` or `id`. Optional when the envelope has one document.
 <div class="api-field">
 <p class="api-field__head"><code class="api-field__name">type</code> <span class="api-field__type">string</span></p>
 
-A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature
-where its own workflow says, and signs the document as the sender approved it, with
-the values of the signers before them. `signature`, `initials` and `aadhaar` fields
-given to such a signer are dropped when the envelope is sent, so older requests still
-work; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar
-eSign box, is read on envelopes sent while it marked where the signer signs; it takes
-no value, and only an Aadhaar eSign signer may have one.
+A recipient with `auth: aadhaar` fills in nothing: the eSign provider signs the
+document as the sender approved it, with the values of the signers before them. They
+may have one `aadhaar` field, the Aadhaar seal position: it only says where the
+provider draws its signature, takes no value, and nothing is drawn for it. Without it
+the provider places the signature where its own setting says. A second `aadhaar`
+field is refused with `VALIDATION`. `signature` and `initials` fields given to such a
+signer are dropped when the envelope is sent, so older requests still work; any other
+field for them is refused with `VALIDATION`. Only an Aadhaar eSign signer may have an
+`aadhaar` field.
 
 <p class="api-field__meta">One of <code>signature</code> <code>initials</code> <code>date_signed</code> <code>name</code> <code>text</code> <code>checkbox</code> <code>aadhaar</code><span aria-hidden="true"> · </span>Default <code>signature</code></p>
 

@@ -354,13 +354,16 @@ createSignServer({
 
 How it runs:
 
-1. The signer has no fields: the provider places the signature where its own workflow says.
-   They give their consent on your signing page, which posts to
-   `POST /v1/sign/:token/esign`. The server sends the document as the sender approved it,
-   with the values of the signers before them drawn on it and nothing else, to the provider
-   and answers `{ signUrl, expiresAt }`. Send the signer to `signUrl`. Asking again while the
-   attempt is open answers the same page. `signature`, `initials` and `aadhaar` fields given
-   to such a signer are dropped when the envelope is sent; any other field is refused.
+1. The signer fills in nothing. The sender may give them one `aadhaar` field, the Aadhaar
+   seal position: the server passes it to the provider as `signaturePositions` (with the
+   page's crop box and rotation) and draws nothing for it. Without it the provider places
+   the signature where its own setting says. The signer gives their consent on your signing
+   page, which posts to `POST /v1/sign/:token/esign`. The server sends the document as the
+   sender approved it, with the values of the signers before them drawn on it and nothing
+   else, to the provider and answers `{ signUrl, expiresAt }`. Send the signer to
+   `signUrl`. Asking again while the attempt is open answers the same page. `signature` and
+   `initials` fields given to such a signer are dropped when the envelope is sent; a second
+   `aadhaar` field and any other field are refused.
 2. The provider calls `POST /v1/esign/webhooks/<provider name>`. The body names the
    request; the server finds the workspace that started it and verifies the body with that
    workspace's provider before acting. The signing page can also poll
