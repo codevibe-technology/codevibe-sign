@@ -1,6 +1,6 @@
 {
   "name": "codevibe-sign",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open-source e-signatures for your own product: seal PDFs with PAdES, verify them offline and talk to a Codevibe Sign server. One Apache-2.0 package with the API client, PDF tools, React components and a CLI.",
   "keywords": [
     "e-signature",

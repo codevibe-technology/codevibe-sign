@@ -1,6 +1,6 @@
 {
   "name": "@codevibe_technology/sign-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React components for signing: signature pad, signing view and field placement.",
   "keywords": [
     "esign",
