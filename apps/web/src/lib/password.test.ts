@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PASSWORD_MAX, PASSWORD_MIN, passwordProblem } from './password';
+import { PASSWORD_MAX, PASSWORD_MIN, passwordProblem, passwordStrength } from './password';
 
 const COMMON = /first anyone would guess/;
 
@@ -79,5 +79,27 @@ describe('passwordProblem', () => {
 
   it('ignores account parts too short to mean anything', () => {
     expect(passwordProblem('mango-river-li-lantern', { email: 'li@x.io', name: 'Li' })).toBeNull();
+  });
+});
+
+describe('passwordStrength', () => {
+  it('says nothing before anything is typed', () => {
+    expect(passwordStrength('')).toEqual({ score: 0, label: '' });
+  });
+
+  it('calls everything the rules refuse too weak, however decorated', () => {
+    for (const password of ['short', 'P@ssw0rd123!', 'qwertyuiop', 'asha.rao.2026']) {
+      expect(
+        passwordStrength(password, { email: 'asha.rao@example.com', name: 'Asha Rao' }),
+      ).toEqual({ score: 1, label: 'Too weak' });
+    }
+  });
+
+  it('grows with length first, then with a mix of characters', () => {
+    expect(passwordStrength('mangoriver').label).toBe('Fair');
+    expect(passwordStrength('mango river lantern').label).toBe('Good');
+    expect(passwordStrength('Mango-river-7').label).toBe('Good');
+    expect(passwordStrength('seven quiet copper kettles').label).toBe('Strong');
+    expect(passwordStrength('Mango-River-Lamp-7').label).toBe('Strong');
   });
 });

@@ -239,8 +239,8 @@ export function SignInForm({
         ) : null}
       </div>
       <p className="text-center text-[13px] text-muted">
-        New here? Use &quot;Email me a link instead&quot;. It creates your account, and you can add
-        a password afterwards in your settings.
+        New here? Use &quot;Email me a link instead&quot;. It creates your account, and you choose a
+        password when you set up your workspace.
       </p>
       <p className="text-center text-xs text-muted">
         By signing in you agree to your workspace&apos;s terms of use.

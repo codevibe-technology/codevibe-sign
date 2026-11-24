@@ -8,7 +8,7 @@ import { ROLE_LABELS } from '@/lib/roles';
 import { getSessionUser } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { findInvitation, invitationState } from '@/server/invitations';
-import { hasAccount } from '@/server/auth/passwords';
+import { hasAccount, needsPassword } from '@/server/auth/passwords';
 import { AcceptInvitation } from './accept-invitation';
 import { turnstileSiteKey } from '@/server/human-check';
 import { JoinForm } from './join-form';
@@ -88,7 +88,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       action={
         <AcceptInvitation
           token={token}
+          email={user.email}
           askName={!hasName(user)}
+          askPassword={await needsPassword(db(), user.id)}
           suggestedName={invitation.name ?? ''}
         />
       }

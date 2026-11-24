@@ -50,7 +50,7 @@ beforeEach(() => {
 
 describe('CreateWorkspaceForm', () => {
   it('suggests the address from the name behind a fixed prefix', async () => {
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
     const address = screen.getByLabelText('Workspace address');
     expect(address).toHaveValue('acme-hr');
@@ -60,7 +60,7 @@ describe('CreateWorkspaceForm', () => {
   });
 
   it('says when the address is taken and fills in a free one', async () => {
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     await userEvent.type(screen.getByLabelText('Workspace name'), 'Codevibe');
     expect(await screen.findByText('This address is taken. Try codevibe-2.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
@@ -71,7 +71,7 @@ describe('CreateWorkspaceForm', () => {
   });
 
   it('stops following the name once the address is edited', async () => {
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     const name = screen.getByLabelText('Workspace name');
     const address = screen.getByLabelText('Workspace address');
     await userEvent.type(name, 'Acme');
@@ -83,7 +83,7 @@ describe('CreateWorkspaceForm', () => {
   });
 
   it('shows format problems at once, without asking the server', async () => {
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     await userEvent.type(screen.getByLabelText('Workspace address'), 'ab');
     expect(screen.getByRole('alert')).toHaveTextContent('Use at least 3 characters.');
     expect(mocks.requests).toEqual([]);
@@ -97,7 +97,7 @@ describe('CreateWorkspaceForm', () => {
       field: 'slug',
     });
     mocks.createWorkspaceAction.mockResolvedValueOnce({ ok: true, data: { slug: 'acme-hr' } });
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
     await screen.findByText('Available');
     await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
@@ -109,7 +109,7 @@ describe('CreateWorkspaceForm', () => {
 
   it('asks someone with no name for it first, and sends it with the workspace', async () => {
     mocks.createWorkspaceAction.mockResolvedValueOnce({ ok: true, data: { slug: 'acme-hr' } });
-    render(<CreateWorkspaceForm host="sign.codevibe.in" askName />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" askName />);
     await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
     await screen.findByText('Available');
     await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
@@ -126,7 +126,7 @@ describe('CreateWorkspaceForm', () => {
   });
 
   it('does not ask someone who already has a name', () => {
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     expect(screen.queryByLabelText('Your name')).toBeNull();
   });
 
@@ -137,7 +137,7 @@ describe('CreateWorkspaceForm', () => {
       error: 'A name needs at least one letter',
       field: 'yourName',
     });
-    render(<CreateWorkspaceForm host="sign.codevibe.in" askName />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" askName />);
     await userEvent.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
     await screen.findByText('Available');
@@ -145,8 +145,61 @@ describe('CreateWorkspaceForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('at least one letter');
   });
 
+  it('asks someone with only email links for a password, typed twice, with a meter', async () => {
+    mocks.createWorkspaceAction.mockResolvedValueOnce({ ok: true, data: { slug: 'acme-hr' } });
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" askPassword />);
+    expect(screen.getByText(/even when email links are slow/)).toBeVisible();
+    await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
+    await screen.findByText('Available');
+
+    const password = screen.getByLabelText('Password');
+    await userEvent.type(password, 'asha2026');
+    expect(screen.getByText('Too weak')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('at least 10 characters');
+    expect(mocks.createWorkspaceAction).not.toHaveBeenCalled();
+
+    await userEvent.clear(password);
+    await userEvent.type(password, 'seven quiet copper kettles');
+    expect(screen.getByText('Strong')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'seven quiet copper kettle');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('do not match');
+    expect(mocks.createWorkspaceAction).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getByLabelText('Confirm password'), 's');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(mocks.createWorkspaceAction).toHaveBeenCalledWith({
+      name: 'Acme HR',
+      slug: 'acme-hr',
+      password: 'seven quiet copper kettles',
+    });
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard/acme-hr'));
+  });
+
+  it('shows the server’s word on the password next to that field', async () => {
+    mocks.createWorkspaceAction.mockResolvedValueOnce({
+      ok: false,
+      code: 'VALIDATION',
+      error: 'Do not build the password from your email address or name.',
+      field: 'password',
+    });
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" askPassword />);
+    await userEvent.type(screen.getByLabelText('Workspace name'), 'Acme HR');
+    await screen.findByText('Available');
+    await userEvent.type(screen.getByLabelText('Password'), 'mango river lantern');
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'mango river lantern');
+    await userEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('email address or name');
+  });
+
+  it('asks no password of someone who has a way in already', () => {
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
+    expect(screen.queryByLabelText('Password')).toBeNull();
+  });
+
   it('writes an Indian-script name in Latin letters', async () => {
-    render(<CreateWorkspaceForm host="sign.codevibe.in" />);
+    render(<CreateWorkspaceForm host="sign.codevibe.in" email="asha@example.com" />);
     await userEvent.type(screen.getByLabelText('Workspace name'), 'भारत');
     expect(screen.getByLabelText('Workspace address')).toHaveValue('bharat');
   });

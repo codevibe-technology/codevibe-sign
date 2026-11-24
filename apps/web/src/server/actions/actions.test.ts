@@ -9,12 +9,19 @@ const state = vi.hoisted(() => ({
   calls: [] as string[],
   signingArgs: [] as unknown[],
   inviterName: '',
+  needsPassword: false,
 }));
 
 const WORKSPACE = { id: 'ws_1', slug: 'acme', name: 'Acme' };
 
 vi.mock('../auth/session', () => ({ getSessionUser: async () => state.user }));
-vi.mock('../db', () => ({ db: () => ({}) }));
+// The only query these actions run themselves: whether the person has a way to sign in
+// besides an emailed link (`needsPassword`).
+vi.mock('../db', () => ({ db: () => async () => (state.needsPassword ? [] : [{}]) }));
+vi.mock('../auth/first-password', () => ({
+  setFirstPassword: async (user: { id: string }, password: string) =>
+    void state.calls.push(`setFirstPassword:${user.id}:${password}`),
+}));
 vi.mock('../env', () => ({
   env: () => ({ SINGLE_WORKSPACE: state.singleWorkspace, APP_URL: 'https://sign.example.com' }),
 }));
@@ -165,6 +172,7 @@ beforeEach(() => {
   state.singleWorkspace = false;
   state.workspaceCount = 0;
   state.calls = [];
+  state.needsPassword = false;
 });
 
 describe.each(workspaceActions)('%s', (_name, minimum, action, input) => {
@@ -339,6 +347,62 @@ describe('user actions', () => {
     expect(state.calls).toEqual([]);
     expect((await acceptInvitationAction({ token: 'abc', name: 'Ravi Kumar' })).ok).toBe(true);
     expect(state.calls).toEqual(['acceptInvitation', 'setOwnName:u9:Ravi Kumar']);
+  });
+
+  it('ask someone with only email links for a password before their first workspace', async () => {
+    state.needsPassword = true;
+    expect(await createWorkspaceAction({ name: 'Acme' })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION',
+      field: 'password',
+      error: 'Choose a password for your account',
+    });
+    for (const password of ['short', 'Password@123', 'asha@example.com!!']) {
+      expect(await createWorkspaceAction({ name: 'Acme', password })).toMatchObject({
+        ok: false,
+        field: 'password',
+      });
+    }
+    expect(state.calls).toEqual([]);
+    expect(
+      (await createWorkspaceAction({ name: 'Acme', password: 'seven quiet kettles' })).ok,
+    ).toBe(true);
+    expect(state.calls).toEqual(['createWorkspace', 'setFirstPassword:u1:seven quiet kettles']);
+  });
+
+  it('never ask or set a password for someone who has a way in already', async () => {
+    expect(
+      (await createWorkspaceAction({ name: 'Acme', password: 'seven quiet kettles' })).ok,
+    ).toBe(true);
+    expect((await acceptInvitationAction({ token: 'abc', password: 'x' })).ok).toBe(true);
+    expect(state.calls).toEqual(['createWorkspace', 'acceptInvitation']);
+  });
+
+  it('ask for a password when someone with only email links accepts an invitation', async () => {
+    state.needsPassword = true;
+    state.user = { id: 'u9', name: '', email: 'ravi@example.com', image: null };
+    expect(await acceptInvitationAction({ token: 'abc', name: 'Ravi Kumar' })).toMatchObject({
+      ok: false,
+      field: 'password',
+    });
+    expect(
+      await acceptInvitationAction({ token: 'abc', name: 'Ravi Kumar', password: 'ravikumar123' }),
+    ).toMatchObject({ ok: false, field: 'password', error: expect.stringMatching(/name/) });
+    expect(state.calls).toEqual([]);
+    expect(
+      (
+        await acceptInvitationAction({
+          token: 'abc',
+          name: 'Ravi Kumar',
+          password: 'amber tide owl',
+        })
+      ).ok,
+    ).toBe(true);
+    expect(state.calls).toEqual([
+      'acceptInvitation',
+      'setOwnName:u9:Ravi Kumar',
+      'setFirstPassword:u9:amber tide owl',
+    ]);
   });
 
   it('sign an invitation with the inviter’s name, or their email address without one', async () => {

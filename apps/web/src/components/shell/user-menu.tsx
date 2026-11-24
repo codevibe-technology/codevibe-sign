@@ -9,6 +9,7 @@ import { useTours } from '@/components/tour/tour-provider';
 import { authClient } from '@/lib/auth-client';
 import { hasName, initialOf } from '@/lib/person-name';
 import type { Theme } from '@/lib/preferences';
+import { announceSignOut } from '@/lib/session-sync';
 import { updatePreferencesAction } from '@/server/actions/personal';
 import { applyTheme } from './theme';
 
@@ -45,6 +46,7 @@ export function UserMenu({
 
   async function signOut() {
     await authClient.signOut();
+    announceSignOut('chosen');
     router.replace('/sign-in');
     router.refresh();
   }

@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { ROLES } from '@/lib/roles';
+import { setFirstPassword } from '../auth/first-password';
+import { choosePassword } from '../auth/passwords';
 import { db } from '../db';
 import { env } from '../env';
 import { acceptInvitation, createInvitation, revokeInvitation } from '../invitations';
@@ -93,16 +95,24 @@ export const leaveWorkspaceAction = workspaceAction('envelopes.read', z.object({
 
 /**
  * Joins the workspace. Someone who has saved no name yet gives it here, so nobody enters a
- * team as a bare email address.
+ * team as a bare email address. Someone with no password who signs in only by emailed link
+ * chooses one here, the same rule as for creating a workspace.
  */
 export const acceptInvitationAction = userAction(
-  z.object({ token: z.string().min(1).max(100), name: personNameInput.optional() }),
+  z.object({
+    token: z.string().min(1).max(100),
+    name: personNameInput.optional(),
+    password: z.string().max(1000).optional(),
+  }),
   async (user, input) => {
     const unnamed = !hasName(user);
     if (unnamed && !input.name) throw new AppError('VALIDATION', 'Enter your name', 'name');
     const sql = db();
+    const named = { ...user, name: unnamed && input.name ? input.name : user.name };
+    const chosen = await choosePassword(sql, named, input.password);
     const joined = await acceptInvitation(sql, input.token, user);
     if (unnamed && input.name) await setOwnName(sql, user.id, input.name);
+    if (chosen) await setFirstPassword(named, chosen);
     return joined;
   },
 );

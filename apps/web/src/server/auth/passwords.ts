@@ -26,6 +26,37 @@ export async function hasPassword(sql: Sql, userId: string): Promise<boolean> {
   return Boolean(row);
 }
 
+/**
+ * Whether the person must choose a password before they create or join a workspace: they
+ * have none and sign in only by emailed link. Someone who signs in with Google already has a
+ * way in that does not wait for an email, so they are not asked.
+ */
+export async function needsPassword(sql: Sql, userId: string): Promise<boolean> {
+  const [row] = await sql`
+    select 1 from auth_accounts
+    where user_id = ${userId} and (provider_id <> 'credential' or password is not null)`;
+  return !row;
+}
+
+/**
+ * The password to set for someone who `needsPassword`, checked against the password rules;
+ * null when they need none. A missing or weak one is an error on the `password` field, raised
+ * before anything else in the step is saved.
+ */
+export async function choosePassword(
+  sql: Sql,
+  user: { id: string; email: string; name: string },
+  password: string | undefined,
+): Promise<string | null> {
+  if (!(await needsPassword(sql, user.id))) return null;
+  if (!password) {
+    throw new AppError('VALIDATION', 'Choose a password for your account', 'password');
+  }
+  const problem = passwordProblem(password, user);
+  if (problem) throw new AppError('VALIDATION', problem, 'password');
+  return password;
+}
+
 /** Whether anyone has an account with this address. */
 export async function hasAccount(sql: Sql, email: string): Promise<boolean> {
   const [row] = await sql`select 1 from auth_users where lower(email) = ${cleanEmail(email)}`;

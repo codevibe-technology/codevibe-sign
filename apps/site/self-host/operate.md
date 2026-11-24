@@ -59,6 +59,14 @@ A setting that is set but malformed is named in the logs and in `/api/health`.
 | `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` | The Microsoft 365 app registration, with `MAIL_TRANSPORT=graph`.                                                                                                                                     |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`         | Optional **Continue with Google**. Redirect URI: `https://<SIGN_HOST>/api/auth/callback/google`.                                                                                                     |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`       | Optional Cloudflare Turnstile bot check on sign-in, forgot password, the invitation password step and installation help booking. Off while both are empty. Use a **Managed** widget for `SIGN_HOST`. |
+| `SESSION_IDLE_MINUTES`                             | Signs people out of the app after this many minutes without activity in any tab, with a warning two minutes before. Default `30`; `0` turns idle sign-out off. At most `1440`.                       |
+| `SESSION_MAX_HOURS`                                | The longest one sign-in lasts, however active. Default `12`, so everyone signs in once a day; at most `720` (30 days).                                                                               |
+
+The server enforces both limits, not only the browser: a session idle longer than
+`SESSION_IDLE_MINUTES`, or older than `SESSION_MAX_HOURS`, is refused and deleted, so a copied
+cookie stops working too. Activity is written at most once a minute per session. Signers on
+the signing page are not affected; their links have their own expiry. A changed value applies
+to every session from its next request, after a restart.
 
 ### How the install behaves
 

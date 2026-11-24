@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AuthFrame } from '@/components/shell/status-page';
+import { signOutNotice } from '@/lib/idle-sign-out';
 import { safeNext } from '@/lib/safe-next';
 import { getSessionUser } from '@/server/auth/session';
 import { env, googleEnabled } from '@/server/env';
@@ -17,6 +18,10 @@ export default async function SignInPage({
   const params = await searchParams;
   const next = safeNext(params.next);
   if (await getSessionUser()) redirect(next);
+  const notice =
+    params.reset !== undefined
+      ? 'Your password was changed. Sign in with the new one.'
+      : signOutNotice(params.reason, env().SESSION_IDLE_MINUTES);
   return (
     <AuthFrame>
       <p className="eyebrow mb-2">Codevibe Sign</p>
@@ -29,9 +34,7 @@ export default async function SignInPage({
         google={googleEnabled(env())}
         failed={params.error !== undefined}
         humanCheckKey={turnstileSiteKey()}
-        {...(params.reset !== undefined
-          ? { notice: 'Your password was changed. Sign in with the new one.' }
-          : {})}
+        {...(notice ? { notice } : {})}
       />
     </AuthFrame>
   );

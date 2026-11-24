@@ -12,6 +12,7 @@ const actions = vi.hoisted(() => ({
   joinWithPasswordAction: vi.fn(),
   setPasswordAction: vi.fn(),
   signOutOtherSessionsAction: vi.fn(),
+  signOutEverywhereAction: vi.fn(),
   acceptInvitationAction: vi.fn(),
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -247,6 +248,7 @@ describe('JoinForm', () => {
     expect(screen.getByLabelText('Email')).toHaveAttribute('readonly');
     await user.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/dashboard/acme'));
     expect(actions.joinWithPasswordAction).toHaveBeenCalledWith({
@@ -267,6 +269,19 @@ describe('JoinForm', () => {
     await user.type(screen.getByLabelText('Choose a password'), 'ravi-kumar-2026');
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(screen.getByRole('alert')).toHaveTextContent('email address or name');
+    expect(actions.joinWithPasswordAction).not.toHaveBeenCalled();
+  });
+
+  it('wants the password typed the same twice', async () => {
+    const user = userEvent.setup();
+    render(<JoinForm {...props} suggestedName="Ravi Kumar" />);
+    await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    expect(screen.getByText('Good')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create account and join' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Type the password again');
+    await user.type(screen.getByLabelText('Confirm password'), `${GOOD}x`);
+    await user.click(screen.getByRole('button', { name: 'Create account and join' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('do not match');
     expect(actions.joinWithPasswordAction).not.toHaveBeenCalled();
   });
 
@@ -292,6 +307,7 @@ describe('JoinForm', () => {
     render(<JoinForm {...props} />);
     await user.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('You already have an account');
     expect(screen.getByRole('link', { name: 'Sign in to accept' })).toHaveAttribute(
@@ -313,6 +329,7 @@ describe('JoinForm', () => {
     render(<JoinForm {...props} />);
     await user.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('first anyone would guess');
     expect(screen.getByLabelText('Choose a password')).toHaveAttribute('aria-invalid', 'true');
@@ -328,7 +345,7 @@ describe('AcceptInvitation', () => {
 
   it('accepts with one press for someone who has a name', async () => {
     const user = userEvent.setup();
-    render(<AcceptInvitation token="inv_token" />);
+    render(<AcceptInvitation token="inv_token" email="ravi@example.com" />);
     expect(screen.queryByLabelText('Your name')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
     expect(actions.acceptInvitationAction).toHaveBeenCalledWith({ token: 'inv_token' });
@@ -337,7 +354,14 @@ describe('AcceptInvitation', () => {
 
   it('asks someone without a name for it, starting from the invitation', async () => {
     const user = userEvent.setup();
-    render(<AcceptInvitation token="inv_token" askName suggestedName="Ravi Kumar" />);
+    render(
+      <AcceptInvitation
+        token="inv_token"
+        email="ravi@example.com"
+        askName
+        suggestedName="Ravi Kumar"
+      />,
+    );
     const name = screen.getByLabelText('Your name');
     expect(name).toHaveValue('Ravi Kumar');
     await user.clear(name);
@@ -352,6 +376,38 @@ describe('AcceptInvitation', () => {
     });
   });
 
+  it('asks someone with only email links for a password before joining', async () => {
+    const user = userEvent.setup();
+    render(<AcceptInvitation token="inv_token" email="ravi@example.com" askPassword />);
+    expect(screen.getByText(/even when email links are slow/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('at least 10 characters');
+    await user.type(screen.getByLabelText('Password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
+      token: 'inv_token',
+      password: GOOD,
+    });
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/dashboard/acme'));
+  });
+
+  it('shows the server’s word on the password next to that field', async () => {
+    const user = userEvent.setup();
+    actions.acceptInvitationAction.mockResolvedValue({
+      ok: false,
+      code: 'VALIDATION',
+      error: 'Choose a password for your account',
+      field: 'password',
+    });
+    render(<AcceptInvitation token="inv_token" email="ravi@example.com" askPassword />);
+    await user.type(screen.getByLabelText('Password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a password');
+    expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('shows the server’s word on the name next to the field', async () => {
     const user = userEvent.setup();
     actions.acceptInvitationAction.mockResolvedValue({
@@ -360,7 +416,9 @@ describe('AcceptInvitation', () => {
       error: 'A name needs at least one letter',
       field: 'name',
     });
-    render(<AcceptInvitation token="inv_token" askName suggestedName="Ravi" />);
+    render(
+      <AcceptInvitation token="inv_token" email="ravi@example.com" askName suggestedName="Ravi" />,
+    );
     await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('at least one letter');
     expect(router.push).not.toHaveBeenCalled();
@@ -376,6 +434,7 @@ describe('PasswordForm', () => {
     render(<PasswordForm user={account} hasPassword={false} />);
     expect(screen.queryByLabelText('Current password')).toBeNull();
     await user.type(screen.getByLabelText('Password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Set password' }));
     expect(actions.setPasswordAction).toHaveBeenCalledWith({
       newPassword: GOOD,
@@ -392,6 +451,7 @@ describe('PasswordForm', () => {
     render(<PasswordForm user={account} hasPassword />);
     await user.type(screen.getByLabelText('Current password'), GOOD);
     await user.type(screen.getByLabelText('New password'), 'seven quiet copper kettles');
+    await user.type(screen.getByLabelText('Confirm password'), 'seven quiet copper kettles');
     await user.click(screen.getByRole('checkbox', { name: /Sign out my other devices/ }));
     await user.click(screen.getByRole('button', { name: 'Change password' }));
     expect(actions.setPasswordAction).toHaveBeenCalledWith({
@@ -413,6 +473,7 @@ describe('PasswordForm', () => {
     render(<PasswordForm user={account} hasPassword />);
     await user.type(screen.getByLabelText('Current password'), 'not-the-password');
     await user.type(screen.getByLabelText('New password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Change password' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('That is not your current password');
     expect(screen.getByLabelText('Current password')).toHaveAttribute('aria-invalid', 'true');
@@ -436,5 +497,29 @@ describe('PasswordForm', () => {
       expect(toast.success).toHaveBeenCalledWith('Signed out on your other devices'),
     );
     expect(actions.signOutOtherSessionsAction).toHaveBeenCalledWith({});
+  });
+
+  it('signs out of every device, this one too, after a confirmation', async () => {
+    const user = userEvent.setup();
+    actions.signOutEverywhereAction.mockResolvedValue({ ok: true, data: undefined });
+    render(<PasswordForm user={account} hasPassword />);
+    await user.click(screen.getByRole('button', { name: 'Sign out of all devices' }));
+    const dialog = screen.getByRole('dialog', { name: 'Sign out of all devices?' });
+    expect(dialog).toHaveTextContent('including this one');
+    expect(actions.signOutEverywhereAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    expect(actions.signOutEverywhereAction).toHaveBeenCalledWith({});
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/sign-in'));
+  });
+
+  it('asks for the new password twice and shows how strong it is', async () => {
+    const user = userEvent.setup();
+    render(<PasswordForm user={account} hasPassword={false} />);
+    await user.type(screen.getByLabelText('Password'), 'seven quiet copper kettles');
+    expect(screen.getByText('Strong')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Confirm password'), 'seven quiet');
+    await user.click(screen.getByRole('button', { name: 'Set password' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('do not match');
+    expect(actions.setPasswordAction).not.toHaveBeenCalled();
   });
 });

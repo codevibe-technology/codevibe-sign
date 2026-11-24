@@ -1,7 +1,7 @@
 import 'server-only';
 import { APIError, betterAuth } from 'better-auth';
 import { db } from '../db';
-import { env, googleEnabled } from '../env';
+import { appSessionPolicy, env, googleEnabled } from '../env';
 import { sendMagicLink, sendPasswordChanged, sendPasswordReset } from '../mail';
 import { checkHuman } from '../human-check';
 import { appRuntime } from '../runtime';
@@ -22,6 +22,7 @@ function createAuth() {
       sql: db(),
       appUrl: config.APP_URL,
       secret: config.AUTH_SECRET,
+      sessionPolicy: appSessionPolicy(config),
       ...(googleEnabled(config)
         ? {
             google: {

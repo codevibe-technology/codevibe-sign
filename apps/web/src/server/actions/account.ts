@@ -33,6 +33,11 @@ export const signOutOtherSessionsAction = userAction(z.object({}), async () => {
   await auth().api.revokeOtherSessions({ headers: await headers() });
 });
 
+/** Ends every session of the signed-in person, this one included. */
+export const signOutEverywhereAction = userAction(z.object({}), async () => {
+  await auth().api.revokeSessions({ headers: await headers() });
+});
+
 /** For someone opening an invitation without an account: the account, with their password. */
 export const joinWithPasswordAction = publicAction(
   z.object({

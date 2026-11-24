@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt';
 import { AuthFrame, StatusPage } from '@/components/shell/status-page';
 import { hasName } from '@/lib/person-name';
+import { needsPassword } from '@/server/auth/passwords';
 import { requireUser } from '@/server/auth/session';
 import { db } from '@/server/db';
 import { env } from '@/server/env';
@@ -67,7 +68,12 @@ export default async function OnboardingPage() {
         A workspace holds your documents, templates, team and brand. Use your company or team name.
         You can change the name and the address later.
       </p>
-      <CreateWorkspaceForm host={new URL(env().APP_URL).host} askName={!hasName(user)} />
+      <CreateWorkspaceForm
+        host={new URL(env().APP_URL).host}
+        email={user.email}
+        askName={!hasName(user)}
+        askPassword={await needsPassword(sql, user.id)}
+      />
     </AuthFrame>
   );
 }

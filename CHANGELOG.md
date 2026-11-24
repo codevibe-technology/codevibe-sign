@@ -9,6 +9,19 @@ full; GitHub releases carry the same notes. You can read this page on the
 Releases follow [semantic versioning](https://semver.org/). Before 1.0, a breaking change bumps
 the minor version and says so in its first line.
 
+## Unreleased: 0.1.1
+
+- **Idle sign-out and a daily sign-in in the web app.** App sessions end after 30 minutes
+  without activity in any open tab (`SESSION_IDLE_MINUTES`, `0` turns it off), with a warning
+  two minutes before, and at most 12 hours after signing in (`SESSION_MAX_HOURS`). The server
+  enforces both, so a copied cookie stops working too. After an idle sign-out, signing in
+  returns to the same page; a draft being sent is saved first. Signers on the signing page are
+  not affected. Everyone signs in once more after upgrading.
+- **A password for every workspace member.** Someone who signs in only by emailed link sets a
+  password when they create their first workspace or accept an invitation. New passwords are
+  typed twice and show a strength meter. Sign-in links keep working.
+- **Sign out of all devices** in Settings, Personal, Security.
+
 ## Unreleased: 0.1.0, the first public release
 
 ### What ships

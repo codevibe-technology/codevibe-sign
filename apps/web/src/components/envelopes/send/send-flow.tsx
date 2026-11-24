@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { ApiError, apiFetch, jsonBody } from '@/lib/api-client';
+import { onBeforeSignOut } from '@/lib/before-sign-out';
 import {
   STEPS,
   adoptSavedRecipients,
@@ -170,6 +171,9 @@ export function SendFlow({
     const timer = setTimeout(() => void saveNow(), AUTOSAVE_MS);
     return () => clearTimeout(timer);
   }, [state, saveNow]);
+
+  // An idle sign-out saves the draft first, so a change made just before it is not lost.
+  useEffect(() => onBeforeSignOut(saveNow), [saveNow]);
 
   useEffect(() => {
     const unsaved =
