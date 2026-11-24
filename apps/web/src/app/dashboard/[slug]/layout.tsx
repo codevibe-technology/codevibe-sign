@@ -5,7 +5,7 @@ import { TransferNotice } from '@/components/workspace/transfer-notice';
 import { can } from '@/lib/roles';
 import { requireWorkspace } from '@/server/auth/guards';
 import { db } from '@/server/db';
-import { env } from '@/server/env';
+import { appSessionPolicy, env } from '@/server/env';
 import { workspaceLogoUrls } from '@/server/brand';
 import { getPreferences } from '@/server/preferences';
 import { getTours } from '@/server/tours';
@@ -31,6 +31,7 @@ export default async function WorkspaceLayout({
     access.workspace.id,
     ...memberships.map((m) => m.workspace.id),
   ]);
+  const { idleSeconds, warningSeconds, touchSeconds } = appSessionPolicy(env());
   const withLogo = <T extends { id: string }>(workspace: T) => ({
     ...workspace,
     logoUrl: logos.get(workspace.id) ?? null,
@@ -44,6 +45,7 @@ export default async function WorkspaceLayout({
         canCreate: !env().SINGLE_WORKSPACE,
       }}
       tours={{ statuses: tours, canSend: can(access.role, 'envelopes.write') }}
+      {...(idleSeconds ? { idle: { idleSeconds, warningSeconds, touchSeconds } } : {})}
     >
       <ViewerTimeZone zone={preferences.timezone}>
         <TransferNotice

@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import { GuidedTours, type TourSetup } from '@/components/tour/guided-tours-root';
 import { hasName } from '@/lib/person-name';
 import { Wordmark } from './brand-mark';
+import { IdleSignOut } from './idle-sign-out';
 import { NamePrompt } from './name-prompt';
 import { Sidebar, type SidebarProps } from './sidebar';
 
@@ -13,17 +14,21 @@ export function AppShell({
   sidebar,
   user,
   tours,
+  idle,
   children,
 }: {
   sidebar: SidebarProps;
   user: { name: string; email: string };
   /** Left out where there are no guided tours. */
   tours?: TourSetup;
+  /** Idle sign-out timings; left out when the install turns it off. */
+  idle?: { idleSeconds: number; warningSeconds: number; touchSeconds: number };
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <GuidedTours slug={sidebar.current.slug} setup={tours}>
+      {idle ? <IdleSignOut {...idle} /> : null}
       <div className="flex min-h-dvh">
         <aside className="sticky top-0 z-30 hidden h-dvh shrink-0 md:block">
           <Sidebar {...sidebar} user={user} />
