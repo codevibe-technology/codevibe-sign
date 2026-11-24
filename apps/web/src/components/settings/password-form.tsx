@@ -2,11 +2,12 @@
 
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
+import { confirmProblem, NewPasswordFields } from '@/components/auth/new-password-fields';
 import { PasswordInput } from '@/components/auth/password-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
-import { PASSWORD_HINT, passwordProblem } from '@/lib/password';
+import { passwordProblem } from '@/lib/password';
 import { setPasswordAction, signOutOtherSessionsAction } from '@/server/actions/account';
 import { useAction } from './use-action';
 
@@ -21,6 +22,8 @@ export function PasswordForm({
   const [hasPassword, setHasPassword] = useState(initial);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [mismatch, setMismatch] = useState<string>();
   const [signOutOthers, setSignOutOthers] = useState(true);
   const [local, setLocal] = useState<string>();
   const { pending, errors, run, clear } = useAction();
@@ -30,7 +33,9 @@ export function PasswordForm({
     event.preventDefault();
     const problem = passwordProblem(next, user);
     setLocal(problem ?? undefined);
-    if (problem) return;
+    const different = problem ? null : confirmProblem(next, confirm);
+    setMismatch(different ?? undefined);
+    if (problem || different) return;
     clear();
     run(
       () =>
@@ -45,6 +50,7 @@ export function PasswordForm({
           setHasPassword(true);
           setCurrent('');
           setNext('');
+          setConfirm('');
         },
       },
     );
@@ -85,21 +91,21 @@ export function PasswordForm({
                 )}
               </Field>
             ) : null}
-            <Field
+            <NewPasswordFields
               label={hasPassword ? 'New password' : 'Password'}
-              hint={PASSWORD_HINT}
-              error={local ?? errors.newPassword}
-            >
-              {(props) => (
-                <PasswordInput
-                  {...props}
-                  name="new-password"
-                  autoComplete="new-password"
-                  value={next}
-                  onChange={(e) => setNext(e.target.value)}
-                />
-              )}
-            </Field>
+              password={next}
+              confirm={confirm}
+              onPassword={setNext}
+              onConfirm={(value) => {
+                setConfirm(value);
+                setMismatch(undefined);
+              }}
+              account={user}
+              errors={{
+                password: local ?? errors.newPassword,
+                confirm: mismatch,
+              }}
+            />
             <label className="flex items-start gap-3 text-sm">
               <input
                 type="checkbox"

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { setFirstPassword } from '../auth/first-password';
+import { choosePassword } from '../auth/passwords';
 import { db } from '../db';
 import { recordSender } from '../envelopes';
 import { env } from '../env';
@@ -21,13 +23,16 @@ import { userAction, workspaceAction } from './action';
 
 const name = z.string({ error: 'Give the workspace a name' });
 const slug = z.string({ error: 'Choose an address for the workspace.' }).max(200);
+const password = z.string().max(1000).optional();
 
 /**
  * Creates a workspace for the signed-in person. Someone who has saved no name yet gives it
  * here (`yourName`); it is saved first, so the sample envelope is addressed to a person.
+ * Someone who has no password and signs in only by emailed link chooses one here too
+ * (`password`), so a slow or lost email never locks a workspace owner out.
  */
 export const createWorkspaceAction = userAction(
-  z.object({ name, slug: slug.optional(), yourName: personNameInput.optional() }),
+  z.object({ name, slug: slug.optional(), yourName: personNameInput.optional(), password }),
   async (session, input) => {
     const sql = db();
     if (env().SINGLE_WORKSPACE && (await countWorkspaces(sql)) > 0) {
@@ -41,11 +46,13 @@ export const createWorkspaceAction = userAction(
       if (!input.yourName) throw new AppError('VALIDATION', 'Enter your name', 'yourName');
       user = { ...session, name: await setOwnName(sql, session.id, input.yourName, 'yourName') };
     }
+    const chosen = await choosePassword(sql, user, input.password);
     const workspace = await createWorkspace(sql, {
       name: input.name,
       userId: user.id,
       slug: input.slug,
     });
+    if (chosen) await setFirstPassword(user, chosen);
     if (workspace.plan === 'free') {
       // The workspace stands without the sample; a failure here only costs the "Start here" card.
       await createSampleEnvelope(

@@ -122,3 +122,27 @@ export function passwordProblem(
   }
   return null;
 }
+
+export interface PasswordStrength {
+  /** 0 nothing typed, 1 not accepted, 2 acceptable, 3 good, 4 strong. */
+  score: 0 | 1 | 2 | 3 | 4;
+  label: string;
+}
+
+/**
+ * How strong a password looks, for the meter under a new password. Anything `passwordProblem`
+ * refuses is "Too weak", so the meter never praises a password the form will reject. Above
+ * that, length counts most, then a mix of kinds of character.
+ */
+export function passwordStrength(
+  password: string,
+  account: { email?: string | null; name?: string | null } = {},
+): PasswordStrength {
+  if (!password) return { score: 0, label: '' };
+  if (passwordProblem(password, account)) return { score: 1, label: 'Too weak' };
+  const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z\d]/].filter((kind) => kind.test(password));
+  const length = password.length;
+  if (length >= 20 || (length >= 16 && kinds.length >= 3)) return { score: 4, label: 'Strong' };
+  if (length >= 14 || kinds.length >= 3) return { score: 3, label: 'Good' };
+  return { score: 2, label: 'Fair' };
+}

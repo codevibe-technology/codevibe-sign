@@ -3,16 +3,16 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { humanCheckHeaders, useHumanCheck } from '@/components/auth/human-check';
-import { PasswordInput } from '@/components/auth/password-input';
+import { confirmProblem, NewPasswordFields } from '@/components/auth/new-password-fields';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { authClient } from '@/lib/auth-client';
-import { PASSWORD_HINT, passwordProblem } from '@/lib/password';
+import { passwordProblem } from '@/lib/password';
 import { PERSON_NAME_MAX, personNameProblem } from '@/lib/person-name';
 import { joinWithPasswordAction } from '@/server/actions/account';
 import { acceptInvitationAction } from '@/server/actions/team';
 
-type Errors = Partial<Record<'name' | 'password' | 'form', string>>;
+type Errors = Partial<Record<'name' | 'password' | 'confirm' | 'form', string>>;
 
 /**
  * For someone invited who has no account yet: their name and a password. The invitation was
@@ -37,6 +37,7 @@ export function JoinForm({
   const human = useHumanCheck(humanCheckKey, 'join');
   const [name, setName] = useState(suggestedName);
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [pending, setPending] = useState(false);
 
@@ -79,6 +80,11 @@ export function JoinForm({
       setErrors({ password: problem });
       return;
     }
+    const mismatch = confirmProblem(password, confirm);
+    if (mismatch) {
+      setErrors({ confirm: mismatch });
+      return;
+    }
     setPending(true);
     setErrors({});
     const failed = await join();
@@ -115,17 +121,15 @@ export function JoinForm({
           />
         )}
       </Field>
-      <Field label="Choose a password" hint={PASSWORD_HINT} error={errors.password}>
-        {(props) => (
-          <PasswordInput
-            {...props}
-            name="new-password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        )}
-      </Field>
+      <NewPasswordFields
+        label="Choose a password"
+        password={password}
+        confirm={confirm}
+        onPassword={setPassword}
+        onConfirm={setConfirm}
+        account={{ email, name }}
+        errors={{ password: errors.password, confirm: errors.confirm }}
+      />
       {human.widget}
       {errors.form ? (
         <p className="text-[13px] text-danger" role="alert">

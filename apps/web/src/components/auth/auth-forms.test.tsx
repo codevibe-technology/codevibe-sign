@@ -15,7 +15,11 @@ const actions = vi.hoisted(() => ({
   acceptInvitationAction: vi.fn(),
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
+const router = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  refresh: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/lib/auth-client', () => ({ authClient: client }));
 vi.mock('@/server/actions/account', () => actions);
@@ -51,7 +55,10 @@ describe('SignInForm', () => {
     await user.type(screen.getByLabelText('Work email'), ' asha@example.com ');
     await user.type(screen.getByLabelText('Password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(client.signIn.email).toHaveBeenCalledWith({ email: 'asha@example.com', password: GOOD });
+    expect(client.signIn.email).toHaveBeenCalledWith({
+      email: 'asha@example.com',
+      password: GOOD,
+    });
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/dashboard'));
     expect(client.signIn.magicLink).not.toHaveBeenCalled();
   });
@@ -68,7 +75,9 @@ describe('SignInForm', () => {
 
   it('says the same thing for any wrong pair and points at the link', async () => {
     const user = userEvent.setup();
-    client.signIn.email.mockResolvedValue({ error: { status: 401, message: 'Invalid' } });
+    client.signIn.email.mockResolvedValue({
+      error: { status: 401, message: 'Invalid' },
+    });
     form();
     await user.type(screen.getByLabelText('Work email'), 'asha@example.com');
     await user.type(screen.getByLabelText('Password'), 'not-the-password');
@@ -82,7 +91,10 @@ describe('SignInForm', () => {
   it('shows how long password sign-in is paused', async () => {
     const user = userEvent.setup();
     client.signIn.email.mockResolvedValue({
-      error: { status: 429, message: 'Too many wrong passwords. Try again in 12 minutes.' },
+      error: {
+        status: 429,
+        message: 'Too many wrong passwords. Try again in 12 minutes.',
+      },
     });
     form();
     await user.type(screen.getByLabelText('Work email'), 'asha@example.com');
@@ -197,7 +209,10 @@ describe('ResetPasswordForm', () => {
     render(<ResetPasswordForm token="tok_12345678" />);
     await user.type(screen.getByLabelText('New password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
-    expect(client.resetPassword).toHaveBeenCalledWith({ newPassword: GOOD, token: 'tok_12345678' });
+    expect(client.resetPassword).toHaveBeenCalledWith({
+      newPassword: GOOD,
+      token: 'tok_12345678',
+    });
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/sign-in?reset=1'));
   });
 
@@ -216,7 +231,9 @@ describe('ResetPasswordForm', () => {
 
   it('says when the link is spent and offers a new one', async () => {
     const user = userEvent.setup();
-    client.resetPassword.mockResolvedValue({ error: { status: 400, code: 'INVALID_TOKEN' } });
+    client.resetPassword.mockResolvedValue({
+      error: { status: 400, code: 'INVALID_TOKEN' },
+    });
     render(<ResetPasswordForm token="tok_12345678" />);
     await user.type(screen.getByLabelText('New password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
@@ -229,7 +246,11 @@ describe('ResetPasswordForm', () => {
 });
 
 describe('JoinForm', () => {
-  const props = { token: 'inv_token', email: 'ravi@example.com', signInHref: '/sign-in?next=x' };
+  const props = {
+    token: 'inv_token',
+    email: 'ravi@example.com',
+    signInHref: '/sign-in?next=x',
+  };
 
   it('creates the account, signs in, accepts and opens the workspace', async () => {
     const user = userEvent.setup();
@@ -247,6 +268,7 @@ describe('JoinForm', () => {
     expect(screen.getByLabelText('Email')).toHaveAttribute('readonly');
     await user.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/dashboard/acme'));
     expect(actions.joinWithPasswordAction).toHaveBeenCalledWith({
@@ -254,8 +276,13 @@ describe('JoinForm', () => {
       name: 'Ravi Kumar',
       password: GOOD,
     });
-    expect(client.signIn.email).toHaveBeenCalledWith({ email: 'ravi@example.com', password: GOOD });
-    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({ token: 'inv_token' });
+    expect(client.signIn.email).toHaveBeenCalledWith({
+      email: 'ravi@example.com',
+      password: GOOD,
+    });
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
+      token: 'inv_token',
+    });
   });
 
   it('checks the name and the password first, against the invited address too', async () => {
@@ -267,6 +294,19 @@ describe('JoinForm', () => {
     await user.type(screen.getByLabelText('Choose a password'), 'ravi-kumar-2026');
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(screen.getByRole('alert')).toHaveTextContent('email address or name');
+    expect(actions.joinWithPasswordAction).not.toHaveBeenCalled();
+  });
+
+  it('wants the password typed the same twice', async () => {
+    const user = userEvent.setup();
+    render(<JoinForm {...props} suggestedName="Ravi Kumar" />);
+    await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    expect(screen.getByText('Good')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create account and join' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Type the password again');
+    await user.type(screen.getByLabelText('Confirm password'), `${GOOD}x`);
+    await user.click(screen.getByRole('button', { name: 'Create account and join' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('do not match');
     expect(actions.joinWithPasswordAction).not.toHaveBeenCalled();
   });
 
@@ -292,6 +332,7 @@ describe('JoinForm', () => {
     render(<JoinForm {...props} />);
     await user.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('You already have an account');
     expect(screen.getByRole('link', { name: 'Sign in to accept' })).toHaveAttribute(
@@ -313,6 +354,7 @@ describe('JoinForm', () => {
     render(<JoinForm {...props} />);
     await user.type(screen.getByLabelText('Your name'), 'Ravi Kumar');
     await user.type(screen.getByLabelText('Choose a password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Create account and join' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('first anyone would guess');
     expect(screen.getByLabelText('Choose a password')).toHaveAttribute('aria-invalid', 'true');
@@ -323,21 +365,33 @@ describe('AcceptInvitation', () => {
   beforeEach(() => {
     router.push.mockReset();
     actions.acceptInvitationAction.mockReset();
-    actions.acceptInvitationAction.mockResolvedValue({ ok: true, data: { workspaceSlug: 'acme' } });
+    actions.acceptInvitationAction.mockResolvedValue({
+      ok: true,
+      data: { workspaceSlug: 'acme' },
+    });
   });
 
   it('accepts with one press for someone who has a name', async () => {
     const user = userEvent.setup();
-    render(<AcceptInvitation token="inv_token" />);
+    render(<AcceptInvitation token="inv_token" email="ravi@example.com" />);
     expect(screen.queryByLabelText('Your name')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
-    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({ token: 'inv_token' });
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
+      token: 'inv_token',
+    });
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/dashboard/acme'));
   });
 
   it('asks someone without a name for it, starting from the invitation', async () => {
     const user = userEvent.setup();
-    render(<AcceptInvitation token="inv_token" askName suggestedName="Ravi Kumar" />);
+    render(
+      <AcceptInvitation
+        token="inv_token"
+        email="ravi@example.com"
+        askName
+        suggestedName="Ravi Kumar"
+      />,
+    );
     const name = screen.getByLabelText('Your name');
     expect(name).toHaveValue('Ravi Kumar');
     await user.clear(name);
@@ -352,6 +406,38 @@ describe('AcceptInvitation', () => {
     });
   });
 
+  it('asks someone with only email links for a password before joining', async () => {
+    const user = userEvent.setup();
+    render(<AcceptInvitation token="inv_token" email="ravi@example.com" askPassword />);
+    expect(screen.getByText(/even when email links are slow/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('at least 10 characters');
+    await user.type(screen.getByLabelText('Password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
+      token: 'inv_token',
+      password: GOOD,
+    });
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/dashboard/acme'));
+  });
+
+  it('shows the server’s word on the password next to that field', async () => {
+    const user = userEvent.setup();
+    actions.acceptInvitationAction.mockResolvedValue({
+      ok: false,
+      code: 'VALIDATION',
+      error: 'Choose a password for your account',
+      field: 'password',
+    });
+    render(<AcceptInvitation token="inv_token" email="ravi@example.com" askPassword />);
+    await user.type(screen.getByLabelText('Password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
+    await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a password');
+    expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('shows the server’s word on the name next to the field', async () => {
     const user = userEvent.setup();
     actions.acceptInvitationAction.mockResolvedValue({
@@ -360,7 +446,9 @@ describe('AcceptInvitation', () => {
       error: 'A name needs at least one letter',
       field: 'name',
     });
-    render(<AcceptInvitation token="inv_token" askName suggestedName="Ravi" />);
+    render(
+      <AcceptInvitation token="inv_token" email="ravi@example.com" askName suggestedName="Ravi" />,
+    );
     await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('at least one letter');
     expect(router.push).not.toHaveBeenCalled();
@@ -372,10 +460,14 @@ describe('PasswordForm', () => {
 
   it('sets a first password without asking for a current one', async () => {
     const user = userEvent.setup();
-    actions.setPasswordAction.mockResolvedValue({ ok: true, data: { hadPassword: false } });
+    actions.setPasswordAction.mockResolvedValue({
+      ok: true,
+      data: { hadPassword: false },
+    });
     render(<PasswordForm user={account} hasPassword={false} />);
     expect(screen.queryByLabelText('Current password')).toBeNull();
     await user.type(screen.getByLabelText('Password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Set password' }));
     expect(actions.setPasswordAction).toHaveBeenCalledWith({
       newPassword: GOOD,
@@ -388,10 +480,14 @@ describe('PasswordForm', () => {
 
   it('changes it with the current one and can leave other devices signed in', async () => {
     const user = userEvent.setup();
-    actions.setPasswordAction.mockResolvedValue({ ok: true, data: { hadPassword: true } });
+    actions.setPasswordAction.mockResolvedValue({
+      ok: true,
+      data: { hadPassword: true },
+    });
     render(<PasswordForm user={account} hasPassword />);
     await user.type(screen.getByLabelText('Current password'), GOOD);
     await user.type(screen.getByLabelText('New password'), 'seven quiet copper kettles');
+    await user.type(screen.getByLabelText('Confirm password'), 'seven quiet copper kettles');
     await user.click(screen.getByRole('checkbox', { name: /Sign out my other devices/ }));
     await user.click(screen.getByRole('button', { name: 'Change password' }));
     expect(actions.setPasswordAction).toHaveBeenCalledWith({
@@ -413,6 +509,7 @@ describe('PasswordForm', () => {
     render(<PasswordForm user={account} hasPassword />);
     await user.type(screen.getByLabelText('Current password'), 'not-the-password');
     await user.type(screen.getByLabelText('New password'), GOOD);
+    await user.type(screen.getByLabelText('Confirm password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Change password' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('That is not your current password');
     expect(screen.getByLabelText('Current password')).toHaveAttribute('aria-invalid', 'true');
@@ -429,12 +526,26 @@ describe('PasswordForm', () => {
 
   it('signs the other sessions out on request', async () => {
     const user = userEvent.setup();
-    actions.signOutOtherSessionsAction.mockResolvedValue({ ok: true, data: undefined });
+    actions.signOutOtherSessionsAction.mockResolvedValue({
+      ok: true,
+      data: undefined,
+    });
     render(<PasswordForm user={account} hasPassword />);
     await user.click(screen.getByRole('button', { name: 'Sign out other sessions' }));
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith('Signed out on your other devices'),
     );
     expect(actions.signOutOtherSessionsAction).toHaveBeenCalledWith({});
+  });
+
+  it('asks for the new password twice and shows how strong it is', async () => {
+    const user = userEvent.setup();
+    render(<PasswordForm user={account} hasPassword={false} />);
+    await user.type(screen.getByLabelText('Password'), 'seven quiet copper kettles');
+    expect(screen.getByText('Strong')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Confirm password'), 'seven quiet');
+    await user.click(screen.getByRole('button', { name: 'Set password' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('do not match');
+    expect(actions.setPasswordAction).not.toHaveBeenCalled();
   });
 });
