@@ -25,7 +25,7 @@ A setting that is set but malformed is named in the logs and in `/api/health`.
 | `TRAEFIK_NETWORK`      | The external Docker network your Traefik watches.                                        |
 | `TRAEFIK_ENTRYPOINT`   | Traefik's HTTPS entrypoint, usually `websecure`.                                         |
 | `TRAEFIK_CERTRESOLVER` | The certificate resolver configured in Traefik, for example your Let's Encrypt one.      |
-| `SIGN_IMAGE_TAG`       | The tag `docker compose build` gives the image, for example a release or a commit.       |
+| `SIGN_IMAGE_TAG`       | The image tag to run, such as the release `0.1.1`, or the tag a source build gets.       |
 
 `compose.yml` derives `APP_URL` (`https://<SIGN_HOST>`), `DATABASE_URL`, `FILES_DIR`,
 `SEAL_P12_PATH` and `TRUST_PROXY` from these; you do not set them yourself.
@@ -188,6 +188,22 @@ the commands.
 
 ## Upgrades
 
+With the published image: take a backup, set `SIGN_IMAGE_TAG` in `.env` to the new release,
+then pull and restart. Check out the same release first, so `compose.yml` and `.env.example`
+match it:
+
+```sh
+git fetch --tags && git checkout v<version>
+# take a backup first, then set SIGN_IMAGE_TAG=<version> in .env
+docker compose pull web
+docker compose up -d web
+```
+
+To check the new image first:
+`gh attestation verify oci://ghcr.io/codevibe-technology/codevibe-sign:<version> --owner codevibe-technology`.
+
+Building from source instead:
+
 ```sh
 git fetch --tags && git checkout <release-tag>
 # take a backup first
@@ -195,10 +211,10 @@ SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose build web
 SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose up -d web
 ```
 
-Migrations run on start. Then check `/api/health`, sign in and send yourself a document. Set
-`SIGN_IMAGE_TAG` in `.env` to the new tag. Migrations only move forward: to roll back, build
-the previous release and restore the backup taken before the upgrade. Read the
-[changelog](/changelog) before each upgrade.
+Migrations run on start. Then check `/api/health`, sign in and send yourself a document. After
+a source build, set `SIGN_IMAGE_TAG` in `.env` to the new tag. Migrations only move forward: to
+roll back, run (or build) the previous release and restore the backup taken before the
+upgrade. Read the [changelog](/changelog) before each upgrade.
 
 ## Next
 

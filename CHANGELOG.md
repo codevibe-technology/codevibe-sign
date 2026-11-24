@@ -18,6 +18,8 @@ the minor version and says so in its first line.
   `ghcr.io/codevibe-technology/codevibe-sign-server`, with a signed build provenance attestation.
 - `deploy/compose.yml` runs the published image of the release in `SIGN_IMAGE_TAG` (`latest`
   when unset). `docker compose build web` still builds it from source under the same name.
+- The self-hosting docs show how to pull the images and check them with
+  `gh attestation verify`.
 
 ### Tests
 
