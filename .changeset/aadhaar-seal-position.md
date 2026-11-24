@@ -1,9 +1,9 @@
 ---
-'@codevibe_technology/sign-aadhaar': minor
-'@codevibe_technology/sign-core': minor
-'@codevibe_technology/sign-pdf': minor
-'@codevibe_technology/sign-server': minor
-'@codevibe_technology/sign-react': minor
+'@codevibe_technology/sign-aadhaar': patch
+'@codevibe_technology/sign-core': patch
+'@codevibe_technology/sign-pdf': patch
+'@codevibe_technology/sign-server': patch
+'@codevibe_technology/sign-react': patch
 '@codevibe_technology/sign-templates': patch
 ---
 

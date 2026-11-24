@@ -9,7 +9,7 @@ full; GitHub releases carry the same notes. You can read this page on the
 Releases follow [semantic versioning](https://semver.org/). Before 1.0, a breaking change bumps
 the minor version and says so in its first line.
 
-## Unreleased
+## 0.1.1 (24 November 2026)
 
 ### Aadhaar eSign
 
