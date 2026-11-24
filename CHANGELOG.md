@@ -11,6 +11,12 @@ the minor version and says so in its first line.
 
 ## Unreleased
 
+### Platform
+
+- Each release publishes multi-platform Docker images (`linux/amd64`, `linux/arm64`) to GitHub
+  Container Registry, `ghcr.io/codevibe-technology/codevibe-sign` and
+  `ghcr.io/codevibe-technology/codevibe-sign-server`, with a signed build provenance attestation.
+
 ### Tests
 
 - Test certificates start on a fixed past date, so tests that sign at a fixed time keep passing

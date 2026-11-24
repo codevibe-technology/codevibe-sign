@@ -1,0 +1,223 @@
+name: Images
+
+# Publishes the Docker images to GitHub Container Registry for each release:
+#   ghcr.io/codevibe-technology/codevibe-sign         the web app, as deploy/ runs it
+#   ghcr.io/codevibe-technology/codevibe-sign-server  the standalone HTTP API (apps/server)
+#
+# Releases are created inside the Release workflow with its GITHUB_TOKEN, and GitHub starts no
+# workflow for events caused by that token, so `on: release` never fires. Instead this runs
+# after every successful Release run on main: when the `v<version>` tag of
+# packages/codevibe-sign exists and no image has that version yet, it builds the tag. A failed
+# build is picked up again by the next Release run. `workflow_dispatch` (re)builds any release.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The release to build, for example 0.1.1 (its v0.1.1 tag must exist)
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - apps/web/Dockerfile
+      - apps/server/Dockerfile
+      - .dockerignore
+      - .github/workflows/images.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'publish' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  release:
+    name: Find the release
+    if: >-
+      github.repository_owner == 'codevibe-technology' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'))
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.find.outputs.version }}
+      sha: ${{ steps.find.outputs.sha }}
+      short: ${{ steps.find.outputs.short }}
+      latest: ${{ steps.find.outputs.latest }}
+      minor: ${{ steps.find.outputs.minor }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: find
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          if [ -n "$REQUESTED" ]; then
+            version="${REQUESTED#v}"
+          else
+            version=$(node -p "require('./packages/codevibe-sign/package.json').version")
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Not a release version: $version"
+            exit 1
+          fi
+          tag="v$version"
+          if ! sha=$(git rev-parse -q --verify "refs/tags/$tag^{commit}"); then
+            if [ -n "$REQUESTED" ]; then
+              echo "::error::The tag $tag does not exist."
+              exit 1
+            fi
+            echo "::notice::No $tag tag yet, so there is no release to publish."
+            exit 0
+          fi
+          # `latest` and `X.Y` only move forward: a rebuild of an older release leaves them alone.
+          stable=$(git tag -l 'v*' | { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V)
+          newest=$(printf '%s\n' "$stable" | tail -n 1)
+          line="${version%.*}"
+          newest_in_line=$(printf '%s\n' "$stable" | { grep -F "v$line." || true; } | tail -n 1)
+          {
+            echo "version=$version"
+            echo "sha=$sha"
+            echo "short=$(git rev-parse --short=7 "$sha")"
+            echo "latest=$([ "$tag" = "$newest" ] && echo true || echo false)"
+            echo "minor=$([ "$tag" = "$newest_in_line" ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice::Release $tag at $sha"
+
+  publish:
+    name: Publish ${{ matrix.name }}
+    needs: release
+    if: needs.release.outputs.version != ''
+    runs-on: ubuntu-latest
+    # Both platforms build in one job; arm64 runs under QEMU and takes most of the time.
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write # push to ghcr.io
+      id-token: write # sign the provenance attestation
+      attestations: write # store the attestation
+      artifact-metadata: write # the storage record of the attested image
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: codevibe-sign
+            dockerfile: apps/web/Dockerfile
+            description: 'Codevibe Sign web app: workspaces, sending, the signing page, the HTTP API and the docs.'
+          - name: codevibe-sign-server
+            dockerfile: apps/server/Dockerfile
+            description: 'Codevibe Sign standalone HTTP API, configured from environment variables.'
+    env:
+      IMAGE: ghcr.io/codevibe-technology/${{ matrix.name }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # After a Release run, a version that already has an image is done. A manual run rebuilds.
+      - id: existing
+        if: github.event_name == 'workflow_run'
+        run: |
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" > /dev/null 2>&1; then
+            echo "::notice::$IMAGE:$VERSION is already published."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.existing.outputs.published != 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/v${{ env.VERSION }}
+          persist-credentials: false
+      - if: steps.existing.outputs.published != 'true'
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+      - if: steps.existing.outputs.published != 'true'
+        uses: docker/setup-buildx-action@v4
+      - id: meta
+        if: steps.existing.outputs.published != 'true'
+        uses: docker/metadata-action@v6
+        env:
+          # Multi-platform images show their description on GitHub from the index.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=v${{ env.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ env.VERSION }},enable=${{ needs.release.outputs.minor == 'true' }}
+            type=raw,value=latest,enable=${{ needs.release.outputs.latest == 'true' }}
+            type=raw,value=sha-${{ needs.release.outputs.short }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.name }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.url=https://sign.codevibe.in
+            org.opencontainers.image.documentation=https://sign.codevibe.in/docs/getting-started/docker
+            org.opencontainers.image.vendor=Codevibe
+            org.opencontainers.image.licenses=AGPL-3.0-only
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ needs.release.outputs.sha }}
+          annotations: |
+            org.opencontainers.image.title=${{ matrix.name }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ needs.release.outputs.sha }}
+      - id: build
+        if: steps.existing.outputs.published != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # The signed attestation below is the provenance; this keeps the platform list clean.
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+      - if: steps.existing.outputs.published != 'true'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  check:
+    name: Build ${{ matrix.name }} (amd64)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: codevibe-sign
+            dockerfile: apps/web/Dockerfile
+          - name: codevibe-sign-server
+            dockerfile: apps/server/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      # Builds only; a pull request never pushes and never writes the release cache.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
