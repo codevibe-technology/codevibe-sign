@@ -485,19 +485,67 @@ describe('FieldPlacer editing tools', () => {
       { ...recipient('r2', 'Ravi Kumar', 2), auth: 'aadhaar' as const },
     ];
 
-    it('offers nothing to place and says the eSign provider places the signature', () => {
+    it('offers only the Aadhaar seal position and says it is a position only', () => {
       setup({ recipients: withAadhaar });
       fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
-      for (const name of ['Signature', 'Initials', 'Aadhaar eSign', 'Date signed', 'Text']) {
+      for (const name of ['Signature', 'Initials', 'Date signed', 'Text']) {
         expect(screen.queryByRole('button', { name })).toBeNull();
       }
+      expect(screen.getByRole('button', { name: 'Aadhaar seal position' })).toBeEnabled();
       expect(screen.queryByRole('button', { name: 'Initials on every page' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Signature on last page' })).toBeNull();
-      expect(
-        screen.getByText(/The eSign provider places the signature where its workflow says/),
-      ).toHaveTextContent(
-        'Ravi Kumar signs with Aadhaar eSign. The eSign provider places the signature where its workflow says, so you place no box and Ravi Kumar fills in nothing here.',
+      expect(screen.getByRole('note')).toHaveTextContent(
+        'Ravi Kumar signs with Aadhaar eSign and fills in nothing. Optionally place one Aadhaar seal position: it only marks where the Aadhaar signature appears. Without it, the eSign provider places it as its own setting says.',
       );
+    });
+
+    it('places one optional box and then offers no second one', () => {
+      const { last } = setup({ recipients: withAadhaar });
+      fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar seal position' }));
+      expect(last()).toEqual([
+        expect.objectContaining({
+          recipientId: 'r2',
+          type: 'aadhaar',
+          page: 0,
+          rect: expect.objectContaining({ width: 200, height: 64 }),
+          required: false,
+        }),
+      ]);
+      const tray = screen.getByRole('button', { name: 'Aadhaar seal position' });
+      expect(tray).toBeDisabled();
+      expect(tray).toHaveAttribute('title', 'Already placed. Drag the box on the page to move it.');
+      const placed = screen.getByRole('button', {
+        name: /^Aadhaar seal position for Ravi Kumar, page 1/,
+      });
+      expect(placed.querySelector('.cvs-placed-required')).toBeNull();
+    });
+
+    it('shows the box as a position, without required, label or copies', () => {
+      setup({ recipients: withAadhaar });
+      fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar seal position' }));
+      const panel = screen.getByRole('group', { name: 'Selected field' });
+      expect(
+        within(panel).getByText(
+          'Position only. The eSign provider draws the Aadhaar signature here; nothing is added to the file.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(panel).queryByRole('checkbox', { name: 'Required' })).toBeNull();
+      expect(within(panel).queryByLabelText('Label')).toBeNull();
+      expect(within(panel).queryByLabelText('Assigned to')).toBeNull();
+    });
+
+    it('puts the box on the last page and moves it there when asked again', () => {
+      const { last } = setup({ recipients: withAadhaar });
+      fireEvent.click(screen.getByRole('radio', { name: 'Ravi Kumar' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar seal position' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar seal on last page' }));
+      const fields = last();
+      expect(fields).toHaveLength(1);
+      expect(fields[0]).toMatchObject({ type: 'aadhaar', page: 1, required: false });
+      fireEvent.click(screen.getByRole('button', { name: 'Aadhaar seal on last page' }));
+      expect(last()).toHaveLength(1);
     });
 
     it('asks for no signature for them in the summary', () => {
@@ -505,7 +553,7 @@ describe('FieldPlacer editing tools', () => {
       const summary = screen.getByRole('region', { name: 'Fields summary' });
       expect(
         within(summary).getByText(
-          'Aadhaar eSign: no fields. The eSign provider places the signature.',
+          'Aadhaar eSign: fills in nothing. The eSign provider draws the signature.',
         ),
       ).toBeInTheDocument();
       expect(within(summary).queryByText(/Add a signature for Ravi Kumar/)).toBeNull();

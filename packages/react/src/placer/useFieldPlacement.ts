@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Field, FieldType, Rect, Recipient } from '@codevibe_technology/sign-core';
 import { clampRect, roundRect, type PageSize } from '../geometry';
 import {
+  aadhaarSealOnLastPage,
   fieldGroups,
   initialsOnEveryPage,
   repeatField as repeatCopies,
@@ -88,6 +89,11 @@ export interface FieldPlacementState {
   addInitialsEveryPage: () => number;
   /** A signature on the last page of each document, for the current recipient. */
   addSignatureLastPage: () => number;
+  /**
+   * The Aadhaar seal position on the last page of the first document, for the current
+   * recipient when they sign with Aadhaar eSign. It replaces their earlier one: they have one.
+   */
+  addAadhaarSealLastPage: () => number;
   pageSize: (documentId: string, page: number) => PageSize | undefined;
   snapThreshold: number;
   minSize: number;
@@ -395,16 +401,34 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     [recipientId, pageSizes, createId, fieldSizes, addFields],
   );
 
-  // An Aadhaar eSign signer has no fields: the eSign provider places their signature.
+  // An Aadhaar eSign signer fills in nothing; at most one box marks where the provider signs.
   const signsWithAadhaar = recipients.find((r) => r.id === recipientId)?.auth === 'aadhaar';
   const addInitialsEveryPage = useCallback(
     () => (signsWithAadhaar ? 0 : preset(initialsOnEveryPage)),
     [preset, signsWithAadhaar],
   );
   const addSignatureLastPage = useCallback(
-    () => (signsWithAadhaar ? 0 : preset(signatureOnLastPage)),
+    () => (signsWithAadhaar ? 0 : preset((input) => signatureOnLastPage(input))),
     [preset, signsWithAadhaar],
   );
+  const addAadhaarSealLastPage = useCallback(() => {
+    const [documentId, pages] =
+      Object.entries(pageSizes).find(([, sizes]) => sizes.length > 0) ?? [];
+    if (!signsWithAadhaar || !recipientId || !documentId || !pages) return 0;
+    const added = aadhaarSealOnLastPage({
+      documentId,
+      recipientId,
+      pages,
+      createId,
+      ...(fieldSizes ? { sizes: fieldSizes } : {}),
+    });
+    commit([
+      ...fieldsRef.current.filter((f) => !(f.recipientId === recipientId && f.type === 'aadhaar')),
+      ...added,
+    ]);
+    setSelectedId(added[0]?.id ?? null);
+    return added.length;
+  }, [signsWithAadhaar, recipientId, pageSizes, createId, fieldSizes, commit]);
 
   const selected = useMemo(
     () => fields.find((f) => f.id === selectedId) ?? null,
@@ -435,6 +459,7 @@ export function useFieldPlacement(options: UseFieldPlacementOptions): FieldPlace
     removeGroup,
     addInitialsEveryPage,
     addSignatureLastPage,
+    addAadhaarSealLastPage,
     pageSize,
     snapThreshold,
     minSize,
