@@ -96,11 +96,13 @@ where it helps, `details` that name the field or option to fix.
 
 ## API
 
-### `inspectPdf(bytes, { maxBytes?, limits? }) → Promise<{ pageCount, pages: { width, height }[] }>`
+### `inspectPdf(bytes, { maxBytes?, limits? }) → Promise<{ pageCount, pages, boxes }>`
 
-Page sizes are in PDF points as the page is displayed: the crop box, with width and height
-swapped for pages rotated 90 or 270 degrees. This is the space field rects live in.
-`maxBytes` defaults to 25 MB.
+`pages` (`{ width, height }[]`) are in PDF points as the page is displayed: the crop box, with
+width and height swapped for pages rotated 90 or 270 degrees. This is the space field rects
+live in. `boxes` (`{ x, y, width, height, rotation }[]`) give each crop box in unrotated user
+space with its clockwise rotation, to express a placed box in PDF user space (the Aadhaar seal
+position does this for the eSign provider). `maxBytes` defaults to 25 MB.
 
 Use it on every upload. Before the file is parsed on your thread, a worker thread reads it
 under `limits` and is terminated if it runs out of time, so one hostile file cannot block the

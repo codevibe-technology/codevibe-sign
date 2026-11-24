@@ -1,5 +1,5 @@
 export { inspectPdf, sha256Hex, DEFAULT_MAX_BYTES } from './inspect';
-export type { InspectOptions, PdfInfo } from './inspect';
+export type { InspectOptions, PageBox, PdfInfo } from './inspect';
 export { checkParseLimits, DEFAULT_PARSE_LIMITS } from './limits';
 export type { ParseLimits } from './limits';
 export { renderFields } from './render';

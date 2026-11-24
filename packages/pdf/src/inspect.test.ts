@@ -49,6 +49,18 @@ describe('inspectPdf', () => {
     expect(info.pages[0]).toEqual({ width: 500, height: 700 });
   });
 
+  it('reports each crop box in user space with its rotation', async () => {
+    const bytes = await makePdf([
+      { size: A4 },
+      { size: A4, rotation: -90, cropBox: [20, 30, 500, 700] },
+    ]);
+    const info = await inspectPdf(bytes);
+    expect(info.boxes).toEqual([
+      { x: 0, y: 0, width: 595.28, height: 841.89, rotation: 0 },
+      { x: 20, y: 30, width: 500, height: 700, rotation: 270 },
+    ]);
+  });
+
   it('rejects files over the size cap', async () => {
     const bytes = await makePdf([{ size: A4 }]);
     const error = await rejection(inspectPdf(bytes, { maxBytes: bytes.length - 1 }));
@@ -158,6 +170,7 @@ describe('inspectPdf', () => {
         await expect(inspectPdf(latin1(broken))).resolves.toEqual({
           pageCount: 1,
           pages: [{ width: A4[0], height: A4[1] }],
+          boxes: [{ x: 0, y: 0, width: A4[0], height: A4[1], rotation: 0 }],
         });
       }
     });
