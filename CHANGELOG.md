@@ -16,6 +16,8 @@ the minor version and says so in its first line.
 - Each release publishes multi-platform Docker images (`linux/amd64`, `linux/arm64`) to GitHub
   Container Registry, `ghcr.io/codevibe-technology/codevibe-sign` and
   `ghcr.io/codevibe-technology/codevibe-sign-server`, with a signed build provenance attestation.
+- `deploy/compose.yml` runs the published image of the release in `SIGN_IMAGE_TAG` (`latest`
+  when unset). `docker compose build web` still builds it from source under the same name.
 
 ### Tests
 

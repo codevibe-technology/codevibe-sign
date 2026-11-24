@@ -4,13 +4,13 @@ This folder runs the web app (the app, the HTTP API and the docs at `/docs`) and
 with Docker Compose, behind a Traefik that already runs on the server and owns ports 80 and 443. The same files serve the Codevibe cloud at `sign.codevibe.in` (`PLAN_MODE=hosted`) and
 a self-hosted install (`PLAN_MODE=self-hosted`).
 
-| File            | What it is                                                                  |
-| --------------- | --------------------------------------------------------------------------- |
-| `compose.yml`   | The `web` service (built from `apps/web/Dockerfile`) and `db` (PostgreSQL). |
-| `.env.example`  | Every setting, with notes. Copy it to `.env`.                               |
-| `secrets/`      | `seal.p12`, the certificate that seals signed PDFs. Never committed.        |
-| `set-secret.sh` | Sets one variable in `.env` without showing its value (step 12).            |
-| `restart.sh`    | Starts the app again with the current `.env`, without building (step 12).   |
+| File            | What it is                                                                                          |
+| --------------- | --------------------------------------------------------------------------------------------------- |
+| `compose.yml`   | The `web` service (the published image, or built from `apps/web/Dockerfile`) and `db` (PostgreSQL). |
+| `.env.example`  | Every setting, with notes. Copy it to `.env`.                                                       |
+| `secrets/`      | `seal.p12`, the certificate that seals signed PDFs. Never committed.                                |
+| `set-secret.sh` | Sets one variable in `.env` without showing its value (step 12).                                    |
+| `restart.sh`    | Starts the app again with the current `.env`, without building (step 12).                           |
 
 Data lives in two named volumes: `codevibe-sign_sign-db` (the database) and
 `codevibe-sign_sign-files` (uploaded and sealed PDFs, logos). Both must be backed up.
@@ -206,16 +206,42 @@ and report any later edit.
 
 ## 5. First start
 
+Each release is published as a ready-made image for `linux/amd64` and `linux/arm64`:
+`ghcr.io/codevibe-technology/codevibe-sign`, tagged with the version (`0.1.1`), its minor line
+(`0.1`), `latest` and `sha-<commit>`. Set `SIGN_IMAGE_TAG` in `.env` to the release you run,
+then pull it and start:
+
 ```sh
 cd /opt/codevibe-sign/deploy
-docker compose build web
+docker compose pull web
 docker compose up -d
 docker compose ps            # web and db become "healthy" within a minute
 docker compose logs -f web   # stop with Ctrl-C
 ```
 
-The build compiles the libraries, the docs and the app inside Docker; it takes a few
-minutes and needs about 3 GB of free memory and disk while it runs. To build on another
+Each image carries a signed build provenance attestation, so you can check that it was built
+by this repository's release workflow from the tagged source before you run it (this needs
+the [GitHub CLI](https://cli.github.com/)):
+
+```sh
+gh attestation verify oci://ghcr.io/codevibe-technology/codevibe-sign:0.1.1 --owner codevibe-technology
+```
+
+### Building from source instead
+
+To run your own changes, or a commit that is not a release, build the image on the server.
+The build compiles the libraries, the docs and the app inside Docker; it takes a few minutes
+and needs about 3 GB of free memory and disk while it runs. The local build gets the name
+`ghcr.io/codevibe-technology/codevibe-sign:<SIGN_IMAGE_TAG>`, so give it a tag no release
+uses, such as the commit:
+
+```sh
+cd /opt/codevibe-sign/deploy
+SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose build web
+SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose up -d
+```
+
+An image that is present locally is never pulled, so `up` runs the build. To build on another
 machine instead, build and push the image there and set `image:` to it.
 
 ## 6. Migrations
@@ -324,6 +350,21 @@ into it, then `docker compose up -d`.
 
 ## 11. Upgrades
 
+With the published image, update the checkout for any change to `compose.yml` or
+`.env.example`, set `SIGN_IMAGE_TAG` in `.env` to the new release, then pull and restart:
+
+```sh
+cd /opt/codevibe-sign
+git fetch --tags && git checkout v<version>
+cd deploy
+# take a backup first (step 9), then set SIGN_IMAGE_TAG=<version> in .env
+docker compose pull web
+docker compose up -d web
+docker compose logs -f web    # migrations run on start
+```
+
+Building from source instead:
+
 ```sh
 cd /opt/codevibe-sign
 git fetch --tags && git checkout <release-tag>     # or: git pull
@@ -334,9 +375,9 @@ SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose up -d web
 docker compose logs -f web    # migrations run on start
 ```
 
-Then repeat the smoke test. Set `SIGN_IMAGE_TAG` in `.env` to the new tag so later
-`docker compose` commands use it. Migrations only move forward: to roll back, check out the
-previous release, build it, and restore the backup taken before the upgrade.
+Then repeat the smoke test. When you build from source, set `SIGN_IMAGE_TAG` in `.env` to the
+new tag so later `docker compose` commands use it. Migrations only move forward: to roll back,
+run (or build) the previous release and restore the backup taken before the upgrade.
 
 ### Rolling back past the release that introduced accounts
 

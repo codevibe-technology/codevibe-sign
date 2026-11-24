@@ -4,10 +4,13 @@ name: codevibe-sign
 
 services:
   web:
+    # The published image of a release by default. `docker compose build web` builds the same
+    # image from this checkout instead and gives it this name, so `up` then runs the local build
+    # (a tag that is present locally is never pulled).
+    image: ghcr.io/codevibe-technology/codevibe-sign:${SIGN_IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
-    image: codevibe-sign-web:${SIGN_IMAGE_TAG:-local}
     restart: unless-stopped
     env_file: .env
     environment:
