@@ -50,7 +50,7 @@ function makeAuthority() {
   const certificate = forge.pki.createCertificate();
   certificate.publicKey = keys.publicKey;
   certificate.serialNumber = `02${forge.util.bytesToHex(forge.random.getBytesSync(8))}`;
-  certificate.validity.notBefore = new Date(Date.now() - DAY);
+  certificate.validity.notBefore = new Date('2020-01-01T00:00:00.000Z');
   certificate.validity.notAfter = new Date(Date.now() + 3650 * DAY);
   const subject = [
     { name: 'commonName', value: 'Codevibe Test TSA' },

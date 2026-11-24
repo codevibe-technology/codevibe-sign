@@ -9,6 +9,15 @@ full; GitHub releases carry the same notes. You can read this page on the
 Releases follow [semantic versioning](https://semver.org/). Before 1.0, a breaking change bumps
 the minor version and says so in its first line.
 
+## Unreleased
+
+### Tests
+
+- Test certificates start on a fixed past date, so tests that sign at a fixed time keep passing
+  as the calendar moves on.
+- The check that no Aadhaar number reaches the audit events ignores long hashes and ids, which
+  could hold twelve digits in a row by chance.
+
 ## 0.1.1 (24 November 2026)
 
 ### Aadhaar eSign
