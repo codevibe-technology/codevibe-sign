@@ -102,6 +102,7 @@ the minor version and says so in its first line.
 ### Platform
 
 - Node 22 or later. Node 20 has reached end of life; CI runs on Node 22 and 24.
+- CI can also be started by hand from the Actions tab, to check `main` without a new commit.
 - CommonJS projects get correct types (`.d.cts` for `require`).
 - Releases are published from GitHub Actions through npm trusted publishing, so each one carries
   a provenance statement.
