@@ -14,12 +14,51 @@ docs) runs with Docker Compose next to PostgreSQL, behind Traefik:
 git clone https://github.com/codevibe-technology/codevibe-sign.git
 cd codevibe-sign/deploy
 cp .env.example .env    # host name, Traefik, database, secrets, SMTP; PLAN_MODE=self-hosted
-docker compose up -d --build
+docker compose pull web # the release named by SIGN_IMAGE_TAG in .env
+docker compose up -d
 ```
 
 Before the first start, create the seal certificate as described in the
 [deployment runbook](https://github.com/codevibe-technology/codevibe-sign/blob/main/deploy/README.md),
 which also covers DNS, backups, a restore drill and upgrades.
+
+### The published image
+
+Each release is published to GitHub Container Registry for `linux/amd64` and `linux/arm64`, so
+nothing is compiled on your server:
+
+```sh
+docker pull ghcr.io/codevibe-technology/codevibe-sign:0.1.1
+```
+
+| Tag            | What it points at                      |
+| -------------- | -------------------------------------- |
+| `0.1.1`        | That release. Pin one in production.   |
+| `0.1`          | The newest release of that minor line. |
+| `latest`       | The newest release.                    |
+| `sha-<commit>` | The release built from that commit.    |
+
+`compose.yml` runs `ghcr.io/codevibe-technology/codevibe-sign:${SIGN_IMAGE_TAG}`, `latest`
+when the variable is unset. Every image carries a signed build provenance attestation. With
+the [GitHub CLI](https://cli.github.com/), check that an image was built by this repository's
+release workflow before you run it:
+
+```sh
+gh attestation verify oci://ghcr.io/codevibe-technology/codevibe-sign:0.1.1 --owner codevibe-technology
+```
+
+### Building from source
+
+To run your own changes or an unreleased commit, build the image on the server. The local
+build takes the image name from `compose.yml`, so tag it with the commit rather than a release:
+
+```sh
+SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose build web
+SIGN_IMAGE_TAG=$(git rev-parse --short HEAD) docker compose up -d
+```
+
+An image that is present locally is never pulled, so `up` runs your build. Set the same
+`SIGN_IMAGE_TAG` in `.env` so later commands keep using it.
 
 Email goes out through your SMTP account (`MAIL_TRANSPORT` set to an SMTP URL) or, for a
 Microsoft 365 mailbox, through Microsoft Graph with an app registration instead of a password:
@@ -67,13 +106,23 @@ A self-hosted install is free and has no limits, no plans and no billing pages.
 configuration from environment variables, migrates the PostgreSQL database on start and stores
 files in a volume.
 
-### Build and run
+### Pull and run
 
-From the repository root:
+Each release is published as `ghcr.io/codevibe-technology/codevibe-sign-server`, with the same
+tags and attestation as the web app image above:
 
 ```sh
-docker build -f apps/server/Dockerfile -t codevibe-sign .
-docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data codevibe-sign
+docker pull ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1
+gh attestation verify oci://ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1 --owner codevibe-technology
+docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data \
+  ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1
+```
+
+To build it yourself instead, from the repository root:
+
+```sh
+docker build -f apps/server/Dockerfile -t codevibe-sign-server .
+docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data codevibe-sign-server
 ```
 
 The image runs as the unprivileged `node` user, stores files under `/data` and checks

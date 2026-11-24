@@ -63,7 +63,8 @@ git clone https://github.com/codevibe-technology/codevibe-sign.git
 cd codevibe-sign/deploy
 cp .env.example .env              # host name, Traefik, database, secrets, SMTP; PLAN_MODE=self-hosted
 # create secrets/seal.p12 as described in deploy/README.md
-docker compose up -d --build
+docker compose pull web           # the published image; or build from source: docker compose build web
+docker compose up -d
 ```
 
 ```sh
@@ -330,9 +331,28 @@ match your product.
 ## Self-hosting
 
 The whole web app (workspaces, the send flow, templates, webhooks, the signing page and the
-docs) runs from [deploy/](deploy/README.md) with Docker Compose. For only the HTTP API,
-`apps/server` builds a Docker image that runs the standalone service from environment
-variables: a PostgreSQL `DATABASE_URL`, a directory for files, SMTP settings, your sealing
+docs) runs from [deploy/](deploy/README.md) with Docker Compose. Each release is published as
+ready-made images for `linux/amd64` and `linux/arm64`, so nothing has to be compiled on your
+server:
+
+```sh
+docker pull ghcr.io/codevibe-technology/codevibe-sign:0.1.1          # the web app, as deploy/ runs it
+docker pull ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1   # the standalone HTTP API
+```
+
+Tags are the version (`0.1.1`), its minor line (`0.1`), `latest` and `sha-<commit>`. Every
+image carries a signed build provenance attestation; check that it was built by this
+repository's release workflow from the tagged source with the
+[GitHub CLI](https://cli.github.com/):
+
+```sh
+gh attestation verify oci://ghcr.io/codevibe-technology/codevibe-sign:0.1.1 --owner codevibe-technology
+```
+
+`deploy/compose.yml` runs the published web app image and can still build it from source
+(`docker compose build web`). For only the HTTP API, the `codevibe-sign-server` image (built
+from `apps/server`) runs the standalone service from environment variables: a PostgreSQL
+`DATABASE_URL`, a directory for files, SMTP settings, your sealing
 certificate as a PKCS#12 file and the API keys your backend uses. See
 [apps/server/README.md](apps/server/README.md). Without Docker,
 `npx @codevibe_technology/sign-server start` runs the same service from the same variables. You run it, so documents, keys and personal data

@@ -7,13 +7,28 @@ environment variables and runs `startSignServer` from `@codevibe_technology/sign
 Without Docker, `npx @codevibe_technology/sign-server start` runs the same service from the
 same variables.
 
-## Build and run
+## Pull and run
 
-From the repository root:
+Each release is published to GitHub Container Registry for `linux/amd64` and `linux/arm64`,
+tagged with the version (`0.1.1`), its minor line (`0.1`), `latest` and `sha-<commit>`:
 
 ```sh
-docker build -f apps/server/Dockerfile -t codevibe-sign .
-docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data codevibe-sign
+docker pull ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1
+docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data \
+  ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1
+```
+
+Each image carries a signed build provenance attestation. Check it with the GitHub CLI:
+
+```sh
+gh attestation verify oci://ghcr.io/codevibe-technology/codevibe-sign-server:0.1.1 --owner codevibe-technology
+```
+
+To build it yourself instead, from the repository root:
+
+```sh
+docker build -f apps/server/Dockerfile -t codevibe-sign-server .
+docker run -d --name sign -p 3000:3000 --env-file sign.env -v sign-data:/data codevibe-sign-server
 ```
 
 The image runs as the unprivileged `node` user, stores files under `/data` and checks

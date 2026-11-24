@@ -11,6 +11,16 @@ the minor version and says so in its first line.
 
 ## Unreleased
 
+### Platform
+
+- Each release publishes multi-platform Docker images (`linux/amd64`, `linux/arm64`) to GitHub
+  Container Registry, `ghcr.io/codevibe-technology/codevibe-sign` and
+  `ghcr.io/codevibe-technology/codevibe-sign-server`, with a signed build provenance attestation.
+- `deploy/compose.yml` runs the published image of the release in `SIGN_IMAGE_TAG` (`latest`
+  when unset). `docker compose build web` still builds it from source under the same name.
+- The self-hosting docs show how to pull the images and check them with
+  `gh attestation verify`.
+
 ### Tests
 
 - Test certificates start on a fixed past date, so tests that sign at a fixed time keep passing
