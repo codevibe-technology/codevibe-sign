@@ -32,9 +32,9 @@ export type RecipientStatus =
 export type AuthMethod = 'email_link' | 'email_otp' | 'sms_otp' | 'aadhaar';
 
 /**
- * `aadhaar` is read on envelopes sent while an Aadhaar eSign signer had a box marking where
- * they sign. It takes no value and is no longer placed: the eSign provider puts the signature
- * where its workflow says, and an Aadhaar eSign signer has no fields.
+ * `aadhaar` is the Aadhaar seal position: an optional box, at most one, for a signer who uses
+ * Aadhaar eSign, saying where the eSign provider draws its signature. It takes no value and
+ * nothing is drawn for it. Without it the provider places the signature as its own setting says.
  */
 export type FieldType =
   | 'signature'

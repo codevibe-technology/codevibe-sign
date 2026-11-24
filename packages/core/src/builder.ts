@@ -617,23 +617,32 @@ export function aadhaarIssues(envelope: Envelope): ValidationIssue[] {
   return issues;
 }
 
-/** Field types that only stood for "the signature goes here" for an Aadhaar eSign signer. */
-const AADHAAR_SIGNATURE_MARKS: readonly Field['type'][] = ['aadhaar', 'signature', 'initials'];
+/** Field types that stood for "the signature goes here" before the eSign provider placed it. */
+const AADHAAR_SIGNATURE_MARKS: readonly Field['type'][] = ['signature', 'initials'];
 
 /**
- * An Aadhaar eSign signer signs the whole file at the eSign provider, which places the
- * signature where its own workflow says. So they have no fields here: the file the provider
- * signs is exactly what the sender approved, with the values of the signers before them.
+ * An Aadhaar eSign signer signs the whole file at the eSign provider, so they fill in
+ * nothing here: the file the provider signs is exactly what the sender approved, with the
+ * values of the signers before them. One `aadhaar` box may say where the provider draws its
+ * signature; nothing is drawn for it, and without it the provider's own setting decides.
  */
 function aadhaarFieldIssues(envelope: Envelope, signer: Recipient): ValidationIssue[] {
-  return envelope.fields
-    .filter((f) => f.recipientId === signer.id)
-    .map((field) => ({
+  const own = envelope.fields.filter((f) => f.recipientId === signer.id);
+  const boxes = own.filter((f) => f.type === 'aadhaar');
+  return [
+    ...boxes.slice(1).map((field) => ({
       path: `fields.${field.id}`,
-      message: AADHAAR_SIGNATURE_MARKS.includes(field.type)
-        ? `${signer.name} signs with Aadhaar eSign; the provider places the signature, so remove this ${field.type === 'aadhaar' ? 'Aadhaar eSign box' : `${field.type} field`}`
-        : `${signer.name} signs with Aadhaar eSign and fills in nothing here; remove this ${field.type.replace('_', ' ')} field or give it to a signer before them`,
-    }));
+      message: `${signer.name} can have one Aadhaar seal position; remove this extra box`,
+    })),
+    ...own
+      .filter((f) => f.type !== 'aadhaar')
+      .map((field) => ({
+        path: `fields.${field.id}`,
+        message: AADHAAR_SIGNATURE_MARKS.includes(field.type)
+          ? `${signer.name} signs with Aadhaar eSign; the provider draws the signature, so remove this ${field.type} field or mark where it goes with the Aadhaar seal position`
+          : `${signer.name} signs with Aadhaar eSign and fills in nothing here; remove this ${field.type.replace('_', ' ')} field or give it to a signer before them`,
+      })),
+  ];
 }
 
 /** An `aadhaar` field given to a recipient who does not sign with Aadhaar eSign. */
@@ -643,14 +652,14 @@ function strayAadhaarBoxes(envelope: Envelope): ValidationIssue[] {
     .filter((f) => envelope.recipients.find((r) => r.id === f.recipientId)?.auth !== 'aadhaar')
     .map((f) => ({
       path: `fields.${f.id}`,
-      message: 'Only a signer who uses Aadhaar eSign can have an Aadhaar eSign box',
+      message: 'Only a signer who uses Aadhaar eSign can have an Aadhaar seal position',
     }));
 }
 
 /**
- * Removes the fields that marked where an Aadhaar eSign signer signs: an `aadhaar` box, or
- * the signature and initials fields envelopes and templates gave them before. The provider
- * places the signature itself, so these carry nothing. Other fields are left for
+ * Removes the signature and initials fields envelopes and templates gave an Aadhaar eSign
+ * signer before: the provider draws the signature itself, so these carry nothing. An
+ * `aadhaar` box stays, as the position of that signature. Other fields are left for
  * `validateForSend` to refuse, since dropping them would lose what the sender asked for.
  */
 export function dropAadhaarSignatureFields(envelope: Envelope): Envelope {
@@ -668,6 +677,14 @@ export function dropAadhaarSignatureFields(envelope: Envelope): Envelope {
     fields: envelope.fields.filter((f) => !dropped.has(f.id)),
     values: envelope.values.filter((v) => !dropped.has(v.fieldId)),
   };
+}
+
+/**
+ * Where the sender placed the Aadhaar eSign signature of a recipient, or null to leave it to
+ * the eSign provider's own setting.
+ */
+export function aadhaarSealPosition(envelope: Envelope, recipientId: Id): Field | null {
+  return envelope.fields.find((f) => f.recipientId === recipientId && f.type === 'aadhaar') ?? null;
 }
 
 /** Everything that must hold before an envelope can be sent. Empty means ready. */
