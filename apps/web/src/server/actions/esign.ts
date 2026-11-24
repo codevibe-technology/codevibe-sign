@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import type { LeegalityV4Workflow } from '@codevibe_technology/sign-aadhaar';
 import { SignError } from '@codevibe_technology/sign-core';
 import { memoryRateLimiter, type RateLimiter } from '@codevibe_technology/sign-server';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ import { billingConfig } from '../billing/config';
 import { clientAddress } from '../client-address';
 import { db } from '../db';
 import { AppError } from '../errors';
+import { parseV4Workflow } from '../esign/leegality-v4';
 import { providerForCredentials } from '../esign/runtime';
 import {
   getEsignSettings,
@@ -98,7 +100,22 @@ const credentialsShape = {
     .max(128, 'That Workflow ID is too long')
     .regex(/^[A-Za-z0-9_-]+$/, 'A Workflow ID has letters, digits, hyphens and underscores only'),
   environment: z.enum(['sandbox', 'production']),
+  v4Workflow: z.string().trim().max(200_000, 'That V4 workflow file is too long').optional(),
 };
+
+/** The v4 workflow from what was pasted, or none when the field is empty. */
+function v4Of(text: string | undefined): LeegalityV4Workflow | undefined {
+  if (!text) return undefined;
+  try {
+    return parseV4Workflow(text);
+  } catch (error) {
+    throw new AppError(
+      'VALIDATION',
+      error instanceof Error ? error.message : 'That is not a V4 workflow',
+      'v4Workflow',
+    );
+  }
+}
 
 /** The operator has switched the install to live payments and eSigns. */
 function liveInstall(): boolean {
@@ -133,6 +150,7 @@ export const saveEsignCredentialsAction = accountAction(
     const sql = db();
     await assertOwnEsignAccount(sql, ctx.workspace.id);
     const { apiKey, privateSalt, workflowId, environment } = input;
+    const v4 = v4Of(input.v4Workflow);
     if (environment === 'sandbox' && liveInstall()) {
       throw new AppError(
         'VALIDATION',
@@ -140,7 +158,7 @@ export const saveEsignCredentialsAction = accountAction(
         'environment',
       );
     }
-    const credentials = { apiKey, privateSalt, workflowId, environment };
+    const credentials = { apiKey, privateSalt, workflowId, environment, ...(v4 ? { v4 } : {}) };
     let ok = true;
     try {
       await providerForCredentials(credentials).checkCredentials?.();
@@ -157,7 +175,11 @@ export const saveEsignCredentialsAction = accountAction(
       credentials,
     });
     await recordConnectionTest(sql, ctx.accountId, ok);
-    await audit(ctx, 'esign.credentials_saved', { environment, checked: ok });
+    await audit(ctx, 'esign.credentials_saved', {
+      environment,
+      checked: ok,
+      v4Workflow: Boolean(v4),
+    });
     refresh(ctx.workspace.slug);
     return getEsignSettings(sql, ctx.accountId);
   },

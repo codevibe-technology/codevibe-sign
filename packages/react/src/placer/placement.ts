@@ -53,7 +53,8 @@ export function createField(input: NewFieldInput): Field {
     type: input.type,
     page: input.page,
     rect: roundRect(rect),
-    required: input.required ?? input.type !== 'checkbox',
+    // A checkbox may stay unticked; the Aadhaar seal position takes no value at all.
+    required: input.required ?? (input.type !== 'checkbox' && input.type !== 'aadhaar'),
   };
 }
 

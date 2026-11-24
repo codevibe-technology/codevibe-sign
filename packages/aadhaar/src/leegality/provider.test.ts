@@ -40,7 +40,6 @@ function signRequest(overrides: Partial<EsignRequest> = {}): EsignRequest {
     recipient: { name: 'Asha Rao', email: 'asha@example.com', phone: '+91 98765 43210' },
     documentBytes: PDF,
     documentName: 'Offer letter (2026).pdf',
-    signaturePositions: [{ page: 0, rect: { x: 72, y: 600, width: 160, height: 48 } }],
     callbackUrl: 'https://sign.example.com/hooks/leegality',
     redirectUrl: 'https://sign.example.com/done',
     ...overrides,
@@ -152,8 +151,8 @@ describe('createRequest', () => {
     });
   });
 
-  it('sends no signature position, which the v3.0 request has no field for', async () => {
-    const { provider, fetch } = setup(() => json(created));
+  it('sends no signature position when placing it is turned off', async () => {
+    const { provider, fetch } = setup(() => json(created), { positionApi: 'off' });
     await provider.createRequest(
       signRequest({
         signaturePositions: [

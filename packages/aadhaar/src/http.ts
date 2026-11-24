@@ -10,13 +10,15 @@ export interface HttpOptions {
 
 /**
  * Sends a request and reads its body under one hard timeout. Transport failures and non-2xx
- * statuses become `SignError`s; `read` only ever sees a 2xx response.
+ * statuses become `SignError`s; `read` only ever sees a 2xx response. `explain`, when given,
+ * reads the body of a 400, 404, 409 or 422 into the error to throw, for APIs that say why.
  */
 export async function request<T>(
   url: string,
   init: RequestInit,
   options: HttpOptions,
   read: (response: Response) => Promise<T>,
+  explain?: (response: Response) => Promise<SignError | null>,
 ): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
@@ -32,7 +34,13 @@ export async function request<T>(
     } catch {
       throw transportError(controller.signal.aborted, options);
     }
-    if (!response.ok) throw statusError(response.status, options.provider);
+    if (!response.ok) {
+      if (explain && [400, 404, 409, 422].includes(response.status)) {
+        const explained = await explain(response).catch(() => null);
+        if (explained) throw explained;
+      }
+      throw statusError(response.status, options.provider);
+    }
     try {
       return await read(response);
     } catch (error) {

@@ -40,6 +40,12 @@ describe('validateTemplate', () => {
     };
     expect(validateTemplate(aadhaar([]))).toEqual([]);
     expect(validateTemplate(aadhaar([at('signature'), at('aadhaar')]))).toEqual([]);
+    expect(validateTemplate(aadhaar([at('aadhaar'), at('aadhaar')]))).toEqual([
+      {
+        path: 'roles.0.fields.1',
+        message: expect.stringMatching(/can have one Aadhaar seal position; remove this extra box/),
+      },
+    ]);
     expect(validateTemplate(aadhaar([at('text')]))).toEqual([
       {
         path: 'roles.0.fields.0',
@@ -48,7 +54,7 @@ describe('validateTemplate', () => {
     ]);
   });
 
-  it('refuses an Aadhaar eSign box for a role that does not use Aadhaar eSign', () => {
+  it('refuses an Aadhaar seal position for a role that does not use Aadhaar eSign', () => {
     const boxed = edit((t) => {
       const role = t.roles[0]!;
       const { document, page, rect } = role.fields![0]!;

@@ -6,6 +6,7 @@ export {
   addField,
   addRecipient,
   aadhaarIssues,
+  aadhaarSealPosition,
   dropAadhaarSignatureFields,
   assertReadyToSend,
   createEnvelope,

@@ -1,5 +1,9 @@
 import 'server-only';
 import type postgres from 'postgres';
+import {
+  LEEGALITY_DEFAULT_COORDINATES,
+  describeLeegalityCoordinates,
+} from '@codevibe_technology/sign-aadhaar';
 import type { Paise } from '@/lib/billing/money';
 import { billingVisible } from '@/lib/plans';
 import { accountIdOfWorkspace } from '../accounts';
@@ -7,6 +11,7 @@ import { billingConfig, creditsOffer, type BillingConfig } from '../billing/conf
 import { creditBalance, type CreditBalance } from '../billing/credits';
 import { planSettings, workspaceEntitlements } from '../plans';
 import { esignState } from './runtime';
+import { ownPositionApi, type PositionApi } from './leegality-v4';
 import { getEsignSettings, type EsignSettings } from './settings';
 import { listEsignUsage, type EsignUsageLine } from './usage';
 
@@ -19,6 +24,12 @@ export interface EsignOverview {
   blocked: { reason: string; message: string } | null;
   /** The install's own provider account is set up. */
   platformConfigured: boolean;
+  /** Which Leegality API places the Aadhaar seal position on the install's account. */
+  platformPositionApi: PositionApi;
+  /** The same for the workspace's own account, from what it saved. */
+  ownPositionApi: PositionApi;
+  /** How the install turns a seal position into Leegality coordinates, e.g. "points, bottom-left". */
+  coordinates: string;
   /** eSigns on the install's account use prepaid credits. */
   creditsRequired: boolean;
   /** Credits and billing exist on this install. */
@@ -71,6 +82,11 @@ export async function esignOverview(
     settings: saved,
     blocked: state.blocked,
     platformConfigured: Boolean(config?.leegality),
+    platformPositionApi: config?.leegality?.positionApi ?? 'v2.1',
+    ownPositionApi: ownPositionApi(saved.own.v4Workflow),
+    coordinates: describeLeegalityCoordinates(
+      config?.leegality?.coordinates ?? LEEGALITY_DEFAULT_COORDINATES,
+    ),
     creditsRequired: billingVisible(settings),
     billingVisible: billingVisible(settings),
     ownAllowed: entitlements.ownEsignAccount,
@@ -94,16 +110,23 @@ export interface EsignSendInfo {
   creditsRequired: boolean;
   credits: number;
   pricePaise: Paise | null;
+  /**
+   * The account the workspace signs with places the Aadhaar seal position (its position API
+   * is not `off`). Otherwise the box is still kept, and Leegality places the signature where
+   * its workflow says.
+   */
+  sealPosition: boolean;
 }
 
 export async function esignSendInfo(sql: Sql, workspaceId: string): Promise<EsignSendInfo> {
   const settings = planSettings();
   const config = readConfig();
   const accountId = await accountIdOfWorkspace(sql, workspaceId);
-  const [state, entitlements, credits] = await Promise.all([
+  const [state, entitlements, credits, saved] = await Promise.all([
     esignState({ sql }, workspaceId),
     workspaceEntitlements(sql, workspaceId, settings),
     creditBalance(sql, accountId),
+    getEsignSettings(sql, accountId),
   ]);
   const billed = state.mode === 'platform' && state.creditsRequired;
   return {
@@ -113,5 +136,9 @@ export async function esignSendInfo(sql: Sql, workspaceId: string): Promise<Esig
     creditsRequired: billed,
     credits: credits.available,
     pricePaise: billed && config ? creditsOffer(config, entitlements.plan).pricePaise : null,
+    sealPosition:
+      (state.mode === 'own'
+        ? ownPositionApi(saved.own.v4Workflow)
+        : (config?.leegality?.positionApi ?? 'v2.1')) !== 'off',
   };
 }

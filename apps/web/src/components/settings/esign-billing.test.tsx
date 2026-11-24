@@ -34,12 +34,16 @@ const esign = (overrides: Partial<EsignOverview> = {}): EsignOverview => ({
       savedAt: null,
       testedAt: null,
       testOk: null,
+      v4Workflow: false,
     },
     version: 0,
   },
   blocked: null,
   owed: 0,
   platformConfigured: true,
+  platformPositionApi: 'v2.1',
+  ownPositionApi: 'v2.1',
+  coordinates: 'points, bottom-left',
   creditsRequired: true,
   billingVisible: true,
   ownAllowed: false,
@@ -62,6 +66,7 @@ const connected = {
     savedAt: '2026-11-23T10:00:00.000Z',
     testedAt: null,
     testOk: null,
+    v4Workflow: false,
   },
   version: 3,
 };
@@ -203,8 +208,52 @@ describe('EsignSettingsPanel', () => {
       apiKey: 'secret-token-1',
       privateSalt: 'secret-salt-1',
       workflowId: 'wf_1',
+      v4Workflow: '',
     });
     expect((await screen.findByRole('alert')).textContent).toMatch(/did not accept/);
+  });
+
+  it('says which API places the seal position and takes an optional V4 workflow', async () => {
+    const user = userEvent.setup();
+    actions.saveEsignCredentialsAction.mockResolvedValue({ ok: true, data: connected });
+    const { rerender } = render(
+      <EsignSettingsPanel
+        workspaceId="ws_1"
+        slug="acme"
+        overview={esign({ ownAllowed: true, settings: connected })}
+      />,
+    );
+    expect(screen.getByTestId('esign-own-seal-position').textContent).toBe(
+      "Aadhaar seal position: on, through Leegality's 2.1 API with your Auth Token (coordinates: points, bottom-left).",
+    );
+    expect(screen.getByTestId('esign-v4-steps').textContent).toMatch(
+      /Nothing to set up.*2\.1 API.*coordinates: points, bottom-left.*Download API Payload/,
+    );
+    await user.click(screen.getByRole('button', { name: 'Replace details' }));
+    await user.type(screen.getByLabelText('Auth Token'), 'secret-token-1');
+    await user.type(screen.getByLabelText('Private Salt'), 'secret-salt-1');
+    await user.type(screen.getByLabelText('Workflow ID'), 'wf_1');
+    await user.type(
+      screen.getByLabelText('V4 workflow, for the Aadhaar seal position (optional)'),
+      '70843c25-8d80-40ac-ab6b-edba12abd495',
+    );
+    await user.click(screen.getByRole('button', { name: 'Check and save' }));
+    const sent = actions.saveEsignCredentialsAction.mock.calls[0]![0] as FormData;
+    expect(sent.get('v4Workflow')).toBe('70843c25-8d80-40ac-ab6b-edba12abd495');
+    rerender(
+      <EsignSettingsPanel
+        workspaceId="ws_1"
+        slug="acme"
+        overview={esign({
+          ownAllowed: true,
+          settings: { ...connected, own: { ...connected.own, v4Workflow: true } },
+          ownPositionApi: 'v4',
+        })}
+      />,
+    );
+    expect(screen.getByTestId('esign-own-seal-position').textContent).toMatch(
+      /Aadhaar seal position: on, through your V4 workflow/,
+    );
   });
 
   it('shows a saved account by its last characters only, and tests it', async () => {

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { DialogClose, DialogContent, DialogRoot, SheetContent } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/field';
+import { Field, Input, NativeSelect, Textarea } from '@/components/ui/field';
 import { LocalTime } from '@/components/ui/local-time';
 import { formatInr } from '@/lib/billing/money';
 import { cn } from '@/lib/cn';
@@ -22,6 +22,18 @@ import {
 import type { EsignOverview } from '@/server/esign/overview';
 import type { EsignMode } from '@/server/esign/settings';
 import { useAction } from './use-action';
+
+/** The status line of the Aadhaar seal position for one Leegality account. */
+function positionLine(api: 'v2.1' | 'v4' | 'off', coordinates: string): string {
+  switch (api) {
+    case 'v2.1':
+      return `Aadhaar seal position: on, through Leegality's 2.1 API with your Auth Token (coordinates: ${coordinates}).`;
+    case 'v4':
+      return `Aadhaar seal position: on, through your V4 workflow (coordinates: ${coordinates}).`;
+    case 'off':
+      return 'Aadhaar seal position: off on this server. Leegality places the signature where the workflow says.';
+  }
+}
 
 const OUTCOMES: Record<string, { label: string; tone: 'success' | 'danger' | 'warning' }> = {
   signed: { label: 'Signed', tone: 'success' },
@@ -324,6 +336,9 @@ export function EsignSettingsPanel({
                       , {settings.own.environment === 'production' ? 'production' : 'sandbox'}.
                       Leegality bills you directly.
                     </p>
+                    <p data-testid="esign-own-seal-position">
+                      {positionLine(overview.ownPositionApi, overview.coordinates)}
+                    </p>
                     {settings.own.testedAt ? (
                       <p data-testid="esign-test-state">
                         {settings.own.testOk ? 'Last check passed ' : 'Last check failed '}
@@ -361,20 +376,26 @@ export function EsignSettingsPanel({
             <p className="flex gap-2 text-[13px] text-muted" data-testid="esign-standard-flow">
               <FileCheck2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Leegality places the Aadhaar signature where the Leegality workflow says; senders
-                place no box and the signer fills in nothing. Everyone then gets the signed PDF,
-                with the Aadhaar signature and the Codevibe Sign seal, and a separate certificate
-                and audit trail PDF.{' '}
+                The signer fills in nothing. A sender may place one Aadhaar seal position: it only
+                marks where Leegality draws the Aadhaar signature, and needs no Leegality setup.
+                Without a box, Leegality places it where its workflow says. Everyone then gets the
+                signed PDF, with the Aadhaar signature and the Codevibe Sign seal, and a separate
+                certificate and audit trail PDF.{' '}
                 <a
                   className="font-semibold text-primary hover:underline"
-                  href="/docs/guides/aadhaar-leegality#set-the-signature-position"
+                  href="/docs/guides/aadhaar-leegality#choose-where-the-signature-goes"
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Set the signature position
+                  How the position works
                 </a>
               </span>
             </p>
+            {settings.mode === 'platform' && overview.platformConfigured ? (
+              <p className="text-[13px] text-muted" data-testid="esign-platform-seal-position">
+                {positionLine(overview.platformPositionApi, overview.coordinates)}
+              </p>
+            ) : null}
           </CardBody>
         </Card>
 
@@ -400,6 +421,33 @@ export function EsignSettingsPanel({
               </ol>
               <CopyRow label="Webhook and error webhook" value={overview.webhookUrl} />
               <CopyRow label="Redirect URL" value={overview.redirectUrl} />
+              <div className="space-y-2 border-t border-line pt-4" data-testid="esign-v4-steps">
+                <p className="text-sm font-semibold text-ink">The Aadhaar seal position</p>
+                <p className="text-sm text-muted">
+                  Nothing to set up: a request with a box goes through Leegality's 2.1 API with the
+                  same Auth Token, and asks for Aadhaar eSign, the webhook (version 2.5) and the
+                  redirect above itself. Send one test eSign with the box at a known spot and check
+                  where the seal lands (coordinates: {overview.coordinates}).
+                </p>
+                <p className="text-sm font-semibold text-ink">
+                  Only if your account has V4 workflows: use one instead
+                </p>
+                <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+                  <li>
+                    In Leegality, Workflows, V4 Workflows, create a workflow with one document (an
+                    empty PDF upload) and one Signer with Aadhaar eSign, details left blank.
+                  </li>
+                  <li>
+                    In Field Properties, leave the document, the invitee details and the signature
+                    coordinates editable by the workflow runner, then publish it.
+                  </li>
+                  <li>
+                    Open the workflow's ⋮ menu, choose Download API Payload, and paste the file (or
+                    the full workflow ID in it) under Replace details. Codevibe Sign sets the
+                    webhooks of each request itself, with version 4.0.
+                  </li>
+                </ol>
+              </div>
             </CardBody>
           </Card>
         ) : null}
@@ -522,6 +570,24 @@ export function EsignSettingsPanel({
                   autoComplete="off"
                   spellCheck={false}
                   required
+                />
+              )}
+            </Field>
+            <Field
+              label="V4 workflow, for the Aadhaar seal position (optional)"
+              hint="Only for accounts with V4 workflows. Paste the file from Download API Payload, or the full V4 workflow ID. Leave it empty to place the seal position through the 2.1 API."
+              error={save.errors.v4Workflow}
+            >
+              {(props) => (
+                <Textarea
+                  {...props}
+                  name="v4Workflow"
+                  rows={3}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={
+                    settings.own.v4Workflow ? 'Saved. Paste again to keep it.' : undefined
+                  }
                 />
               )}
             </Field>

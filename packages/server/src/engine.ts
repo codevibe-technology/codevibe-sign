@@ -13,6 +13,20 @@ export interface PdfInfo {
   pageCount: number;
   /** Page sizes in PDF points, in page order. */
   pages: PageSize[];
+  /**
+   * Each page's crop box in unrotated user space and its clockwise rotation. Used to place
+   * the Aadhaar seal position for the eSign provider; without it the page is taken as
+   * unrotated, with its crop box at the origin.
+   */
+  boxes?: PageBox[];
+}
+
+export interface PageBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: 0 | 90 | 180 | 270;
 }
 
 export interface SealOptions {

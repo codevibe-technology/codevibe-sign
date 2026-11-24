@@ -50,14 +50,23 @@ instead. Leegality then bills you directly and no credits are used. On Free the 
 
 1. In Leegality, publish a workflow with Aadhaar eSign as the signature type, and set the
    signature position for the invitee with custom coordinates. Leegality places the signature
-   there, and at the bottom left of every page when the workflow has none. Senders place no
-   box. See
+   there when the sender places no box, and at the bottom left of every page when the
+   workflow has none. See
    [Set the signature position](/guides/aadhaar-leegality#set-the-signature-position).
 2. Copy the **Webhook and error webhook** URL and the **Redirect URL** from this page into the
    workflow.
 3. Choose **Use your own Leegality account** and enter the **Environment** (Production or
-   Sandbox), **Auth Token**, **Private Salt** and **Workflow ID**.
-4. Press **Check and save**, then **Test connection**.
+   Sandbox), **Auth Token** (the dashboard may call it the legacy Auth Token), **Private Salt**
+   and **Workflow ID**. Leave **V4 workflow** empty unless your account has V4 workflows and you
+   want to use one.
+4. Press **Check and save**, then **Test connection**. The card says how the Aadhaar seal
+   position reaches Leegality, for example "on, through Leegality's 2.1 API with your Auth
+   Token (coordinates: points, bottom-left)". Nothing else needs setting up in Leegality: a
+   request with a box goes through the 2.1 API with the same token, and asks for Aadhaar eSign,
+   the webhook (version 2.5) and the redirect itself.
+5. Send one test eSign in the sandbox with the box over a known mark and check where the seal
+   lands; see
+   [Calibrate the coordinates](/guides/aadhaar-leegality#calibrate-the-coordinates).
 
 The details are encrypted and never shown again. If the account moves back to Free, the saved
 account is kept but not used until it is on Cloud again or switches to credits. The detailed
@@ -65,10 +74,13 @@ steps are in [Aadhaar eSign with Leegality](/guides/aadhaar-leegality#your-own-l
 
 ## What senders see
 
-Aadhaar eSign follows Leegality's standard process. A signer who uses it gets no fields in
-the send flow: a note in **Recipients**, **Fields** and **Review** says Leegality places the
-Aadhaar signature where the workflow says. Leegality receives the document exactly as the
-sender approved it, with the fields of earlier signers filled in.
+Aadhaar eSign follows Leegality's standard process. A signer who uses it fills in nothing. In
+**Fields** the sender may place one optional **Aadhaar seal position**, a box that only marks
+where Leegality draws the Aadhaar signature. Without it Leegality places the signature where the
+workflow says.
+A note in **Recipients**, **Fields** and **Review** says which applies. Leegality receives the
+document exactly as the sender approved it, with the fields of earlier signers filled in and
+nothing drawn for the box.
 
 <HelpClip name="aadhaar-send" caption="Choosing Aadhaar eSign as the identity check, with the note on where Leegality places the signature." />
 

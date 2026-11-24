@@ -507,6 +507,7 @@ export function SendFlow({
               problems={problems}
               previewing={previewing}
               onPreviewingChange={setPreviewing}
+              {...(esign?.sealPosition !== undefined ? { sealPosition: esign.sealPosition } : {})}
               onChange={(fields: Field[]) => update((s) => ({ ...s, fields }))}
             />
           </div>
@@ -536,6 +537,7 @@ export function SendFlow({
                 state={state}
                 problems={problems}
                 sender={me}
+                {...(esign?.sealPosition !== undefined ? { sealPosition: esign.sealPosition } : {})}
                 onSettings={(patch: Partial<DraftSettings>) =>
                   update((s) => ({ ...s, settings: { ...s.settings, ...patch } }))
                 }

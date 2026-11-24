@@ -67,6 +67,20 @@ interface ProviderDocument {
   uploaded: Uint8Array;
   state: 'open' | 'signed' | 'rejected' | 'expired';
   token: string;
+  /** Set for a pack sent through the v4 API, with the body it was sent with. */
+  pack?: { packId: string; body: V4Body };
+  /** The body of a request made with the 2.1 Create API. */
+  v21?: Record<string, unknown>;
+}
+
+interface V4Body {
+  workflowId: string;
+  documents: { subDocuments: { file: string }[] }[];
+  invitees: {
+    inviteeDetails: { uuid: string; inviteeName: string }[];
+    combinations: { combinationSettings: { webhooks: Record<string, string> } }[];
+  }[];
+  coordinates: { appearances: { pageNo: string; rect: Record<string, string> }[] }[];
 }
 
 /** A stand-in for Leegality's API: keeps requests in memory and signs with its own key. */
@@ -81,6 +95,28 @@ function fakeLeegality(espP12: Uint8Array) {
     const target = new URL(input);
     const token = new Headers(init?.headers).get('x-auth-token') ?? '';
     if (refuse !== null && token === refuse) return new Response('no', { status: 401 });
+    if (target.pathname.endsWith('/v2.1/sign/request') && init?.method === 'POST') {
+      calls.create += 1;
+      const body = JSON.parse(String(init.body)) as {
+        file: { file: string };
+        invitees: { name: string; email?: string }[];
+      };
+      const id = `doc21_${randomUUID().slice(0, 8)}`;
+      const signUrl = `https://sandbox.leegality.com/sign/${id}`;
+      documents.set(id, {
+        id,
+        signUrl,
+        uploaded: new Uint8Array(Buffer.from(body.file.file, 'base64')),
+        state: 'open',
+        token,
+        v21: body,
+      });
+      const { name, email } = body.invitees[0]!;
+      return json({
+        status: 1,
+        data: { documentId: id, invitations: [{ name, email, signUrl, active: true }] },
+      });
+    }
     if (target.pathname.endsWith('/v3.0/sign/request') && init?.method === 'POST') {
       calls.create += 1;
       const body = JSON.parse(String(init.body)) as {
@@ -101,8 +137,83 @@ function fakeLeegality(espP12: Uint8Array) {
         data: { documentId: id, invitees: [{ ...body.invitees[0], signUrl }] },
       });
     }
+    if (target.pathname.endsWith('/v4/pack/sync') && init?.method === 'POST') {
+      calls.create += 1;
+      const body = JSON.parse(String(init.body)) as V4Body;
+      const id = `01V4DOC${randomUUID().slice(0, 8).toUpperCase()}`;
+      const packId = `01V4PACK${randomUUID().slice(0, 8).toUpperCase()}`;
+      const signUrl = `https://sandbox.leegality.com/sign/${id}`;
+      documents.set(id, {
+        id,
+        signUrl,
+        uploaded: new Uint8Array(Buffer.from(body.documents[0]!.subDocuments[0]!.file, 'base64')),
+        state: 'open',
+        token,
+        pack: { packId, body },
+      });
+      const person = body.invitees[0]!.inviteeDetails[0]!;
+      return new Response(
+        JSON.stringify({
+          code: 'SUCCESS',
+          data: {
+            pack: { packId },
+            documents: [{ documentId: id }],
+            invitations: [{ inviteeDetails: [{ ...person, invitationUrl: signUrl }] }],
+          },
+        }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (target.pathname.endsWith('/v4/packs')) {
+      calls.status += 1;
+      const packId = target.searchParams.get('packId');
+      const found = [...documents.values()].find((d) => d.pack?.packId === packId);
+      if (!found || found.token !== token) {
+        return new Response(JSON.stringify({ code: 'LE_ERR_AP_001', errors: [] }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      const invitation = {
+        open: 'PENDING',
+        signed: 'SIGNED',
+        rejected: 'SIGNER_REJECTED',
+        expired: 'EXPIRED',
+      }[found.state];
+      return json({
+        data: {
+          pack: { packId, status: found.state === 'signed' ? 'COMPLETED' : 'SENT' },
+          documents: [
+            { documentId: found.id, status: found.state === 'signed' ? 'COMPLETED' : 'SENT' },
+          ],
+          invitations: [
+            {
+              inviteeType: 'signer',
+              inviteeDetails: [
+                { invitationUrl: found.signUrl, invitationStatus: { status: invitation } },
+              ],
+            },
+          ],
+        },
+      });
+    }
     const id = target.searchParams.get('documentId') ?? '';
     const document = documents.get(id);
+    if (target.pathname.endsWith('/v4/packs/download') && document) {
+      if (target.searchParams.get('downloadType') === 'AUDIT_TRAIL') {
+        return new Response(new TextEncoder().encode(`%PDF-1.7\nLeegality audit trail ${id}\n`), {
+          headers: { 'content-type': 'application/pdf' },
+        });
+      }
+      calls.fetch += 1;
+      const signed = await seal(document.uploaded, {
+        p12: espP12,
+        passphrase: 'esp',
+        certify: false,
+        reason: 'Aadhaar eSign',
+      });
+      return new Response(signed, { headers: { 'content-type': 'application/pdf' } });
+    }
     if (target.pathname.endsWith('/v3.2/sign/request')) {
       calls.status += 1;
       if (!document || document.token !== token) {
@@ -164,6 +275,19 @@ function fakeLeegality(espP12: Uint8Array) {
       const document = [...documents.values()].at(-1);
       if (!document) throw new Error('the provider was never asked');
       return document;
+    },
+    /** A Webhook 4.0 body for a v4 pack. */
+    webhookV4(document: ProviderDocument, salt = SALT) {
+      document.state = 'signed';
+      return JSON.stringify({
+        webhookType: 'SUCCESS',
+        eventType: 'SIGNED',
+        pack: { packId: document.pack!.packId, packStatus: 'COMPLETED' },
+        document: { documentId: document.id, documentStatus: 'COMPLETED' },
+        invitee: { inviteeName: 'RAVI KUMAR', invitationStatus: 'SIGNED' },
+        messages: [],
+        mac: computeLeegalityMac(document.id, salt),
+      });
     },
     webhook(document: ProviderDocument, action: 'Signed' | 'Rejected', salt = SALT) {
       document.state = action === 'Signed' ? 'signed' : 'rejected';
@@ -235,7 +359,10 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
   };
 
   /** Sends an envelope whose one signer, or last signer, signs with Aadhaar eSign. */
-  async function send(ws: { key: string }, options: { withFirstSigner?: boolean } = {}) {
+  async function send(
+    ws: { key: string },
+    options: { withFirstSigner?: boolean; sealPosition?: boolean } = {},
+  ) {
     const first = options.withFirstSigner
       ? [
           {
@@ -268,6 +395,16 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
             page: 0,
             rect: { x: 72, y: 500, width: 180, height: 48 },
           })),
+          ...(options.sealPosition
+            ? [
+                {
+                  recipient: 'r1',
+                  type: 'aadhaar',
+                  page: 0,
+                  rect: { x: 300, y: 700, width: 200, height: 64 },
+                },
+              ]
+            : []),
         ],
       }),
     );
@@ -314,6 +451,25 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
   const envelopeOf = async (ws: { key: string }, id: string) =>
     (await (await api(ws.key, `/v1/envelopes/${id}`)).json()) as Envelope;
 
+  const makeServer = (env: Record<string, string>) =>
+    createSignServer({
+      store: postgresStore(sql),
+      files,
+      mailer,
+      otp: consoleOtpSender({ silent: true }),
+      sealer: { p12: sealP12, passphrase: 'pass' },
+      apiKeys: [],
+      authenticate: async (request) => {
+        const key = request.headers.get('authorization')?.replace(/^Bearer /, '');
+        const workspaceId = [...keys].find(([, value]) => value === key)?.[0];
+        return workspaceId ? { id: `key:${workspaceId}`, workspaceId } : null;
+      },
+      basePath: '/api',
+      publicUrl: APP_URL,
+      signingPageUrl: `${APP_URL}/sign`,
+      esign: createEsignOptions({ sql, config: () => billingConfig(env), fetch: provider.fetch }),
+    });
+
   beforeAll(async () => {
     admin = postgres(url!, { max: 1, onnotice: () => {} });
     await admin.unsafe(`create schema ${schema}`);
@@ -329,23 +485,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
     provider = fakeLeegality(espP12);
     files = memoryFileStore();
     mailer.sent.length = 0;
-    sign = createSignServer({
-      store: postgresStore(sql),
-      files,
-      mailer,
-      otp: consoleOtpSender({ silent: true }),
-      sealer: { p12: sealP12, passphrase: 'pass' },
-      apiKeys: [],
-      authenticate: async (request) => {
-        const key = request.headers.get('authorization')?.replace(/^Bearer /, '');
-        const workspaceId = [...keys].find(([, value]) => value === key)?.[0];
-        return workspaceId ? { id: `key:${workspaceId}`, workspaceId } : null;
-      },
-      basePath: '/api',
-      publicUrl: APP_URL,
-      signingPageUrl: `${APP_URL}/sign`,
-      esign: createEsignOptions({ sql, config: () => billingConfig(ENV), fetch: provider.fetch }),
-    });
+    sign = makeServer(ENV);
     state.user = null;
   });
 
@@ -544,6 +684,135 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       expect(message).not.toMatch(/credit|cost|markup/i);
       expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 2 });
       expect(provider.calls.create).toBe(1);
+    });
+  });
+
+  describe('the Aadhaar seal position', () => {
+    const V4 = '70843c25-8d80-40ac-ab6b-edba12abd495';
+    const withV4 = () => {
+      sign = makeServer({ ...ENV, LEEGALITY_V4_WORKFLOW_ID: V4 });
+    };
+
+    it('goes to Leegality as v4 coordinates and is signed and sealed like any other', async () => {
+      withV4();
+      const ws = await workspace('free', 1);
+      const { res, email } = await send(ws, { sealPosition: true });
+      expect(res.status).toBe(201);
+      const envelope = (await res.json()) as Envelope;
+      expect(envelope.fields.map((f) => f.type)).toEqual(['aadhaar']);
+
+      expect((await start(tokenFor(email))).status).toBe(200);
+      const document = provider.last();
+      const body = document.pack!.body;
+      expect(body.workflowId).toBe(V4);
+      // A4 is 841.89 points high: the box from 700 to 764 down the page is 78 to 142 up it.
+      expect(body.coordinates[0]!.appearances).toEqual([
+        expect.objectContaining({
+          pageNo: '1',
+          rect: { x1Axis: '300', y1Axis: '78', x2Axis: '500', y2Axis: '142' },
+        }),
+      ]);
+      expect(body.invitees[0]!.combinations[0]!.combinationSettings.webhooks).toEqual({
+        successWebhook: `${APP_URL}/api/v1/esign/webhooks/leegality`,
+        errorWebhook: `${APP_URL}/api/v1/esign/webhooks/leegality`,
+        webhookVersion: 'VERSION_4.0',
+      });
+      // Nothing is drawn for the box: the file Leegality signs is the one uploaded.
+      expect((await PDFDocument.load(document.uploaded)).getPageCount()).toBe(1);
+
+      const wrong = provider.webhookV4(document, 'another-salt');
+      expect((await hook(wrong)).status).toBeGreaterThanOrEqual(400);
+      expect((await hook(provider.webhookV4(document))).status).toBe(200);
+      await sign.tick();
+      const done = await envelopeOf(ws, envelope.id);
+      expect(done.status).toBe('completed');
+      const sealed = await files.get(sealedFileKey(envelope.id, done.documents[0]!.id));
+      const signatures = await verifySignatures(sealed!);
+      expect(signatures).toHaveLength(2);
+      expect(signatures.every((signature) => signature.valid)).toBe(true);
+      const theirs = await api(
+        ws.key,
+        `/v1/envelopes/${envelope.id}/documents/${done.documents[0]!.id}?version=provider-audit-trail`,
+      );
+      expect(await theirs.text()).toContain(`Leegality audit trail ${document.id}`);
+      expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
+    });
+
+    it('goes through the 2.1 API with no V4 workflow, and is signed like any other', async () => {
+      const ws = await workspace('free', 1);
+      const { res, email } = await send(ws, { sealPosition: true });
+      const envelope = (await res.json()) as Envelope;
+      expect(envelope.fields.map((f) => f.type)).toEqual(['aadhaar']);
+      expect((await esignSendInfo(sql, ws.id)).sealPosition).toBe(true);
+      expect((await start(tokenFor(email))).status).toBe(200);
+      const document = provider.last();
+      expect(document.pack).toBeUndefined();
+      expect(document.token).toBe('platform-token');
+      expect(document.v21).toMatchObject({
+        irn: expect.any(String),
+        invitees: [
+          {
+            name: 'Ravi Kumar',
+            appearances: [{ page: '1', x1: 300, y1: 78, x2: 500, y2: 142 }],
+            signatures: [{ type: 'AADHAAR', config: { authTypes: ['OTP'] } }],
+            webhook: {
+              success: `${APP_URL}/api/v1/esign/webhooks/leegality`,
+              failure: `${APP_URL}/api/v1/esign/webhooks/leegality`,
+              version: 2.5,
+            },
+            redirectUrl: `${APP_URL}/sign?esign=return`,
+          },
+        ],
+      });
+      expect(document.v21).not.toHaveProperty('profileId');
+      expect((await PDFDocument.load(document.uploaded)).getPageCount()).toBe(1);
+
+      expect((await hook(provider.webhook(document, 'Signed'))).status).toBe(200);
+      await sign.tick();
+      const done = await envelopeOf(ws, envelope.id);
+      expect(done.status).toBe('completed');
+      const sealed = await files.get(sealedFileKey(envelope.id, done.documents[0]!.id));
+      expect(await verifySignatures(sealed!)).toHaveLength(2);
+    });
+
+    it('keeps the box but uses the v3.0 workflow when placing is off', async () => {
+      sign = makeServer({ ...ENV, LEEGALITY_POSITION_API: 'off' });
+      vi.stubEnv('LEEGALITY_POSITION_API', 'off');
+      const ws = await workspace('free', 1);
+      const { res, email } = await send(ws, { sealPosition: true });
+      expect(((await res.json()) as Envelope).fields.map((f) => f.type)).toEqual(['aadhaar']);
+      expect((await start(tokenFor(email))).status).toBe(200);
+      expect(provider.last().v21).toBeUndefined();
+      expect(provider.last().pack).toBeUndefined();
+    });
+
+    it('refuses a second box with a clear message', async () => {
+      const ws = await workspace('free', 1);
+      const form = new FormData();
+      const box = (y: number) => ({
+        recipient: 'r1',
+        type: 'aadhaar',
+        page: 0,
+        rect: { x: 300, y, width: 200, height: 64 },
+      });
+      form.set(
+        'envelope',
+        JSON.stringify({
+          title: 'Two boxes',
+          send: true,
+          recipients: [
+            { key: 'r1', name: 'Ravi Kumar', email: 'ravi@example.com', auth: 'aadhaar' },
+          ],
+          documents: [{ key: 'd1', name: 'letter.pdf' }],
+          fields: [box(600), box(700)],
+        }),
+      );
+      form.append('documents', new Blob([await makePdf(1)], { type: 'application/pdf' }), 'l.pdf');
+      const res = await api(ws.key, '/v1/envelopes', { method: 'POST', body: form });
+      expect(res.status).toBe(400);
+      expect(await res.text()).toContain(
+        'Ravi Kumar can have one Aadhaar seal position; remove this extra box',
+      );
     });
   });
 
@@ -1041,6 +1310,49 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         ]),
       );
       expect(JSON.stringify(audit)).not.toMatch(/own-auth-token|workspace-private-salt/);
+    });
+
+    it('saves only the ids of a pasted V4 workflow and refuses one that is not', async () => {
+      const ws = await workspace('cloud');
+      state.user = ws.owner;
+      const { saveEsignCredentialsAction } = await actions();
+      const bad = await saveEsignCredentialsAction({
+        workspaceId: ws.id,
+        ...form,
+        v4Workflow: '{"pack":{}}',
+      });
+      expect(bad).toMatchObject({ ok: false, field: 'v4Workflow' });
+      const payload = JSON.stringify({
+        workflowId: '70843c25-8d80-40ac-ab6b-edba12abd495',
+        invitees: [
+          {
+            uuid: '8bc21487-b200-4130-8240-a5f1715244dc',
+            type: 'signer',
+            combinations: [
+              {
+                uuid: '29bdb6fd-99a9-4501-b74b-d482d7ad5062',
+                combinationSettings: { automatedEsign: { automatedSignPassword: 'secret-pass' } },
+              },
+            ],
+          },
+        ],
+      });
+      const saved = await saveEsignCredentialsAction({
+        workspaceId: ws.id,
+        ...form,
+        v4Workflow: payload,
+      });
+      expect(saved).toMatchObject({ ok: true, data: { own: { v4Workflow: true } } });
+      expect((await ownCredentials(sql, ws.accountId))?.v4).toEqual({
+        workflowId: '70843c25-8d80-40ac-ab6b-edba12abd495',
+        inviteeUuid: '8bc21487-b200-4130-8240-a5f1715244dc',
+        combinationUuid: '29bdb6fd-99a9-4501-b74b-d482d7ad5062',
+      });
+      const [row] = await sql`select own_v4_workflow from app_esign_settings
+        where account_id = ${ws.accountId}`;
+      expect(JSON.stringify(row)).not.toContain('secret-pass');
+      const again = await saveEsignCredentialsAction({ workspaceId: ws.id, ...form });
+      expect(again).toMatchObject({ ok: true, data: { own: { v4Workflow: false } } });
     });
 
     it('keeps your own account for Cloud, with what an upgrade prompt needs', async () => {

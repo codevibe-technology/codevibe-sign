@@ -1,4 +1,7 @@
 import { createHmac } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CREDITS_UNAVAILABLE_MESSAGES,
@@ -89,6 +92,89 @@ describe('billingConfig', () => {
     expect(config.hostingOffers).toEqual([
       { name: 'Example Host', url: 'https://example.com/ref' },
     ]);
+  });
+
+  describe('the Aadhaar seal position', () => {
+    const WORKFLOW = '70843c25-8d80-40ac-ab6b-edba12abd495';
+
+    it('goes through the 2.1 API by default, in points from the bottom left', () => {
+      expect(billingConfig(LEEGALITY).leegality).toMatchObject({
+        v4: null,
+        positionApi: 'v2.1',
+        coordinates: { units: 'points', origin: 'bottom-left' },
+      });
+      expect(
+        billingConfig({ ...LEEGALITY, LEEGALITY_V4_WORKFLOW_ID: WORKFLOW }).leegality,
+      ).toMatchObject({ positionApi: 'v4' });
+      expect(
+        billingConfig({
+          ...LEEGALITY,
+          LEEGALITY_V4_WORKFLOW_ID: WORKFLOW,
+          LEEGALITY_POSITION_API: 'v2.1',
+        }).leegality,
+      ).toMatchObject({ positionApi: 'v2.1' });
+      expect(
+        billingConfig({ ...LEEGALITY, LEEGALITY_POSITION_API: 'off' }).leegality,
+      ).toMatchObject({ positionApi: 'off' });
+    });
+
+    it('reports a position API it cannot use and falls back', () => {
+      const v4 = billingConfig({ ...LEEGALITY, LEEGALITY_POSITION_API: 'v4' });
+      expect(v4.leegality?.positionApi).toBe('v2.1');
+      expect(v4.problems.join(' ')).toMatch(/LEEGALITY_POSITION_API is v4 but no V4 workflow/);
+      const typo = billingConfig({ ...LEEGALITY, LEEGALITY_POSITION_API: 'v3' });
+      expect(typo.problems.join(' ')).toMatch(/must be v2.1, v4 or off/);
+    });
+
+    it('reads the V4 workflow id and the coordinate setting', () => {
+      const config = billingConfig({
+        ...LEEGALITY,
+        LEEGALITY_V4_WORKFLOW_ID: WORKFLOW,
+        LEEGALITY_COORDINATE_UNITS: 'pixels@96',
+        LEEGALITY_COORDINATE_ORIGIN: 'top-left',
+      });
+      expect(config.leegality).toMatchObject({
+        v4: { workflowId: WORKFLOW },
+        coordinates: { units: { pixelsPerInch: 96 }, origin: 'top-left' },
+      });
+      expect(config.problems).toEqual([]);
+    });
+
+    it('reads the ids of a downloaded API payload file', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'cvs-v4-'));
+      const file = join(dir, 'payload.json');
+      writeFileSync(
+        file,
+        JSON.stringify({
+          workflowId: WORKFLOW,
+          documents: [{ uuid: '711abfff-2057-48ac-909e-519f3f7415a4', subDocuments: [] }],
+        }),
+      );
+      try {
+        const config = billingConfig({ ...LEEGALITY, LEEGALITY_V4_PAYLOAD_FILE: file });
+        expect(config.leegality?.v4).toEqual({
+          workflowId: WORKFLOW,
+          documentUuid: '711abfff-2057-48ac-909e-519f3f7415a4',
+        });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('reports a malformed setting without turning eSign off', () => {
+      const config = billingConfig({
+        ...LEEGALITY,
+        LEEGALITY_V4_PAYLOAD_FILE: '/nonexistent/payload.json',
+        LEEGALITY_COORDINATE_UNITS: 'inches',
+      });
+      expect(config.leegality).toMatchObject({
+        v4: null,
+        coordinates: { units: 'points', origin: 'bottom-left' },
+      });
+      expect(config.problems.join(' ')).toMatch(
+        /LEEGALITY_V4_PAYLOAD_FILE could not be read.*not used.*LEEGALITY_COORDINATE_UNITS/,
+      );
+    });
   });
 
   it.each([

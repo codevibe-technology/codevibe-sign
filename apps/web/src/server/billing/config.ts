@@ -7,8 +7,19 @@ import {
   DEFAULT_PROFORMA_SERIES,
   seriesProblem,
 } from '@/lib/billing/invoice-series';
+import {
+  LEEGALITY_DEFAULT_COORDINATES,
+  type LeegalityCoordinateMapping,
+  type LeegalityV4Workflow,
+} from '@codevibe_technology/sign-aadhaar';
 import { parseInr, type Paise } from '@/lib/billing/money';
 import type { Plan } from '@/lib/plans';
+import {
+  leegalityCoordinates,
+  leegalityPositionApi,
+  leegalityV4FromEnv,
+  type PositionApi,
+} from '../esign/leegality-v4';
 
 export interface RazorpayConfig {
   keyId: string;
@@ -58,6 +69,12 @@ export interface LeegalityConfig {
   /** From the base URL: only `sandbox.` hosts are the sandbox. */
   environment: 'sandbox' | 'production';
   webhookHeader: { name: string; value: string } | null;
+  /** `LEEGALITY_V4_WORKFLOW_ID` / `LEEGALITY_V4_PAYLOAD_FILE`, for the v4 position API. */
+  v4: LeegalityV4Workflow | null;
+  /** `LEEGALITY_COORDINATE_UNITS` and `LEEGALITY_COORDINATE_ORIGIN`. */
+  coordinates: LeegalityCoordinateMapping;
+  /** `LEEGALITY_POSITION_API`: which API places the Aadhaar seal position. */
+  positionApi: PositionApi;
 }
 
 export interface HostingOffer {
@@ -258,7 +275,43 @@ function leegalityBaseUrl(source: Source): string {
   return raw.replace(/\/+$/, '');
 }
 
-function leegality(source: Source): LeegalityConfig | null {
+/**
+ * The Aadhaar seal position settings. A malformed one is a problem for the operator, not a
+ * reason to stop eSign or billing: the default is used in its place.
+ */
+function sealPosition(
+  source: Source,
+  problems: string[],
+): Pick<LeegalityConfig, 'v4' | 'coordinates' | 'positionApi'> {
+  let v4: LeegalityV4Workflow | null = null;
+  let positionApi: PositionApi;
+  let coordinates: LeegalityCoordinateMapping = LEEGALITY_DEFAULT_COORDINATES;
+  try {
+    v4 = leegalityV4FromEnv(source);
+  } catch (error) {
+    problems.push(
+      `${error instanceof Error ? error.message : String(error)}. The V4 workflow is not used.`,
+    );
+  }
+  try {
+    coordinates = leegalityCoordinates(source);
+  } catch (error) {
+    problems.push(
+      `${error instanceof Error ? error.message : String(error)}. The default is used.`,
+    );
+  }
+  try {
+    positionApi = leegalityPositionApi(v4 !== null, source);
+  } catch (error) {
+    positionApi = v4 ? 'v4' : 'v2.1';
+    problems.push(
+      `${error instanceof Error ? error.message : String(error)}. ${positionApi} is used.`,
+    );
+  }
+  return { v4, coordinates, positionApi };
+}
+
+function leegality(source: Source, problems: string[]): LeegalityConfig | null {
   const values = group(
     source,
     ['LEEGALITY_API_KEY', 'LEEGALITY_PRIVATE_SALT', 'LEEGALITY_WORKFLOW_ID'] as const,
@@ -281,6 +334,7 @@ function leegality(source: Source): LeegalityConfig | null {
     webhookHeader: header
       ? { name: header.LEEGALITY_WEBHOOK_HEADER_NAME, value: header.LEEGALITY_WEBHOOK_HEADER_VALUE }
       : null,
+    ...sealPosition(source, problems),
   };
 }
 
@@ -344,8 +398,8 @@ export function billingConfig(source: Source = process.env): BillingConfig {
   const series = seriesOf(source, 'INVOICE_SERIES', DEFAULT_INVOICE_SERIES);
   const live = isLive(source);
   const keys = razorpay(source);
-  const esignAccount = leegality(source);
   const problems: string[] = [];
+  const esignAccount = leegality(source, problems);
   if (live && keys?.mode === 'test') {
     problems.push(
       'BILLING_LIVE is on but RAZORPAY_KEY_ID is a test key. Payments stay off until a live key is set.',

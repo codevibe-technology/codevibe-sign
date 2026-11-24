@@ -1,10 +1,21 @@
 import type { Id, Rect, Recipient } from '@codevibe_technology/sign-core';
 
+/** A page's crop box in PDF user space (before rotation) and its clockwise `/Rotate`. */
+export interface PageBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: 0 | 90 | 180 | 270;
+}
+
 export interface SignaturePosition {
   /** Zero-based page index. */
   page: number;
-  /** PDF points with a top-left origin, as in `Field.rect`. */
+  /** PDF points with a top-left origin on the page as displayed, as in `Field.rect`. */
   rect: Rect;
+  /** The page the box is on, so the box can be expressed in the provider's coordinates. */
+  pageBox?: PageBox;
 }
 
 export interface EsignRequest {
@@ -19,9 +30,9 @@ export interface EsignRequest {
   documentBytes: Uint8Array;
   documentName: string;
   /**
-   * Where to place the signature, for a provider whose API takes a position per request.
-   * Leegality's v3.0 API takes it from the workflow and ignores this; the server sends none,
-   * so the signature goes where the provider's own configuration says.
+   * Where the provider should draw its signature appearance. Without it the signature goes
+   * where the provider's own configuration says. Leegality takes it only through a v4
+   * workflow (`LeegalityOptions.v4`); its v3.0 API has no field for it.
    */
   signaturePositions?: SignaturePosition[];
   /** Where the provider should send status callbacks. */

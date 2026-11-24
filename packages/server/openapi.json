@@ -2597,7 +2597,7 @@
       "FieldType": {
         "type": "string",
         "enum": ["signature", "initials", "date_signed", "name", "text", "checkbox", "aadhaar"],
-        "description": "A recipient with `auth: aadhaar` has no fields: the eSign provider places the signature\nwhere its own workflow says, and signs the document as the sender approved it, with\nthe values of the signers before them. `signature`, `initials` and `aadhaar` fields\ngiven to such a signer are dropped when the envelope is sent, so older requests still\nwork; any other field for them is refused with `VALIDATION`. `aadhaar`, the Aadhaar\neSign box, is read on envelopes sent while it marked where the signer signs; it takes\nno value, and only an Aadhaar eSign signer may have one.\n"
+        "description": "A recipient with `auth: aadhaar` fills in nothing: the eSign provider signs the\ndocument as the sender approved it, with the values of the signers before them. They\nmay have one `aadhaar` field, the Aadhaar seal position: it only says where the\nprovider draws its signature, takes no value, and nothing is drawn for it. Without it\nthe provider places the signature where its own setting says. A second `aadhaar`\nfield is refused with `VALIDATION`. `signature` and `initials` fields given to such a\nsigner are dropped when the envelope is sent, so older requests still work; any other\nfield for them is refused with `VALIDATION`. Only an Aadhaar eSign signer may have an\n`aadhaar` field.\n"
       },
       "AuditAction": {
         "type": "string",

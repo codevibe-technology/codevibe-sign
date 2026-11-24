@@ -57,6 +57,7 @@ export function StepReview({
   sender,
   onSettings,
   onGoTo,
+  sealPosition,
 }: {
   state: SendFlowState;
   problems: Problems;
@@ -64,6 +65,8 @@ export function StepReview({
   sender?: { name: string; email: string };
   onSettings: (patch: Partial<DraftSettings>) => void;
   onGoTo: (step: StepKey) => void;
+  /** The Leegality account in use places the Aadhaar seal position; unknown when left out. */
+  sealPosition?: boolean;
 }) {
   const { settings } = state;
   const elsewhere = Object.entries(problems).filter(
@@ -75,6 +78,9 @@ export function StepReview({
   const pages = state.documents.reduce((n, d) => n + d.pages.length, 0);
   const actors = state.recipients.filter((r) => r.role !== 'viewer');
   const esigner = state.recipients.find((r) => r.auth === 'aadhaar' && r.role === 'signer');
+  const sealPlaced = Boolean(
+    esigner && state.fields.some((f) => f.recipientId === esigner.id && f.type === 'aadhaar'),
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
@@ -304,7 +310,11 @@ export function StepReview({
                           {ROLE_LABEL[r.role]}
                           {r.role !== 'viewer' ? ` · ${AUTH_LABELS[r.auth]}` : ''}
                           {r.role === 'signer' && !esign ? ` · ${required} required` : ''}
-                          {r.role === 'signer' && esign ? ' · signature placed by Leegality' : ''}
+                          {r.role === 'signer' && esign
+                            ? sealPlaced
+                              ? ' · Aadhaar seal position placed'
+                              : ' · signature placed by Leegality'
+                            : ''}
                         </span>
                       </span>
                       {r.role === 'signer' ? (
@@ -330,7 +340,12 @@ export function StepReview({
                 })}
               </ol>
               {esigner ? (
-                <AadhaarPlacementNote name={esigner.name.trim() || undefined} className="mt-3" />
+                <AadhaarPlacementNote
+                  name={esigner.name.trim() || undefined}
+                  placed={sealPlaced}
+                  {...(sealPosition !== undefined ? { supported: sealPosition } : {})}
+                  className="mt-3"
+                />
               ) : null}
             </div>
           </div>

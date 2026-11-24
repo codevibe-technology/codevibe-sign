@@ -198,8 +198,8 @@ export function SigningView({
       ),
     [allFields, recipient.id, documents],
   );
-  // An Aadhaar eSign box, on an envelope sent while it existed, takes nothing and is not
-  // shown: the eSign provider places the signature where its workflow says.
+  // The Aadhaar seal position takes nothing and is not shown: it only tells the eSign
+  // provider where to draw its signature.
   const fields = useMemo(() => own.filter((f) => f.type !== 'aadhaar'), [own]);
 
   const [values, setValues] = useState<FieldValues>(() => {

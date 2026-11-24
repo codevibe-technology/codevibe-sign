@@ -10,6 +10,7 @@ import {
   parsePageRange,
   repeatField,
   scaleRectBetween,
+  aadhaarSealOnLastPage,
   signatureOnLastPage,
 } from './multipage';
 
@@ -156,5 +157,13 @@ describe('presets', () => {
     expect(
       signatureOnLastPage({ documentId: 'doc', recipientId: 'r1', pages: [], createId }),
     ).toEqual([]);
+  });
+
+  it('puts the optional Aadhaar seal position where the signature would go', () => {
+    const input = { documentId: 'doc', recipientId: 'r1', pages, createId };
+    const [seal] = aadhaarSealOnLastPage(input);
+    expect(seal).toMatchObject({ type: 'aadhaar', page: 2, required: false });
+    expect(seal!.rect).toMatchObject({ width: 200, height: 64 });
+    expect(seal!.rect.y + seal!.rect.height).toBeLessThanOrEqual(A4_LANDSCAPE.height - 36);
   });
 });

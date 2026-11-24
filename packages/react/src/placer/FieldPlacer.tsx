@@ -80,10 +80,16 @@ export interface FieldPlacerLabels extends ViewerLabels {
   initialsEveryPage: string;
   signatureLastPage: string;
   /**
-   * In place of the field tray while an Aadhaar eSign signer is picked: they get no fields,
-   * because the eSign provider places their signature.
+   * Under the field tray while an Aadhaar eSign signer is picked: they fill in nothing, and
+   * one optional box marks where the eSign provider draws their signature.
    */
   aadhaarHint: (name: string) => string;
+  /** The quick add that puts the Aadhaar seal position on the last page. */
+  aadhaarSealLastPage: string;
+  /** On the tray item once the signer has their one Aadhaar seal position. */
+  aadhaarSealPlaced: string;
+  /** In the panel of a selected Aadhaar seal position. */
+  aadhaarPositionNote: string;
   placeFromTags: (count: number) => string;
   tagsPlaced: (placed: number, unmatched: number) => string;
   fieldCount: (count: number) => string;
@@ -181,7 +187,11 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   initialsEveryPage: 'Initials on every page',
   signatureLastPage: 'Signature on last page',
   aadhaarHint: (name) =>
-    `${name} signs with Aadhaar eSign. The eSign provider places the signature where its workflow says, so you place no box and ${name} fills in nothing here.`,
+    `${name} signs with Aadhaar eSign and fills in nothing. Optionally place one Aadhaar seal position: it only marks where the Aadhaar signature appears. Without it, the eSign provider places it as its own setting says.`,
+  aadhaarSealLastPage: 'Aadhaar seal on last page',
+  aadhaarSealPlaced: 'Already placed. Drag the box on the page to move it.',
+  aadhaarPositionNote:
+    'Position only. The eSign provider draws the Aadhaar signature here; nothing is added to the file.',
   placeFromTags: (count) => `Place fields from tags (found ${count})`,
   tagsPlaced: (placed, unmatched) =>
     unmatched === 0
@@ -219,7 +229,7 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   },
   noSignature: 'No signature field yet.',
   addSignatureFor: (name) => `Add a signature for ${name}`,
-  aadhaarSummary: 'Aadhaar eSign: no fields. The eSign provider places the signature.',
+  aadhaarSummary: 'Aadhaar eSign: fills in nothing. The eSign provider draws the signature.',
   aadhaarCount: 'Aadhaar eSign, no fields',
   showField: 'Show it',
   fieldLabel: 'Label',
@@ -250,7 +260,7 @@ export const defaultFieldPlacerLabels: FieldPlacerLabels = {
   stopPreview: 'Back to editing',
   previewSign: 'Sign',
   previewInitial: 'Initial',
-  previewAadhaar: 'Aadhaar eSign',
+  previewAadhaar: 'Aadhaar seal',
 };
 
 interface TrayItem {
@@ -261,7 +271,12 @@ interface TrayItem {
 const TRAY: { group: keyof FieldPlacerLabels['trayGroups']; items: TrayItem[] }[] = [
   {
     group: 'signature',
-    items: [{ type: 'signature' }, { type: 'initials' }, { type: 'date_signed' }],
+    items: [
+      { type: 'signature' },
+      { type: 'initials' },
+      { type: 'aadhaar' },
+      { type: 'date_signed' },
+    ],
   },
   {
     group: 'details',
@@ -1083,8 +1098,13 @@ export function FieldPlacer({
   const activeColor = recipientColorIndex(signers, placement.recipientId ?? '');
   const active = signers.find((r) => r.id === placement.recipientId);
   const aadhaarActive = active?.auth === 'aadhaar';
-  // An Aadhaar eSign signer is offered nothing to place, and nobody is offered the box.
-  const offered: FieldType[] = aadhaarActive ? [] : fieldTypes.filter((t) => t !== 'aadhaar');
+  // An Aadhaar eSign signer is offered only the seal position, and nobody else is.
+  const offered: FieldType[] = aadhaarActive
+    ? fieldTypes.filter((t) => t === 'aadhaar')
+    : fieldTypes.filter((t) => t !== 'aadhaar');
+  const sealPlaced =
+    aadhaarActive &&
+    placement.fields.some((f) => f.recipientId === active.id && f.type === 'aadhaar');
   const noSigners = signers.length === 0;
   const zoomPercent = Math.round(zoom * 100);
   const zoomChoices = ZOOM_STEPS.includes(zoom)
@@ -1142,6 +1162,7 @@ export function FieldPlacer({
                     const label = item.preset
                       ? labels.trayPresets[item.preset]
                       : labels.fieldTypes[item.type];
+                    const placedSeal = item.type === 'aadhaar' && sealPlaced;
                     return (
                       <button
                         key={item.preset ?? item.type}
@@ -1149,7 +1170,8 @@ export function FieldPlacer({
                         className="cvs-palette-item"
                         data-type={item.type}
                         data-cvs-color={activeColor}
-                        disabled={noSigners || previewing}
+                        disabled={noSigners || previewing || placedSeal}
+                        title={placedSeal ? labels.aadhaarSealPlaced : undefined}
                         aria-describedby={`${id}-palette-hint`}
                         onPointerDown={(e) => onPalettePointerDown(e, item)}
                         onPointerMove={onPalettePointerMove}
@@ -1185,6 +1207,25 @@ export function FieldPlacer({
           {aadhaarActive && active ? labels.aadhaarHint(active.name) : labels.paletteHint}
         </p>
 
+        {aadhaarActive && offered.includes('aadhaar') && (
+          <>
+            <h3 className="cvs-panel-title">{labels.presets}</h3>
+            <div className="cvs-presets" role="group" aria-label={labels.presets}>
+              <button
+                type="button"
+                className="cvs-button cvs-button--quiet"
+                disabled={previewing}
+                onClick={() => {
+                  gesture.current = null;
+                  placement.addAadhaarSealLastPage();
+                }}
+              >
+                <Icon name="aadhaar" />
+                {labels.aadhaarSealLastPage}
+              </button>
+            </div>
+          </>
+        )}
         {!aadhaarActive && (
           <>
             <h3 className="cvs-panel-title">{labels.presets}</h3>

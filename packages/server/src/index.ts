@@ -21,6 +21,7 @@ export {
   defaultPdfEngine,
   type PdfEngine,
   type PdfInfo,
+  type PageBox,
   type SealOptions,
   type CertificateDetails,
   type CertificateInput,

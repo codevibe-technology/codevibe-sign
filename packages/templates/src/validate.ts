@@ -155,9 +155,18 @@ function roleIssues(
     issues.push(...fieldIssues(field, documents, `${path}.fields.${i}`)),
   );
   if (role.auth === 'aadhaar') {
-    // The eSign provider places the signature, so such a role has no fields. The signature,
-    // initials and box fields older templates gave it are dropped when the envelope is sent.
+    // Such a role fills in nothing. One `aadhaar` box may mark where the eSign provider draws
+    // its signature; the signature and initials fields older templates gave it are dropped
+    // when the envelope is sent.
+    let boxes = 0;
     fields.forEach((field, i) => {
+      if (field.type === 'aadhaar' && ++boxes > 1) {
+        issues.push({
+          path: `${path}.fields.${i}`,
+          message: `${role.name || 'This role'} can have one Aadhaar seal position; remove this extra box`,
+        });
+        return;
+      }
       if (field.type === 'signature' || field.type === 'initials' || field.type === 'aadhaar') {
         return;
       }
@@ -172,7 +181,7 @@ function roleIssues(
     if (field.type === 'aadhaar') {
       issues.push({
         path: `${path}.fields.${i}`,
-        message: 'Only a role that signs with Aadhaar eSign can have an Aadhaar eSign box',
+        message: 'Only a role that signs with Aadhaar eSign can have an Aadhaar seal position',
       });
     }
   });

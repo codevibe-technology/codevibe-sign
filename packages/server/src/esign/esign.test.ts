@@ -165,6 +165,11 @@ describe('sending with an Aadhaar signer', () => {
       'Ravi Kumar signs with Aadhaar eSign and fills in nothing here',
     ],
     [
+      'two Aadhaar seal positions',
+      { fields: [signature('asha', 72), box('ravi', 300), { ...box('ravi', 300), y: 100 }] },
+      'Ravi Kumar can have one Aadhaar seal position; remove this extra box',
+    ],
+    [
       'an Aadhaar eSign box for someone who signs by email',
       { fields: [signature('asha', 72), box('asha', 72)] },
       'Only a signer who uses Aadhaar eSign',
@@ -199,13 +204,12 @@ describe('sending with an Aadhaar signer', () => {
     expect(status).toBe(201);
   });
 
-  it('drops the signature, initials and box an older request gives the Aadhaar signer', async () => {
+  it('drops the signature and initials an older request gives the Aadhaar signer', async () => {
     const { h } = setup();
     const older = [
       signature('asha', 72),
       signature('ravi', 300),
       signature('ravi', 300, 'initials'),
-      box('ravi', 300),
     ];
     const created = await h.call('POST', '/v1/envelopes', {
       body: aadhaarBody({ fields: older }),
@@ -215,14 +219,66 @@ describe('sending with an Aadhaar signer', () => {
     const draft = await h.call('POST', '/v1/envelopes', {
       body: aadhaarBody({ send: false, fields: older }),
     });
-    expect((draft.json as Api).fields).toHaveLength(4);
+    expect((draft.json as Api).fields).toHaveLength(3);
     const sent = await h.call('POST', `/v1/envelopes/${draft.json.id}/send`);
     expect(sent.status).toBe(200);
     expect((sent.json as Api).fields.map((f) => f.type)).toEqual(['signature']);
   });
+
+  it('keeps one Aadhaar seal position as the place of the signature', async () => {
+    const { h } = setup();
+    const fields = [signature('asha', 72), signature('ravi', 300), box('ravi', 300)];
+    const created = await h.call('POST', '/v1/envelopes', { body: aadhaarBody({ fields }) });
+    expect(created.status).toBe(201);
+    expect((created.json as Api).fields.map((f) => f.type)).toEqual(['signature', 'aadhaar']);
+    const draft = await h.call('POST', '/v1/envelopes', {
+      body: aadhaarBody({ send: false, fields }),
+    });
+    const sent = await h.call('POST', `/v1/envelopes/${draft.json.id}/send`);
+    expect((sent.json as Api).fields.map((f) => f.type)).toEqual(['signature', 'aadhaar']);
+  });
 });
 
 describe('POST /v1/sign/:token/esign', () => {
+  it('passes the Aadhaar seal position to the provider and draws nothing for it', async () => {
+    const { h, provider } = setup();
+    const { start } = await readyForRavi(h, {
+      fields: [signature('asha', 72), title('asha'), box('ravi', 300)],
+    });
+    expect((await start()).status).toBe(200);
+    const { request } = provider.requests[0]!;
+    expect(request.signaturePositions).toEqual([
+      {
+        page: 1,
+        rect: { x: 300, y: 600, width: 180, height: 48 },
+        pageBox: { x: 0, y: 0, width: 612, height: 792, rotation: 0 },
+      },
+    ]);
+    // Only Asha's two fields are drawn: the box is a position, not a field.
+    expect(new TextDecoder().decode(request.documentBytes)).toMatch(/fields=2;values=2\n$/);
+  });
+
+  it('gives the provider the crop box and rotation of the page', async () => {
+    const box90 = { x: 10, y: 20, width: 595, height: 842, rotation: 90 as const };
+    const engine = fakePdfEngine();
+    const { h, provider } = setup({
+      server: {
+        pdf: {
+          ...engine,
+          inspectPdf: async (pdf, options) => ({
+            ...(await engine.inspectPdf(pdf, options)),
+            boxes: [{ ...box90, rotation: 0 }, box90],
+          }),
+        },
+      },
+    });
+    const { start } = await readyForRavi(h, {
+      fields: [signature('asha', 72), title('asha'), box('ravi', 300)],
+    });
+    await start();
+    expect(provider.requests[0]!.request.signaturePositions?.[0]?.pageBox).toEqual(box90);
+  });
+
   it('sends the signer to the provider with the filled file and reserves once', async () => {
     const { h, provider, hooks } = setup();
     const { envelope, token, start } = await readyForRavi(h);

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { LeegalityV4Workflow } from '@codevibe_technology/sign-aadhaar';
 import type postgres from 'postgres';
 import { AppError } from '../errors';
 import { openSecret, sealSecret } from '../billing/secret-box';
@@ -19,6 +20,8 @@ export interface EsignSettings {
     savedAt: string | null;
     testedAt: string | null;
     testOk: boolean | null;
+    /** A V4 workflow is saved; the Aadhaar seal position then goes through the v4 API. */
+    v4Workflow: boolean;
   };
   /** Changes whenever the mode or the credentials change. */
   version: number;
@@ -29,6 +32,8 @@ export interface OwnCredentials {
   privateSalt: string;
   workflowId: string;
   environment: EsignEnvironment;
+  /** The v4 workflow that places the signature at the sender's Aadhaar seal position. */
+  v4?: LeegalityV4Workflow;
 }
 
 interface Row {
@@ -41,6 +46,7 @@ interface Row {
   own_saved_at: Date | null;
   own_tested_at: Date | null;
   own_test_ok: boolean | null;
+  own_v4_workflow: LeegalityV4Workflow | null;
   version: number;
 }
 
@@ -53,6 +59,7 @@ const DEFAULTS: EsignSettings = {
     savedAt: null,
     testedAt: null,
     testOk: null,
+    v4Workflow: false,
   },
   version: 0,
 };
@@ -72,6 +79,7 @@ const toSettings = (row: Row): EsignSettings => ({
     savedAt: row.own_saved_at?.toISOString() ?? null,
     testedAt: row.own_tested_at?.toISOString() ?? null,
     testOk: row.own_test_ok,
+    v4Workflow: hasCredentials(row) && row.own_v4_workflow !== null,
   },
   version: row.version,
 });
@@ -79,7 +87,7 @@ const toSettings = (row: Row): EsignSettings => ({
 async function read(sql: Sql, accountId: string): Promise<Row | null> {
   const [row] = await sql<Row[]>`
     select mode, own_api_key, own_private_salt, own_workflow_id, own_environment, own_key_hint,
-           own_saved_at, own_tested_at, own_test_ok, version
+           own_saved_at, own_tested_at, own_test_ok, own_v4_workflow, version
     from app_esign_settings where account_id = ${accountId}`;
   return row ?? null;
 }
@@ -102,6 +110,7 @@ export async function ownCredentials(sql: Sql, accountId: string): Promise<OwnCr
       privateSalt: openSecret(row.own_private_salt!, context(accountId, 'privateSalt')),
       workflowId: row.own_workflow_id!,
       environment: row.own_environment!,
+      ...(row.own_v4_workflow ? { v4: row.own_v4_workflow } : {}),
     };
   } catch {
     return null;
@@ -186,17 +195,19 @@ export async function saveOwnCredentials(
     const apiKey = sealSecret(credentials.apiKey, context(accountId, 'apiKey'));
     const salt = sealSecret(credentials.privateSalt, context(accountId, 'privateSalt'));
     const hint = credentials.apiKey.slice(-4);
+    const v4 = credentials.v4 ? sql.json(credentials.v4 as unknown as postgres.JSONValue) : null;
     await sql`
       insert into app_esign_settings (
         account_id, own_api_key, own_private_salt, own_workflow_id, own_environment,
-        own_key_hint, own_saved_at, version, updated_by
+        own_v4_workflow, own_key_hint, own_saved_at, version, updated_by
       ) values (
         ${accountId}, ${apiKey}, ${salt}, ${credentials.workflowId}, ${credentials.environment},
-        ${hint}, now(), 1, ${input.userId}
+        ${v4}, ${hint}, now(), 1, ${input.userId}
       )
       on conflict (account_id) do update
       set own_api_key = excluded.own_api_key, own_private_salt = excluded.own_private_salt,
           own_workflow_id = excluded.own_workflow_id, own_environment = excluded.own_environment,
+          own_v4_workflow = excluded.own_v4_workflow,
           own_key_hint = excluded.own_key_hint, own_saved_at = now(),
           own_tested_at = null, own_test_ok = null,
           version = app_esign_settings.version + 1,
@@ -216,7 +227,7 @@ export async function removeOwnCredentials(
     await sql`
       update app_esign_settings
       set mode = 'platform', own_api_key = null, own_private_salt = null, own_workflow_id = null,
-          own_environment = null, own_key_hint = null, own_saved_at = null, own_tested_at = null,
+          own_v4_workflow = null, own_environment = null, own_key_hint = null, own_saved_at = null, own_tested_at = null,
           own_test_ok = null, version = version + 1, updated_by = ${input.userId},
           updated_at = now()
       where account_id = ${input.accountId}`;

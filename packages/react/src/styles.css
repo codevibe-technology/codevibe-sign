@@ -1679,6 +1679,12 @@
   z-index: 2;
 }
 
+/* The Aadhaar seal position marks a place; the dashed edge says nothing is drawn there. */
+.cvs-placed[data-type='aadhaar'] {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--cvs-color) 8%, rgb(255 255 255 / 0.6));
+}
+
 .cvs-placed[data-compact] {
   justify-content: center;
   padding: 0;

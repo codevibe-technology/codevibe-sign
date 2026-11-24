@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { PDFDocument } from 'pdf-lib';
 import { SignError, type PageSize } from '@codevibe_technology/sign-core';
-import { pageGeometry } from './geometry';
+import { pageGeometry, type Rotation } from './geometry';
 import { checkParseLimits, type ParseLimits } from './limits';
 import { assertUnsigned } from './signatures';
 
@@ -24,6 +24,20 @@ export interface PdfInfo {
    * space field rects are placed in, and maps directly onto `Document.pageSizes`.
    */
   pages: PageSize[];
+  /**
+   * Each page's crop box in unrotated user space and its clockwise rotation: what a box
+   * placed on the displayed page needs to be expressed in PDF user space, for example for an
+   * eSign provider that draws its own signature appearance.
+   */
+  boxes: PageBox[];
+}
+
+export interface PageBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: Rotation;
 }
 
 /** Lowercase hex SHA-256 of the bytes. */
@@ -128,9 +142,8 @@ export async function inspectPdf(
   await checkParseLimits(bytes, options.limits);
   const doc = await loadPdf(bytes, options);
   assertUnsigned(doc);
-  const pages = doc.getPages().map((page) => {
-    const geometry = pageGeometry(page);
-    return { width: geometry.width, height: geometry.height };
-  });
-  return { pageCount: pages.length, pages };
+  const geometries = doc.getPages().map(pageGeometry);
+  const pages = geometries.map(({ width, height }) => ({ width, height }));
+  const boxes = geometries.map(({ box, rotation }) => ({ ...box, rotation }));
+  return { pageCount: pages.length, pages, boxes };
 }

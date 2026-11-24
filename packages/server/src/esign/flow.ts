@@ -1,6 +1,11 @@
-import type { EsignEvent, EsignProvider } from '@codevibe_technology/sign-aadhaar';
+import type {
+  EsignEvent,
+  EsignProvider,
+  SignaturePosition,
+} from '@codevibe_technology/sign-aadhaar';
 import {
   SignError,
+  aadhaarSealPosition,
   decline,
   hasActed,
   isActive,
@@ -319,8 +324,8 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
     const timeZone = await timeZoneFor(rt, workspaceId);
     // What the provider signs is the document as the sender approved it, with the values of
     // the signers before this one drawn on it. Nothing else is added: the certificate and the
-    // audit trail go in a file of their own once the eSign is done, and the provider places
-    // its signature where its workflow says.
+    // audit trail go in a file of their own once the eSign is done, and the provider draws
+    // its signature at the sender's seal position, or where its own setting says.
     const fields = envelope.fields.filter(
       (f) => f.documentId === document.id && f.type !== 'aadhaar',
     );
@@ -343,6 +348,7 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
         reason: 'not_configured',
       });
     }
+    const position = await sealPosition(rt, envelope, recipient.id, document, rendered);
     created = await account.createRequest({
       envelopeId: envelope.id,
       reference: session.id,
@@ -353,6 +359,7 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
       },
       documentBytes: rendered,
       documentName: document.name,
+      ...(position ? { signaturePositions: [position] } : {}),
       callbackUrl: `${rt.publicUrl}${rt.basePath}/v1/esign/webhooks/${provider.name}`,
       redirectUrl: `${rt.signingPageUrl}?esign=return`,
     });
@@ -408,6 +415,27 @@ export async function startEsign(rt: Runtime, input: StartEsignInput): Promise<S
     ),
   );
   return { signUrl: created.signUrl, expiresAt: expiresAt.toISOString() };
+}
+
+/**
+ * The sender's Aadhaar seal position for this signer, with the page it is on, or null to
+ * leave the signature where the provider's own setting puts it.
+ */
+async function sealPosition(
+  rt: Runtime,
+  envelope: Envelope,
+  recipientId: Id,
+  document: Envelope['documents'][number],
+  pdf: Uint8Array,
+): Promise<SignaturePosition | null> {
+  const field = aadhaarSealPosition(envelope, recipientId);
+  if (!field || field.documentId !== document.id) return null;
+  const info = await rt.pdf.inspectPdf(pdf, { maxBytes: pdf.byteLength });
+  const size = info.pages[field.page] ?? document.pageSizes?.[field.page];
+  const pageBox =
+    info.boxes?.[field.page] ??
+    (size ? { x: 0, y: 0, width: size.width, height: size.height, rotation: 0 as const } : null);
+  return { page: field.page, rect: field.rect, ...(pageBox ? { pageBox } : {}) };
 }
 
 const invalidFile = (message: string) =>

@@ -121,7 +121,9 @@ export function Inspector({
   const group = placement.groupOf(field.id).length;
   const owner = recipients.find((r) => r.id === field.recipientId)?.name ?? '';
   const title = field.label || labels.fieldTypes[field.type];
-  const labelled = field.type !== 'signature' && field.type !== 'initials';
+  // The Aadhaar seal position is a place, not a field: it has no label, value or copies.
+  const seal = field.type === 'aadhaar';
+  const labelled = field.type !== 'signature' && field.type !== 'initials' && !seal;
   return (
     <div className="cvs-inspector" role="group" aria-label={labels.selectedField}>
       <div className="cvs-inspector-head" data-cvs-color={color}>
@@ -134,39 +136,49 @@ export function Inspector({
         </div>
       </div>
 
-      <div className="cvs-prop">
-        <label className="cvs-label" htmlFor={`${id}-assign`}>
-          {labels.assignedTo}
-        </label>
-        <select
-          id={`${id}-assign`}
-          className="cvs-input"
-          value={field.recipientId}
-          onChange={(e) => {
-            onEdit(null);
-            placement.updateField(field.id, { recipientId: e.target.value });
-          }}
-        >
-          {recipients.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {seal && (
+        <p className="cvs-hint cvs-hint--esign" role="note">
+          {labels.aadhaarPositionNote}
+        </p>
+      )}
 
-      <label className="cvs-check cvs-switch">
-        <input
-          type="checkbox"
-          checked={field.required}
-          onChange={(e) => {
-            onEdit(null);
-            placement.updateField(field.id, { required: e.target.checked });
-          }}
-        />
-        <span className="cvs-switch-track" aria-hidden="true" />
-        {labels.required}
-      </label>
+      {!seal && (
+        <div className="cvs-prop">
+          <label className="cvs-label" htmlFor={`${id}-assign`}>
+            {labels.assignedTo}
+          </label>
+          <select
+            id={`${id}-assign`}
+            className="cvs-input"
+            value={field.recipientId}
+            onChange={(e) => {
+              onEdit(null);
+              placement.updateField(field.id, { recipientId: e.target.value });
+            }}
+          >
+            {recipients.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {!seal && (
+        <label className="cvs-check cvs-switch">
+          <input
+            type="checkbox"
+            checked={field.required}
+            onChange={(e) => {
+              onEdit(null);
+              placement.updateField(field.id, { required: e.target.checked });
+            }}
+          />
+          <span className="cvs-switch-track" aria-hidden="true" />
+          {labels.required}
+        </label>
+      )}
 
       {labelled && (
         <div className="cvs-prop">
@@ -192,19 +204,21 @@ export function Inspector({
         </div>
       )}
 
-      <RepeatControl
-        id={id}
-        labels={labels}
-        pageCount={pageCount}
-        page={field.page}
-        pages={placement.pagesOf(field.id)}
-        typed={typedPages}
-        notice={repeatNotice}
-        inputRef={pagesInput}
-        onChoose={onChooseRepeat}
-        onType={onTypePages}
-        onApply={onApplyPages}
-      />
+      {!seal && (
+        <RepeatControl
+          id={id}
+          labels={labels}
+          pageCount={pageCount}
+          page={field.page}
+          pages={placement.pagesOf(field.id)}
+          typed={typedPages}
+          notice={repeatNotice}
+          inputRef={pagesInput}
+          onChoose={onChooseRepeat}
+          onType={onTypePages}
+          onApply={onApplyPages}
+        />
+      )}
 
       <fieldset className="cvs-prop cvs-size">
         <legend className="cvs-label">{labels.size}</legend>

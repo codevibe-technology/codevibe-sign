@@ -31,6 +31,7 @@ export default async function NewEnvelopePage({
     creditsRequired: info.creditsRequired,
     credits: info.credits,
     pricePaise: info.pricePaise,
+    sealPosition: info.sealPosition,
     settingsHref: can(role, 'esign.manage') ? `/dashboard/${slug}/settings/aadhaar-esign` : null,
   };
   if (!draft) return <SendFlow slug={slug} workspaceId={workspace.id} me={me} esign={esign} />;
