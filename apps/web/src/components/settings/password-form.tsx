@@ -6,12 +6,21 @@ import { confirmProblem, NewPasswordFields } from '@/components/auth/new-passwor
 import { PasswordInput } from '@/components/auth/password-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader } from '@/components/ui/card';
+import { DialogClose, DialogContent, DialogRoot, DialogTrigger } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { passwordProblem } from '@/lib/password';
-import { setPasswordAction, signOutOtherSessionsAction } from '@/server/actions/account';
+import { announceSignOut } from '@/lib/session-sync';
+import {
+  setPasswordAction,
+  signOutEverywhereAction,
+  signOutOtherSessionsAction,
+} from '@/server/actions/account';
 import { useAction } from './use-action';
 
-/** Set a first password, or change it, and sign the account out everywhere else. */
+/**
+ * Set a first password, or change it; sign the account out everywhere else, or everywhere
+ * including here.
+ */
 export function PasswordForm({
   user,
   hasPassword: initial,
@@ -28,6 +37,7 @@ export function PasswordForm({
   const [local, setLocal] = useState<string>();
   const { pending, errors, run, clear } = useAction();
   const sessions = useAction();
+  const everywhere = useAction();
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -101,10 +111,7 @@ export function PasswordForm({
                 setMismatch(undefined);
               }}
               account={user}
-              errors={{
-                password: local ?? errors.newPassword,
-                confirm: mismatch,
-              }}
+              errors={{ password: local ?? errors.newPassword, confirm: mismatch }}
             />
             <label className="flex items-start gap-3 text-sm">
               <input
@@ -131,8 +138,14 @@ export function PasswordForm({
       <Card>
         <CardHeader
           title="Sessions"
-          description="Signed in on a device you no longer use? Sign out everywhere except here."
-          action={
+          description="Signed in on a device you no longer use, or think someone else might be? Sign out there from here."
+        />
+        <CardBody className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm">
+              Sign out of other devices
+              <span className="block text-[13px] text-muted">This device stays signed in.</span>
+            </p>
             <Button
               variant="secondary"
               pending={sessions.pending}
@@ -144,8 +157,45 @@ export function PasswordForm({
             >
               Sign out other sessions
             </Button>
-          }
-        />
+          </div>
+          <div className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm">
+              Sign out of all devices
+              <span className="block text-[13px] text-muted">
+                Every session ends, this one too. You sign in again here afterwards.
+              </span>
+            </p>
+            <DialogRoot>
+              <DialogTrigger asChild>
+                <Button variant="secondary">Sign out of all devices</Button>
+              </DialogTrigger>
+              <DialogContent
+                title="Sign out of all devices?"
+                description="Every browser and device signed in to your account is signed out, including this one."
+              >
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <DialogClose asChild>
+                    <Button variant="secondary">Cancel</Button>
+                  </DialogClose>
+                  <Button
+                    variant="danger"
+                    pending={everywhere.pending}
+                    onClick={() =>
+                      everywhere.run(() => signOutEverywhereAction({}), {
+                        onSuccess: () => {
+                          announceSignOut('chosen');
+                          window.location.assign('/sign-in');
+                        },
+                      })
+                    }
+                  >
+                    Sign out everywhere
+                  </Button>
+                </div>
+              </DialogContent>
+            </DialogRoot>
+          </div>
+        </CardBody>
       </Card>
     </div>
   );

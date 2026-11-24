@@ -12,14 +12,11 @@ const actions = vi.hoisted(() => ({
   joinWithPasswordAction: vi.fn(),
   setPasswordAction: vi.fn(),
   signOutOtherSessionsAction: vi.fn(),
+  signOutEverywhereAction: vi.fn(),
   acceptInvitationAction: vi.fn(),
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-const router = vi.hoisted(() => ({
-  push: vi.fn(),
-  replace: vi.fn(),
-  refresh: vi.fn(),
-}));
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/lib/auth-client', () => ({ authClient: client }));
 vi.mock('@/server/actions/account', () => actions);
@@ -55,10 +52,7 @@ describe('SignInForm', () => {
     await user.type(screen.getByLabelText('Work email'), ' asha@example.com ');
     await user.type(screen.getByLabelText('Password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(client.signIn.email).toHaveBeenCalledWith({
-      email: 'asha@example.com',
-      password: GOOD,
-    });
+    expect(client.signIn.email).toHaveBeenCalledWith({ email: 'asha@example.com', password: GOOD });
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/dashboard'));
     expect(client.signIn.magicLink).not.toHaveBeenCalled();
   });
@@ -75,9 +69,7 @@ describe('SignInForm', () => {
 
   it('says the same thing for any wrong pair and points at the link', async () => {
     const user = userEvent.setup();
-    client.signIn.email.mockResolvedValue({
-      error: { status: 401, message: 'Invalid' },
-    });
+    client.signIn.email.mockResolvedValue({ error: { status: 401, message: 'Invalid' } });
     form();
     await user.type(screen.getByLabelText('Work email'), 'asha@example.com');
     await user.type(screen.getByLabelText('Password'), 'not-the-password');
@@ -91,10 +83,7 @@ describe('SignInForm', () => {
   it('shows how long password sign-in is paused', async () => {
     const user = userEvent.setup();
     client.signIn.email.mockResolvedValue({
-      error: {
-        status: 429,
-        message: 'Too many wrong passwords. Try again in 12 minutes.',
-      },
+      error: { status: 429, message: 'Too many wrong passwords. Try again in 12 minutes.' },
     });
     form();
     await user.type(screen.getByLabelText('Work email'), 'asha@example.com');
@@ -209,10 +198,7 @@ describe('ResetPasswordForm', () => {
     render(<ResetPasswordForm token="tok_12345678" />);
     await user.type(screen.getByLabelText('New password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
-    expect(client.resetPassword).toHaveBeenCalledWith({
-      newPassword: GOOD,
-      token: 'tok_12345678',
-    });
+    expect(client.resetPassword).toHaveBeenCalledWith({ newPassword: GOOD, token: 'tok_12345678' });
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/sign-in?reset=1'));
   });
 
@@ -231,9 +217,7 @@ describe('ResetPasswordForm', () => {
 
   it('says when the link is spent and offers a new one', async () => {
     const user = userEvent.setup();
-    client.resetPassword.mockResolvedValue({
-      error: { status: 400, code: 'INVALID_TOKEN' },
-    });
+    client.resetPassword.mockResolvedValue({ error: { status: 400, code: 'INVALID_TOKEN' } });
     render(<ResetPasswordForm token="tok_12345678" />);
     await user.type(screen.getByLabelText('New password'), GOOD);
     await user.click(screen.getByRole('button', { name: 'Save new password' }));
@@ -246,11 +230,7 @@ describe('ResetPasswordForm', () => {
 });
 
 describe('JoinForm', () => {
-  const props = {
-    token: 'inv_token',
-    email: 'ravi@example.com',
-    signInHref: '/sign-in?next=x',
-  };
+  const props = { token: 'inv_token', email: 'ravi@example.com', signInHref: '/sign-in?next=x' };
 
   it('creates the account, signs in, accepts and opens the workspace', async () => {
     const user = userEvent.setup();
@@ -276,13 +256,8 @@ describe('JoinForm', () => {
       name: 'Ravi Kumar',
       password: GOOD,
     });
-    expect(client.signIn.email).toHaveBeenCalledWith({
-      email: 'ravi@example.com',
-      password: GOOD,
-    });
-    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
-      token: 'inv_token',
-    });
+    expect(client.signIn.email).toHaveBeenCalledWith({ email: 'ravi@example.com', password: GOOD });
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({ token: 'inv_token' });
   });
 
   it('checks the name and the password first, against the invited address too', async () => {
@@ -365,10 +340,7 @@ describe('AcceptInvitation', () => {
   beforeEach(() => {
     router.push.mockReset();
     actions.acceptInvitationAction.mockReset();
-    actions.acceptInvitationAction.mockResolvedValue({
-      ok: true,
-      data: { workspaceSlug: 'acme' },
-    });
+    actions.acceptInvitationAction.mockResolvedValue({ ok: true, data: { workspaceSlug: 'acme' } });
   });
 
   it('accepts with one press for someone who has a name', async () => {
@@ -376,9 +348,7 @@ describe('AcceptInvitation', () => {
     render(<AcceptInvitation token="inv_token" email="ravi@example.com" />);
     expect(screen.queryByLabelText('Your name')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Accept invitation' }));
-    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({
-      token: 'inv_token',
-    });
+    expect(actions.acceptInvitationAction).toHaveBeenCalledWith({ token: 'inv_token' });
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/dashboard/acme'));
   });
 
@@ -460,10 +430,7 @@ describe('PasswordForm', () => {
 
   it('sets a first password without asking for a current one', async () => {
     const user = userEvent.setup();
-    actions.setPasswordAction.mockResolvedValue({
-      ok: true,
-      data: { hadPassword: false },
-    });
+    actions.setPasswordAction.mockResolvedValue({ ok: true, data: { hadPassword: false } });
     render(<PasswordForm user={account} hasPassword={false} />);
     expect(screen.queryByLabelText('Current password')).toBeNull();
     await user.type(screen.getByLabelText('Password'), GOOD);
@@ -480,10 +447,7 @@ describe('PasswordForm', () => {
 
   it('changes it with the current one and can leave other devices signed in', async () => {
     const user = userEvent.setup();
-    actions.setPasswordAction.mockResolvedValue({
-      ok: true,
-      data: { hadPassword: true },
-    });
+    actions.setPasswordAction.mockResolvedValue({ ok: true, data: { hadPassword: true } });
     render(<PasswordForm user={account} hasPassword />);
     await user.type(screen.getByLabelText('Current password'), GOOD);
     await user.type(screen.getByLabelText('New password'), 'seven quiet copper kettles');
@@ -526,16 +490,26 @@ describe('PasswordForm', () => {
 
   it('signs the other sessions out on request', async () => {
     const user = userEvent.setup();
-    actions.signOutOtherSessionsAction.mockResolvedValue({
-      ok: true,
-      data: undefined,
-    });
+    actions.signOutOtherSessionsAction.mockResolvedValue({ ok: true, data: undefined });
     render(<PasswordForm user={account} hasPassword />);
     await user.click(screen.getByRole('button', { name: 'Sign out other sessions' }));
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith('Signed out on your other devices'),
     );
     expect(actions.signOutOtherSessionsAction).toHaveBeenCalledWith({});
+  });
+
+  it('signs out of every device, this one too, after a confirmation', async () => {
+    const user = userEvent.setup();
+    actions.signOutEverywhereAction.mockResolvedValue({ ok: true, data: undefined });
+    render(<PasswordForm user={account} hasPassword />);
+    await user.click(screen.getByRole('button', { name: 'Sign out of all devices' }));
+    const dialog = screen.getByRole('dialog', { name: 'Sign out of all devices?' });
+    expect(dialog).toHaveTextContent('including this one');
+    expect(actions.signOutEverywhereAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    expect(actions.signOutEverywhereAction).toHaveBeenCalledWith({});
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/sign-in'));
   });
 
   it('asks for the new password twice and shows how strong it is', async () => {

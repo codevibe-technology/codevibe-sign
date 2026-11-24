@@ -22,7 +22,12 @@ export default async function PersonalSettings({ params }: { params: Promise<{ s
     <div className="space-y-6">
       <NameForm user={account} />
       <PersonalForm user={account} preferences={preferences} />
-      <PasswordForm user={account} hasPassword={password} />
+      <section id="security" aria-labelledby="security-heading" className="scroll-mt-6 space-y-3">
+        <h2 id="security-heading" className="font-display text-lg font-semibold">
+          Security
+        </h2>
+        <PasswordForm user={account} hasPassword={password} />
+      </section>
       <TourSettings />
     </div>
   );

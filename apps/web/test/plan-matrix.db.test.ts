@@ -1037,6 +1037,7 @@ const ACTIONS: Record<string, { entry: string; enforcedBy: string } | { free: st
   // account, personal
   setPasswordAction: { free: 'the person, not a workspace' },
   signOutOtherSessionsAction: { free: 'the person, not a workspace' },
+  signOutEverywhereAction: { free: 'the person, not a workspace' },
   joinWithPasswordAction: { free: 'makes the account only; joining is acceptInvitationAction' },
   updatePreferencesAction: { free: 'the person, not a workspace' },
   updateNameAction: { free: 'the person, not a workspace' },
