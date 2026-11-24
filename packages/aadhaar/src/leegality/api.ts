@@ -19,6 +19,8 @@ export interface CreateResponseData {
   documentId?: string;
   irn?: string;
   invitees?: { name?: string; email?: string; phone?: string; signUrl?: string }[];
+  /** The 2.1 Create API names the same list `invitations`. */
+  invitations?: { name?: string; email?: string; phone?: string; signUrl?: string }[];
 }
 
 export interface StatusRequest {

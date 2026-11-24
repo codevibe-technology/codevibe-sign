@@ -34,6 +34,7 @@ import {
   type PackCreated,
   type PackDetails,
 } from './v4';
+import { v21Request } from './v21';
 import { checkHeader, peekDocumentId, verifyWebhook, type LeegalityWebhook } from './webhook';
 
 export const LEEGALITY_BASE_URLS = {
@@ -76,11 +77,17 @@ export interface LeegalityOptions {
   /** Largest signed PDF accepted from the provider. Default 50 MB. */
   maxSignedDocumentBytes?: number;
   /**
-   * A v4 workflow for requests that carry `signaturePositions`: such a request is sent with
-   * the v4 Pack API, which places the Aadhaar eSign appearance at those positions. Requests
-   * without positions, or every request when this is unset, use `profileId` and v3.0.
+   * A v4 workflow, for `positionApi: 'v4'`: a request with `signaturePositions` is then sent
+   * with the v4 Pack API.
    */
   v4?: LeegalityV4Workflow;
+  /**
+   * Which API places a request's `signaturePositions`. `v2.1` (the default without `v4`)
+   * sends the request to the 2.1 Create API with the positions as the invitee's
+   * `appearances`, using the same Auth Token; `v4` (the default with `v4`) uses the v4 Pack
+   * API; `off` ignores positions. Requests without positions always use `profileId` and v3.0.
+   */
+  positionApi?: 'v2.1' | 'v4' | 'off';
   /** How positions become Leegality coordinates. Default points, bottom-left origin. */
   coordinates?: CoordinateMapping;
 }
@@ -223,6 +230,17 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
   const maxSignedBytes = options.maxSignedDocumentBytes ?? 50 * 1024 * 1024;
   const headers = { 'X-Auth-Token': authToken, Accept: 'application/json' };
   const v4 = options.v4 ? checkV4Workflow(options.v4) : undefined;
+  const positionApi = options.positionApi ?? (v4 ? 'v4' : 'v2.1');
+  if (!['v2.1', 'v4', 'off'].includes(positionApi)) {
+    throw new SignError('VALIDATION', 'Leegality option positionApi must be v2.1, v4 or off', {
+      option: 'positionApi',
+    });
+  }
+  if (positionApi === 'v4' && !v4) {
+    throw new SignError('VALIDATION', 'Leegality option positionApi v4 needs the v4 workflow', {
+      option: 'v4',
+    });
+  }
   const mapping = options.coordinates ?? DEFAULT_COORDINATE_MAPPING;
   parseCoordinateOrigin(mapping.origin);
   if (
@@ -330,29 +348,19 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
       retryable: false,
     });
 
-  async function createV3(input: EsignRequest, prepared: Prepared): Promise<EsignSession> {
+  /**
+   * Creates a request with the v3.0 or the 2.1 Create API. Both answer in the same wrapper
+   * with the document id and each invitee's sign URL, and the document is then followed with
+   * the same status, download and webhook calls.
+   */
+  async function createLegacy(
+    path: string,
+    body: Record<string, unknown>,
+    prepared: Prepared,
+  ): Promise<EsignSession> {
     const { email, phone } = prepared;
-    const invitee: Record<string, string> = { name: prepared.name };
-    if (email) invitee.email = email;
-    if (phone) invitee.phone = phone;
-
-    // Positions are not sent: the v3.0 Create request has no field for them
-    // (https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request).
-    // Leegality places the appearance where the workflow says, or at the bottom left of every
-    // page when the workflow has no coordinates
-    // (https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate).
-    const body = {
-      profileId: resolveProfileId(input),
-      file: {
-        name: documentName(input.documentName),
-        file: Buffer.from(input.documentBytes).toString('base64'),
-      },
-      invitees: [invitee],
-      irn: prepared.reference,
-    };
-
     const envelope = await request(
-      `${baseUrl}/v3.0/sign/request`,
+      `${baseUrl}${path}`,
       {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
@@ -367,7 +375,8 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     const data = envelope.data;
     if (!data?.documentId) throw envelopeError(envelope);
 
-    const invitees = Array.isArray(data.invitees) ? data.invitees : [];
+    const listed = Array.isArray(data.invitees) ? data.invitees : data.invitations;
+    const invitees = Array.isArray(listed) ? listed : [];
     const lower = email?.toLowerCase();
     const match =
       invitees.find((i) => lower !== undefined && i.email?.toLowerCase() === lower) ??
@@ -376,6 +385,56 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     // The signer is sent to this URL, so anything but https (javascript:, data:, http:) is refused.
     if (!match?.signUrl || !isHttpsUrl(match.signUrl)) throw missingSignUrl(data.documentId);
     return { providerRef: data.documentId, signUrl: match.signUrl };
+  }
+
+  function createV3(input: EsignRequest, prepared: Prepared): Promise<EsignSession> {
+    const invitee: Record<string, string> = { name: prepared.name };
+    if (prepared.email) invitee.email = prepared.email;
+    if (prepared.phone) invitee.phone = prepared.phone;
+    // Positions are not sent: the v3.0 Create request has no field for them
+    // (https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request).
+    // Leegality places the appearance where the workflow says, or at the bottom left of every
+    // page when the workflow has no coordinates
+    // (https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate).
+    return createLegacy(
+      '/v3.0/sign/request',
+      {
+        profileId: resolveProfileId(input),
+        file: {
+          name: documentName(input.documentName),
+          file: Buffer.from(input.documentBytes).toString('base64'),
+        },
+        invitees: [invitee],
+        irn: prepared.reference,
+      },
+      prepared,
+    );
+  }
+
+  /**
+   * The 2.1 Create API, `POST /api/v2.1/sign/request` with the `X-Auth-Token` header (v2.1
+   * OpenAPI schema `SignRequest`, https://github.com/prakharmittal/leegality-apidocs/blob/master/api_2_1.json).
+   * Its document is an ordinary Leegality document, followed with the v3.x status and
+   * download calls and Webhook 2.5 like a v3.0 one.
+   */
+  function createV21(input: EsignRequest, prepared: Prepared): Promise<EsignSession> {
+    const invitee: { name: string; email?: string; phone?: string } = { name: prepared.name };
+    if (prepared.email) invitee.email = prepared.email;
+    if (prepared.phone) invitee.phone = prepared.phone;
+    return createLegacy(
+      '/v2.1/sign/request',
+      v21Request({
+        reference: prepared.reference,
+        documentName: documentName(input.documentName),
+        fileBase64: Buffer.from(input.documentBytes).toString('base64'),
+        invitee,
+        positions: input.signaturePositions ?? [],
+        mapping,
+        callbackUrl: input.callbackUrl,
+        redirectUrl: input.redirectUrl,
+      }),
+      prepared,
+    );
   }
 
   /**
@@ -435,9 +494,9 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
 
   async function createRequest(input: EsignRequest): Promise<EsignSession> {
     const prepared = prepare(input);
-    if (v4 && input.signaturePositions && input.signaturePositions.length > 0) {
-      return createV4(input, prepared, v4);
-    }
+    const placed = (input.signaturePositions?.length ?? 0) > 0;
+    if (placed && positionApi === 'v4' && v4) return createV4(input, prepared, v4);
+    if (placed && positionApi === 'v2.1') return createV21(input, prepared);
     return createV3(input, prepared);
   }
 

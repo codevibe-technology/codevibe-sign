@@ -171,7 +171,8 @@ your handler idempotent on `(providerRef, status)`.
 | `webhookHeader`          | no       | `{ name, value }` of a static header Leegality support adds to your webhooks.                                 |
 | `timeoutMs`              | no       | Default 30 000, covering the response body as well. Whole milliseconds, at most 10 minutes.                   |
 | `maxSignedDocumentBytes` | no       | Default 50 MB.                                                                                                |
-| `v4`                     | no       | A v4 workflow (`leegalityV4WorkflowFromPayload`). Requests with `signaturePositions` then use it.             |
+| `positionApi`            | no       | Which API places `signaturePositions`: `v2.1` (default without `v4`), `v4` (default with `v4`) or `off`.      |
+| `v4`                     | no       | A v4 workflow (`leegalityV4WorkflowFromPayload`), for `positionApi: 'v4'`.                                    |
 | `coordinates`            | no       | `{ units: 'points' \| { pixelsPerInch }, origin: 'bottom-left' \| 'top-left' }`. Default points, bottom-left. |
 | `baseUrl`, `fetch`       | no       | Overrides for proxies and tests. `baseUrl` must be https (plain http only for localhost).                     |
 
@@ -186,13 +187,32 @@ API request. In the Leegality dashboard, for the workflow you pass as `profileId
 - under the invitee's custom URLs and webhooks, set the Webhook and Error Webhook to your
   `callbackUrl`, choose webhook version 2.5, and set the Redirect URL to your `redirectUrl`.
 
+### Placing the signature per request (2.1)
+
+Leegality's v3.0 request has no field for a signature position, but its 2.1 Create API takes one
+per invitee: "pass the eSign coordinates in the appearances array of the payload"
+([Coordinate Picker](https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate/coordinate-picker)).
+By default (`positionApi: 'v2.1'`) a request that carries `signaturePositions` goes to
+`POST /api/v2.1/sign/request` with the same Auth Token (the dashboard calls it the legacy Auth
+Token). The body follows the v2.1 OpenAPI schema (`SignRequest`, `Invitee`, `Appearance`; published
+copy at https://github.com/prakharmittal/leegality-apidocs/blob/master/api_2_1.json): the file,
+the `irn`, and one invitee with `appearances` (`page` from 1, `x1`/`y1` lower-left and `x2`/`y2`
+upper-right, whole numbers), `signatures: [{ type: 'AADHAAR', config: { authTypes: ['OTP'] } }]`,
+`webhook { success, failure, version: 2.5 }` set to `callbackUrl`, and `redirectUrl`. The 2.1
+API takes no workflow, so `profileId` is not sent and the workflow's other settings do not
+apply to such a request. The response is the usual wrapper with `data.documentId` and
+`data.invitations[].signUrl`; the document is then followed with the same v3.x status and
+download calls and verified Webhook 2.5 bodies as a v3.0 one, and `providerRef` is its document
+id.
+
 ### Placing the signature per request (v4)
 
 Leegality's v3.0 request has no field for a signature position. Its v4 Pack API has one:
 `coordinates[]` per invitee, with `appearances[]` of `pageNo` (from 1) and
 `rect { x1Axis, y1Axis, x2Axis, y2Axis }`
 ([Send Pack for eSigning (Sync)](https://knowledge.leegality.com/document-execution/api/create-pack-sync)).
-With the `v4` option, a request that carries `signaturePositions` is sent to
+With the `v4` option (and `positionApi: 'v4'`, its default then), a request that carries
+`signaturePositions` is sent to
 `POST /api/v4/pack/sync` with the signer's appearances at those positions, its success and
 error webhooks set to `callbackUrl` with version 4.0, and `redirectUrl` as the invitee's
 redirect URL. Its `providerRef` is `v4:<packId>:<documentId>`. Webhook 4.0 bodies are verified

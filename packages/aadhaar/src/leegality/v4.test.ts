@@ -251,7 +251,7 @@ describe('createRequest with a v4 workflow', () => {
     });
   });
 
-  it('uses the v3.0 request when there is no position or no v4 workflow', async () => {
+  it('uses the v3.0 request when there is no position or placing is off', async () => {
     const created = {
       status: 1,
       data: { documentId: 'DOC123', invitees: [{ name: 'Asha Rao', signUrl: SIGN_URL }] },
@@ -259,7 +259,7 @@ describe('createRequest with a v4 workflow', () => {
     const { provider, fetch } = setup(() => json(created));
     await provider.createRequest(signRequest({ signaturePositions: [] }));
     expect(fetch.mock.calls[0]![0]).toBe('https://sandbox.leegality.com/api/v3.0/sign/request');
-    const plain = setup(() => json(created), { v4: undefined });
+    const plain = setup(() => json(created), { v4: undefined, positionApi: 'off' });
     await expect(plain.provider.createRequest(signRequest())).resolves.toEqual({
       providerRef: 'DOC123',
       signUrl: SIGN_URL,
