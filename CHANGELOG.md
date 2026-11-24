@@ -28,6 +28,10 @@ the minor version and says so in its first line.
 - The check that no Aadhaar number reaches the audit events ignores long hashes and ids, which
   could hold twelve digits in a row by chance.
 
+### Docs
+
+- The README links the 3-minute launch video on YouTube under the demo, with its thumbnail.
+
 ## 0.1.1 (24 November 2026)
 
 ### Aadhaar eSign

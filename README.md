@@ -21,6 +21,12 @@
 </p>
 
 <p align="center">
+  <a href="https://youtu.be/nuT4E2BcrPw"><img src="https://img.youtube.com/vi/nuT4E2BcrPw/maxresdefault.jpg" alt="Codevibe Sign launch video on YouTube: get documents signed, keep the proof. A sealed offer letter with its signing certificate and the signing page on a phone" width="80%"></a>
+  <br>
+  <a href="https://youtu.be/nuT4E2BcrPw"><b>Watch the 3-minute demo on YouTube</b></a>: sending a PDF, signing it on a phone and checking the sealed file.
+</p>
+
+<p align="center">
   <a href="#get-started">Get started</a> ·
   <a href="#features">Features</a> ·
   <a href="#how-it-works">How it works</a> ·
