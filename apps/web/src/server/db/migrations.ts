@@ -699,4 +699,11 @@ insert into app_user_tours (user_id, tour, status)
   select u.id, t.tour, 'skipped' from auth_users u cross join (values ('workspace'), ('send')) as t (tour);
 `,
   },
+  {
+    name: '0024_esign_v4_workflow',
+    sql: `
+-- The ids of a Leegality v4 workflow read from its API payload, for the Aadhaar seal position.
+alter table app_esign_settings add column own_v4_workflow jsonb;
+`,
+  },
 ];

@@ -1,9 +1,11 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import {
+  LEEGALITY_DEFAULT_COORDINATES,
   createLeegalityProvider,
   type EsignProvider,
   type FetchLike,
+  type LeegalityCoordinateMapping,
 } from '@codevibe_technology/sign-aadhaar';
 import { SignError } from '@codevibe_technology/sign-core';
 import type { EsignOptions, EsignUnavailable } from '@codevibe_technology/sign-server';
@@ -34,6 +36,7 @@ import {
   type EsignMode,
   type OwnCredentials,
 } from './settings';
+import { leegalityCoordinates } from './leegality-v4';
 import { getEsignUsage, markUnbilled, recordEsignOutcome, recordEsignStart } from './usage';
 
 type Sql = postgres.Sql;
@@ -189,6 +192,16 @@ export async function esignState(deps: EsignRuntimeDeps, workspaceId: string): P
   };
 }
 
+/** The install's coordinate setting; a malformed one is reported and the default used. */
+function coordinates(): LeegalityCoordinateMapping {
+  try {
+    return leegalityCoordinates();
+  } catch (err) {
+    console.error('[esign]', err instanceof Error ? err.message : err);
+    return LEEGALITY_DEFAULT_COORDINATES;
+  }
+}
+
 function fromOwn(credentials: OwnCredentials, fetch?: FetchLike): EsignProvider {
   return createLeegalityProvider({
     authToken: credentials.apiKey,
@@ -197,6 +210,7 @@ function fromOwn(credentials: OwnCredentials, fetch?: FetchLike): EsignProvider 
     environment: credentials.environment,
     baseUrl:
       credentials.environment === 'production' ? LEEGALITY_PRODUCTION_URL : LEEGALITY_SANDBOX_URL,
+    ...(credentials.v4 ? { v4: credentials.v4, coordinates: coordinates() } : {}),
     ...(fetch ? { fetch } : {}),
   });
 }
@@ -209,6 +223,7 @@ function fromPlatform(config: LeegalityConfig, fetch?: FetchLike): EsignProvider
     environment: config.environment,
     baseUrl: config.baseUrl,
     ...(config.webhookHeader ? { webhookHeader: config.webhookHeader } : {}),
+    ...(config.v4 ? { v4: config.v4, coordinates: config.coordinates } : {}),
     ...(fetch ? { fetch } : {}),
   });
 }

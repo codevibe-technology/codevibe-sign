@@ -1,5 +1,9 @@
 import 'server-only';
 import type postgres from 'postgres';
+import {
+  LEEGALITY_DEFAULT_COORDINATES,
+  describeLeegalityCoordinates,
+} from '@codevibe_technology/sign-aadhaar';
 import type { Paise } from '@/lib/billing/money';
 import { billingVisible } from '@/lib/plans';
 import { accountIdOfWorkspace } from '../accounts';
@@ -19,6 +23,10 @@ export interface EsignOverview {
   blocked: { reason: string; message: string } | null;
   /** The install's own provider account is set up. */
   platformConfigured: boolean;
+  /** The install's account has a v4 workflow, so it places the Aadhaar seal position. */
+  platformSealPosition: boolean;
+  /** How the install turns a seal position into Leegality coordinates, e.g. "points, bottom-left". */
+  coordinates: string;
   /** eSigns on the install's account use prepaid credits. */
   creditsRequired: boolean;
   /** Credits and billing exist on this install. */
@@ -71,6 +79,10 @@ export async function esignOverview(
     settings: saved,
     blocked: state.blocked,
     platformConfigured: Boolean(config?.leegality),
+    platformSealPosition: Boolean(config?.leegality?.v4),
+    coordinates: describeLeegalityCoordinates(
+      config?.leegality?.coordinates ?? LEEGALITY_DEFAULT_COORDINATES,
+    ),
     creditsRequired: billingVisible(settings),
     billingVisible: billingVisible(settings),
     ownAllowed: entitlements.ownEsignAccount,
@@ -94,16 +106,23 @@ export interface EsignSendInfo {
   creditsRequired: boolean;
   credits: number;
   pricePaise: Paise | null;
+  /**
+   * The account the workspace signs with places the Aadhaar seal position (it has a v4
+   * workflow). Without it the box is still kept, and Leegality places the signature as its
+   * workflow says.
+   */
+  sealPosition: boolean;
 }
 
 export async function esignSendInfo(sql: Sql, workspaceId: string): Promise<EsignSendInfo> {
   const settings = planSettings();
   const config = readConfig();
   const accountId = await accountIdOfWorkspace(sql, workspaceId);
-  const [state, entitlements, credits] = await Promise.all([
+  const [state, entitlements, credits, saved] = await Promise.all([
     esignState({ sql }, workspaceId),
     workspaceEntitlements(sql, workspaceId, settings),
     creditBalance(sql, accountId),
+    getEsignSettings(sql, accountId),
   ]);
   const billed = state.mode === 'platform' && state.creditsRequired;
   return {
@@ -113,5 +132,6 @@ export async function esignSendInfo(sql: Sql, workspaceId: string): Promise<Esig
     creditsRequired: billed,
     credits: credits.available,
     pricePaise: billed && config ? creditsOffer(config, entitlements.plan).pricePaise : null,
+    sealPosition: state.mode === 'own' ? saved.own.sealPosition : Boolean(config?.leegality?.v4),
   };
 }
