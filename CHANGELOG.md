@@ -15,6 +15,8 @@ the minor version and says so in its first line.
 
 - Test certificates start on a fixed past date, so tests that sign at a fixed time keep passing
   as the calendar moves on.
+- The check that no Aadhaar number reaches the audit events ignores long hashes and ids, which
+  could hold twelve digits in a row by chance.
 
 ## 0.1.1 (24 November 2026)
 

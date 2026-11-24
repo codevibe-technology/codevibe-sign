@@ -142,7 +142,10 @@ describe('an Aadhaar eSign with real files', () => {
     expect(sealEvent).toMatchObject({ seal: 'countersigned', certificate: 'with_audit_trail' });
     const signedEvent = events.find((e) => e.action === 'recipient.signed')!;
     expect(signedEvent.data).toMatchObject({ method: 'aadhaar_esign', signerName: 'RAVI KUMAR' });
-    expect(JSON.stringify(events)).not.toMatch(/\b\d{12}\b/);
+    // No Aadhaar number anywhere: a run of exactly 12 digits standing alone. Hashes, ids and
+    // fingerprints are removed first, since a long hex or id string can hold 12 digits by chance.
+    const text = JSON.stringify(events).replace(/[0-9A-Za-z_-]{20,}/g, '');
+    expect(text).not.toMatch(/(?<![0-9A-Za-z])\d{12}(?![0-9A-Za-z])/);
   }, 60_000);
 
   it('keeps a file the provider certified against changes and still recognises it', async () => {
