@@ -1,6 +1,6 @@
 {
   "name": "@codevibe_technology/sign-templates",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Reusable signing templates with roles, prefilled fields and bulk send from CSV.",
   "keywords": [
     "esign",

@@ -1,6 +1,6 @@
 {
   "name": "@codevibe_technology/sign-client",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Typed client for the Codevibe Sign HTTP API, signing sessions and webhooks.",
   "keywords": [
     "esign",
