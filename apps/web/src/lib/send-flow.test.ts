@@ -2,6 +2,7 @@ import type { Envelope, Field } from '@codevibe_technology/sign-core';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_PDF_BYTES,
+  aadhaarPlacementNote,
   aadhaarProblems,
   adoptSavedRecipients,
   documentProblems,
@@ -152,7 +153,11 @@ describe('fields and settings', () => {
     const esigner = { ...asha, auth: 'aadhaar' as const };
     expect(fieldProblems([esigner], [])).toEqual({});
     const box = signature('a', { id: 'box', type: 'aadhaar' });
-    // Left from an earlier draft; dropped when the envelope is sent.
+    // One optional seal position; signature and initials are dropped when the envelope is sent.
+    expect(fieldProblems([esigner], [box])).toEqual({});
+    expect(
+      fieldProblems([esigner], [box, signature('a', { id: 'box2', type: 'aadhaar' })]),
+    ).toEqual({ 'fields.a': 'Asha Rao can have one Aadhaar seal position. Delete the extra box.' });
     expect(
       fieldProblems([esigner], [box, signature('a'), signature('a', { type: 'initials' })]),
     ).toEqual({});
@@ -161,7 +166,19 @@ describe('fields and settings', () => {
         'Asha Rao signs with Aadhaar eSign and fills in nothing here. Delete their fields, or give them to a signer before them.',
     });
     expect(fieldProblems([asha], [signature('a'), box])['fields.a']).toMatch(
-      /Only a signer who uses Aadhaar eSign/,
+      /Only a signer who uses Aadhaar eSign can have an Aadhaar seal position/,
+    );
+  });
+
+  it('tells the sender where the Aadhaar signature goes', () => {
+    expect(aadhaarPlacementNote({ placed: true, supported: true })).toMatch(
+      /^Leegality draws the Aadhaar signature in the Aadhaar seal position you placed/,
+    );
+    expect(aadhaarPlacementNote({ placed: true })).toMatch(/in the Aadhaar seal position/);
+    expect(aadhaarPlacementNote({ placed: true, supported: false })).toMatch(/no V4 workflow/);
+    expect(aadhaarPlacementNote({ placed: false })).toMatch(/place the optional Aadhaar seal/);
+    expect(aadhaarPlacementNote({ placed: false, supported: false })).toMatch(
+      /You don't place a box/,
     );
   });
 

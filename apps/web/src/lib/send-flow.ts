@@ -219,9 +219,10 @@ export function aadhaarProblems(
 }
 
 /**
- * Every signer needs a required signature field. A signer with Aadhaar eSign has no fields:
- * Leegality places the signature where its workflow says. Their signature, initials and box
- * fields are dropped on send; any other field is refused, as the server does.
+ * Every signer needs a required signature field. A signer with Aadhaar eSign fills in
+ * nothing; one optional Aadhaar seal position may say where Leegality draws the signature.
+ * Their signature and initials fields are dropped on send; a second box or any other field
+ * is refused, as the server does.
  */
 export function fieldProblems(recipients: DraftRecipient[], fields: Field[]): Problems {
   const problems: Problems = {};
@@ -235,12 +236,15 @@ export function fieldProblems(recipients: DraftRecipient[], fields: Field[]): Pr
       if (filled.length > 0) {
         problems[`fields.${r.id}`] =
           `${name} signs with Aadhaar eSign and fills in nothing here. Delete their fields, or give them to a signer before them.`;
+      } else if (own.filter((f) => f.type === 'aadhaar').length > 1) {
+        problems[`fields.${r.id}`] =
+          `${name} can have one Aadhaar seal position. Delete the extra box.`;
       }
       continue;
     }
     if (own.some((f) => f.type === 'aadhaar')) {
       problems[`fields.${r.id}`] =
-        `Only a signer who uses Aadhaar eSign had an Aadhaar eSign box. Delete the one given to ${name}.`;
+        `Only a signer who uses Aadhaar eSign can have an Aadhaar seal position. Delete the one given to ${name}.`;
       continue;
     }
     if (!own.some((f) => f.type === 'signature' && f.required)) {
@@ -251,9 +255,24 @@ export function fieldProblems(recipients: DraftRecipient[], fields: Field[]): Pr
   return problems;
 }
 
-/** Where the Aadhaar eSign goes: what the send flow tells the sender for such a signer. */
-export const AADHAAR_PLACEMENT_NOTE =
-  "Leegality places the Aadhaar signature where your Leegality workflow says (set the signature position in the workflow). You don't place a box.";
+/**
+ * Where the Aadhaar eSign goes, as the send flow tells the sender for such a signer: at the
+ * Aadhaar seal position they placed, when the Leegality account in use can take it (a v4
+ * workflow), and otherwise where the Leegality workflow says.
+ */
+export function aadhaarPlacementNote(input: { placed: boolean; supported?: boolean }): string {
+  const { placed, supported } = input;
+  if (placed && supported !== false) {
+    return 'Leegality draws the Aadhaar signature in the Aadhaar seal position you placed. Nothing else is added to the file, and the signer fills in nothing.';
+  }
+  if (placed) {
+    return 'You placed an Aadhaar seal position, but the Leegality account in use has no V4 workflow for it, so Leegality places the signature where its workflow says. Add a V4 workflow in Settings, Aadhaar eSign.';
+  }
+  if (supported === false) {
+    return "Leegality places the Aadhaar signature where your Leegality workflow says (set the signature position in the workflow). You don't place a box.";
+  }
+  return 'Leegality places the Aadhaar signature where your Leegality workflow says. To choose the spot, place the optional Aadhaar seal position on the page.';
+}
 
 export function settingsProblems(settings: DraftSettings): Problems {
   const problems: Problems = {};

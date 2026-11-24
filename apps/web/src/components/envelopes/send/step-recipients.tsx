@@ -41,6 +41,8 @@ export interface EsignChoice {
   credits: number;
   /** Price of one eSign before tax; null shows as "Price coming soon". */
   pricePaise: number | null;
+  /** The account in use places the Aadhaar seal position (it has a Leegality v4 workflow). */
+  sealPosition?: boolean;
   /** Settings, Aadhaar eSign, for someone who may open it; null otherwise. */
   settingsHref: string | null;
 }
@@ -439,7 +441,12 @@ export function StepRecipients({
                   {r.auth === 'aadhaar' && r.role !== 'viewer' ? (
                     <>
                       <EsignNote esign={esign} />
-                      <AadhaarPlacementNote className="sm:col-span-2" />
+                      <AadhaarPlacementNote
+                        className="sm:col-span-2"
+                        {...(esign?.sealPosition !== undefined
+                          ? { supported: esign.sealPosition }
+                          : {})}
+                      />
                     </>
                   ) : null}
                   {r.auth === 'sms_otp' && r.role !== 'viewer' ? (

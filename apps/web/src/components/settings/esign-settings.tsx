@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { DialogClose, DialogContent, DialogRoot, SheetContent } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/field';
+import { Field, Input, NativeSelect, Textarea } from '@/components/ui/field';
 import { LocalTime } from '@/components/ui/local-time';
 import { formatInr } from '@/lib/billing/money';
 import { cn } from '@/lib/cn';
@@ -324,6 +324,11 @@ export function EsignSettingsPanel({
                       , {settings.own.environment === 'production' ? 'production' : 'sandbox'}.
                       Leegality bills you directly.
                     </p>
+                    <p data-testid="esign-own-seal-position">
+                      {settings.own.sealPosition
+                        ? 'Aadhaar seal position: on. A V4 workflow places the signature where the sender puts the box.'
+                        : 'Aadhaar seal position: off. Add a V4 workflow to place the signature where the sender puts the box.'}
+                    </p>
                     {settings.own.testedAt ? (
                       <p data-testid="esign-test-state">
                         {settings.own.testOk ? 'Last check passed ' : 'Last check failed '}
@@ -361,17 +366,24 @@ export function EsignSettingsPanel({
             <p className="flex gap-2 text-[13px] text-muted" data-testid="esign-standard-flow">
               <FileCheck2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Leegality places the Aadhaar signature where the Leegality workflow says; senders
-                place no box and the signer fills in nothing. Everyone then gets the signed PDF,
-                with the Aadhaar signature and the Codevibe Sign seal, and a separate certificate
-                and audit trail PDF.{' '}
+                The signer fills in nothing. A sender may place one Aadhaar seal position: it only
+                marks where Leegality draws the Aadhaar signature, and needs a V4 workflow on the
+                Leegality account in use
+                {settings.mode === 'platform' && overview.platformConfigured
+                  ? overview.platformSealPosition
+                    ? ' (this server has one)'
+                    : ' (this server has none yet)'
+                  : ''}
+                . Without a box, or without a V4 workflow, Leegality places it where its workflow
+                says. Everyone then gets the signed PDF, with the Aadhaar signature and the Codevibe
+                Sign seal, and a separate certificate and audit trail PDF.{' '}
                 <a
                   className="font-semibold text-primary hover:underline"
-                  href="/docs/guides/aadhaar-leegality#set-the-signature-position"
+                  href="/docs/guides/aadhaar-leegality#choose-where-the-signature-goes"
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Set the signature position
+                  How the position works
                 </a>
               </span>
             </p>
@@ -400,6 +412,30 @@ export function EsignSettingsPanel({
               </ol>
               <CopyRow label="Webhook and error webhook" value={overview.webhookUrl} />
               <CopyRow label="Redirect URL" value={overview.redirectUrl} />
+              <div className="space-y-2 border-t border-line pt-4" data-testid="esign-v4-steps">
+                <p className="text-sm font-semibold text-ink">
+                  Optional: a V4 workflow for the Aadhaar seal position
+                </p>
+                <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+                  <li>
+                    In Leegality, Workflows, V4 Workflows, create a workflow with one document (an
+                    empty PDF upload) and one Signer with Aadhaar eSign, details left blank.
+                  </li>
+                  <li>
+                    In Field Properties, leave the document, the invitee details and the signature
+                    coordinates editable by the workflow runner, then publish it.
+                  </li>
+                  <li>
+                    Open the workflow's ⋮ menu, choose Download API Payload, and paste the file (or
+                    the full workflow ID in it) under Replace details. Codevibe Sign sets the
+                    webhooks of each request itself, with version 4.0.
+                  </li>
+                  <li>
+                    Send one test eSign with the box at a known spot and check where the seal lands
+                    (coordinates: {overview.coordinates}).
+                  </li>
+                </ol>
+              </div>
             </CardBody>
           </Card>
         ) : null}
@@ -522,6 +558,24 @@ export function EsignSettingsPanel({
                   autoComplete="off"
                   spellCheck={false}
                   required
+                />
+              )}
+            </Field>
+            <Field
+              label="V4 workflow, for the Aadhaar seal position (optional)"
+              hint="Paste the file from Download API Payload, or the full V4 workflow ID. Leave it empty to let your workflow place the signature."
+              error={save.errors.v4Workflow}
+            >
+              {(props) => (
+                <Textarea
+                  {...props}
+                  name="v4Workflow"
+                  rows={3}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={
+                    settings.own.sealPosition ? 'Saved. Paste again to keep it.' : undefined
+                  }
                 />
               )}
             </Field>
