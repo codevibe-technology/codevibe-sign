@@ -9,7 +9,17 @@ full; GitHub releases carry the same notes. You can read this page on the
 Releases follow [semantic versioning](https://semver.org/). Before 1.0, a breaking change bumps
 the minor version and says so in its first line.
 
-## Unreleased: 0.1.1
+## Unreleased
+
+### Aadhaar eSign
+
+- **Choose where the Aadhaar signature appears.** The sender can place one Aadhaar seal box for
+  an Aadhaar eSign signer. It only sets the position: the request then goes through Leegality's
+  2.1 API with that box as coordinates, using the same Auth Token, so no new Leegality set-up is
+  needed. Without a box the request and its workflow are unchanged. Coordinate units and origin
+  are settings, checked with one calibration signing.
+
+### In the web app
 
 - **Idle sign-out and a daily sign-in in the web app.** App sessions end after 30 minutes
   without activity in any open tab (`SESSION_IDLE_MINUTES`, `0` turns it off), with a warning
@@ -22,7 +32,13 @@ the minor version and says so in its first line.
   typed twice and show a strength meter. Sign-in links keep working.
 - **Sign out of all devices** in Settings, Personal, Security.
 
-## Unreleased: 0.1.0, the first public release
+### Platform
+
+- Releases publish through npm trusted publishing only; the npm token is gone. Each release
+  gets a project release `vX.Y.Z` from this changelog, and each package its tag and release
+  from its own CHANGELOG.
+
+## 0.1.0 (24 November 2026), the first public release
 
 ### What ships
 

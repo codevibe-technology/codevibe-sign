@@ -31,6 +31,7 @@ jobs:
       - run: pnpm test
       - run: pnpm check:types
       - uses: changesets/action@v1
+        id: changesets
         with:
           version: pnpm version-packages
           publish: pnpm release
@@ -38,10 +39,11 @@ jobs:
           commit: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # npm checks this workflow through OIDC, so publishing needs no token. NPM_TOKEN is
-          # only a fallback for the very first publish, before the packages exist on npm and
-          # their trusted publishers can be set. Delete the secret and this line once all
-          # eight packages list this workflow as their trusted publisher.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # Provenance needs a public repository.
+          # npm checks this workflow through OIDC (trusted publishing), so publishing needs no
+          # token. Provenance needs a public repository.
           NPM_CONFIG_PROVENANCE: 'true'
+      # After a publish, tag each released package and open its GitHub release.
+      - if: steps.changesets.outputs.hasChangesets == 'false'
+        run: node scripts/release-tags.mjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
