@@ -1,6 +1,13 @@
 import 'server-only';
 import { z } from 'zod';
 import { isTimeZone } from '@/lib/preferences';
+import {
+  DEFAULT_IDLE_MINUTES,
+  DEFAULT_MAX_HOURS,
+  MAX_IDLE_MINUTES,
+  MAX_SESSION_HOURS,
+  sessionPolicy,
+} from '@/lib/session-policy';
 import { parseMailbox } from './graph-mail';
 
 const flag = z
@@ -49,6 +56,20 @@ const schema = z.object({
   TRUST_PROXY: flag,
   WEBHOOK_ALLOW_INSECURE: flag,
   SIGN_TICK_SECONDS: z.coerce.number().int().min(0).default(60),
+  SESSION_IDLE_MINUTES: z.coerce
+    .number({
+      error: 'SESSION_IDLE_MINUTES must be a whole number of minutes, or 0 to turn it off',
+    })
+    .int('SESSION_IDLE_MINUTES must be a whole number of minutes, or 0 to turn it off')
+    .min(0, 'SESSION_IDLE_MINUTES must be 0 (off) or more')
+    .max(MAX_IDLE_MINUTES, `SESSION_IDLE_MINUTES must be at most ${MAX_IDLE_MINUTES} (a day)`)
+    .default(DEFAULT_IDLE_MINUTES),
+  SESSION_MAX_HOURS: z.coerce
+    .number({ error: 'SESSION_MAX_HOURS must be a whole number of hours' })
+    .int('SESSION_MAX_HOURS must be a whole number of hours')
+    .min(1, 'SESSION_MAX_HOURS must be at least 1')
+    .max(MAX_SESSION_HOURS, `SESSION_MAX_HOURS must be at most ${MAX_SESSION_HOURS} (30 days)`)
+    .default(DEFAULT_MAX_HOURS),
   TURNSTILE_SITE_KEY: z.string().max(200).optional(),
   TURNSTILE_SECRET_KEY: z.string().max(200).optional(),
 });
@@ -117,6 +138,10 @@ export function env(): Env {
 
 /** The zone for workspaces that have not chosen one: `SIGN_TIME_ZONE`, or UTC. */
 export const defaultTimeZone = (config: Env) => config.SIGN_TIME_ZONE ?? 'UTC';
+
+/** Idle sign-out and the lifetime cap of app sessions, from `SESSION_*`. */
+export const appSessionPolicy = (config: Env) =>
+  sessionPolicy({ idleMinutes: config.SESSION_IDLE_MINUTES, maxHours: config.SESSION_MAX_HOURS });
 
 export const googleEnabled = (config: Env) =>
   Boolean(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET);

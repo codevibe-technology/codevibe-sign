@@ -5,7 +5,7 @@ import { createSignServer, postgresStore, type SignServer } from '@codevibe_tech
 import { resolveApiKey } from '../api-keys';
 import { defaultCertificateNote } from '@/lib/brand';
 import { getBrand } from '../brand';
-import { auth } from '../auth/auth';
+import { activeSession } from '../auth/session';
 import { db } from '../db';
 import { createEsignOptions } from '../esign/runtime';
 import { senderOf } from '../envelopes';
@@ -55,7 +55,7 @@ function authenticate() {
   return createAuthenticate({
     appUrl: config.APP_URL,
     resolveApiKey: (key) => resolveApiKey(sql, key),
-    sessionUser: async (headers) => (await auth().api.getSession({ headers }))?.user ?? null,
+    sessionUser: async (headers) => (await activeSession(headers))?.user ?? null,
     roleOf: async (userId, workspaceId) =>
       (await findMembership(sql, userId, { id: workspaceId }))?.role ?? null,
     isSender: async (userId, workspaceId, envelopeId) =>

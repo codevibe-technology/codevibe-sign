@@ -26,11 +26,30 @@ vi.mock('./auth', () => ({
   auth: () => ({
     api: {
       getSession: async () =>
-        state.user ? { user: { ...state.user, name: 'A', email: 'a@x.co', image: null } } : null,
+        state.user
+          ? {
+              user: { ...state.user, name: 'A', email: 'a@x.co', image: null },
+              session: {
+                token: 't',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                expiresAt: new Date(Date.now() + 60_000),
+              },
+            }
+          : null,
     },
   }),
 }));
 vi.mock('../db', () => ({ db: () => ({}) }));
+vi.mock('../env', () => ({
+  env: () => ({}),
+  appSessionPolicy: () => ({
+    idleSeconds: 1800,
+    maxSeconds: 43_200,
+    touchSeconds: 60,
+    warningSeconds: 120,
+  }),
+}));
 vi.mock('../workspaces', () => ({
   findMembership: async (_sql: unknown, _user: string, by: { slug: string }) =>
     state.role && by.slug === 'acme'

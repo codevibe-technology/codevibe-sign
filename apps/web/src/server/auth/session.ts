@@ -2,7 +2,10 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
+import { db } from '../db';
+import { appSessionPolicy, env } from '../env';
 import { auth } from './auth';
+import { keepSessionActive } from './session-activity';
 
 export interface SessionUser {
   id: string;
@@ -11,9 +14,31 @@ export interface SessionUser {
   image: string | null;
 }
 
+type FoundSession = NonNullable<Awaited<ReturnType<ReturnType<typeof auth>['api']['getSession']>>>;
+
+/**
+ * The session behind these request headers, held to the idle and lifetime limits, with the
+ * request counted as activity. Null when there is none or it has run out. Everything that
+ * reads a person's session goes through here: pages, actions, route handlers and the API.
+ */
+export async function activeSession(requestHeaders: Headers): Promise<FoundSession | null> {
+  const found = await auth().api.getSession({ headers: requestHeaders });
+  if (!found) return null;
+  const { token, createdAt, updatedAt, expiresAt } = found.session;
+  const live = await keepSessionActive(db(), appSessionPolicy(env()), {
+    token,
+    createdAt: new Date(createdAt),
+    updatedAt: new Date(updatedAt),
+    expiresAt: new Date(expiresAt),
+  });
+  return live ? found : null;
+}
+
+const currentSession = cache(async () => activeSession(await headers()));
+
 /** The signed-in person for this request, or null. Read once per request. */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
-  const session = await auth().api.getSession({ headers: await headers() });
+  const session = await currentSession();
   if (!session) return null;
   const { id, name, email, image } = session.user;
   return { id, name, email, image: image ?? null };
@@ -36,6 +61,6 @@ export async function siteViewer(): Promise<{ name: string; email: string } | nu
 
 /** When the current session was signed in, for checks that need a recent sign-in. */
 export async function sessionStartedAt(): Promise<Date | null> {
-  const session = await auth().api.getSession({ headers: await headers() });
+  const session = await currentSession();
   return session ? new Date(session.session.createdAt) : null;
 }

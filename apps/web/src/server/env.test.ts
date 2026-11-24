@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEnv } from './env';
+import { appSessionPolicy, parseEnv } from './env';
 
 const required = {
   DATABASE_URL: 'postgres://sign:pw@localhost:5432/sign',
@@ -124,5 +124,34 @@ describe('parseEnv Turnstile settings', () => {
     const onlySecret = problems({ ...required, TURNSTILE_SECRET_KEY: '0x4AAAAAAAsecret' });
     expect(onlySecret).toContain('TURNSTILE_SITE_KEY is required');
     expect(onlySecret).not.toContain('0x4AAAAAAAsecret');
+  });
+});
+
+describe('parseEnv session settings', () => {
+  it('signs out after 30 idle minutes and 12 hours by default', () => {
+    const config = parseEnv(required);
+    expect(config.SESSION_IDLE_MINUTES).toBe(30);
+    expect(config.SESSION_MAX_HOURS).toBe(12);
+    expect(appSessionPolicy(config)).toMatchObject({ idleSeconds: 1800, maxSeconds: 43_200 });
+  });
+
+  it('turns idle sign-out off with 0 and takes a longer day', () => {
+    const config = parseEnv({ ...required, SESSION_IDLE_MINUTES: '0', SESSION_MAX_HOURS: '168' });
+    expect(appSessionPolicy(config)).toMatchObject({ idleSeconds: null, maxSeconds: 604_800 });
+  });
+
+  it('names the variable when a value is wrong', () => {
+    expect(problems({ ...required, SESSION_IDLE_MINUTES: 'soon' })).toContain(
+      'SESSION_IDLE_MINUTES must be a whole number of minutes',
+    );
+    expect(problems({ ...required, SESSION_IDLE_MINUTES: '-5' })).toContain(
+      'SESSION_IDLE_MINUTES must be 0 (off) or more',
+    );
+    expect(problems({ ...required, SESSION_MAX_HOURS: '0' })).toContain(
+      'SESSION_MAX_HOURS must be at least 1',
+    );
+    expect(problems({ ...required, SESSION_MAX_HOURS: '1000' })).toContain(
+      'SESSION_MAX_HOURS must be at most 720',
+    );
   });
 });

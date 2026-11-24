@@ -5,6 +5,7 @@ import { Kysely } from 'kysely';
 import { PostgresJSDialect } from 'kysely-postgres-js';
 import type postgres from 'postgres';
 import { PASSWORD_MAX, PASSWORD_MIN } from '@/lib/password';
+import { defaultSessionPolicy, sessionExpiry, type SessionPolicy } from '@/lib/session-policy';
 
 export interface AuthConfigInput {
   sql: postgres.Sql;
@@ -16,6 +17,8 @@ export interface AuthConfigInput {
   sendPasswordReset: (email: string, url: string) => Promise<void>;
   /** Tells the account's owner their password was just set or changed. */
   passwordChanged: (email: string) => Promise<void>;
+  /** Idle and lifetime limits for app sessions; the defaults when left out. */
+  sessionPolicy?: SessionPolicy;
 }
 
 /** A reset link is as good as the password, so it does not live long. */
@@ -28,6 +31,7 @@ const timestamps = { createdAt: 'created_at', updatedAt: 'updated_at' } as const
  * migration creates are exactly what this configuration expects.
  */
 export function authOptions(input: AuthConfigInput) {
+  const policy = input.sessionPolicy ?? defaultSessionPolicy();
   return {
     appName: 'Codevibe Sign',
     baseURL: input.appUrl,
@@ -52,8 +56,21 @@ export function authOptions(input: AuthConfigInput) {
         userAgent: 'user_agent',
         ...timestamps,
       },
-      expiresIn: 30 * 24 * 60 * 60,
-      updateAge: 24 * 60 * 60,
+      // The cookie lives as long as the lifetime cap. The stored expiry is what ends a
+      // session: it starts at the idle limit and only activity moves it (touchSession), so
+      // the library's own sliding refresh is off.
+      expiresIn: policy.maxSeconds,
+      disableSessionRefresh: true,
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session: { expiresAt: Date } & Record<string, unknown>) => {
+            const now = new Date();
+            return { data: { ...session, expiresAt: sessionExpiry(policy, now, now) } };
+          },
+        },
+      },
     },
     account: {
       modelName: 'auth_accounts',
