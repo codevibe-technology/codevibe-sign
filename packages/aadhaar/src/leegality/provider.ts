@@ -10,14 +10,31 @@ import type {
   WebhookHeaders,
 } from '../provider';
 import {
+  MAX_JSON_RESPONSE_BYTES,
   PROVIDER,
   envelopeError,
+  isRecord,
   readEnvelope,
   type CreateResponseData,
   type StatusRequest,
   type StatusResponseData,
 } from './api';
-import { checkHeader, peekDocumentId, verifyWebhook } from './webhook';
+import {
+  DEFAULT_COORDINATE_MAPPING,
+  parseCoordinateOrigin,
+  type CoordinateMapping,
+} from './coordinates';
+import {
+  checkV4Workflow,
+  packRequest,
+  parseV4Ref,
+  v4Error,
+  v4Ref,
+  type LeegalityV4Workflow,
+  type PackCreated,
+  type PackDetails,
+} from './v4';
+import { checkHeader, peekDocumentId, verifyWebhook, type LeegalityWebhook } from './webhook';
 
 export const LEEGALITY_BASE_URLS = {
   sandbox: 'https://sandbox.leegality.com/api',
@@ -38,8 +55,8 @@ export interface LeegalityOptions {
   /**
    * The Workflow ID to run. Leegality takes signature positions, the eSign type (Aadhaar),
    * the webhook URLs and the redirect URLs from the workflow, not from the API request, so
-   * configure them there. The request's `signaturePositions` are not sent: the v3.0 API has
-   * no field for them. Pass a function to choose a workflow per request, for example
+   * configure them there. The v3.0 API has no field for `signaturePositions`; see `v4` for
+   * requests that carry them. Pass a function to choose a workflow per request, for example
    * by document layout.
    */
   profileId: string | ((request: EsignRequest) => string);
@@ -58,6 +75,14 @@ export interface LeegalityOptions {
   webhookHeader?: { name: string; value: string };
   /** Largest signed PDF accepted from the provider. Default 50 MB. */
   maxSignedDocumentBytes?: number;
+  /**
+   * A v4 workflow for requests that carry `signaturePositions`: such a request is sent with
+   * the v4 Pack API, which places the Aadhaar eSign appearance at those positions. Requests
+   * without positions, or every request when this is unset, use `profileId` and v3.0.
+   */
+  v4?: LeegalityV4Workflow;
+  /** How positions become Leegality coordinates. Default points, bottom-left origin. */
+  coordinates?: CoordinateMapping;
 }
 
 const MAX_TIMEOUT_MS = 10 * 60 * 1000;
@@ -134,6 +159,24 @@ function confirms(status: EsignStatus, row: StatusRequest): boolean {
   }
 }
 
+/**
+ * `invitationStatus.status` of Check Pack Details. A failed verification or exhausted Aadhaar
+ * retries leave the invitation `EXPIRED`
+ * (https://knowledge.leegality.com/document-execution/api/webhook-verification-failed).
+ */
+function confirmsV4(status: EsignStatus, invitation: string): boolean {
+  switch (status) {
+    case 'signed':
+      return invitation === 'SIGNED';
+    case 'declined':
+      return invitation === 'SIGNER_REJECTED';
+    case 'expired':
+      return invitation === 'EXPIRED';
+    case 'failed':
+      return invitation !== 'SIGNED' && invitation !== 'SIGNER_REJECTED';
+  }
+}
+
 export function createLeegalityProvider(options: LeegalityOptions): EsignProvider {
   const authToken = required(options.authToken, 'authToken');
   const privateSalt = required(options.privateSalt, 'privateSalt');
@@ -179,6 +222,17 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
   const confirmWebhooks = options.confirmWebhooks ?? true;
   const maxSignedBytes = options.maxSignedDocumentBytes ?? 50 * 1024 * 1024;
   const headers = { 'X-Auth-Token': authToken, Accept: 'application/json' };
+  const v4 = options.v4 ? checkV4Workflow(options.v4) : undefined;
+  const mapping = options.coordinates ?? DEFAULT_COORDINATE_MAPPING;
+  parseCoordinateOrigin(mapping.origin);
+  if (
+    mapping.units !== 'points' &&
+    !(Number.isInteger(mapping.units?.pixelsPerInch) && mapping.units.pixelsPerInch > 0)
+  ) {
+    throw new SignError('VALIDATION', 'Leegality option coordinates.units is not valid', {
+      option: 'coordinates.units',
+    });
+  }
 
   function resolveProfileId(input: EsignRequest): string {
     const id =
@@ -195,7 +249,50 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     return envelope.data;
   }
 
-  async function createRequest(input: EsignRequest): Promise<EsignSession> {
+  /** Reads a v4 JSON response, which is not wrapped like the v3 ones. */
+  async function readJson<T>(res: Response): Promise<T> {
+    const bytes = await readLimited(res, MAX_JSON_RESPONSE_BYTES);
+    let body: unknown;
+    try {
+      body = bytes ? JSON.parse(new TextDecoder().decode(bytes)) : undefined;
+    } catch {
+      body = undefined;
+    }
+    if (!isRecord(body)) {
+      throw new SignError('PROVIDER_ERROR', `${PROVIDER} returned an unexpected response`, {
+        provider: PROVIDER,
+        reason: 'malformed_response',
+        retryable: false,
+      });
+    }
+    return body as T;
+  }
+
+  const explainV4 = async (res: Response) =>
+    v4Error(await readJson<unknown>(res), `${PROVIDER} rejected the request`);
+
+  /** `GET /api/v4/packs` (https://knowledge.leegality.com/document-execution/api/check-pack-details). */
+  async function packDetails(packId: string): Promise<NonNullable<PackDetails['data']>> {
+    const url = `${baseUrl}/v4/packs?packId=${encodeURIComponent(packId)}`;
+    const body = await request(
+      url,
+      { method: 'GET', headers },
+      http,
+      (res) => readJson<PackDetails>(res),
+      explainV4,
+    );
+    if (!isRecord(body.data)) throw v4Error(body, `${PROVIDER} returned no pack details`);
+    return body.data;
+  }
+
+  interface Prepared {
+    reference: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  }
+
+  function prepare(input: EsignRequest): Prepared {
     const { recipient, documentBytes } = input;
     if (!recipient.name?.trim()) {
       throw new SignError('VALIDATION', 'Recipient name is required', { field: 'recipient.name' });
@@ -219,27 +316,39 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     if (!isPdf(documentBytes)) {
       throw new SignError('DOCUMENT_INVALID', 'The document is not a PDF');
     }
+    const prepared: Prepared = { reference, name: recipient.name.trim().slice(0, 255) };
+    if (recipient.email) prepared.email = recipient.email;
+    if (recipient.phone) prepared.phone = normalisePhone(recipient.phone);
+    return prepared;
+  }
 
-    const phone = recipient.phone ? normalisePhone(recipient.phone) : undefined;
-    const invitee: Record<string, string> = { name: recipient.name.trim().slice(0, 255) };
-    if (recipient.email) invitee.email = recipient.email;
+  const missingSignUrl = (providerRef: string) =>
+    new SignError('PROVIDER_ERROR', 'Leegality did not return a signing link', {
+      provider: PROVIDER,
+      reason: 'missing_sign_url',
+      providerRef,
+      retryable: false,
+    });
+
+  async function createV3(input: EsignRequest, prepared: Prepared): Promise<EsignSession> {
+    const { email, phone } = prepared;
+    const invitee: Record<string, string> = { name: prepared.name };
+    if (email) invitee.email = email;
     if (phone) invitee.phone = phone;
 
-    // `signaturePositions` is not sent. The v3.0 Create request has no field for a signature
-    // position (https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request);
+    // Positions are not sent: the v3.0 Create request has no field for them
+    // (https://knowledge.leegality.com/document-execution/api/create-an-e-signing-request).
     // Leegality places the appearance where the workflow says, or at the bottom left of every
     // page when the workflow has no coordinates
     // (https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate).
-    // Only the v4 Pack API takes per-request `coordinates`
-    // (https://knowledge.leegality.com/document-execution/api/create-pack).
     const body = {
       profileId: resolveProfileId(input),
       file: {
         name: documentName(input.documentName),
-        file: Buffer.from(documentBytes).toString('base64'),
+        file: Buffer.from(input.documentBytes).toString('base64'),
       },
       invitees: [invitee],
-      irn: reference,
+      irn: prepared.reference,
     };
 
     const envelope = await request(
@@ -259,21 +368,114 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     if (!data?.documentId) throw envelopeError(envelope);
 
     const invitees = Array.isArray(data.invitees) ? data.invitees : [];
-    const email = recipient.email?.toLowerCase();
+    const lower = email?.toLowerCase();
     const match =
-      invitees.find((i) => email !== undefined && i.email?.toLowerCase() === email) ??
+      invitees.find((i) => lower !== undefined && i.email?.toLowerCase() === lower) ??
       invitees.find((i) => phone !== undefined && i.phone?.slice(-10) === phone) ??
       (invitees.length === 1 ? invitees[0] : undefined);
     // The signer is sent to this URL, so anything but https (javascript:, data:, http:) is refused.
-    if (!match?.signUrl || !isHttpsUrl(match.signUrl)) {
-      throw new SignError('PROVIDER_ERROR', 'Leegality did not return a signing link', {
+    if (!match?.signUrl || !isHttpsUrl(match.signUrl)) throw missingSignUrl(data.documentId);
+    return { providerRef: data.documentId, signUrl: match.signUrl };
+  }
+
+  /**
+   * Sends one pack through the v4 workflow with the signer's appearances at the positions
+   * (https://knowledge.leegality.com/document-execution/api/create-pack-sync). The sync call
+   * answers with the pack, its document and the signer's `invitationUrl` in one response.
+   */
+  async function createV4(
+    input: EsignRequest,
+    prepared: Prepared,
+    workflow: LeegalityV4Workflow,
+  ): Promise<EsignSession> {
+    const invitee: { name: string; email?: string; phone?: string } = { name: prepared.name };
+    if (prepared.email) invitee.email = prepared.email;
+    if (prepared.phone) invitee.phone = prepared.phone;
+    const { body, inviteeDetailsUuid } = packRequest({
+      workflow,
+      reference: prepared.reference,
+      documentName: documentName(input.documentName),
+      fileBase64: Buffer.from(input.documentBytes).toString('base64'),
+      invitee,
+      positions: input.signaturePositions ?? [],
+      mapping,
+      callbackUrl: input.callbackUrl,
+      redirectUrl: input.redirectUrl,
+    });
+    const created = await request(
+      `${baseUrl}/v4/pack/sync`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      http,
+      (res) => readJson<PackCreated>(res),
+      explainV4,
+    );
+    const packId = created.data?.pack?.packId;
+    const documentId = created.data?.documents?.[0]?.documentId;
+    if (
+      created.code !== 'SUCCESS' ||
+      typeof packId !== 'string' ||
+      typeof documentId !== 'string'
+    ) {
+      throw v4Error(created, `${PROVIDER} did not create the pack`);
+    }
+    const providerRef = v4Ref(packId, documentId);
+    const people = (created.data?.invitations ?? []).flatMap((i) => i.inviteeDetails ?? []);
+    const person =
+      people.find((p) => p.uuid === inviteeDetailsUuid) ??
+      (people.length === 1 ? people[0] : undefined);
+    if (!person?.invitationUrl || !isHttpsUrl(person.invitationUrl)) {
+      throw missingSignUrl(providerRef);
+    }
+    return { providerRef, signUrl: person.invitationUrl };
+  }
+
+  async function createRequest(input: EsignRequest): Promise<EsignSession> {
+    const prepared = prepare(input);
+    if (v4 && input.signaturePositions && input.signaturePositions.length > 0) {
+      return createV4(input, prepared, v4);
+    }
+    return createV3(input, prepared);
+  }
+
+  async function confirmV3(webhook: LeegalityWebhook): Promise<void> {
+    if (!webhook.invitationUrl) {
+      throw new SignError('WEBHOOK_INVALID', 'Webhook does not name the invitation', {
         provider: PROVIDER,
-        reason: 'missing_sign_url',
-        providerRef: data.documentId,
-        retryable: false,
       });
     }
-    return { providerRef: data.documentId, signUrl: match.signUrl };
+    const status = await transactionStatus(webhook.documentId);
+    const row = (status.requests ?? []).find((r) => r.signUrl === webhook.invitationUrl);
+    if (!row || !confirms(webhook.status!, row)) {
+      throw new SignError('WEBHOOK_INVALID', 'Webhook does not match the document status', {
+        provider: PROVIDER,
+        providerRef: webhook.documentId,
+      });
+    }
+  }
+
+  /**
+   * Checks a Webhook 4.0 event against Check Pack Details: the pack must hold the document
+   * the mac signs, and its signer's `invitationStatus` must agree with the event.
+   */
+  async function confirmV4(webhook: LeegalityWebhook, packId: string): Promise<void> {
+    const mismatch = () =>
+      new SignError('WEBHOOK_INVALID', 'Webhook does not match the pack status', {
+        provider: PROVIDER,
+        providerRef: v4Ref(packId, webhook.documentId),
+      });
+    const details = await packDetails(packId);
+    if (!(details.documents ?? []).some((d) => d.documentId === webhook.documentId)) {
+      throw mismatch();
+    }
+    const signers = (details.invitations ?? [])
+      .filter((i) => i.inviteeType === undefined || i.inviteeType === 'signer')
+      .flatMap((i) => i.inviteeDetails ?? []);
+    const status = signers.length === 1 ? signers[0]?.invitationStatus?.status : undefined;
+    if (!status || !confirmsV4(webhook.status!, status)) throw mismatch();
   }
 
   async function parseWebhook(
@@ -283,24 +485,14 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     if (options.webhookHeader) checkHeader(webhookHeaders, options.webhookHeader);
     const webhook = verifyWebhook(rawBody, privateSalt);
     if (webhook.status === null) return null;
-
     if (confirmWebhooks) {
-      if (!webhook.invitationUrl) {
-        throw new SignError('WEBHOOK_INVALID', 'Webhook does not name the invitation', {
-          provider: PROVIDER,
-        });
-      }
-      const status = await transactionStatus(webhook.documentId);
-      const row = (status.requests ?? []).find((r) => r.signUrl === webhook.invitationUrl);
-      if (!row || !confirms(webhook.status, row)) {
-        throw new SignError('WEBHOOK_INVALID', 'Webhook does not match the document status', {
-          provider: PROVIDER,
-          providerRef: webhook.documentId,
-        });
-      }
+      if (webhook.packId) await confirmV4(webhook, webhook.packId);
+      else await confirmV3(webhook);
     }
-
-    const event: EsignEvent = { providerRef: webhook.documentId, status: webhook.status };
+    const providerRef = webhook.packId
+      ? v4Ref(webhook.packId, webhook.documentId)
+      : webhook.documentId;
+    const event: EsignEvent = { providerRef, status: webhook.status };
     if (webhook.signerName) event.signerName = webhook.signerName;
     return event;
   }
@@ -332,6 +524,8 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
     what: string,
   ): Promise<Uint8Array> {
     required(providerRef, 'providerRef');
+    const pack = parseV4Ref(providerRef);
+    if (pack) return downloadV4(pack, type, what);
     const status = await transactionStatus(providerRef);
     // Leegality documents `auditTrail` as present only once every required invitee has signed.
     if (!status.auditTrail) {
@@ -356,6 +550,52 @@ export function createLeegalityProvider(options: LeegalityOptions): EsignProvide
         if (envelope.status === 1 && typeof file === 'string' && isHttpsUrl(file)) return file;
         throw envelopeError(envelope);
       },
+    );
+    if (typeof link !== 'string') return link;
+    return request(link, { method: 'GET' }, http, (res) => readPdf(res, what));
+  }
+
+  /**
+   * One file of a completed v4 pack, from `GET /api/v4/packs/download`
+   * (https://knowledge.leegality.com/document-execution/api/download-files). `mode=stream`
+   * asks for the file itself; an account set up for links answers with `data.url` instead.
+   */
+  async function downloadV4(
+    pack: { packId: string; documentId: string },
+    type: 'DOCUMENT' | 'AUDIT_TRAIL',
+    what: string,
+  ): Promise<Uint8Array> {
+    const details = await packDetails(pack.packId);
+    const document = (details.documents ?? []).find((d) => d.documentId === pack.documentId);
+    if (!document) {
+      throw new SignError('PROVIDER_ERROR', 'Leegality does not know this document', {
+        provider: PROVIDER,
+        reason: 'not_found',
+        retryable: false,
+      });
+    }
+    if (document.status !== 'COMPLETED') {
+      throw new SignError('INVALID_STATE', 'The document is not signed by everyone yet', {
+        provider: PROVIDER,
+        providerRef: v4Ref(pack.packId, pack.documentId),
+      });
+    }
+    const url =
+      `${baseUrl}/v4/packs/download?downloadType=${type}` +
+      `&documentId=${encodeURIComponent(pack.documentId)}&mode=stream`;
+    const link = await request(
+      url,
+      { method: 'GET', headers: { 'X-Auth-Token': authToken } },
+      http,
+      async (res): Promise<Uint8Array | string> => {
+        const contentType = res.headers.get('content-type') ?? '';
+        if (!contentType.includes('json')) return readPdf(res, what);
+        const body = await readJson<{ data?: { url?: unknown } }>(res);
+        const file = body.data?.url;
+        if (typeof file === 'string' && isHttpsUrl(file)) return file;
+        throw v4Error(body, `${PROVIDER} returned no download link`);
+      },
+      explainV4,
     );
     if (typeof link !== 'string') return link;
     return request(link, { method: 'GET' }, http, (res) => readPdf(res, what));
