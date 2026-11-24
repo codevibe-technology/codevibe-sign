@@ -177,8 +177,29 @@ Better Auth runs at `/api/auth/*` with:
   passwords in fifteen minutes. See "Passwords for senders" in the threat model.
 - **Google** when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set; the button is hidden
   otherwise.
-- Database sessions in an HttpOnly, `SameSite=Lax`, `Secure` (on https) cookie, 30 days,
-  refreshed daily. Telemetry is off.
+- Database sessions in an HttpOnly, `SameSite=Lax`, `Secure` (on https) cookie. Telemetry is
+  off. Sessions end after `SESSION_IDLE_MINUTES` without activity (default 30, `0` off) and
+  `SESSION_MAX_HOURS` after sign-in however active (default 12):
+  - The stored `expires_at` is what ends a session, so the library refuses it everywhere,
+    `/api/auth/*` included. A new session starts with the idle limit (a `session.create.before`
+    hook); the library's own sliding refresh is off and the cookie lives as long as the cap.
+  - `activeSession(headers)` (`src/server/auth/session.ts`) is the one way the app reads a
+    session: pages, actions, route handlers and the `/api/v1` session principal. It checks
+    both limits against `created_at` and `updated_at` (the last recorded activity), deletes a
+    session over either, and otherwise records the request as activity (`touchSession`): at
+    most once a minute it moves `expires_at` to the idle limit from now, never past the cap.
+  - In the browser, `IdleSignOut` (in the app shell) watches pointer, keyboard and visibility
+    in every open tab, shares activity between tabs (BroadcastChannel, or storage events), and
+    posts to `/api/session/activity` so work that stays in the browser keeps the server
+    session alive. Two minutes before the limit it shows a warning; at the limit it flushes
+    pending saves (`onBeforeSignOut`, used by the send flow's draft), signs out and opens
+    `/sign-in?reason=idle&next=<page>`. The signing page has no app session and is never
+    affected.
+- Someone who signs in only by emailed link (no password, no Google) sets a password in the
+  step that creates their first workspace or accepts an invitation (`needsPassword`,
+  `choosePassword` in `src/server/auth/passwords.ts`). Invited people without an account
+  choose one when the account is created, so every workspace member has a way in that does
+  not wait for an email.
 
 After signing in, everyone lands on `/dashboard`, which opens their workspace at
 `/dashboard/[slug]` (or onboarding when they have none); a `next` parameter may name another
