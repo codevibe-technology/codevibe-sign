@@ -85,9 +85,8 @@ A signer who uses Aadhaar eSign fills in nothing. With them picked, the tray off
 **Aadhaar seal position**, and the quick add **Aadhaar seal on last page**. The box is
 optional and only marks where Leegality draws the Aadhaar signature: it has a dashed edge, its
 panel says "Position only", it has no Required switch, and nothing is drawn for it in any PDF.
-There is at most one; drag it to move it. It is used when the Leegality account in use has a
-V4 workflow. Without a box, or without one, Leegality places the signature where its workflow
-says, and the note above the pages says so. Give any date, text or checkbox to a signer
+There is at most one; drag it to move it. Without a box, Leegality places the signature where
+its workflow says, and the note above the pages says so. Give any date, text or checkbox to a signer
 before them. The document Leegality signs is then exactly what you approved, with the earlier
 signers' fields filled in. See
 [Choose where the signature goes](/guides/aadhaar-leegality#choose-where-the-signature-goes).

@@ -47,14 +47,12 @@ offers one item, **Aadhaar seal position**, and the quick add **Aadhaar seal on 
 Drag the box where the Aadhaar signature should appear and resize it; its panel says
 "Position only. Leegality draws the Aadhaar signature here; nothing is added to the file." It
 is optional and there is at most one: once placed, the tray item is greyed out, and the quick
-add moves the box instead of adding a second one. Nothing is drawn for it in any PDF. The box
-works only when the Leegality account in use has a V4 workflow (see
-[Set up a V4 workflow](#set-up-a-v4-workflow-for-the-seal-position)); the **Fields** and
-**Review** steps say which applies.
+add moves the box instead of adding a second one. Nothing is drawn for it in any PDF. It needs
+no change in Leegality: see [How the seal position reaches Leegality](#how-the-seal-position-reaches-leegality).
 
-**Leave it to the workflow.** Without a box, or without a V4 workflow, Leegality places the
-signature where its workflow says (see [Set the signature position](#set-the-signature-position)).
-The note in **Recipients**, **Fields** and **Review** says so.
+**Leave it to the workflow.** Without a box, Leegality places the signature where its workflow
+says (see [Set the signature position](#set-the-signature-position)). The note in
+**Recipients**, **Fields** and **Review** says which applies.
 
 ### Set the signature position
 
@@ -78,14 +76,46 @@ The position is fixed per workflow, so documents with the same layout work best 
 workflow. Leave room for it in your document, for example an empty "Signature" area at the
 foot of the last page.
 
-### Set up a V4 workflow for the seal position
+### How the seal position reaches Leegality
 
-Only Leegality's v4 Pack API takes a position per request: each signer's `coordinates[]`, with
+Leegality's 2.1 Create API takes a position per signer: you "pass the eSign coordinates in the
+appearances array of the payload"
+([Coordinate Picker](https://knowledge.leegality.com/document-execution/leegality-features/signature-coordinate/coordinate-picker)).
+When an envelope has a seal position, Codevibe Sign creates the request with
+`POST /api/v2.1/sign/request` and the same Auth Token as the v3.0 requests (Leegality's dashboard
+calls it the legacy Auth Token). The request carries the document, the signer, their box as
+`appearances` (`page` from 1, `x1`/`y1` the lower-left and `x2`/`y2` the upper-right corner), Aadhaar
+eSign by OTP as the signature type, the webhook URL with version 2.5 and the redirect URL. The
+field names come from Leegality's 2.1 API description, of which a copy is published at
+[leegality-apidocs](https://github.com/prakharmittal/leegality-apidocs/blob/master/api_2_1.json).
+
+So the owner of a Leegality account with only V3 workflows sets up nothing new: keep the V3
+workflow, its webhooks and its Workflow ID as they are, and do the one
+[calibration](#calibrate-the-coordinates) signing. The 2.1 API takes no workflow, so a request with
+a box does not use the workflow's other settings (such as its expiry, branding or certificate
+checks): it is an Aadhaar eSign by OTP, followed with the same status and download calls and
+webhooks as any other. Envelopes without a box keep using the workflow through v3.0.
+
+**Settings, Aadhaar eSign** shows which way each account uses, for example "Aadhaar seal
+position: on, through Leegality's 2.1 API with your Auth Token". The install chooses it with
+`LEEGALITY_POSITION_API`: `v2.1` (the default), `v4` (the default when a V4 workflow is set, see
+below) or `off` (a placed box is kept but Leegality places the signature where the workflow
+says).
+
+### Set up a V4 workflow for the seal position (optional)
+
+Only for accounts that have V4 workflows and want to use one instead of the 2.1 API. Leegality
+documents OAuth 2.0 for the v4 APIs
+([v4 Authentication](https://knowledge.leegality.com/document-execution/api/v4-authentication)),
+while its v4 endpoint pages name the `X-Auth-Token` header, which is what Codevibe Sign sends;
+check with Leegality that your token works for v4 before you choose it.
+
+Leegality's v4 Pack API also takes a position per request: each signer's `coordinates[]`, with
 an `appearances[]` entry per page holding `pageNo` (from 1) and a `rect`
 (`x1Axis`, `y1Axis`, `x2Axis`, `y2Axis`)
 ([Send Pack for eSigning (Sync)](https://knowledge.leegality.com/document-execution/api/create-pack-sync)).
-When an envelope has a seal position and a V4 workflow is set, Codevibe Sign sends it through
-`POST /api/v4/pack/sync`; otherwise it uses v3.0 as before.
+With a V4 workflow set (and `LEEGALITY_POSITION_API` not set to another value), an envelope
+with a seal position goes through `POST /api/v4/pack/sync`.
 
 In the Leegality dashboard
 ([Create a v4 workflow](https://knowledge.leegality.com/document-execution/workflows/v4/create-a-workflow)):
@@ -128,10 +158,10 @@ v3.0 workflow, with its webhook version 2.5, keeps working for envelopes without
 
 ### Calibrate the coordinates
 
-Leegality's v4 documentation does not say in which unit the rectangle is measured or from
-which corner. Its only example is `350, 680, 550, 720` on page 1. Its earlier API described the
-same rectangle as the lower-left and upper-right corners in whole numbers, which is PDF user
-space: points (1/72 inch) from the bottom-left corner. Codevibe Sign uses that by default and
+Leegality's 2.1 API description names the corners "lower-left" and "upper-right" in whole
+numbers, which is PDF user space: points (1/72 inch) from the bottom-left corner of the page.
+It does not say "points" in so many words, and the v4 documentation names neither the unit nor
+the corner (its only example is `350, 680, 550, 720` on page 1). Codevibe Sign uses that by default and
 turns the box into it, taking the page's crop box and rotation into account (a box on a
 landscape page rotated by 90 degrees lands where it was drawn). If one test shows otherwise,
 change the setting; no code changes:
@@ -250,16 +280,16 @@ credits are used.
 
 1. In the Leegality dashboard, publish a workflow with Aadhaar eSign as the invitee's signature
    type and the signature position set (see [Set the signature position](#set-the-signature-position)).
-   To let senders place the Aadhaar seal position, also publish a V4 workflow (see
-   [Set up a V4 workflow](#set-up-a-v4-workflow-for-the-seal-position)).
+   Senders can place the Aadhaar seal position with no further setup; it goes through the 2.1
+   API with the same Auth Token.
 2. In that workflow, under the invitee's custom URLs and webhooks, set the Webhook and Error
    Webhook to `https://<your app>/api/v1/esign/webhooks/leegality` (version 2.5) and the
    Redirect URL to `https://<your app>/sign?esign=return`. The settings page shows both with a
    copy button.
 3. In **Settings, Aadhaar eSign**, choose **Use your own Leegality account** and enter the
    Auth Token, the Private Salt, the Workflow ID and whether they belong to the sandbox or to
-   production. Optionally paste the V4 workflow's downloaded API payload; the page then says
-   "Aadhaar seal position: on".
+   production. Only if you want to use a V4 workflow for the seal position, paste its
+   downloaded API payload; the page says which API places the seal position.
 4. **Test connection** makes one read-only call to Leegality and says whether the details work.
 
 The credentials are encrypted before they are stored and are never shown again; the page shows
@@ -282,11 +312,12 @@ environment (`LEEGALITY_API_KEY`, `LEEGALITY_PRIVATE_SALT`, `LEEGALITY_WORKFLOW_
 `LEEGALITY_BASE_URL`). `LEEGALITY_BASE_URL` is `https://app1.leegality.com/api` for production;
 left unset, the sandbox is used. If you add a custom header to the workflow's webhooks in
 Leegality, set the same one in `LEEGALITY_WEBHOOK_HEADER_NAME` and
-`LEEGALITY_WEBHOOK_HEADER_VALUE`, and a webhook without it is refused. For the Aadhaar seal
-position, set `LEEGALITY_V4_PAYLOAD_FILE` to the path of the V4 workflow's downloaded API
-payload (or `LEEGALITY_V4_WORKFLOW_ID` to its full ID), and `LEEGALITY_COORDINATE_UNITS` and
-`LEEGALITY_COORDINATE_ORIGIN` if the [calibration](#calibrate-the-coordinates) asks for it. A
-malformed value is listed among the billing problems and the box is then not sent. See
+`LEEGALITY_WEBHOOK_HEADER_VALUE`, and a webhook without it is refused. The Aadhaar seal position
+needs nothing more; set `LEEGALITY_COORDINATE_UNITS` and `LEEGALITY_COORDINATE_ORIGIN` if the
+[calibration](#calibrate-the-coordinates) asks for it, and `LEEGALITY_POSITION_API=off` to
+turn it off. To use a V4 workflow instead, set `LEEGALITY_V4_PAYLOAD_FILE` to the path of its
+downloaded API payload (or `LEEGALITY_V4_WORKFLOW_ID` to its full ID). A malformed value is
+listed among the billing problems and the default is used. See
 [Self-host with Docker](/getting-started/docker) and section 12 of the deploy guide in the
 repository.
 
@@ -349,9 +380,10 @@ const esign = createLeegalityProvider({
 
 Start with `sandbox` and switch to `production` when you go live.
 
-To place the signature per request, add a V4 workflow. A request that carries
-`signaturePositions` then goes through the v4 Pack API; one without them uses `profileId` and
-v3.0 as above:
+To place the signature per request, pass `signaturePositions`. By default
+(`positionApi: 'v2.1'`) such a request goes to the 2.1 Create API with the positions as the
+signer's `appearances`; one without them uses `profileId` and v3.0 as above. With a V4
+workflow it can use the v4 Pack API instead:
 
 <!-- check:
 import { createLeegalityProvider, leegalityV4WorkflowFromPayload } from '@codevibe_technology/sign-aadhaar';
@@ -427,8 +459,9 @@ covers only the document id.
 ## Things to know
 
 - With the v3.0 request, signature positions, callback URL and redirect URL come from the
-  workflow; that API does not take them. With a V4 workflow, the request sets all three, and
-  the provider reference is `v4:<packId>:<documentId>`.
+  workflow; that API does not take them. A 2.1 request with a seal position sets all three
+  and takes no workflow. A v4 request sets them too, and its provider reference is
+  `v4:<packId>:<documentId>`.
 - Webhooks carry no signing time. Record the time you received the verified event.
 - Provider failures throw `PROVIDER_ERROR` with `details.reason` and `details.retryable`;
   HTTP 429 throws `RATE_LIMITED`. Errors never contain the document or your credentials.

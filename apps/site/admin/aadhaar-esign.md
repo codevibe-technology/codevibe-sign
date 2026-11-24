@@ -55,23 +55,18 @@ instead. Leegality then bills you directly and no credits are used. On Free the 
    [Set the signature position](/guides/aadhaar-leegality#set-the-signature-position).
 2. Copy the **Webhook and error webhook** URL and the **Redirect URL** from this page into the
    workflow.
-3. Optional, to let senders place the Aadhaar seal position: in Leegality, **Workflows**, **V4
-   Workflows**, create and publish a workflow with one PDF document and one Signer using
-   Aadhaar eSign, its details and signature coordinates left editable, then choose **⋮**,
-   **Download API Payload**. The card **Optional: a V4 workflow for the Aadhaar seal
-   position** on this page lists the steps; the full ones are in
-   [Set up a V4 workflow](/guides/aadhaar-leegality#set-up-a-v4-workflow-for-the-seal-position).
-   It needs no webhook setting: each request sets its own, with version 4.0.
-4. Choose **Use your own Leegality account** and enter the **Environment** (Production or
-   Sandbox), **Auth Token**, **Private Salt** and **Workflow ID**, and paste the downloaded
-   file (or the full V4 workflow ID) into **V4 workflow, for the Aadhaar seal position**. Only
-   its IDs are kept.
-5. Press **Check and save**, then **Test connection**. The card then says **Aadhaar seal
-   position: on** or **off**.
-6. With a V4 workflow, send one test eSign in the sandbox with the box over a known mark and
-   check where the seal lands; see
-   [Calibrate the coordinates](/guides/aadhaar-leegality#calibrate-the-coordinates). The page
-   shows the coordinate setting in use, for example "points, bottom-left".
+3. Choose **Use your own Leegality account** and enter the **Environment** (Production or
+   Sandbox), **Auth Token** (the dashboard may call it the legacy Auth Token), **Private Salt**
+   and **Workflow ID**. Leave **V4 workflow** empty unless your account has V4 workflows and you
+   want to use one.
+4. Press **Check and save**, then **Test connection**. The card says how the Aadhaar seal
+   position reaches Leegality, for example "on, through Leegality's 2.1 API with your Auth
+   Token (coordinates: points, bottom-left)". Nothing else needs setting up in Leegality: a
+   request with a box goes through the 2.1 API with the same token, and asks for Aadhaar eSign,
+   the webhook (version 2.5) and the redirect itself.
+5. Send one test eSign in the sandbox with the box over a known mark and check where the seal
+   lands; see
+   [Calibrate the coordinates](/guides/aadhaar-leegality#calibrate-the-coordinates).
 
 The details are encrypted and never shown again. If the account moves back to Free, the saved
 account is kept but not used until it is on Cloud again or switches to credits. The detailed
@@ -81,8 +76,8 @@ steps are in [Aadhaar eSign with Leegality](/guides/aadhaar-leegality#your-own-l
 
 Aadhaar eSign follows Leegality's standard process. A signer who uses it fills in nothing. In
 **Fields** the sender may place one optional **Aadhaar seal position**, a box that only marks
-where Leegality draws the Aadhaar signature; it needs a V4 workflow on the account in use.
-Without it, or without a V4 workflow, Leegality places the signature where the workflow says.
+where Leegality draws the Aadhaar signature. Without it Leegality places the signature where the
+workflow says.
 A note in **Recipients**, **Fields** and **Review** says which applies. Leegality receives the
 document exactly as the sender approved it, with the fields of earlier signers filled in and
 nothing drawn for the box.

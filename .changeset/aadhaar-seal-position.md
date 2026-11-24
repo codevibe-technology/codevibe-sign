@@ -15,8 +15,11 @@ server passes it to the provider as `signaturePositions` with the page's crop bo
 (`inspectPdf` in the PDF package now reports `boxes`). The placer offers it, with the quick add
 "Aadhaar seal on last page", only for that signer.
 
-The Leegality adapter takes a `v4` workflow (`leegalityV4WorkflowFromPayload` reads one from the
+The Leegality adapter places such positions through Leegality's 2.1 Create API by default
+(`positionApi: 'v2.1'`), with the same Auth Token: the request carries the signer's
+`appearances`, Aadhaar eSign by OTP, a version 2.5 webhook and the redirect URL, and is then
+followed like a v3.0 one. Requests without positions keep using v3.0. It also takes a `v4` workflow (`leegalityV4WorkflowFromPayload` reads one from the
 dashboard's downloaded API payload) and a `coordinates` mapping (default PDF points from the
-bottom-left). A request with positions then goes to the v4 Pack API with per-request
+bottom-left). With `positionApi: 'v4'` a request with positions goes to the v4 Pack API with per-request
 coordinates and Webhook 4.0; its `providerRef` is `v4:<packId>:<documentId>`, and webhooks,
-status checks and downloads follow the v4 API. Requests without positions keep using v3.0.
+status checks and downloads follow the v4 API.
