@@ -107,6 +107,12 @@ function makeCertificate(spec: CertificateSpec): forge.pki.Certificate {
 const DAY = 24 * 60 * 60 * 1000;
 
 /** A self-signed root CA, for tests only. */
+/**
+ * Test certificates are valid from a fixed date in the past, so tests that sign at a fixed
+ * signing time keep passing however long after that time they run.
+ */
+const TEST_NOT_BEFORE = new Date('2020-01-01T00:00:00.000Z');
+
 export function createTestCa(commonName = 'Codevibe Test Root'): TestCa {
   const keys = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
   const certificate = makeCertificate({
@@ -115,7 +121,7 @@ export function createTestCa(commonName = 'Codevibe Test Root'): TestCa {
     commonName,
     organization: 'Codevibe Test',
     ca: true,
-    notBefore: new Date(Date.now() - DAY),
+    notBefore: TEST_NOT_BEFORE,
     notAfter: new Date(Date.now() + 3650 * DAY),
   });
   return {
@@ -128,7 +134,7 @@ export function createTestCa(commonName = 'Codevibe Test Root'): TestCa {
 /** RSA key and certificate (self-signed, or issued by a test CA) in a PKCS#12 file, for tests only. */
 export function createTestP12(options: TestP12Options = {}): TestP12 {
   const passphrase = options.passphrase ?? 'test-passphrase';
-  const notBefore = options.notBefore ?? new Date(Date.now() - DAY);
+  const notBefore = options.notBefore ?? TEST_NOT_BEFORE;
   const notAfter = options.notAfter ?? new Date(Date.now() + 365 * DAY);
   const keys = forge.pki.rsa.generateKeyPair({ bits: options.bits ?? 2048, e: 0x10001 });
   const cert = makeCertificate({
