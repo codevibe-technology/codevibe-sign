@@ -1,6 +1,6 @@
 {
   "name": "@codevibe_technology/sign-aadhaar",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Aadhaar eSign through a licensed eSign provider, with your own provider account.",
   "keywords": [
     "esign",

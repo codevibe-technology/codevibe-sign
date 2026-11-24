@@ -1,6 +1,6 @@
 {
   "name": "@codevibe_technology/sign-pdf",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Draw signatures on PDFs, add a signing certificate page, and apply or verify a PAdES seal.",
   "keywords": [
     "esign",
