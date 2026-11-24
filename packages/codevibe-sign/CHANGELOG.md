@@ -1,5 +1,14 @@
 # codevibe-sign
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [7dbd02e]
+  - @codevibe_technology/sign-core@0.1.1
+  - @codevibe_technology/sign-pdf@0.1.1
+  - @codevibe_technology/sign-client@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
