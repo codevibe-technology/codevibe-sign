@@ -36,7 +36,7 @@ import {
   type EsignMode,
   type OwnCredentials,
 } from './settings';
-import { leegalityCoordinates } from './leegality-v4';
+import { leegalityCoordinates, ownPositionApi } from './leegality-v4';
 import { getEsignUsage, markUnbilled, recordEsignOutcome, recordEsignStart } from './usage';
 
 type Sql = postgres.Sql;
@@ -210,7 +210,9 @@ function fromOwn(credentials: OwnCredentials, fetch?: FetchLike): EsignProvider 
     environment: credentials.environment,
     baseUrl:
       credentials.environment === 'production' ? LEEGALITY_PRODUCTION_URL : LEEGALITY_SANDBOX_URL,
-    ...(credentials.v4 ? { v4: credentials.v4, coordinates: coordinates() } : {}),
+    ...(credentials.v4 ? { v4: credentials.v4 } : {}),
+    positionApi: ownPositionApi(Boolean(credentials.v4)),
+    coordinates: coordinates(),
     ...(fetch ? { fetch } : {}),
   });
 }
@@ -223,7 +225,9 @@ function fromPlatform(config: LeegalityConfig, fetch?: FetchLike): EsignProvider
     environment: config.environment,
     baseUrl: config.baseUrl,
     ...(config.webhookHeader ? { webhookHeader: config.webhookHeader } : {}),
-    ...(config.v4 ? { v4: config.v4, coordinates: config.coordinates } : {}),
+    ...(config.v4 ? { v4: config.v4 } : {}),
+    positionApi: config.positionApi,
+    coordinates: config.coordinates,
     ...(fetch ? { fetch } : {}),
   });
 }

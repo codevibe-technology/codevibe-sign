@@ -175,7 +175,9 @@ describe('fields and settings', () => {
       /^Leegality draws the Aadhaar signature in the Aadhaar seal position you placed/,
     );
     expect(aadhaarPlacementNote({ placed: true })).toMatch(/in the Aadhaar seal position/);
-    expect(aadhaarPlacementNote({ placed: true, supported: false })).toMatch(/no V4 workflow/);
+    expect(aadhaarPlacementNote({ placed: true, supported: false })).toMatch(
+      /placing it is turned off/,
+    );
     expect(aadhaarPlacementNote({ placed: false })).toMatch(/place the optional Aadhaar seal/);
     expect(aadhaarPlacementNote({ placed: false, supported: false })).toMatch(
       /You don't place a box/,

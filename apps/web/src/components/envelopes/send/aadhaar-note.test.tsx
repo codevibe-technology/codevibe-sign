@@ -21,10 +21,10 @@ describe('AadhaarPlacementNote', () => {
     );
   });
 
-  it('says a placed box is not used when the account has no V4 workflow', () => {
+  it('says a placed box is not used when placing is turned off', () => {
     render(<AadhaarPlacementNote placed supported={false} />);
     expect(screen.getByRole('note')).toHaveTextContent(
-      /You placed an Aadhaar seal position, but the Leegality account in use has no V4 workflow/,
+      /You placed an Aadhaar seal position, but placing it is turned off/,
     );
   });
 

@@ -20,8 +20,8 @@ export interface EsignSettings {
     savedAt: string | null;
     testedAt: string | null;
     testOk: boolean | null;
-    /** A v4 workflow is saved, so the Aadhaar seal position is sent to Leegality. */
-    sealPosition: boolean;
+    /** A V4 workflow is saved; the Aadhaar seal position then goes through the v4 API. */
+    v4Workflow: boolean;
   };
   /** Changes whenever the mode or the credentials change. */
   version: number;
@@ -59,7 +59,7 @@ const DEFAULTS: EsignSettings = {
     savedAt: null,
     testedAt: null,
     testOk: null,
-    sealPosition: false,
+    v4Workflow: false,
   },
   version: 0,
 };
@@ -79,7 +79,7 @@ const toSettings = (row: Row): EsignSettings => ({
     savedAt: row.own_saved_at?.toISOString() ?? null,
     testedAt: row.own_tested_at?.toISOString() ?? null,
     testOk: row.own_test_ok,
-    sealPosition: hasCredentials(row) && row.own_v4_workflow !== null,
+    v4Workflow: hasCredentials(row) && row.own_v4_workflow !== null,
   },
   version: row.version,
 });

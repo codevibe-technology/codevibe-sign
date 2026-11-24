@@ -11,6 +11,7 @@ import { billingConfig, creditsOffer, type BillingConfig } from '../billing/conf
 import { creditBalance, type CreditBalance } from '../billing/credits';
 import { planSettings, workspaceEntitlements } from '../plans';
 import { esignState } from './runtime';
+import { ownPositionApi, type PositionApi } from './leegality-v4';
 import { getEsignSettings, type EsignSettings } from './settings';
 import { listEsignUsage, type EsignUsageLine } from './usage';
 
@@ -23,8 +24,10 @@ export interface EsignOverview {
   blocked: { reason: string; message: string } | null;
   /** The install's own provider account is set up. */
   platformConfigured: boolean;
-  /** The install's account has a v4 workflow, so it places the Aadhaar seal position. */
-  platformSealPosition: boolean;
+  /** Which Leegality API places the Aadhaar seal position on the install's account. */
+  platformPositionApi: PositionApi;
+  /** The same for the workspace's own account, from what it saved. */
+  ownPositionApi: PositionApi;
   /** How the install turns a seal position into Leegality coordinates, e.g. "points, bottom-left". */
   coordinates: string;
   /** eSigns on the install's account use prepaid credits. */
@@ -79,7 +82,8 @@ export async function esignOverview(
     settings: saved,
     blocked: state.blocked,
     platformConfigured: Boolean(config?.leegality),
-    platformSealPosition: Boolean(config?.leegality?.v4),
+    platformPositionApi: config?.leegality?.positionApi ?? 'v2.1',
+    ownPositionApi: ownPositionApi(saved.own.v4Workflow),
     coordinates: describeLeegalityCoordinates(
       config?.leegality?.coordinates ?? LEEGALITY_DEFAULT_COORDINATES,
     ),
@@ -107,9 +111,9 @@ export interface EsignSendInfo {
   credits: number;
   pricePaise: Paise | null;
   /**
-   * The account the workspace signs with places the Aadhaar seal position (it has a v4
-   * workflow). Without it the box is still kept, and Leegality places the signature as its
-   * workflow says.
+   * The account the workspace signs with places the Aadhaar seal position (its position API
+   * is not `off`). Otherwise the box is still kept, and Leegality places the signature where
+   * its workflow says.
    */
   sealPosition: boolean;
 }
@@ -132,6 +136,9 @@ export async function esignSendInfo(sql: Sql, workspaceId: string): Promise<Esig
     creditsRequired: billed,
     credits: credits.available,
     pricePaise: billed && config ? creditsOffer(config, entitlements.plan).pricePaise : null,
-    sealPosition: state.mode === 'own' ? saved.own.sealPosition : Boolean(config?.leegality?.v4),
+    sealPosition:
+      (state.mode === 'own'
+        ? ownPositionApi(saved.own.v4Workflow)
+        : (config?.leegality?.positionApi ?? 'v2.1')) !== 'off',
   };
 }

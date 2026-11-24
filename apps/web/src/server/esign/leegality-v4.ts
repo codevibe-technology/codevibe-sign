@@ -100,3 +100,37 @@ export function leegalityV4FromEnv(source: Source = process.env): LeegalityV4Wor
     throw new Error(`LEEGALITY_V4_WORKFLOW_ID ${problem(error)}`, { cause: error });
   }
 }
+
+export type PositionApi = 'v2.1' | 'v4' | 'off';
+const POSITION_APIS: readonly PositionApi[] = ['v2.1', 'v4', 'off'];
+
+/**
+ * `LEEGALITY_POSITION_API`: which Leegality API places the Aadhaar seal position. `v2.1`, the
+ * 2.1 Create API with the account's Auth Token, needs no Leegality setup; `v4` needs a V4
+ * workflow; `off` leaves the signature where the v3.0 workflow says. Unset: `v4` when the
+ * account has a V4 workflow, otherwise `v2.1`. Throws on another value, or `v4` without one.
+ */
+export function leegalityPositionApi(
+  hasV4Workflow: boolean,
+  source: Source = process.env,
+): PositionApi {
+  const raw = read(source, 'LEEGALITY_POSITION_API')?.toLowerCase();
+  if (raw === undefined) return hasV4Workflow ? 'v4' : 'v2.1';
+  if (!POSITION_APIS.includes(raw as PositionApi)) {
+    throw new Error('LEEGALITY_POSITION_API must be v2.1, v4 or off');
+  }
+  if (raw === 'v4' && !hasV4Workflow) {
+    throw new Error('LEEGALITY_POSITION_API is v4 but no V4 workflow is set');
+  }
+  return raw as PositionApi;
+}
+
+/**
+ * The position API of a workspace's own Leegality account: v4 when it saved a V4 workflow,
+ * otherwise v2.1, unless the install turned placing off. A malformed install setting is
+ * reported by the install's billing check, and v2.1 used here.
+ */
+export function ownPositionApi(hasV4Workflow: boolean, source: Source = process.env): PositionApi {
+  if (read(source, 'LEEGALITY_POSITION_API')?.toLowerCase() === 'off') return 'off';
+  return hasV4Workflow ? 'v4' : 'v2.1';
+}

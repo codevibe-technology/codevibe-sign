@@ -178,7 +178,7 @@ export const saveEsignCredentialsAction = accountAction(
     await audit(ctx, 'esign.credentials_saved', {
       environment,
       checked: ok,
-      sealPosition: Boolean(v4),
+      v4Workflow: Boolean(v4),
     });
     refresh(ctx.workspace.slug);
     return getEsignSettings(sql, ctx.accountId);

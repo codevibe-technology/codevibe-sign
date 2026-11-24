@@ -14,7 +14,12 @@ import {
 } from '@codevibe_technology/sign-aadhaar';
 import { parseInr, type Paise } from '@/lib/billing/money';
 import type { Plan } from '@/lib/plans';
-import { leegalityCoordinates, leegalityV4FromEnv } from '../esign/leegality-v4';
+import {
+  leegalityCoordinates,
+  leegalityPositionApi,
+  leegalityV4FromEnv,
+  type PositionApi,
+} from '../esign/leegality-v4';
 
 export interface RazorpayConfig {
   keyId: string;
@@ -64,10 +69,12 @@ export interface LeegalityConfig {
   /** From the base URL: only `sandbox.` hosts are the sandbox. */
   environment: 'sandbox' | 'production';
   webhookHeader: { name: string; value: string } | null;
-  /** `LEEGALITY_V4_WORKFLOW_ID` / `LEEGALITY_V4_PAYLOAD_FILE`: places the Aadhaar seal position. */
+  /** `LEEGALITY_V4_WORKFLOW_ID` / `LEEGALITY_V4_PAYLOAD_FILE`, for the v4 position API. */
   v4: LeegalityV4Workflow | null;
   /** `LEEGALITY_COORDINATE_UNITS` and `LEEGALITY_COORDINATE_ORIGIN`. */
   coordinates: LeegalityCoordinateMapping;
+  /** `LEEGALITY_POSITION_API`: which API places the Aadhaar seal position. */
+  positionApi: PositionApi;
 }
 
 export interface HostingOffer {
@@ -270,19 +277,20 @@ function leegalityBaseUrl(source: Source): string {
 
 /**
  * The Aadhaar seal position settings. A malformed one is a problem for the operator, not a
- * reason to stop eSign or billing: the signature then goes where the v3.0 workflow says.
+ * reason to stop eSign or billing: the default is used in its place.
  */
 function sealPosition(
   source: Source,
   problems: string[],
-): Pick<LeegalityConfig, 'v4' | 'coordinates'> {
+): Pick<LeegalityConfig, 'v4' | 'coordinates' | 'positionApi'> {
   let v4: LeegalityV4Workflow | null = null;
+  let positionApi: PositionApi;
   let coordinates: LeegalityCoordinateMapping = LEEGALITY_DEFAULT_COORDINATES;
   try {
     v4 = leegalityV4FromEnv(source);
   } catch (error) {
     problems.push(
-      `${error instanceof Error ? error.message : String(error)}. The Aadhaar seal position is not sent.`,
+      `${error instanceof Error ? error.message : String(error)}. The V4 workflow is not used.`,
     );
   }
   try {
@@ -292,7 +300,15 @@ function sealPosition(
       `${error instanceof Error ? error.message : String(error)}. The default is used.`,
     );
   }
-  return { v4, coordinates };
+  try {
+    positionApi = leegalityPositionApi(v4 !== null, source);
+  } catch (error) {
+    positionApi = v4 ? 'v4' : 'v2.1';
+    problems.push(
+      `${error instanceof Error ? error.message : String(error)}. ${positionApi} is used.`,
+    );
+  }
+  return { v4, coordinates, positionApi };
 }
 
 function leegality(source: Source, problems: string[]): LeegalityConfig | null {

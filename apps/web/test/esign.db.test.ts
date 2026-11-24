@@ -69,6 +69,8 @@ interface ProviderDocument {
   token: string;
   /** Set for a pack sent through the v4 API, with the body it was sent with. */
   pack?: { packId: string; body: V4Body };
+  /** The body of a request made with the 2.1 Create API. */
+  v21?: Record<string, unknown>;
 }
 
 interface V4Body {
@@ -93,6 +95,28 @@ function fakeLeegality(espP12: Uint8Array) {
     const target = new URL(input);
     const token = new Headers(init?.headers).get('x-auth-token') ?? '';
     if (refuse !== null && token === refuse) return new Response('no', { status: 401 });
+    if (target.pathname.endsWith('/v2.1/sign/request') && init?.method === 'POST') {
+      calls.create += 1;
+      const body = JSON.parse(String(init.body)) as {
+        file: { file: string };
+        invitees: { name: string; email?: string }[];
+      };
+      const id = `doc21_${randomUUID().slice(0, 8)}`;
+      const signUrl = `https://sandbox.leegality.com/sign/${id}`;
+      documents.set(id, {
+        id,
+        signUrl,
+        uploaded: new Uint8Array(Buffer.from(body.file.file, 'base64')),
+        state: 'open',
+        token,
+        v21: body,
+      });
+      const { name, email } = body.invitees[0]!;
+      return json({
+        status: 1,
+        data: { documentId: id, invitations: [{ name, email, signUrl, active: true }] },
+      });
+    }
     if (target.pathname.endsWith('/v3.0/sign/request') && init?.method === 'POST') {
       calls.create += 1;
       const body = JSON.parse(String(init.body)) as {
@@ -714,13 +738,52 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
       expect(await creditBalance(sql, ws.accountId)).toEqual({ available: 0, reserved: 0 });
     });
 
-    it('keeps the box but uses the v3.0 workflow when no V4 workflow is set', async () => {
+    it('goes through the 2.1 API with no V4 workflow, and is signed like any other', async () => {
+      const ws = await workspace('free', 1);
+      const { res, email } = await send(ws, { sealPosition: true });
+      const envelope = (await res.json()) as Envelope;
+      expect(envelope.fields.map((f) => f.type)).toEqual(['aadhaar']);
+      expect((await esignSendInfo(sql, ws.id)).sealPosition).toBe(true);
+      expect((await start(tokenFor(email))).status).toBe(200);
+      const document = provider.last();
+      expect(document.pack).toBeUndefined();
+      expect(document.token).toBe('platform-token');
+      expect(document.v21).toMatchObject({
+        irn: expect.any(String),
+        invitees: [
+          {
+            name: 'Ravi Kumar',
+            appearances: [{ page: '1', x1: 300, y1: 78, x2: 500, y2: 142 }],
+            signatures: [{ type: 'AADHAAR', config: { authTypes: ['OTP'] } }],
+            webhook: {
+              success: `${APP_URL}/api/v1/esign/webhooks/leegality`,
+              failure: `${APP_URL}/api/v1/esign/webhooks/leegality`,
+              version: 2.5,
+            },
+            redirectUrl: `${APP_URL}/sign?esign=return`,
+          },
+        ],
+      });
+      expect(document.v21).not.toHaveProperty('profileId');
+      expect((await PDFDocument.load(document.uploaded)).getPageCount()).toBe(1);
+
+      expect((await hook(provider.webhook(document, 'Signed'))).status).toBe(200);
+      await sign.tick();
+      const done = await envelopeOf(ws, envelope.id);
+      expect(done.status).toBe('completed');
+      const sealed = await files.get(sealedFileKey(envelope.id, done.documents[0]!.id));
+      expect(await verifySignatures(sealed!)).toHaveLength(2);
+    });
+
+    it('keeps the box but uses the v3.0 workflow when placing is off', async () => {
+      sign = makeServer({ ...ENV, LEEGALITY_POSITION_API: 'off' });
+      vi.stubEnv('LEEGALITY_POSITION_API', 'off');
       const ws = await workspace('free', 1);
       const { res, email } = await send(ws, { sealPosition: true });
       expect(((await res.json()) as Envelope).fields.map((f) => f.type)).toEqual(['aadhaar']);
       expect((await start(tokenFor(email))).status).toBe(200);
+      expect(provider.last().v21).toBeUndefined();
       expect(provider.last().pack).toBeUndefined();
-      expect((await esignSendInfo(sql, ws.id)).sealPosition).toBe(false);
     });
 
     it('refuses a second box with a clear message', async () => {
@@ -1279,7 +1342,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         ...form,
         v4Workflow: payload,
       });
-      expect(saved).toMatchObject({ ok: true, data: { own: { sealPosition: true } } });
+      expect(saved).toMatchObject({ ok: true, data: { own: { v4Workflow: true } } });
       expect((await ownCredentials(sql, ws.accountId))?.v4).toEqual({
         workflowId: '70843c25-8d80-40ac-ab6b-edba12abd495',
         inviteeUuid: '8bc21487-b200-4130-8240-a5f1715244dc',
@@ -1289,7 +1352,7 @@ describe.skipIf(!url)('aadhaar esign against PostgreSQL', () => {
         where account_id = ${ws.accountId}`;
       expect(JSON.stringify(row)).not.toContain('secret-pass');
       const again = await saveEsignCredentialsAction({ workspaceId: ws.id, ...form });
-      expect(again).toMatchObject({ ok: true, data: { own: { sealPosition: false } } });
+      expect(again).toMatchObject({ ok: true, data: { own: { v4Workflow: false } } });
     });
 
     it('keeps your own account for Cloud, with what an upgrade prompt needs', async () => {

@@ -34,14 +34,15 @@ const esign = (overrides: Partial<EsignOverview> = {}): EsignOverview => ({
       savedAt: null,
       testedAt: null,
       testOk: null,
-      sealPosition: false,
+      v4Workflow: false,
     },
     version: 0,
   },
   blocked: null,
   owed: 0,
   platformConfigured: true,
-  platformSealPosition: false,
+  platformPositionApi: 'v2.1',
+  ownPositionApi: 'v2.1',
   coordinates: 'points, bottom-left',
   creditsRequired: true,
   billingVisible: true,
@@ -65,7 +66,7 @@ const connected = {
     savedAt: '2026-11-23T10:00:00.000Z',
     testedAt: null,
     testOk: null,
-    sealPosition: false,
+    v4Workflow: false,
   },
   version: 3,
 };
@@ -212,7 +213,7 @@ describe('EsignSettingsPanel', () => {
     expect((await screen.findByRole('alert')).textContent).toMatch(/did not accept/);
   });
 
-  it('takes an optional V4 workflow and says whether the seal position is on', async () => {
+  it('says which API places the seal position and takes an optional V4 workflow', async () => {
     const user = userEvent.setup();
     actions.saveEsignCredentialsAction.mockResolvedValue({ ok: true, data: connected });
     const { rerender } = render(
@@ -222,11 +223,11 @@ describe('EsignSettingsPanel', () => {
         overview={esign({ ownAllowed: true, settings: connected })}
       />,
     );
-    expect(screen.getByTestId('esign-own-seal-position').textContent).toMatch(
-      /Aadhaar seal position: off/,
+    expect(screen.getByTestId('esign-own-seal-position').textContent).toBe(
+      "Aadhaar seal position: on, through Leegality's 2.1 API with your Auth Token (coordinates: points, bottom-left).",
     );
     expect(screen.getByTestId('esign-v4-steps').textContent).toMatch(
-      /Download API Payload.*coordinates: points, bottom-left/,
+      /Nothing to set up.*2\.1 API.*coordinates: points, bottom-left.*Download API Payload/,
     );
     await user.click(screen.getByRole('button', { name: 'Replace details' }));
     await user.type(screen.getByLabelText('Auth Token'), 'secret-token-1');
@@ -245,12 +246,13 @@ describe('EsignSettingsPanel', () => {
         slug="acme"
         overview={esign({
           ownAllowed: true,
-          settings: { ...connected, own: { ...connected.own, sealPosition: true } },
+          settings: { ...connected, own: { ...connected.own, v4Workflow: true } },
+          ownPositionApi: 'v4',
         })}
       />,
     );
     expect(screen.getByTestId('esign-own-seal-position').textContent).toMatch(
-      /Aadhaar seal position: on/,
+      /Aadhaar seal position: on, through your V4 workflow/,
     );
   });
 
