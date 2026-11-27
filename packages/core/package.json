@@ -57,7 +57,7 @@
     "postpack": "node ../../scripts/readme-utm.mjs restore"
   },
   "devDependencies": {
-    "@types/node": "22.19.1",
-    "fast-check": "4.10.1"
+    "@types/node": "26.6.6",
+    "fast-check": "4.10.2"
   }
 }
